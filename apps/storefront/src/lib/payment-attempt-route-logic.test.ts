@@ -177,6 +177,54 @@ test("finalizeCheckoutIntentRouteLogic rejects cart mismatch", async () => {
   assert.deepEqual(result.body, { error: "Cart mismatch" });
 });
 
+test("finalizeCheckoutIntentRouteLogic rejects missing payment attempts", async () => {
+  const events: Array<Record<string, unknown>> = [];
+
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_missing",
+    cartId: "cart_1",
+    row: null,
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => okResult(),
+    logEvent: (payload) => {
+      events.push(payload as Record<string, unknown>);
+    },
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, {
+    error: "This checkout session could not be found. Start checkout again before completing payment.",
+  });
+  assert.equal(events[0]?.errorCode, "missing_attempt");
+});
+
+test("finalizeCheckoutIntentRouteLogic rejects COD attempts on hosted finalize route", async () => {
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_cod",
+    cartId: "cart_cod",
+    row: {
+      cart_id: "cart_cod",
+      correlation_id: "corr_cod",
+      provider: "cod",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => okResult(),
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 400);
+  assert.deepEqual(result.body, {
+    error: "This payment session belongs to cash on delivery. Use the COD completion flow instead.",
+  });
+});
+
 test("finalizeCheckoutIntentRouteLogic expires stale quote mismatches", async () => {
   const patches: Array<Record<string, unknown>> = [];
 
@@ -251,6 +299,58 @@ test("codPlaceOrderRouteLogic rejects non-COD attempt rows", async () => {
 
   assert.equal(result.status, 400);
   assert.deepEqual(result.body, { error: "Not a COD attempt" });
+});
+
+test("codPlaceOrderRouteLogic rejects missing payment attempts", async () => {
+  const result = await codPlaceOrderRouteLogic({
+    correlationId: "corr_missing",
+    cartId: "cart_cod",
+    row: null,
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => okResult(),
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 404);
+  assert.deepEqual(result.body, {
+    error: "This checkout session could not be found. Start checkout again before completing payment.",
+  });
+});
+
+test("codPlaceOrderRouteLogic marks attempts for review when finalize throws", async () => {
+  const patches: Array<Record<string, unknown>> = [];
+  const events: Array<Record<string, unknown>> = [];
+
+  const result = await codPlaceOrderRouteLogic({
+    correlationId: "corr_cod",
+    cartId: "cart_cod",
+    row: {
+      cart_id: "cart_cod",
+      correlation_id: "corr_cod",
+      provider: "cod",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async (_id, patch) => {
+      patches.push(patch);
+    },
+    finalizeMedusaCart: async () => {
+      throw new Error("Complete failed");
+    },
+    logEvent: (payload) => {
+      events.push(payload as Record<string, unknown>);
+    },
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 500);
+  assert.deepEqual(result.body, { error: "Complete failed" });
+  assert.equal(patches[0]?.status, "needs_review");
+  assert.equal(events[0]?.errorCode, "exception");
 });
 
 test("codPlaceOrderRouteLogic completes order exactly once per correlation", async () => {
@@ -387,6 +487,20 @@ test("internalReconcilePaymentAttemptRouteLogic completes a known hosted payment
   assert.equal(result.status, 200);
   assert.equal(result.body.orderId, "order_reconciled");
   assert.equal(patches[0]?.status, "completed");
+});
+
+test("finalizePaymentAttemptsCronRouteLogic rejects wrong secret", async () => {
+  const result = await finalizePaymentAttemptsCronRouteLogic({
+    configuredSecret: "expected",
+    providedSecret: "wrong",
+    supabaseAvailable: true,
+    stuckRows: [],
+    finalizeMedusaCart: async () => okResult(),
+    updatePaymentAttempt: async () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.body, { error: "Unauthorized" });
 });
 
 test("finalizePaymentAttemptsCronRouteLogic updates completed and errored rows", async () => {

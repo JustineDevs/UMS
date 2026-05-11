@@ -1,7 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { posCommitSaleRouteLogic } from "./pos-commit-sale-route-logic";
+import {
+  posCommitSaleRouteLogic,
+  type PosCommitSaleRouteResult,
+} from "./pos-commit-sale-route-logic";
+
+function expectOk(result: PosCommitSaleRouteResult): Extract<PosCommitSaleRouteResult, { logPhase: "ok" }> {
+  assert.equal(result.logPhase, "ok");
+  return result;
+}
+
+function expectError(
+  result: PosCommitSaleRouteResult,
+): Extract<PosCommitSaleRouteResult, { logPhase: "error" }> {
+  assert.equal(result.logPhase, "error");
+  return result;
+}
 
 test("posCommitSaleRouteLogic replays completed idempotent sales", async () => {
   const result = await posCommitSaleRouteLogic({
@@ -20,9 +35,10 @@ test("posCommitSaleRouteLogic replays completed idempotent sales", async () => {
     rememberCompletedReplay: () => {},
   });
 
-  assert.equal(result.status, 200);
-  assert.equal(result.body.orderNumber, "1001");
-  assert.equal(result.body.idempotent, true);
+  const ok = expectOk(result);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.orderNumber, "1001");
+  assert.equal(ok.body.idempotent, true);
 });
 
 test("posCommitSaleRouteLogic rejects missing items", async () => {
@@ -41,8 +57,9 @@ test("posCommitSaleRouteLogic rejects missing items", async () => {
     rememberCompletedReplay: () => {},
   });
 
-  assert.equal(result.status, 400);
-  assert.equal(result.body.code, "BAD_REQUEST");
+  const error = expectError(result);
+  assert.equal(error.status, 400);
+  assert.equal(error.body.code, "BAD_REQUEST");
 });
 
 test("posCommitSaleRouteLogic enforces stock and policy denials", async () => {
@@ -64,7 +81,7 @@ test("posCommitSaleRouteLogic enforces stock and policy denials", async () => {
     patchOrderMetadata: async () => {},
     rememberCompletedReplay: () => {},
   });
-  assert.equal(stockDenied.status, 409);
+  assert.equal(expectError(stockDenied).status, 409);
 
   const policyDenied = await posCommitSaleRouteLogic({
     body: { items: [{ variantId: "variant_1", quantity: 2 }], shiftId: "shift_1" },
@@ -80,8 +97,9 @@ test("posCommitSaleRouteLogic enforces stock and policy denials", async () => {
     patchOrderMetadata: async () => {},
     rememberCompletedReplay: () => {},
   });
-  assert.equal(policyDenied.status, 403);
-  assert.equal(policyDenied.body.code, "POS_POLICY_DENIED");
+  const denied = expectError(policyDenied);
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, "POS_POLICY_DENIED");
 });
 
 test("posCommitSaleRouteLogic returns existing order for offline replay", async () => {
@@ -106,9 +124,10 @@ test("posCommitSaleRouteLogic returns existing order for offline replay", async 
     rememberCompletedReplay: () => {},
   });
 
-  assert.equal(result.status, 200);
-  assert.equal(result.body.idempotent, true);
-  assert.equal(result.body.orderNumber, "1001");
+  const ok = expectOk(result);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.idempotent, true);
+  assert.equal(ok.body.orderNumber, "1001");
 });
 
 test("posCommitSaleRouteLogic creates order, patches metadata, and remembers idempotency", async () => {
@@ -140,9 +159,10 @@ test("posCommitSaleRouteLogic creates order, patches metadata, and remembers ide
     },
   });
 
-  assert.equal(result.status, 200);
-  assert.equal(result.body.orderNumber, "1001");
-  assert.equal(result.body.orderId, "order_1");
+  const ok = expectOk(result);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.orderNumber, "1001");
+  assert.equal(ok.body.orderId, "order_1");
   assert.deepEqual(patched[0], {
     pos_offline_id: "offline_1",
     pos_shift_id: "shift_1",
@@ -166,6 +186,32 @@ test("posCommitSaleRouteLogic fails when Medusa draft-order creation returns no 
     rememberCompletedReplay: () => {},
   });
 
-  assert.equal(result.status, 502);
-  assert.equal(result.body.code, "MEDUSA_UNAVAILABLE");
+  const error = expectError(result);
+  assert.equal(error.status, 502);
+  assert.equal(error.body.code, "MEDUSA_UNAVAILABLE");
+});
+
+test("posCommitSaleRouteLogic fails when converted order has no usable identifiers", async () => {
+  const result = await posCommitSaleRouteLogic({
+    body: { items: [{ variantId: "variant_1", quantity: 1 }] },
+    correlationId: "req_1",
+    envReady: true,
+    completedReplayOrderNumber: null,
+    findExistingOrderByOfflineSaleId: async () => null,
+    assertStock: async () => ({ ok: true }),
+    loadShiftStatus: async () => "open",
+    evaluatePolicy: () => ({ allowed: true, violations: [] }),
+    createDraftOrder: async () => ({ id: "draft_1" }),
+    convertDraftToOrder: async () => ({}),
+    patchOrderMetadata: async () => {},
+    rememberCompletedReplay: () => {},
+  });
+
+  const error = expectError(result);
+  assert.equal(error.status, 502);
+  assert.equal(error.body.code, "MEDUSA_UNAVAILABLE");
+  assert.equal(
+    error.body.error,
+    "Converted draft order missing identifiers from the store API",
+  );
 });

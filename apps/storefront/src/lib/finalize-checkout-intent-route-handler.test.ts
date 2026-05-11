@@ -105,3 +105,34 @@ test("handleFinalizeCheckoutIntentRequest rejects cart mismatch through live han
   assert.equal(res.status, 403);
   assert.deepEqual(await res.json(), { error: "Cart mismatch" });
 });
+
+test("handleFinalizeCheckoutIntentRequest rejects missing cart before finalization", async () => {
+  const events: Array<Record<string, unknown>> = [];
+
+  const res = await handleFinalizeCheckoutIntentRequest(
+    new Request("http://localhost/api/finalize", { method: "POST" }),
+    "corr_1",
+    {
+      applyRateLimit: async () => ({ ok: true }),
+      readCartIdFromCookie: async () => null,
+      getPaymentAttemptRow: async () => null,
+      readCurrentQuoteFingerprint: async () => null,
+      incrementFinalizeAttempts: async () => {},
+      updatePaymentAttempt: async () => {},
+      finalizeMedusaCart: async () => ({
+        ok: true,
+        orderId: "order_1",
+        redirectUrl: "/track/order_1",
+        attempts: 1,
+      }),
+      logEvent: (payload) => {
+        events.push(payload as Record<string, unknown>);
+      },
+      nowIso: () => "2026-04-06T00:00:00.000Z",
+    },
+  );
+
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { error: "No active cart" });
+  assert.equal(events[0]?.errorCode, "no_cart");
+});

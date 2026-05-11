@@ -1,6 +1,10 @@
 import { isPhilippinesMobilePhone } from "@apparel-commerce/validation";
 import type { ServerCustomerProfile } from "@/lib/server-customer-profile";
 
+function requiresBarangay(country: string | undefined): boolean {
+  return (country?.trim().toUpperCase() || "PH") === "PH";
+}
+
 export function isStorefrontProfileComplete(
   profile: ServerCustomerProfile | null,
 ): boolean {
@@ -15,6 +19,7 @@ export function isStorefrontProfileComplete(
   if (
     !addr.fullName?.trim() ||
     !addr.line1?.trim() ||
+    (requiresBarangay(addr.country) && !(addr.barangay?.trim() ?? "")) ||
     !addr.city?.trim() ||
     !addr.province?.trim()
   ) {
@@ -41,6 +46,7 @@ export function listMissingProfileParts(
     if (
       !addr.fullName?.trim() ||
       !addr.line1?.trim() ||
+      (requiresBarangay(addr.country) && !(addr.barangay?.trim() ?? "")) ||
       !addr.city?.trim() ||
       !addr.province?.trim()
     ) {

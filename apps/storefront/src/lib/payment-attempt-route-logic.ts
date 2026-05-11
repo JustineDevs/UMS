@@ -89,6 +89,10 @@ const STALE_CHECKOUT_ERROR =
   "Your order changed before payment could be completed. Review the updated total before continuing.";
 const LEGACY_CHECKOUT_ERROR =
   "This checkout session is outdated and needs a fresh review before payment can continue.";
+const MISSING_CHECKOUT_ATTEMPT_ERROR =
+  "This checkout session could not be found. Start checkout again before completing payment.";
+const WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR =
+  "This payment session belongs to cash on delivery. Use the COD completion flow instead.";
 
 async function expireAttemptForQuoteMismatch(input: {
   correlationId: string;
@@ -239,8 +243,23 @@ export async function finalizeCheckoutIntentRouteLogic(
     return { status: 400, body: { error: "No active cart" } };
   }
 
-  if (input.row && input.row.cart_id !== input.cartId) {
+  if (!input.row) {
+    input.logEvent({
+      stage: "complete_medusa_cart",
+      outcome: "failure",
+      httpStatus: 404,
+      errorCode: "missing_attempt",
+      message: MISSING_CHECKOUT_ATTEMPT_ERROR,
+    });
+    return { status: 404, body: { error: MISSING_CHECKOUT_ATTEMPT_ERROR } };
+  }
+
+  if (input.row.cart_id !== input.cartId) {
     return { status: 403, body: { error: "Cart mismatch" } };
+  }
+
+  if (input.row.provider === "cod") {
+    return { status: 400, body: { error: WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR } };
   }
 
   const staleMismatchMessage = await expireAttemptForQuoteMismatch({
@@ -254,15 +273,13 @@ export async function finalizeCheckoutIntentRouteLogic(
     return { status: 409, body: { error: staleMismatchMessage } };
   }
 
-  if (input.row) {
-    try {
-      await input.incrementFinalizeAttempts(input.correlationId);
-    } catch {
-      await input.updatePaymentAttempt(input.correlationId, {
-        status: "finalizing_order",
-        checkout_state: "finalizing_order",
-      });
-    }
+  try {
+    await input.incrementFinalizeAttempts(input.correlationId);
+  } catch {
+    await input.updatePaymentAttempt(input.correlationId, {
+      status: "finalizing_order",
+      checkout_state: "finalizing_order",
+    });
   }
 
   try {
@@ -346,11 +363,15 @@ export async function codPlaceOrderRouteLogic(
     return { status: 400, body: { error: "correlationId is required" } };
   }
 
-  if (input.row && input.row.cart_id !== input.cartId) {
+  if (!input.row) {
+    return { status: 404, body: { error: MISSING_CHECKOUT_ATTEMPT_ERROR } };
+  }
+
+  if (input.row.cart_id !== input.cartId) {
     return { status: 403, body: { error: "Cart mismatch" } };
   }
 
-  if (input.row && input.row.provider !== "cod") {
+  if (input.row.provider !== "cod") {
     return { status: 400, body: { error: "Not a COD attempt" } };
   }
 
@@ -365,65 +386,81 @@ export async function codPlaceOrderRouteLogic(
     return { status: 409, body: { error: staleMismatchMessage } };
   }
 
-  if (input.row) {
-    try {
-      await input.incrementFinalizeAttempts(input.correlationId);
-    } catch {
-      await input.updatePaymentAttempt(input.correlationId, {
-        status: "finalizing_order",
-        checkout_state: "finalizing_order",
-      });
-    }
+  try {
+    await input.incrementFinalizeAttempts(input.correlationId);
+  } catch {
+    await input.updatePaymentAttempt(input.correlationId, {
+      status: "finalizing_order",
+      checkout_state: "finalizing_order",
+    });
   }
 
-  const result = await input.finalizeMedusaCart(input.cartId);
-  if (!result.ok) {
+  try {
+    const result = await input.finalizeMedusaCart(input.cartId);
+    if (!result.ok) {
+      await input.updatePaymentAttempt(input.correlationId, {
+        status: "paid_awaiting_order",
+        checkout_state: "awaiting_completion",
+        last_error: result.error.slice(0, 2000),
+      });
+      input.logEvent({
+        stage: "cod_place_order",
+        outcome: "failure",
+        httpStatus: result.status,
+        errorCode: "order_not_ready",
+        message: result.error.slice(0, 500),
+      });
+      return { status: result.status, body: { error: result.error } };
+    }
+
     await input.updatePaymentAttempt(input.correlationId, {
-      status: "paid_awaiting_order",
-      checkout_state: "awaiting_completion",
-      last_error: result.error.slice(0, 2000),
+      status: "completed",
+      checkout_state: "completed",
+      medusa_order_id: result.orderId,
+      order_id: result.orderId,
+      last_error: null,
+      finalized_at: input.nowIso(),
+    });
+
+    input.logEvent({
+      stage: "cod_place_order",
+      outcome: "success",
+      httpStatus: 200,
+      orderId: result.orderId,
+    });
+
+    logCommerceObservabilityServer("payment_session_completed", {
+      correlationId: input.correlationId,
+      cartId: input.cartId,
+      orderId: result.orderId,
+      stage: "cod_place_order",
+    });
+
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        orderId: result.orderId,
+        redirectUrl: result.redirectUrl,
+      },
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Complete failed";
+    await input.updatePaymentAttempt(input.correlationId, {
+      last_error: message.slice(0, 2000),
+      status: "needs_review",
+      checkout_state: "needs_review",
     });
     input.logEvent({
       stage: "cod_place_order",
       outcome: "failure",
-      httpStatus: result.status,
-      errorCode: "order_not_ready",
-      message: result.error.slice(0, 500),
+      httpStatus: 500,
+      errorCode: "exception",
+      message: message.slice(0, 500),
     });
-    return { status: result.status, body: { error: result.error } };
+    return { status: 500, body: { error: message } };
   }
-
-  await input.updatePaymentAttempt(input.correlationId, {
-    status: "completed",
-    checkout_state: "completed",
-    medusa_order_id: result.orderId,
-    order_id: result.orderId,
-    last_error: null,
-    finalized_at: input.nowIso(),
-  });
-
-  input.logEvent({
-    stage: "cod_place_order",
-    outcome: "success",
-    httpStatus: 200,
-    orderId: result.orderId,
-  });
-
-  logCommerceObservabilityServer("payment_session_completed", {
-    correlationId: input.correlationId,
-    cartId: input.cartId,
-    orderId: result.orderId,
-    stage: "cod_place_order",
-  });
-
-  return {
-    status: 200,
-    body: {
-      ok: true,
-      orderId: result.orderId,
-      redirectUrl: result.redirectUrl,
-    },
-  };
 }
 
 export async function internalReconcilePaymentAttemptRouteLogic(

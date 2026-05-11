@@ -28,6 +28,8 @@ export type MayaInvoiceStatus = {
   status: string;
   amountMinor?: number;
   paymentStatus?: string;
+  /** P3 transaction reference for void/refund APIs when returned by Maya. */
+  transactionReferenceNo?: string;
 };
 
 function getApiBase(sandbox: boolean): string {
@@ -59,9 +61,9 @@ export async function createMayaInvoice(
         currency: input.currency ?? "PHP",
       },
       redirectUrl: {
-        success: `${input.storefrontUrl}/checkout?maya=success`,
-        failure: `${input.storefrontUrl}/checkout?maya=failure`,
-        cancel: `${input.storefrontUrl}/checkout?maya=cancel`,
+        success: `${input.storefrontUrl}/checkout/hosted-return?provider=maya&status=success`,
+        failure: `${input.storefrontUrl}/checkout/hosted-return?provider=maya&status=failure`,
+        cancel: `${input.storefrontUrl}/checkout/hosted-return?provider=maya&status=cancel`,
       },
       requestReferenceNumber: `medusa_ps:${input.sessionId}`,
       metadata: {},
@@ -106,10 +108,21 @@ export async function getMayaInvoice(
     throw new Error(`Maya retrieve invoice failed: ${res.status} ${text}`);
   }
 
+  /** @see https://developers.maya.ph/docs/invoice-api-integration (Get invoice response) */
   const json = JSON.parse(text) as {
     status?: string;
     totalAmount?: { value?: string };
-    payments?: Array<{ status?: string }>;
+    payments?: Array<
+      | string
+      | {
+          checkoutId?: string;
+          id?: string;
+          paymentId?: string;
+          transactionReferenceNo?: string;
+          status?: string;
+        }
+    >;
+    transactionReferenceNo?: string;
   };
 
   const amountStr = json.totalAmount?.value;
@@ -117,11 +130,127 @@ export async function getMayaInvoice(
     ? Math.round(parseFloat(String(amountStr)) * 100)
     : undefined;
 
+  const pays = json.payments ?? [];
+
+  let transactionReferenceNo: string | undefined =
+    typeof json.transactionReferenceNo === "string" && json.transactionReferenceNo.trim()
+      ? json.transactionReferenceNo.trim()
+      : undefined;
+
+  for (const p of pays) {
+    if (p && typeof p === "object") {
+      const po = p as Record<string, unknown>;
+      const st = String(po.status ?? "").toUpperCase();
+      if (st && st !== "SUCCESS") {
+        continue;
+      }
+      const checkoutId =
+        typeof po.checkoutId === "string" && po.checkoutId.trim()
+          ? po.checkoutId.trim()
+          : undefined;
+      if (checkoutId) {
+        transactionReferenceNo = checkoutId;
+        break;
+      }
+    }
+  }
+
+  if (!transactionReferenceNo) {
+    for (const p of pays) {
+      if (typeof p === "string" && p.trim()) {
+        transactionReferenceNo = p.trim();
+        break;
+      }
+      if (p && typeof p === "object") {
+        const po = p as Record<string, unknown>;
+        const cand =
+          (typeof po.transactionReferenceNo === "string" && po.transactionReferenceNo.trim()
+            ? po.transactionReferenceNo.trim()
+            : undefined) ??
+          (typeof po.id === "string" && po.id.trim() ? po.id.trim() : undefined) ??
+          (typeof po.paymentId === "string" && po.paymentId.trim() ? po.paymentId.trim() : undefined);
+        if (cand) {
+          transactionReferenceNo = cand;
+          break;
+        }
+      }
+    }
+  }
+
+  let firstPaymentStatus: string | undefined;
+  for (const p of pays) {
+    if (p && typeof p === "object" && "status" in p) {
+      const st = String((p as { status?: string }).status ?? "").toUpperCase();
+      if (st === "SUCCESS") {
+        firstPaymentStatus = (p as { status?: string }).status;
+        break;
+      }
+    }
+  }
+  if (firstPaymentStatus == null) {
+    for (const p of pays) {
+      if (p && typeof p === "object" && "status" in p) {
+        firstPaymentStatus = (p as { status?: string }).status;
+        break;
+      }
+    }
+  }
+
   return {
     status: (json.status ?? "").toUpperCase(),
     amountMinor,
-    paymentStatus: json.payments?.[0]?.status,
+    paymentStatus: firstPaymentStatus,
+    transactionReferenceNo,
   };
+}
+
+function randomRequestRef(): string {
+  const base = `medusa${Date.now()}${Math.random().toString(36).slice(2, 15)}`;
+  return base.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 36).padEnd(12, "x");
+}
+
+/**
+ * Maya P3 refund (captured / purchase). Requires the `transactionReferenceNo` from the original payment.
+ * @see https://developers.maya.ph/reference/refund
+ */
+export async function refundMayaP3Payment(
+  options: MayaClientOptions,
+  input: {
+    transactionReferenceNo: string;
+    amountValue: number;
+    currency: string;
+    reason: string;
+    merchantRefNo?: string;
+  },
+): Promise<void> {
+  const apiBase = getApiBase(options.sandbox);
+  const safeReason = input.reason.replace(/[^-a-zA-Z_0-9 .,]/g, "").slice(0, 512) || "Refund";
+  const refNo =
+    (input.merchantRefNo?.trim().slice(0, 36) || "medusa-refund").replace(
+      /[^-a-zA-Z_0-9]/g,
+      "",
+    ) || "medusa-refund";
+  const res = await fetch(`${apiBase}/p3/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: basicAuth(options.secretKey),
+      "Content-Type": "application/json",
+      "Request-Reference-No": randomRequestRef(),
+    },
+    body: JSON.stringify({
+      transactionReferenceNo: input.transactionReferenceNo,
+      merchant: { metadata: { refNo } },
+      amount: {
+        currency: input.currency.toUpperCase(),
+        value: input.amountValue,
+      },
+      reason: safeReason,
+    }),
+  });
+  const resText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Maya P3 refund failed: ${res.status} ${resText}`);
+  }
 }
 
 export async function createMayaVaultToken(

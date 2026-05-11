@@ -8,6 +8,29 @@ export type PaymongoClientOptions = {
   secretKey: string;
 };
 
+export type PaymongoCheckoutSessionInput = {
+  amountMinor: number;
+  currency: string;
+  description: string;
+  referenceNumber: string;
+  successUrl: string;
+  cancelUrl: string;
+  paymentMethodTypes?: string[];
+};
+
+export type PaymongoCheckoutSessionResult = {
+  checkoutSessionId: string;
+  checkoutUrl: string;
+};
+
+export type PaymongoCheckoutSessionStatus = {
+  status: string;
+  amountMinor?: number;
+  paymentId?: string;
+  paymentIntentId?: string;
+  paymentIntentStatus?: string;
+};
+
 export type PaymongoLinkInput = {
   amountMinor: number;
   currency: string;
@@ -22,6 +45,8 @@ export type PaymongoLinkResult = {
 export type PaymongoLinkStatus = {
   status: string;
   amountMinor?: number;
+  /** Present after PayMongo records a payment for this link. */
+  paymentId?: string;
 };
 
 export type PaymongoPaymentIntentInput = {
@@ -36,6 +61,109 @@ export type PaymongoPaymentIntentResult = {
   clientKey: string;
   status: string;
 };
+
+export async function createPaymongoCheckoutSession(
+  options: PaymongoClientOptions,
+  input: PaymongoCheckoutSessionInput,
+): Promise<PaymongoCheckoutSessionResult> {
+  const res = await fetch(`${PAYMONGO_API}/checkout_sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: basicAuth(options.secretKey),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          billing_information_fields_editable: "enabled",
+          cancel_url: input.cancelUrl,
+          success_url: input.successUrl,
+          description: input.description,
+          reference_number: input.referenceNumber,
+          currency: input.currency.toUpperCase(),
+          payment_method_types: input.paymentMethodTypes ?? ["gcash"],
+          send_email_receipt: false,
+          show_description: false,
+          show_line_items: false,
+          line_items: [
+            {
+              amount: Math.round(input.amountMinor),
+              currency: input.currency.toUpperCase(),
+              description: input.description,
+              name: "Order total",
+              quantity: 1,
+            },
+          ],
+        },
+      },
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(
+      `PayMongo create checkout session failed: ${res.status} ${text}`,
+    );
+  }
+  const json = JSON.parse(text) as {
+    data?: { id?: string; attributes?: { checkout_url?: string } };
+  };
+  const checkoutSessionId = json.data?.id;
+  const checkoutUrl = json.data?.attributes?.checkout_url;
+  if (!checkoutSessionId || !checkoutUrl) {
+    throw new Error(
+      "PayMongo response missing checkout session id or checkout_url.",
+    );
+  }
+  return { checkoutSessionId, checkoutUrl };
+}
+
+export async function getPaymongoCheckoutSession(
+  options: PaymongoClientOptions,
+  checkoutSessionId: string,
+): Promise<PaymongoCheckoutSessionStatus> {
+  const res = await fetch(
+    `${PAYMONGO_API}/checkout_sessions/${encodeURIComponent(checkoutSessionId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: basicAuth(options.secretKey) },
+    },
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(
+      `PayMongo retrieve checkout session failed: ${res.status} ${text}`,
+    );
+  }
+  const json = JSON.parse(text) as {
+    data?: {
+      attributes?: {
+        status?: string;
+        payment_intent?: {
+          id?: string;
+          attributes?: {
+            amount?: number;
+            status?: string;
+            payments?: Array<{ id?: string }>;
+          };
+        };
+      };
+    };
+  };
+  const attrs = json.data?.attributes;
+  const paymentIntent = attrs?.payment_intent;
+  const payments = paymentIntent?.attributes?.payments ?? [];
+  const paymentId =
+    payments[0] && typeof payments[0] === "object" && payments[0]?.id?.trim()
+      ? payments[0].id.trim()
+      : undefined;
+  return {
+    status: (attrs?.status ?? "").toLowerCase(),
+    amountMinor: paymentIntent?.attributes?.amount,
+    paymentId,
+    paymentIntentId: paymentIntent?.id,
+    paymentIntentStatus: paymentIntent?.attributes?.status?.toLowerCase(),
+  };
+}
 
 export async function createPaymongoLink(
   options: PaymongoClientOptions,
@@ -88,11 +216,29 @@ export async function getPaymongoLink(
     throw new Error(`PayMongo retrieve link failed: ${res.status} ${text}`);
   }
   const json = JSON.parse(text) as {
-    data?: { attributes?: { status?: string; amount?: number } };
+    data?: {
+      attributes?: {
+        status?: string;
+        amount?: number;
+        payments?: string[] | Array<{ id?: string }>;
+      };
+    };
   };
+  const attrs = json.data?.attributes;
+  let paymentId: string | undefined;
+  const pays = attrs?.payments;
+  if (Array.isArray(pays) && pays.length > 0) {
+    const p0 = pays[0];
+    if (typeof p0 === "string" && p0.trim()) {
+      paymentId = p0.trim();
+    } else if (p0 && typeof p0 === "object" && typeof p0.id === "string" && p0.id.trim()) {
+      paymentId = p0.id.trim();
+    }
+  }
   return {
-    status: (json.data?.attributes?.status ?? "").toLowerCase(),
-    amountMinor: json.data?.attributes?.amount,
+    status: (attrs?.status ?? "").toLowerCase(),
+    amountMinor: attrs?.amount,
+    paymentId,
   };
 }
 

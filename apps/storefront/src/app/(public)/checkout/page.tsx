@@ -8,6 +8,7 @@ export default async function CheckoutPage({
     stripe_cancel?: string;
     review?: string;
     message?: string;
+    guest?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -22,11 +23,13 @@ export default async function CheckoutPage({
     review && typeof sp.message === "string" && sp.message.trim()
       ? sp.message.trim()
       : undefined;
+  const guestMode = sp.guest === "1" || sp.guest === "true";
   return (
     <CheckoutClient
       initialResumeCartId={resume}
       initialStripeCheckoutCancel={stripeCancel}
       initialReviewMessage={initialReviewMessage}
+      guestMode={guestMode}
     />
   );
 }
