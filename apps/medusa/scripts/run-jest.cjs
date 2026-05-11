@@ -11,6 +11,7 @@ const { checkRuntime } = require(path.join(
   "..",
   "..",
   "..",
+  "stress-test",
   "scripts",
   "check-test-runtime.cjs",
 ));
