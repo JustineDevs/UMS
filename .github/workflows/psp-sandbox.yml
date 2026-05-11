@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Run PSP sandbox for ${{ matrix.provider }}
         run: |
           pnpm --filter medusa test:unit -- --testPathPattern="psp-sandbox" --silent --runInBand --forceExit
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Run webhook dedup + replay tests
         run: |
           pnpm --filter medusa test:unit -- --testPathPattern="webhook-dedup" --silent --runInBand --forceExit
