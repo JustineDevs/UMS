@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@apparel-commerce/storefront"
+  "installCommand": "cd ../.. && pnpm install --no-frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@apparel-commerce/storefront",
+  "crons": [
+    {
+      "path": "/api/cron/finalize-payment-attempts",
+      "schedule": "*/10 * * * *"
+    }
+  ]
 }

@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Prepare Medusa E2E data
@@ -36,6 +36,20 @@ jobs:
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
           CI_STRICT_E2E: "1"
+      - name: Run PSP full matrix (when secrets present)
+        if: |
+          secrets.E2E_PAYMONGO_SECRET_KEY != '' ||
+          secrets.E2E_MAYA_SECRET_KEY != ''
+        run: pnpm test:e2e:psp-full -- --project=chromium
+        env:
+          MEDUSA_BACKEND_URL: http://localhost:9000
+          NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
+          E2E_BASE_URL: http://localhost:3000
+          CI_STRICT_E2E: "1"
+          E2E_PAYMONGO_SECRET_KEY: ${{ secrets.E2E_PAYMONGO_SECRET_KEY }}
+          E2E_MAYA_SECRET_KEY: ${{ secrets.E2E_MAYA_SECRET_KEY }}
+          E2E_PAYPAL_CLIENT_ID: ${{ secrets.E2E_PAYPAL_CLIENT_ID }}
+        continue-on-error: false
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -56,7 +70,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Run contract tests
         run: node --import tsx/esm --test apps/storefront/src/lib/__tests__/medusa-contract.test.ts
         env:

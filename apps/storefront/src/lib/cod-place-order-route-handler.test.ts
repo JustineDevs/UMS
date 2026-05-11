@@ -99,3 +99,31 @@ test("handleCodPlaceOrderRequest returns order redirect on success", async () =>
     redirectUrl: "/track/order_cod?t=test",
   });
 });
+
+test("handleCodPlaceOrderRequest rejects missing correlation ids through handler wiring", async () => {
+  const req = new Request("http://localhost/api/checkout/cod-place-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+
+  const res = await handleCodPlaceOrderRequest(req, {
+    applyRateLimit: async () => ({ ok: true }),
+    readCartIdFromCookie: async () => "cart_cod",
+    getPaymentAttemptRow: async () => null,
+    readCurrentQuoteFingerprint: async () => "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => ({
+      ok: true,
+      orderId: "order_cod",
+      redirectUrl: "/track/order_cod",
+      attempts: 1,
+    }),
+    logEvent: () => {},
+    nowIso: () => "2026-04-06T00:00:00.000Z",
+  });
+
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { error: "correlationId is required" });
+});

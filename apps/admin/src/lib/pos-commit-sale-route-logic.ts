@@ -191,7 +191,21 @@ export async function posCommitSaleRouteLogic(
     order.display_id != null ? String(order.display_id) : String(order.id ?? "");
   const orderId = order.id != null ? String(order.id) : undefined;
 
-  if (input.idempotencyKey?.trim() && orderNumber) {
+  if (!orderNumber) {
+    return {
+      status: 502,
+      body: {
+        error: "Converted draft order missing identifiers from the store API",
+        code: "MEDUSA_UNAVAILABLE",
+      },
+      logPhase: "error",
+      logDetail: {
+        message: "Converted draft order missing identifiers from the store API",
+      },
+    };
+  }
+
+  if (input.idempotencyKey?.trim()) {
     input.rememberCompletedReplay(input.idempotencyKey, orderNumber);
   }
 

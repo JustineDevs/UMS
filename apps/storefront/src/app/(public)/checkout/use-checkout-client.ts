@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
+import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
 import {
   readCart,
   clearCart,
@@ -17,6 +18,10 @@ import {
   type MedusaCheckoutTotalsPreview,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
+import {
+  CHECKOUT_AVAILABILITY,
+  isCheckoutHardUnavailableCode,
+} from "@/lib/checkout-availability-codes";
 import { resolveCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 import { CHECKOUT_SITE_ORIGIN } from "./checkout-utils";
@@ -34,13 +39,13 @@ export type CheckoutPendingPayment = {
   confirmedTotal: number;
   currencyCode: string;
   priceMismatch: boolean;
+  providerKey: string;
   correlationId?: string;
 };
 
 export type CheckoutEmbeddedData = {
-  provider: "STRIPE" | "PAYPAL";
-  stripeClientSecret?: string;
-  paypalOrderId?: string;
+  provider: "PAYPAL";
+  paypalOrderId: string;
   cartId: string;
   trackingPageUrl: string;
   confirmedTotal: number;
@@ -56,10 +61,12 @@ export function useCheckoutClient({
   initialResumeCartId,
   initialStripeCheckoutCancel,
   initialReviewMessage,
+  guestMode,
 }: {
   initialResumeCartId?: string;
   initialStripeCheckoutCancel?: boolean;
   initialReviewMessage?: string;
+  guestMode?: boolean;
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
@@ -73,6 +80,7 @@ export function useCheckoutClient({
   const [embeddedData, setEmbeddedData] = useState<CheckoutEmbeddedData | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [hydrated, setHydrated] = useState(false);
   const [medusaPricePreview, setMedusaPricePreview] =
     useState<MedusaCheckoutTotalsPreview | null>(null);
@@ -86,6 +94,12 @@ export function useCheckoutClient({
   const [profileMissing, setProfileMissing] = useState<string[]>([]);
   const [quoteReviewAcknowledged, setQuoteReviewAcknowledged] = useState(false);
   const [foreignCheckoutActive, setForeignCheckoutActive] = useState(false);
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoApplied, setPromoApplied] = useState<{ code: string; discountAmount?: number } | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
   const quoteFingerprintObsRef = useRef<string | null>(null);
   const leaseConflictLoggedRef = useRef(false);
 
@@ -111,41 +125,78 @@ export function useCheckoutClient({
   }, []);
 
   const [payAvailability, setPayAvailability] = useState(() =>
-    resolveCheckoutPaymentAvailability(undefined),
+    resolveCheckoutPaymentAvailability([]),
   );
+  const [checkoutAvailabilityStatus, setCheckoutAvailabilityStatus] = useState<
+    "loading" | "ready" | "unavailable"
+  >("loading");
+  const [checkoutUnavailableCode, setCheckoutUnavailableCode] = useState<
+    string | null
+  >(null);
+  const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<
+    string | null
+  >(null);
+
+  const loadCheckoutPaymentMethods = useCallback(async () => {
+    setCheckoutAvailabilityStatus("loading");
+    setCheckoutUnavailableCode(null);
+    try {
+      const res = await fetch("/api/checkout/available-payment-methods", {
+        cache: "no-store",
+      });
+      const j = (await res.json()) as {
+        ok?: boolean;
+        keys?: string[];
+        code?: string;
+      };
+
+      if (j.ok === true && Array.isArray(j.keys) && j.keys.length > 0) {
+        const allowed = new Set(j.keys);
+        const valid = (Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).filter(
+          (k) => allowed.has(k),
+        );
+        if (valid.length > 0) {
+          setPayAvailability(resolveCheckoutPaymentAvailability(valid));
+          setCheckoutAvailabilityStatus("ready");
+          return;
+        }
+      }
+
+      if (isCheckoutHardUnavailableCode(j.code)) {
+        setPayAvailability(resolveCheckoutPaymentAvailability([]));
+        setCheckoutUnavailableCode(j.code ?? null);
+        setCheckoutAvailabilityStatus("unavailable");
+        return;
+      }
+
+      setPayAvailability(resolveCheckoutPaymentAvailability([]));
+      setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
+      setCheckoutAvailabilityStatus("unavailable");
+    } catch {
+      setPayAvailability(resolveCheckoutPaymentAvailability([]));
+      setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
+      setCheckoutAvailabilityStatus("unavailable");
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/checkout/available-payment-methods", {
-          cache: "no-store",
-        });
-        const j = (await res.json()) as {
-          ok?: boolean;
-          keys?: string[];
-        };
-        if (cancelled) return;
-        if (j.ok === true && Array.isArray(j.keys) && j.keys.length > 0) {
-          const allowed = new Set(j.keys);
-          const valid = (Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).filter(
-            (k) => allowed.has(k),
-          );
-          if (valid.length > 0) {
-            setPayAvailability(resolveCheckoutPaymentAvailability(valid));
-          }
-        }
-      } catch {
-        /* keep env fallback */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void loadCheckoutPaymentMethods();
+  }, [loadCheckoutPaymentMethods]);
 
   const providerAvailable = payAvailability.available;
   const preferredKey = payAvailability.preferredKey;
+  const paymentAvailabilitySource = payAvailability.source;
+
+  useEffect(() => {
+    const opts = medusaPricePreview?.shippingOptions ?? [];
+    if (opts.length === 0) {
+      setSelectedShippingOptionId(null);
+      return;
+    }
+    setSelectedShippingOptionId((prev) =>
+      prev && opts.some((o) => o.id === prev) ? prev : opts[0].id,
+    );
+  }, [medusaPricePreview?.quoteFingerprint, medusaPricePreview?.shippingOptions]);
 
   useEffect(() => {
     setPaymentMethod((prev) =>
@@ -167,8 +218,15 @@ export function useCheckoutClient({
 
   useEffect(() => {
     if (authStatus !== "authenticated" || !session?.user) {
-      setProfileGate("idle");
-      setProfileMissing([]);
+      if (guestMode) {
+        // Guest mode: mark profile as complete for non-COD paths.
+        // COD will be blocked at pay time via the COD payload endpoint.
+        setProfileGate("complete");
+        setProfileMissing([]);
+      } else {
+        setProfileGate("idle");
+        setProfileMissing([]);
+      }
       return;
     }
     let cancelled = false;
@@ -181,7 +239,7 @@ export function useCheckoutClient({
     return () => {
       cancelled = true;
     };
-  }, [authStatus, session?.user, fetchProfileStatus]);
+  }, [authStatus, session?.user, guestMode, fetchProfileStatus]);
 
   useEffect(() => {
     if (profileGate !== "complete") return;
@@ -190,6 +248,14 @@ export function useCheckoutClient({
       setEmail((prev) => (prev.trim() === "" ? e : prev));
     }
   }, [profileGate, session?.user?.email]);
+
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    fetch("/api/checkout/loyalty-balance")
+      .then((r) => (r.ok ? r.json() : { balance: 0 }))
+      .then((d: { balance?: number }) => setLoyaltyBalance(Number(d.balance ?? 0)))
+      .catch(() => setLoyaltyBalance(0));
+  }, [session?.user?.email]);
 
   useEffect(() => {
     if (initialStripeCheckoutCancel) {
@@ -297,6 +363,7 @@ export function useCheckoutClient({
     loyaltyPoints,
     email,
     paymentMethod,
+    selectedShippingOptionId,
   ]);
 
   const localSubtotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
@@ -391,6 +458,9 @@ export function useCheckoutClient({
     setLoading(true);
     setError(null);
 
+    const cartTotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
+    trackBeginCheckout({ value: cartTotal, itemCount: lines.reduce((s, l) => s + l.quantity, 0) });
+
     try {
       const em = email.trim();
       if (
@@ -459,6 +529,7 @@ export function useCheckoutClient({
             ? parsedLoyalty
             : undefined,
         codCartPayload,
+        shippingOptionId: selectedShippingOptionId ?? undefined,
       });
 
       const {
@@ -469,7 +540,13 @@ export function useCheckoutClient({
         providerLabel,
         codOrderPlaced,
         orderId,
+        confirmedPreview,
       } = result;
+
+      if (confirmedPreview) {
+        setMedusaPricePreview(confirmedPreview);
+        setMedusaPriceStatus("ready");
+      }
 
       await fetch("/api/cart/medusa-bind", {
         method: "POST",
@@ -492,21 +569,22 @@ export function useCheckoutClient({
           : `/track/${encodeURIComponent(trackId)}`);
 
       if (codOrderPlaced && orderId?.trim()) {
+        trackPurchase({
+          orderId: orderId.trim(),
+          value: cartTotal,
+          itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+          paymentMethod: "COD",
+        });
         clearCart();
         window.location.href = trackingPageUrl;
         return;
       }
 
       const sessionData = result as Record<string, unknown> & typeof result;
-      const stripeClientSecret =
-        typeof sessionData.stripeClientSecret === "string"
-          ? sessionData.stripeClientSecret
-          : undefined;
       const paypalOrderId =
         typeof sessionData.paypalOrderId === "string"
           ? sessionData.paypalOrderId
           : undefined;
-      const useStripeElement = paymentMethod === "STRIPE" && Boolean(stripeClientSecret);
       const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
       const providerKey = paymentMethod.toLowerCase();
       const amountMinor = Math.round(
@@ -538,16 +616,15 @@ export function useCheckoutClient({
         checkoutCorrelationId = undefined;
       }
 
-      if (useStripeElement || usePayPalElement) {
+      if (usePayPalElement) {
         if (!checkoutCorrelationId) {
           throw new Error(
             "Could not register a durable payment attempt for this checkout. Try again before entering payment details.",
           );
         }
         setEmbeddedData({
-          provider: useStripeElement ? "STRIPE" : "PAYPAL",
-          stripeClientSecret,
-          paypalOrderId,
+          provider: "PAYPAL",
+          paypalOrderId: paypalOrderId!,
           cartId,
           trackingPageUrl,
           confirmedTotal,
@@ -556,6 +633,11 @@ export function useCheckoutClient({
         });
         setCopyDone(false);
       } else {
+        if (!checkoutCorrelationId && paymentMethod !== "COD") {
+          throw new Error(
+            "Could not register a durable payment attempt for this checkout. Try again before leaving for payment.",
+          );
+        }
         const comparableBagTotal =
           medusaPricePreview?.total ?? localTotal;
         const tol = Math.max(0.5, comparableBagTotal * 0.02);
@@ -571,6 +653,7 @@ export function useCheckoutClient({
           confirmedTotal,
           currencyCode,
           priceMismatch,
+          providerKey,
           correlationId: checkoutCorrelationId,
         });
         setCopyDone(false);
@@ -595,11 +678,22 @@ export function useCheckoutClient({
         /* ignore */
       }
     }
+    const popup = window.open(
+      pendingPayment.checkoutUrl,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    if (popup) {
+      popup.focus();
+      return;
+    }
     clearCart();
     window.location.href = pendingPayment.checkoutUrl;
   }
 
-  async function completeEmbeddedPayment(active: CheckoutEmbeddedData): Promise<void> {
+  async function finalizeCheckoutAttempt(
+    active: { correlationId: string },
+  ): Promise<void> {
     setLoading(true);
     setError(null);
     try {
@@ -671,6 +765,24 @@ export function useCheckoutClient({
     }
   }
 
+  async function completeEmbeddedPayment(
+    active: CheckoutEmbeddedData,
+  ): Promise<void> {
+    await finalizeCheckoutAttempt(active);
+  }
+
+  async function resumePendingHostedPayment(
+    active: CheckoutPendingPayment,
+  ): Promise<void> {
+    if (!active.correlationId) {
+      setError(
+        "This checkout session cannot be resumed because the payment attempt was not recorded. Start checkout again.",
+      );
+      return;
+    }
+    await finalizeCheckoutAttempt({ correlationId: active.correlationId });
+  }
+
   async function copyTrackingLink() {
     if (!pendingPayment || typeof navigator.clipboard?.writeText !== "function")
       return;
@@ -679,6 +791,57 @@ export function useCheckoutClient({
       setCopyDone(true);
     } catch {
       setCopyDone(false);
+    }
+  }
+
+  async function applyPromoCode(cartId: string) {
+    const code = promoCode.trim().toUpperCase();
+    if (!code) {
+      setPromoError("Enter a promotion code.");
+      return;
+    }
+    if (promoApplied?.code === code) {
+      setPromoError(`"${code}" is already applied.`);
+      return;
+    }
+    setPromoLoading(true);
+    setPromoError(null);
+    try {
+      const res = await fetch("/api/checkout/apply-promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId, code }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string; discountAmount?: number };
+      if (!json.ok) {
+        setPromoError(json.error ?? "Could not apply that code.");
+        return;
+      }
+      setPromoApplied({ code, discountAmount: json.discountAmount });
+      setPromoCode("");
+      setPromoError(null);
+    } catch {
+      setPromoError("Could not apply the promotion code. Try again.");
+    } finally {
+      setPromoLoading(false);
+    }
+  }
+
+  async function removePromoCode(cartId: string) {
+    if (!promoApplied) return;
+    setPromoLoading(true);
+    try {
+      await fetch("/api/checkout/apply-promo", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId, code: promoApplied.code }),
+      });
+      setPromoApplied(null);
+      setPromoError(null);
+    } catch {
+      setPromoError("Could not remove the code. Try again.");
+    } finally {
+      setPromoLoading(false);
     }
   }
 
@@ -700,6 +863,7 @@ export function useCheckoutClient({
     setCopyDone,
     loyaltyPoints,
     setLoyaltyPoints,
+    loyaltyBalance,
     hydrated,
     medusaPricePreview,
     medusaPriceStatus,
@@ -717,6 +881,7 @@ export function useCheckoutClient({
     displayCurrency,
     handlePay,
     completeEmbeddedPayment,
+    resumePendingHostedPayment,
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate: PH_VAT_RATE,
@@ -725,5 +890,23 @@ export function useCheckoutClient({
     quoteReviewAcknowledged,
     acknowledgeQuoteReview: () => setQuoteReviewAcknowledged(true),
     foreignCheckoutActive,
+    checkoutAvailabilityStatus,
+    checkoutUnavailableCode,
+    retryCheckoutAvailability: loadCheckoutPaymentMethods,
+    paymentAvailabilitySource,
+    selectedShippingOptionId,
+    setSelectedShippingOptionId,
+    deliveryInstructions,
+    setDeliveryInstructions,
+    termsAccepted,
+    setTermsAccepted,
+    promoCode,
+    setPromoCode,
+    promoApplied,
+    promoError,
+    promoLoading,
+    applyPromoCode,
+    removePromoCode,
+    guestMode: guestMode ?? false,
   };
 }

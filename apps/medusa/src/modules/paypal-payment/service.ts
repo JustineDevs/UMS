@@ -38,6 +38,8 @@ import {
 import {
   createPayPalOrder,
   capturePayPalOrder,
+  getPayPalOrder,
+  refundPayPalCapture,
   verifyPayPalWebhookSignature,
   type PayPalClientOptions,
 } from "../../lib/paypal-sdk-client";
@@ -112,10 +114,10 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       "http://localhost:3000";
     const returnUrl =
       process.env.PAYPAL_RETURN_URL?.trim() ||
-      `${storefrontOrigin.replace(/\/$/, "")}/checkout`;
+      `${storefrontOrigin.replace(/\/$/, "")}/checkout/hosted-return?provider=paypal&status=success`;
     const cancelUrl =
       process.env.PAYPAL_CANCEL_URL?.trim() ||
-      `${returnUrl.replace(/\/$/, "")}?paypal=cancel`;
+      `${storefrontOrigin.replace(/\/$/, "")}/checkout/hosted-return?provider=paypal&status=cancel`;
 
     const value = minorToMajor(amountMinor, currency);
 
@@ -163,7 +165,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     }
 
     try {
-      const { status, captureAmountMinor } = await capturePayPalOrder(
+      const { status, captureAmountMinor, captureId } = await capturePayPalOrder(
         this.sdkOptions,
         orderId,
       );
@@ -179,6 +181,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         data: {
           ...((input.data as Record<string, unknown>) ?? {}),
           paypal_order_id: orderId,
+          ...(captureId?.trim() ? { paypal_capture_id: captureId.trim() } : {}),
           ...(captureAmountMinor != null && Number.isFinite(captureAmountMinor)
             ? { captured_amount_minor: captureAmountMinor }
             : {}),
@@ -205,16 +208,57 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     return { data: input.data ?? {} };
   }
 
-  async getPaymentStatus(
-    _input: GetPaymentStatusInput,
-  ): Promise<GetPaymentStatusOutput> {
-    throw new MedusaError(
-      MedusaError.Types.NOT_ALLOWED,
-      "PayPal getPaymentStatus is not used.",
-    );
+  async getPaymentStatus(input: GetPaymentStatusInput): Promise<GetPaymentStatusOutput> {
+    const orderId =
+      (input.data?.paypal_order_id as string | undefined) ??
+      (input.data?.id as string | undefined);
+    if (!orderId?.trim()) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "PayPal getPaymentStatus: missing paypal_order_id in session data.",
+      );
+    }
+    const order = await getPayPalOrder(this.sdkOptions, orderId.trim());
+    const st = (order.status ?? "").toUpperCase();
+    const base = (input.data as Record<string, unknown>) ?? {};
+    if (st === "COMPLETED") {
+      return { status: PaymentSessionStatus.AUTHORIZED, data: base };
+    }
+    if (st === "VOIDED" || st === "CANCELLED" || st === "CANCELED") {
+      return { status: PaymentSessionStatus.CANCELED, data: base };
+    }
+    if (st === "APPROVED" || st === "PAYER_ACTION_REQUIRED") {
+      return { status: PaymentSessionStatus.REQUIRES_MORE, data: base };
+    }
+    return { status: PaymentSessionStatus.PENDING, data: base };
   }
 
   async refundPayment(input: RefundPaymentInput): Promise<RefundPaymentOutput> {
+    const captureId = (input.data?.paypal_capture_id as string | undefined)?.trim();
+    if (!captureId) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "PayPal refundPayment: missing paypal_capture_id on payment data.",
+      );
+    }
+    const currency = String(input.data?.currency ?? "PHP").toUpperCase();
+    const decimals = currency === "JPY" ? 0 : 2;
+    const major =
+      input.amount != null && Number.isFinite(Number(input.amount))
+        ? Number(input.amount).toFixed(decimals)
+        : undefined;
+    try {
+      await refundPayPalCapture(this.sdkOptions, {
+        captureId,
+        currencyCode: currency,
+        amountMajor: major,
+      });
+    } catch (err) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
     return { data: input.data ?? {} };
   }
 
@@ -258,7 +302,15 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
           ? payload.rawData.toString("utf8")
           : JSON.stringify(payload.rawData);
 
+    const allowUnverified =
+      process.env.MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS === "true";
     const webhookId = process.env.PAYPAL_WEBHOOK_ID?.trim();
+    if (!webhookId && !allowUnverified) {
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "PAYPAL_WEBHOOK_ID is required for PayPal webhooks (set MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS=true for local dev only).",
+      );
+    }
     if (webhookId) {
       const valid = await verifyPayPalWebhookSignature(
         this.sdkOptions,
@@ -272,11 +324,6 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
           "PayPal webhook signature invalid.",
         );
       }
-    } else if (process.env.NODE_ENV === "production") {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        "PAYPAL_WEBHOOK_ID is required in production for webhook signature verification.",
-      );
     }
 
     let body: Record<string, unknown>;
@@ -313,9 +360,14 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
 
     let sessionId: string | undefined;
     let amountMinor = 0;
+    let paypalCaptureId: string | undefined;
 
     if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
       sessionId = resource.custom_id as string | undefined;
+      paypalCaptureId =
+        typeof resource.id === "string" && resource.id.trim()
+          ? resource.id.trim()
+          : undefined;
       const amountObj = resource.amount as
         | { value?: string; currency_code?: string }
         | undefined;
@@ -343,6 +395,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       data: {
         session_id: sessionId,
         amount: Math.max(0, amountMinor),
+        ...(paypalCaptureId ? { paypal_capture_id: paypalCaptureId } : {}),
       },
     };
   }

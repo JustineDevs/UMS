@@ -110,14 +110,14 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
     if (configured?.includes("{CHECKOUT_SESSION_ID}")) {
       return configured;
     }
-    return `${defaultStorefrontBase()}/checkout/stripe-return?stripe_session={CHECKOUT_SESSION_ID}`;
+    return `${defaultStorefrontBase()}/checkout/hosted-return?provider=stripe&status=success&stripe_session={CHECKOUT_SESSION_ID}`;
   }
 
   private cancelUrl(): string {
     return (
       this.options_.cancelUrl?.trim() ||
       process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim() ||
-      `${defaultStorefrontBase()}/checkout?stripe_cancel=1`
+      `${defaultStorefrontBase()}/checkout/hosted-return?provider=stripe&status=cancel`
     );
   }
 

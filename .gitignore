@@ -7,6 +7,7 @@ node_modules/
 .turbo/
 .medusa/
 .cache/
+.jest-cache/
 dist/
 out/
 build/
@@ -33,6 +34,8 @@ Thumbs.db
 
 # Logs and debug
 *.log
+*.pid
+*.tmp
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -59,7 +62,9 @@ playwright-report/
 test-results/
 .playwright-cache/
 playwright/.cache/
-stress-test/
+tmp/
+*.cookies
+*.cookie
 
 # Supabase local
 .supabase/
@@ -73,6 +78,9 @@ internal/docs/exclusive/
 .claude/
 .codex
 .omx/
+.cursor/
+docs/contracts/*
+.specify/extensions/.registry
 
 # Lockfile: pnpm only
 package-lock.json

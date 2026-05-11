@@ -7,11 +7,11 @@
   },
   "scripts": {
     "pretest": "node ../../stress-test/scripts/check-test-runtime.cjs esbuild",
-    "dev": "node ../../scripts/clean-next-trace.cjs apps/storefront && next dev --port 3000",
+    "dev": "node ../../scripts/run-next-dev.cjs apps/storefront 3000",
     "build": "node ../../scripts/clean-next-dir.cjs apps/storefront && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test src/lib/storefront-api-rate-limit.test.ts src/lib/medusa-money.test.ts src/lib/medusa-profile-address.test.ts src/lib/medusa-review-verification.test.ts src/lib/medusa-catalog-stock.test.ts src/lib/checkout-quote-fingerprint.test.ts src/lib/payment-attempt-route-logic.test.ts src/lib/finalize-checkout-intent-route-handler.test.ts src/lib/cod-place-order-route-handler.test.ts src/lib/medusa-track-fetch.test.ts src/lib/tracking-link-route-logic.test.ts src/lib/checkout-payment-availability.test.ts src/lib/maharlika-commerce-integration.test.ts src/lib/commerce-invalidation-plan.test.ts src/lib/medusa-checkout-action.test.ts src/lib/medusa-admin-fetch.test.ts src/lib/medusa-totals-preview-route-handler.test.ts src/lib/medusa-checkout-cart-prep.test.ts src/lib/cart.test.ts src/lib/product-media.test.ts src/lib/variant-color-swatch.test.ts \"src/app/(public)/checkout/checkout-review.test.ts\"",
+    "test": "tsx --test src/lib/storefront-api-rate-limit.test.ts src/lib/medusa-money.test.ts src/lib/medusa-profile-address.test.ts src/lib/medusa-review-verification.test.ts src/lib/medusa-catalog-stock.test.ts src/lib/checkout-quote-fingerprint.test.ts src/lib/payment-attempt-route-logic.test.ts src/lib/finalize-checkout-intent-route-handler.test.ts src/lib/cod-place-order-route-handler.test.ts src/lib/hosted-payment-return.test.ts src/lib/stripe-return-recovery.test.ts src/lib/storefront-profile-complete.test.ts src/lib/shop-page-query.test.ts src/lib/medusa-track-fetch.test.ts src/lib/tracking-link-route-logic.test.ts src/lib/checkout-payment-availability.test.ts src/lib/checkout-availability-codes.test.ts src/lib/maharlika-commerce-integration.test.ts src/lib/commerce-invalidation-plan.test.ts src/lib/medusa-checkout-action.test.ts src/lib/medusa-admin-fetch.test.ts src/lib/medusa-checkout-errors.test.ts src/lib/medusa-totals-preview-route-handler.test.ts src/lib/medusa-checkout-cart-prep.test.ts src/lib/cart.test.ts src/lib/product-media.test.ts src/lib/variant-color-swatch.test.ts \"src/app/(public)/checkout/checkout-review.test.ts\"",
     "generate:icons": "python scripts/generate-favicons.py"
   },
   "dependencies": {
@@ -25,6 +25,7 @@
     "@apparel-commerce/validation": "workspace:*",
     "@medusajs/js-sdk": "2.13.1",
     "@paypal/react-paypal-js": "^8.0.0",
+    "@sentry/nextjs": "^10.49.0",
     "@stripe/react-stripe-js": "^3.0.0",
     "@stripe/stripe-js": "^5.0.0",
     "@supabase/supabase-js": "^2.45.0",

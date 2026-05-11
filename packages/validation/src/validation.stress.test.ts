@@ -148,16 +148,12 @@ test("productListQuerySchema: keeps finite non-negative prices", () => {
   }
 });
 
-test("productListQuerySchema: drops invalid prices", () => {
+test("productListQuerySchema: rejects invalid prices", () => {
   const r = productListQuerySchema.safeParse({
     minPrice: -1,
     maxPrice: "not-a-number",
   });
-  assert.equal(r.success, true);
-  if (r.success) {
-    assert.equal(r.data.minPrice, undefined);
-    assert.equal(r.data.maxPrice, undefined);
-  }
+  assert.equal(r.success, false);
 });
 
 test("productListQuerySchema: limit float coerced to int", () => {
@@ -237,8 +233,21 @@ test("storefrontShippingAddressSchema: rejects non-PH mobile numbers", () => {
     fullName: "Test User",
     phone: "+15551234567",
     line1: "123 Example Street",
+    barangay: "Bel-Air",
     city: "Makati",
     province: "Metro Manila",
+  });
+  assert.equal(r.success, false);
+});
+
+test("storefrontShippingAddressSchema: requires barangay for PH", () => {
+  const r = storefrontShippingAddressSchema.safeParse({
+    fullName: "Test User",
+    phone: "+639123456789",
+    line1: "123 Example Street",
+    city: "Makati",
+    province: "Metro Manila",
+    country: "PH",
   });
   assert.equal(r.success, false);
 });

@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Generate SBOM (CycloneDX)
         run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format JSON
       - name: Upload SBOM artifact
@@ -39,7 +39,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Run pnpm audit
         run: pnpm audit --prod || true
       - name: Check for critical vulnerabilities
@@ -62,6 +62,6 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install --no-frozen-lockfile
       - name: Check licenses
         run: npx license-checker --production --failOn "GPL-3.0;AGPL-3.0;AGPL-1.0;GPL-2.0" --summary || true

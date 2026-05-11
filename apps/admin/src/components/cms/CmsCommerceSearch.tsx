@@ -24,7 +24,7 @@ export function CmsCommerceSearch() {
     staffHasPermission(session?.user?.permissions ?? [], "content:read") ||
     staffHasPermission(session?.user?.permissions ?? [], "catalog:read");
   const [q, setQ] = useState("");
-  const [collectionId, setCollectionId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [published, setPublished] = useState("");
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string; handle: string }[]>([]);
@@ -54,7 +54,7 @@ export function CmsCommerceSearch() {
     setLoading(true);
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
-    if (collectionId.trim()) params.set("collection_id", collectionId.trim());
+    if (categoryId.trim()) params.set("category_id", categoryId.trim());
     if (published) params.set("published", published);
     params.set("limit", "60");
     try {
@@ -88,11 +88,11 @@ export function CmsCommerceSearch() {
           />
         </label>
         <label className="text-xs font-medium text-slate-600">
-          Collection
+          Category
           <select
             className="mt-1 block min-w-[160px] rounded border border-slate-200 px-2 py-1.5 text-sm"
-            value={collectionId}
-            onChange={(e) => setCollectionId(e.target.value)}
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
           >
             <option value="">Any</option>
             {categories.map((c) => (

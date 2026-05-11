@@ -3,7 +3,6 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@apparel-commerce/platform-data";
 import {
-  productListQuerySchema,
   sanitizeCmsHtml,
   SHOP_PRODUCT_PAGE_SIZE,
 } from "@apparel-commerce/validation";
@@ -18,64 +17,82 @@ import {
   primaryCommerceFailure,
   secondaryCommerceFailure,
 } from "@/lib/catalog-fetch-helpers";
+import { cssColorForVariantColorLabel } from "@/lib/variant-color-swatch";
 import type { ShopQuery } from "@/lib/shop-url";
 import { shopHref } from "@/lib/shop-url";
+import { parseShopPageQuery } from "@/lib/shop-page-query";
 import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { canonicalUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
-export const metadata: Metadata = {
-  title: "Shop — All Products",
-  description: SITE_DESCRIPTION,
-  alternates: { canonical: canonicalUrl("/shop") },
-  openGraph: {
-    title: `Shop | ${SITE_NAME}`,
-    description: SITE_DESCRIPTION,
-    url: canonicalUrl("/shop"),
-  },
+type ShopSearchParams = {
+  category?: string;
+  locale?: string;
+  size?: string;
+  color?: string;
+  brand?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  sort?: string;
+  offset?: string;
+  q?: string;
 };
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<ShopSearchParams>;
+}): Promise<Metadata> {
+  const sp = await searchParams;
+  const q = parseShopPageQuery(sp);
+  const searchQ = q.q?.trim() || undefined;
+  const offset = q.offset ?? 0;
+  const normalizedBase: ShopQuery = {
+    category: q.category,
+    size: q.size,
+    color: q.color,
+    brand: q.brand,
+    minPrice: q.minPrice,
+    maxPrice: q.maxPrice,
+    search: searchQ,
+    sort: q.sort,
+  };
+  const canonical = canonicalUrl(shopHref(normalizedBase));
+  const prevOffset = offset - SHOP_PRODUCT_PAGE_SIZE;
+  const nextOffset = offset + SHOP_PRODUCT_PAGE_SIZE;
+  const alternates: Record<string, unknown> = { canonical };
+  const toShopQuery = (patch: { offset: number }) => ({
+    ...normalizedBase,
+    offset: patch.offset,
+  });
+  if (prevOffset >= 0) {
+    alternates.prev = canonicalUrl(shopHref(toShopQuery({ offset: prevOffset })));
+  }
+  alternates.next = canonicalUrl(shopHref(toShopQuery({ offset: nextOffset })));
+  return {
+    title: "Shop — All Products",
+    description: SITE_DESCRIPTION,
+    alternates: alternates as Metadata["alternates"],
+    openGraph: {
+      title: `Shop | ${SITE_NAME}`,
+      description: SITE_DESCRIPTION,
+      url: canonical,
+    },
+  };
+}
 
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    category?: string;
-    locale?: string;
-    size?: string;
-    color?: string;
-    brand?: string;
-    minPrice?: string;
-    maxPrice?: string;
-    sort?: string;
-    offset?: string;
-    q?: string;
-  }>;
+  searchParams: Promise<ShopSearchParams>;
 }) {
   const sp = await searchParams;
   const cmsLocale = (sp.locale ?? "en").trim() || "en";
-  const parsed = productListQuerySchema.safeParse({
-    limit: SHOP_PRODUCT_PAGE_SIZE,
-    offset: sp.offset,
-    category: sp.category,
-    size: sp.size,
-    color: sp.color,
-    brand: sp.brand,
-    minPrice: sp.minPrice,
-    maxPrice: sp.maxPrice,
-    q: sp.q,
-    sort: sp.sort,
-  });
-  const q = parsed.success
-    ? parsed.data
-    : productListQuerySchema.parse({
-        limit: SHOP_PRODUCT_PAGE_SIZE,
-        offset: 0,
-        sort: "newest",
-      });
+  const q = parseShopPageQuery(sp);
 
   const category = q.category?.trim() || undefined;
   const size = q.size?.trim() || undefined;
@@ -326,7 +343,10 @@ export default async function ShopPage({
                         active ? "ring-1 ring-primary" : ""
                       }`}
                     >
-                      <span className="w-4 h-4 rounded-full bg-surface-container-highest border border-outline-variant shrink-0" />
+                      <span
+                        className="w-4 h-4 rounded-full border border-outline-variant shrink-0"
+                        style={{ backgroundColor: cssColorForVariantColorLabel(col) }}
+                      />
                       <span className="text-xs font-medium text-on-surface-variant group-hover:text-primary transition-colors uppercase tracking-wider">
                         {col}
                       </span>

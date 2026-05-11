@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export {
   cartMergePostBodySchema,
+  cmsBlockSchema,
+  cmsPagePutBodySchema,
   cmsFormSubmissionPayloadSchema,
   complianceEmailParamSchema,
   internalCustomerDataErasureBodySchema,
@@ -11,6 +13,7 @@ export {
   storefrontProductSlugSchema,
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
+  type CmsBlockInput,
 } from "./http-schemas";
 
 // Shared validation schemas
@@ -34,8 +37,8 @@ function preprocessOptionalNonNegativeNumber(value: unknown): unknown {
     return undefined;
   }
   const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n) || n < 0) {
-    return undefined;
+  if (!Number.isFinite(n)) {
+    return value;
   }
   return n;
 }
@@ -43,7 +46,7 @@ function preprocessOptionalNonNegativeNumber(value: unknown): unknown {
 function buildOptionalNonNegativeNumberQuerySchema() {
   return z.preprocess(
     preprocessOptionalNonNegativeNumber,
-    z.number().optional(),
+    z.number().nonnegative().optional(),
   );
 }
 
@@ -110,30 +113,44 @@ export function isPhilippinesMobilePhone(raw: string): boolean {
   return /^(\+639|639|09|9)\d{9}$/.test(normalized);
 }
 
-export const storefrontShippingAddressSchema = z.object({
-  id: z.string().uuid().optional(),
-  label: z.string().trim().max(60).optional(),
-  fullName: z.string().trim().min(1).max(120),
-  phone: z
-    .string()
-    .trim()
-    .min(1)
-    .max(40)
-    .refine((v) => isPhilippinesMobilePhone(v), {
-      message: PHILIPPINES_MOBILE_PHONE_ERROR,
-    }),
-  line1: z.string().trim().min(1).max(200),
-  line2: z.string().trim().max(200).optional(),
-  city: z.string().trim().min(1).max(100),
-  province: z.string().trim().min(1).max(100),
-  postalCode: z.string().trim().max(20).optional(),
-  country: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .length(2)
-    .default("PH"),
-});
+export const storefrontShippingAddressSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    label: z.string().trim().max(60).optional(),
+    fullName: z.string().trim().min(1).max(120),
+    phone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(40)
+      .refine((v) => isPhilippinesMobilePhone(v), {
+        message: PHILIPPINES_MOBILE_PHONE_ERROR,
+      }),
+    line1: z.string().trim().min(1).max(200),
+    line2: z.string().trim().max(200).optional(),
+    barangay: z.string().trim().max(120).optional(),
+    city: z.string().trim().min(1).max(100),
+    province: z.string().trim().min(1).max(100),
+    postalCode: z.string().trim().max(20).optional(),
+    country: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .length(2)
+      .default("PH"),
+  })
+  .superRefine((data, ctx) => {
+    const cc = (data.country ?? "PH").toUpperCase();
+    if (cc !== "PH") return;
+    const b = data.barangay?.trim() ?? "";
+    if (!b) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Barangay is required for Philippine addresses",
+        path: ["barangay"],
+      });
+    }
+  });
 
 export type StorefrontShippingAddress = z.infer<
   typeof storefrontShippingAddressSchema
