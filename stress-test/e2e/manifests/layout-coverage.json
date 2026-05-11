@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "storefront": {
+    "root": { "file": "apps/storefront/src/app/layout.tsx", "childStates": ["normal", "loading-boundary", "error-alert"] },
+    "public": { "file": "apps/storefront/src/app/(public)/layout.tsx", "childStates": ["chrome", "motion"] },
+    "StorefrontPublicChrome": {
+      "components": ["StorefrontHeader", "StorefrontFooter", "GlobalRouteMotion", "CmsExperimentAssigner"],
+      "permutations": ["mobile", "tablet", "desktop", "ultra-wide", "rapid-route-switch", "back-forward"]
+    }
+  },
+  "admin": {
+    "AdminDashboardChrome": {
+      "components": ["AdminSidebar", "AdminCommandPalette", "AdminToastProvider"],
+      "permutations": ["authenticated", "sidebar-expanded", "modal-overlay", "toast-visible"]
+    }
+  }
+}

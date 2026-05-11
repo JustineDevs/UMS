@@ -83,6 +83,43 @@ export const cmsFormSubmissionPayloadSchema = z
     }
   });
 
+const CMS_BLOCK_TYPES = [
+  "hero",
+  "rich_text",
+  "image",
+  "cta_row",
+  "divider",
+  "two_column",
+  "faq",
+  "video",
+  "trust_strip",
+  "contact_strip",
+  "newsletter",
+  "featured_products",
+] as const;
+
+export const cmsBlockSchema = z.object({
+  id: z.string().trim().min(1).max(128),
+  type: z.enum(CMS_BLOCK_TYPES),
+  props: z.record(z.string(), z.unknown()).default({}),
+});
+
+export type CmsBlockInput = z.infer<typeof cmsBlockSchema>;
+
+export const cmsPagePutBodySchema = z.object({
+  slug: z.string().trim().min(1).max(220).optional(),
+  locale: z.string().trim().min(2).max(20).optional(),
+  title: z.string().trim().min(0).max(500).optional(),
+  body: z.string().max(200_000).optional(),
+  blocks: z.array(cmsBlockSchema).max(200).optional(),
+  status: z.enum(["draft", "published", "scheduled"]).optional(),
+  scheduled_publish_at: z.string().datetime({ offset: true }).nullable().optional(),
+  page_type: z.enum(["static", "landing", "legal"]).optional(),
+  seo_title: z.string().trim().max(200).nullable().optional(),
+  seo_description: z.string().trim().max(400).nullable().optional(),
+  preview_token: z.string().trim().max(128).nullable().optional(),
+});
+
 export const internalCustomerDataExportBodySchema = z.object({
   customerId: medusaResourceIdSchema,
   email: complianceEmailParamSchema,

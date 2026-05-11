@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "storefront": {
+    "/": { "layouts": ["root", "public", "StorefrontPublicChrome"], "tags": ["@smoke"] },
+    "/shop": { "layouts": ["public", "StorefrontPublicChrome"], "tags": ["@smoke", "@workflow"] },
+    "/shop/[slug]": { "layouts": ["public"], "components": ["AddToCartSection", "ProductGalleryCarousel"], "tags": ["@workflow"] },
+    "/checkout": { "layouts": ["public"], "components": ["CheckoutClient", "payment rows"], "tags": ["@checkout"] },
+    "/checkout/stripe-return": { "tags": ["@checkout"] },
+    "/sign-in": { "tags": ["@workflow"] },
+    "/help": { "tags": ["@smoke"] },
+    "/track/[token]": { "tags": ["@workflow"] },
+    "/collections": { "tags": ["@smoke"] },
+    "/blog": { "tags": ["@smoke"] },
+    "/p/[slug]": { "tags": ["@smoke"] }
+  },
+  "admin": {
+    "/admin": { "layouts": ["dashboard", "AdminDashboardChrome"], "tags": ["@admin"] },
+    "/admin/orders": { "tags": ["@admin", "@cross-app"] },
+    "/admin/catalog": { "tags": ["@admin"] },
+    "/admin/inventory": { "tags": ["@admin"] },
+    "/admin/pos": { "tags": ["@admin"] },
+    "/admin/cms": { "tags": ["@admin"] },
+    "/admin/settings/payments": { "tags": ["@admin"] },
+    "/admin/channels": { "tags": ["@admin"] },
+    "/admin/audit": { "tags": ["@admin"] },
+    "/admin/settings/storefront": { "tags": ["@admin", "@cross-app"] }
+  }
+}
