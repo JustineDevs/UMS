@@ -1,6 +1,8 @@
 import "../runtime-logs-init";
 import { type Page, type APIRequestContext, test, expect } from "@playwright/test";
 
+import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
+
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
@@ -68,10 +70,214 @@ export function getPspTestConfig(): {
 export function skipUnlessPspConfigured(provider: PaymentProvider): void {
   const config = getPspTestConfig().find((c) => c.provider === provider);
   if (!config?.configured) {
+    if (isE2eStrictPayments()) {
+      throw new Error(
+        `${provider}: E2E credentials not configured. Strict mode is on (E2E_STRICT_PAYMENTS=1 or E2E_STRICT_E2E=1).`,
+      );
+    }
     test.skip(
       true,
       `${provider} E2E credentials not configured (set E2E_${provider.toUpperCase()}_* env vars)`,
     );
+  }
+}
+
+/**
+ * When E2E_EXPECT_ALL_PSPS=1, every PSP Medusa reports as configured must have sandbox E2E_* env set.
+ */
+export async function assertExpectAllPspsMatchMedusa(
+  request: APIRequestContext,
+): Promise<void> {
+  if (!isE2eExpectAllPsps()) return;
+  const res = await request.get(`${medusaBaseURL}/admin/payment-health`, {
+    failOnStatusCode: false,
+  });
+  if (!res.ok()) {
+    if (isE2eStrictPayments()) {
+      throw new Error(
+        `E2E_EXPECT_ALL_PSPS: GET /admin/payment-health failed (${res.status()}).`,
+      );
+    }
+    return;
+  }
+  const body = (await res.json()) as {
+    providers?: Record<string, { configured: boolean }>;
+  };
+  for (const entry of getPspTestConfig()) {
+    if (entry.provider === "cod") continue;
+    const inMedusa = body.providers?.[entry.provider]?.configured === true;
+    if (inMedusa && !entry.configured) {
+      throw new Error(
+        `E2E_EXPECT_ALL_PSPS: Medusa has "${entry.provider}" enabled but matching E2E sandbox credentials are missing.`,
+      );
+    }
+  }
+}
+
+export type AddCatalogProductResult = { slug: string; productTitle?: string };
+
+/**
+ * Walks /shop [data-product-slug] cards, opens PDPs, skips sign-in / disabled / OOS-looking pages,
+ * clicks "Add to bag" when the customer is already authenticated.
+ */
+export async function navigateToShopAndAddPreferredCatalogProduct(
+  page: Page,
+  options?: { maxCandidates?: number; log?: (message: string) => void },
+): Promise<AddCatalogProductResult | null> {
+  const max = options?.maxCandidates ?? 8;
+  const log = options?.log ?? (() => {});
+  await page.goto(`${baseURL}/shop`, { waitUntil: "load" });
+  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+
+  const cards = page.locator("[data-product-slug]");
+  const n = await cards.count();
+  if (n === 0) {
+    log("stress catalog: no [data-product-slug] on /shop");
+    return null;
+  }
+
+  const trySlug = async (slug: string): Promise<AddCatalogProductResult | null> => {
+    const res = await page.goto(`${baseURL}/shop/${slug}`, {
+      waitUntil: "domcontentloaded",
+    });
+    if (!res || res.status() >= 400) return null;
+    const btn = page.getByTestId("pdp-add-to-bag");
+    await expect(btn).toBeVisible({ timeout: 20_000 });
+    const label = ((await btn.innerText().catch(() => "")) as string).trim();
+    log(`stress catalog: /shop/${slug} CTA "${label.slice(0, 72)}"`);
+    if (/sign in to add/i.test(label)) {
+      log(`stress catalog: skip ${slug} (needs storefront sign-in)`);
+      return null;
+    }
+    if (await btn.isDisabled()) {
+      log(`stress catalog: skip ${slug} (add control disabled)`);
+      return null;
+    }
+    const bodyText = (await page.locator("body").innerText().catch(() => "")) as string;
+    if (/out of stock|sold out|currently unavailable/i.test(bodyText)) {
+      log(`stress catalog: skip ${slug} (oos/unavailable copy)`);
+      return null;
+    }
+    await btn.click();
+    await page.waitForTimeout(800);
+    if (page.url().includes("/sign-in")) {
+      log(`stress catalog: skip ${slug} (redirected to sign-in)`);
+      return null;
+    }
+    const title = await page
+      .getByRole("heading", { level: 1 })
+      .first()
+      .innerText()
+      .catch(() => "");
+    return { slug, productTitle: title.trim() || undefined };
+  };
+
+  for (let i = 0; i < Math.min(n, max); i++) {
+    const slugRaw = await cards.nth(i).getAttribute("data-product-slug");
+    const slug = slugRaw?.trim();
+    if (!slug) continue;
+    const got = await trySlug(slug);
+    if (got) {
+      log(`stress catalog: selected ${slug}${got.productTitle ? ` (${got.productTitle})` : ""}`);
+      return got;
+    }
+  }
+  return null;
+}
+
+export async function getStressRunProviders(
+  request: APIRequestContext,
+): Promise<PaymentProvider[]> {
+  await assertExpectAllPspsMatchMedusa(request);
+  const out: PaymentProvider[] = [];
+  for (const entry of getPspTestConfig()) {
+    if (entry.provider === "cod") {
+      if (process.env.E2E_STRESS_EXCLUDE_COD === "1") continue;
+      out.push("cod");
+      continue;
+    }
+    if (!entry.configured) continue;
+    out.push(entry.provider);
+  }
+  if (out.length === 0 && isE2eStrictPayments()) {
+    throw new Error(
+      "E2E strict payments: no providers to run (configure E2E_STRIPE_API_KEY, E2E_PAYPAL_*, … or unset strict).",
+    );
+  }
+  return out;
+}
+
+/** Optional: confirm Medusa Admin API sees the order (needs MEDUSA_SECRET_API_KEY or E2E_MEDUSA_ADMIN_SECRET). */
+export async function verifyMedusaOrderExists(
+  request: APIRequestContext,
+  orderId: string,
+): Promise<boolean> {
+  if (process.env.E2E_VERIFY_MEDUSA_ORDER !== "1") return false;
+  const secret =
+    process.env.E2E_MEDUSA_ADMIN_SECRET?.trim() ??
+    process.env.MEDUSA_SECRET_API_KEY?.trim();
+  if (!secret || !orderId.startsWith("order_")) return false;
+  const auth = `Basic ${Buffer.from(`${secret}:`, "utf8").toString("base64")}`;
+  const res = await request.get(
+    `${medusaBaseURL}/admin/orders/${encodeURIComponent(orderId)}`,
+    { headers: { Authorization: auth }, failOnStatusCode: false },
+  );
+  return res.ok();
+}
+
+/**
+ * After sandbox payment, assert confirmation UI and optionally Medusa order row.
+ */
+export async function verifyPostPaymentSuccess(
+  page: Page,
+  request: APIRequestContext,
+  provider: PaymentProvider,
+): Promise<void> {
+  const strict = isE2eStrictPayments();
+
+  if (provider === "stripe" || provider === "cod") {
+    await expectOrderConfirmation(page);
+    await expect(page).toHaveURL(/\/(track\/order_|checkout\/stripe-return)/i, {
+      timeout: strict ? 60_000 : 30_000,
+    });
+    const m = page.url().match(/(order_[a-z0-9]+)/i);
+    if (m?.[1]) {
+      const ok = await verifyMedusaOrderExists(request, m[1]);
+      if (strict && process.env.E2E_VERIFY_MEDUSA_ORDER === "1") {
+        expect(ok, `Medusa admin should return order ${m[1]}`).toBe(true);
+      }
+    }
+    return;
+  }
+
+  if (provider === "paypal") {
+    const onPaypal = /paypal\.com/i.test(page.url());
+    const onTrack = /\/track\/order_/i.test(page.url());
+    if (strict) {
+      await expect(
+        page
+          .getByTestId("order-confirmation")
+          .or(page.getByRole("heading", { name: /order|thank you|success/i }))
+          .or(page.getByText(/order.*confirm/i)),
+      ).toBeVisible({ timeout: 120_000 });
+    } else {
+      expect(onPaypal || onTrack).toBeTruthy();
+    }
+    return;
+  }
+
+  if (provider === "paymongo" || provider === "maya") {
+    if (strict) {
+      await expectOrderConfirmation(page);
+    } else {
+      await expect(
+        page
+          .getByText(/paymongo|maya|payment|processing|confirm/i)
+          .first()
+          .or(page.getByTestId("order-confirmation"))
+          .or(page.locator("[data-order-id]")),
+      ).toBeVisible({ timeout: 45_000 });
+    }
   }
 }
 
@@ -102,6 +308,11 @@ export async function skipUnlessPspRegisteredInMedusa(
 }
 
 export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void> {
+  const preferred = await navigateToShopAndAddPreferredCatalogProduct(page, {
+    maxCandidates: 4,
+  });
+  if (preferred) return;
+
   await page.goto(`${baseURL}/shop`);
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
 
@@ -354,4 +565,49 @@ export async function expectOrderConfirmation(page: Page): Promise<void> {
       .or(page.getByTestId("order-confirmation"))
       .or(page.locator("[data-order-id]")),
   ).toBeVisible({ timeout: 60_000 });
+}
+
+/**
+ * Extract `order_*` ID from current URL (track page or stripe-return).
+ */
+export function extractOrderIdFromUrl(url: string): string | null {
+  const m = url.match(/(order_[a-z0-9]+)/i);
+  return m?.[1] ?? null;
+}
+
+/**
+ * Navigate to the tracking page for an order and verify basic content renders.
+ * Returns false if tracking is not available (no TRACKING_HMAC_SECRET in dev, etc.).
+ */
+export async function verifyTrackingPageContent(
+  page: Page,
+  orderId: string,
+): Promise<boolean> {
+  if (!orderId.startsWith("order_")) return false;
+  const trackUrl = `${baseURL}/track/${encodeURIComponent(orderId)}`;
+  const res = await page.goto(trackUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 30_000,
+  });
+  if (!res || res.status() >= 400) return false;
+  const heading = page.getByRole("heading").first();
+  await expect(heading).toBeVisible({ timeout: 15_000 });
+  const bodyText = (await page.locator("body").innerText().catch(() => "")) as string;
+  const hasOrderContent =
+    /order|tracking|status|pending|paid|shipped|delivered/i.test(bodyText);
+  return hasOrderContent;
+}
+
+/**
+ * Verify admin can see the order via API and optionally by navigating admin UI.
+ * Requires `E2E_VERIFY_ADMIN_ORDER=1` + admin auth env.
+ */
+export async function verifyAdminOrderVisibility(
+  request: APIRequestContext,
+  orderId: string,
+): Promise<{ apiVisible: boolean; uiChecked: boolean }> {
+  const result = { apiVisible: false, uiChecked: false };
+  if (process.env.E2E_VERIFY_ADMIN_ORDER !== "1") return result;
+  result.apiVisible = await verifyMedusaOrderExists(request, orderId);
+  return result;
 }

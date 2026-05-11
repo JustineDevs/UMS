@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "packages/ui": {
+    "Card": { "surfaces": ["admin lists", "storefront cards"], "states": ["default", "loading", "empty"] },
+    "Input": { "surfaces": ["checkout", "sign-in", "admin forms"], "states": ["typing", "invalid", "disabled"] },
+    "Dialog": { "surfaces": ["admin", "command palette"], "states": ["open", "escape-close", "focus-trap"] },
+    "Tabs": { "surfaces": ["admin", "product details"], "states": ["switch", "preserve-child"] },
+    "Table": { "surfaces": ["admin orders", "inventory"], "states": ["empty", "many-rows", "sticky-header"] },
+    "Skeleton": { "surfaces": ["storefront", "admin"], "states": ["to-loaded-transition"] },
+    "Breadcrumb": { "surfaces": ["admin", "CMS pages"], "states": ["nested"] },
+    "DropdownMenu": { "surfaces": ["admin"], "states": ["keyboard", "outside-click"] }
+  },
+  "storefront": {
+    "checkout-submit-pay": { "testid": "checkout-submit-pay", "tags": ["@checkout"] },
+    "payment-provider-row": { "pattern": "payment-*", "tags": ["@checkout"] },
+    "pdp-add-to-bag": { "testid": "pdp-add-to-bag", "tags": ["@workflow"] }
+  },
+  "admin": {
+    "e2e-credentials-form": { "testid": "e2e-credentials-form", "tags": ["@admin"] }
+  }
+}

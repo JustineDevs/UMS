@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "workflows": [
+    {
+      "id": "guest-landing-to-checkout",
+      "prerequisites": ["Medusa up", "storefront dev"],
+      "steps": ["GET /api/health", "GET /", "GET /shop", "optional PDP", "GET /checkout"],
+      "outputs": ["checkout shell visible"],
+      "tags": ["@workflow", "@checkout", "@smoke"]
+    },
+    {
+      "id": "cross-app-health",
+      "prerequisites": ["storefront", "admin dev"],
+      "steps": ["storefront /api/health", "admin /admin probe"],
+      "outputs": ["both apps respond"],
+      "tags": ["@cross-app"]
+    },
+    {
+      "id": "admin-authenticated-surface-pass",
+      "prerequisites": ["ADMIN_ALLOWED_EMAILS", "NEXTAUTH_SECRET", "e2e:ensure-staff"],
+      "steps": ["sign-in /sign-in/e2e", "visit each ADMIN_OPERATION_PATH"],
+      "outputs": ["no Application error in body"],
+      "tags": ["@admin", "@workflow"]
+    },
+    {
+      "id": "chaos-storefront-api",
+      "prerequisites": ["Playwright route interception"],
+      "steps": ["abort /api/shop/* once", "reload page"],
+      "outputs": ["no crash; error UI or retry acceptable"],
+      "tags": ["@chaos", "@resilience"]
+    }
+  ],
+  "crossAppDependencies": [
+    {
+      "from": "storefront order placement",
+      "to": "admin /admin/orders visibility",
+      "note": "Full sync requires seeded catalog, checkout completion, and Medusa order; harness verifies routes and health when order is absent."
+    }
+  ]
+}
