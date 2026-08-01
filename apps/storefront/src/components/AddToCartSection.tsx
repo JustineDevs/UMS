@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import posthog from "posthog-js";
 import type { Product } from "@apparel-commerce/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
 import { WishlistToggle } from "@/components/WishlistToggle";
@@ -58,6 +59,12 @@ export function AddToCartSection({ product }: { product: Product }) {
       price: variant.price,
     };
     addCartLine(line);
+    posthog.capture("product_added_to_cart", {
+      product_id: product.id,
+      variant_id: variant.id,
+      product_slug: product.slug,
+      quantity: line.quantity,
+    });
     router.push("/checkout");
   }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import posthog from "posthog-js";
 import { toggleWishlist, wishlistContains } from "@/lib/wishlist";
 
 type Props = {
@@ -44,6 +45,11 @@ export function WishlistToggle({
         : {}),
     });
     setOn(next);
+    posthog.capture("wishlist_item_toggled", {
+      product_slug: slug,
+      ...(medusaProductId?.trim() ? { product_id: medusaProductId.trim() } : {}),
+      saved: next,
+    });
   }, [slug, name, medusaProductId, status, router, pathname]);
 
   return (

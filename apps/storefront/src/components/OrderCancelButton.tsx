@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 
 type Props = {
   orderId: string;
@@ -28,6 +29,9 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
         setConfirming(false);
         return;
       }
+      posthog.capture("order_cancellation_requested", {
+        order_id: orderId,
+      });
       setConfirming(false);
       router.refresh();
     } catch {

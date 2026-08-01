@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import posthog from "posthog-js";
 import {
   PAYMENT_PROVIDER_IDS,
   PAYMENT_PROVIDER_LABELS,
@@ -1004,7 +1005,14 @@ export function CheckoutClient({
                 foreignCheckoutActive ||
                 !termsAccepted
               }
-              onClick={handlePay}
+              onClick={() => {
+                posthog.capture("checkout_payment_submitted", {
+                  payment_method: paymentMethod,
+                  item_count: lines.reduce((total, line) => total + line.quantity, 0),
+                  checkout_mode: isGuestCheckout ? "guest" : "authenticated",
+                });
+                handlePay();
+              }}
               className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading

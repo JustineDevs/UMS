@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import posthog from "posthog-js";
 
 type Props = {
   productId: string;
@@ -24,6 +25,11 @@ export function BackInStockNotify({ productId, productSlug, variantId }: Props) 
         body: JSON.stringify({ email: email.trim(), productId, productSlug, variantId }),
       });
       if (res.ok) {
+        posthog.capture("back_in_stock_notification_requested", {
+          product_id: productId,
+          product_slug: productSlug,
+          ...(variantId ? { variant_id: variantId } : {}),
+        });
         setStatus("done");
         setMessage("We will notify you when this item is back in stock.");
       } else {

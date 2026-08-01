@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
+import posthog from "posthog-js";
 import { REVIEW_STAR_PATH } from "@/components/ReviewStarRatingDisplay";
 
 export function ProductReviewForm({
@@ -56,6 +57,12 @@ export function ProductReviewForm({
         return;
       }
       setVerifiedHint(typeof j.isVerifiedBuyer === "boolean" ? j.isVerifiedBuyer : null);
+      posthog.capture("product_review_submitted", {
+        product_id: medusaProductId,
+        product_slug: productSlug,
+        rating,
+        is_verified_buyer: j.isVerifiedBuyer === true,
+      });
       setDone(true);
       setBody("");
       setRating(5);
