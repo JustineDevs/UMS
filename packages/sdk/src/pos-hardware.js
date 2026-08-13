@@ -1,0 +1,77 @@
+export async function checkPrinterHealth(agentUrl, printer) {
+    const start = Date.now();
+    try {
+        const res = await fetch(`${agentUrl}/status`, {
+            signal: AbortSignal.timeout(5000),
+        });
+        const elapsed = Date.now() - start;
+        if (res.ok) {
+            return {
+                deviceId: printer.id,
+                deviceName: printer.name,
+                deviceType: "printer",
+                status: elapsed > 2000 ? "degraded" : "online",
+                lastCheckAt: new Date().toISOString(),
+                responseTimeMs: elapsed,
+            };
+        }
+        return {
+            deviceId: printer.id,
+            deviceName: printer.name,
+            deviceType: "printer",
+            status: "degraded",
+            lastCheckAt: new Date().toISOString(),
+            responseTimeMs: elapsed,
+            error: `HTTP ${res.status}`,
+        };
+    }
+    catch (err) {
+        return {
+            deviceId: printer.id,
+            deviceName: printer.name,
+            deviceType: "printer",
+            status: "offline",
+            lastCheckAt: new Date().toISOString(),
+            error: err instanceof Error ? err.message : "Connection failed",
+        };
+    }
+}
+export function isPeakHour(now = new Date()) {
+    const hour = now.getHours();
+    const day = now.getDay();
+    const isWeekend = day === 0 || day === 6;
+    if (isWeekend)
+        return hour >= 10 && hour <= 20;
+    return (hour >= 11 && hour <= 14) || (hour >= 17 && hour <= 21);
+}
+export async function runPeakHourHealthCheck(agentUrl, config) {
+    const peak = isPeakHour();
+    const results = [];
+    for (const printer of config.printers) {
+        const health = await checkPrinterHealth(agentUrl, printer);
+        results.push(health);
+    }
+    return {
+        storeId: config.storeId,
+        isPeakHour: peak,
+        results,
+        allHealthy: results.every((r) => r.status === "online"),
+    };
+}
+export const DEFAULT_THERMAL_PRINTER = {
+    id: "default-thermal",
+    name: "Star TSP100",
+    type: "thermal",
+    connectionType: "cloudprnt",
+    paperWidth: 80,
+    dpi: 203,
+};
+export const DEFAULT_DRAWER = {
+    id: "default-drawer",
+    name: "Standard Cash Drawer",
+    connectionType: "printer_port",
+    kickPulse: "pin2",
+    pulseOnMs: 100,
+    pulseOffMs: 100,
+};
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoicG9zLWhhcmR3YXJlLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsicG9zLWhhcmR3YXJlLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiJBQXVDQSxNQUFNLENBQUMsS0FBSyxVQUFVLGtCQUFrQixDQUN0QyxRQUFnQixFQUNoQixPQUF1QjtJQUV2QixNQUFNLEtBQUssR0FBRyxJQUFJLENBQUMsR0FBRyxFQUFFLENBQUM7SUFDekIsSUFBSSxDQUFDO1FBQ0gsTUFBTSxHQUFHLEdBQUcsTUFBTSxLQUFLLENBQUMsR0FBRyxRQUFRLFNBQVMsRUFBRTtZQUM1QyxNQUFNLEVBQUUsV0FBVyxDQUFDLE9BQU8sQ0FBQyxJQUFJLENBQUM7U0FDbEMsQ0FBQyxDQUFDO1FBQ0gsTUFBTSxPQUFPLEdBQUcsSUFBSSxDQUFDLEdBQUcsRUFBRSxHQUFHLEtBQUssQ0FBQztRQUVuQyxJQUFJLEdBQUcsQ0FBQyxFQUFFLEVBQUUsQ0FBQztZQUNYLE9BQU87Z0JBQ0wsUUFBUSxFQUFFLE9BQU8sQ0FBQyxFQUFFO2dCQUNwQixVQUFVLEVBQUUsT0FBTyxDQUFDLElBQUk7Z0JBQ3hCLFVBQVUsRUFBRSxTQUFTO2dCQUNyQixNQUFNLEVBQUUsT0FBTyxHQUFHLElBQUksQ0FBQyxDQUFDLENBQUMsVUFBVSxDQUFDLENBQUMsQ0FBQyxRQUFRO2dCQUM5QyxXQUFXLEVBQUUsSUFBSSxJQUFJLEVBQUUsQ0FBQyxXQUFXLEVBQUU7Z0JBQ3JDLGNBQWMsRUFBRSxPQUFPO2FBQ3hCLENBQUM7UUFDSixDQUFDO1FBRUQsT0FBTztZQUNMLFFBQVEsRUFBRSxPQUFPLENBQUMsRUFBRTtZQUNwQixVQUFVLEVBQUUsT0FBTyxDQUFDLElBQUk7WUFDeEIsVUFBVSxFQUFFLFNBQVM7WUFDckIsTUFBTSxFQUFFLFVBQVU7WUFDbEIsV0FBVyxFQUFFLElBQUksSUFBSSxFQUFFLENBQUMsV0FBVyxFQUFFO1lBQ3JDLGNBQWMsRUFBRSxPQUFPO1lBQ3ZCLEtBQUssRUFBRSxRQUFRLEdBQUcsQ0FB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

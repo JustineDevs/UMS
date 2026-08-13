@@ -1,0 +1,52 @@
+services:
+  medusa:
+    build:
+      context: .
+      dockerfile: Dockerfile.medusa
+      target: ${MEDUSA_DOCKER_TARGET:-dev}
+    env_file:
+      - .env.local
+    entrypoint: []
+    environment:
+      CI: "true"
+      HOME: /tmp/medusa-config
+      NODE_ENV: ${MEDUSA_DOCKER_ENV:-development}
+      PAYPAL_ENVIRONMENT: production
+      XENDIT_CHECKOUT_SUCCESS_URL: ${XENDIT_CHECKOUT_SUCCESS_URL:-http://localhost:3000/checkout/hosted-return?provider=xendit&status=success}
+      XENDIT_CHECKOUT_CANCEL_URL: ${XENDIT_CHECKOUT_CANCEL_URL:-http://localhost:3000/checkout/hosted-return?provider=xendit&status=cancel}
+      XDG_CONFIG_HOME: /tmp/medusa-config
+      APPDATA: /tmp/medusa-config
+      LOCALAPPDATA: /tmp/medusa-config
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - medusa_node_modules:/app/node_modules
+      - medusa_config:/tmp/medusa-config
+    tmpfs:
+      - /tmp
+      - /run
+    labels:
+      com.universal-music-store.service: medusa
+      com.universal-music-store.tier: dev
+    ports:
+      - "${MEDUSA_PORT:-9000}:9000"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:9000/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+volumes:
+  medusa_node_modules:
+  medusa_config:

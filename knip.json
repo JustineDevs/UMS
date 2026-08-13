@@ -1,0 +1,79 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreDependencies": [
+    "@universal-music-store/config-.+",
+    "@types/.+",
+    "@typescript-eslint/parser",
+    "@medusajs/(admin-sdk|admin-shared|dashboard|draft-order|utils)",
+    "@universal-music-store/types",
+    "eslint",
+    "esbuild",
+    "prettier",
+    "@swc/core-win32-x64-msvc",
+    "react",
+    "react-dom",
+    "prop-types",
+    "ts-node",
+    "yalc"
+  ],
+  "ignoreBinaries": [
+    "next",
+    "AGPL-3.0",
+    "AGPL-1.0",
+    "GPL-2.0"
+  ],
+  "playwright": true,
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/**/*.{js,cjs,mjs,ts}",
+        "stress-test/scripts/**/*.{js,cjs,mjs,ts}",
+        "stress-test/e2e/**/*.spec.{ts,tsx,js,jsx}",
+        "stress-test/e2e/**/*.workflow.{ts,tsx,js,jsx}",
+        "stress-test/e2e/runtime-logs-init.ts"
+      ],
+      "ignoreFiles": [
+        ".venv-favicon/**"
+      ]
+    },
+    "apps/admin": {
+      "next": {
+        "entry": [
+          "src/app/**/*/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}",
+          "src/app/**/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}"
+        ]
+      }
+    },
+    "apps/storefront": {
+      "next": {
+        "entry": [
+          "src/app/**/*/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}",
+          "src/app/**/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}"
+        ]
+      }
+    },
+    "apps/api": {
+      "entry": [
+        "src/routes/**/*.ts"
+      ]
+    },
+    "apps/medusa": {
+      "entry": [
+        "medusa-config.ts",
+        "instrumentation.ts",
+        "src/api/**/*.ts",
+        "src/scripts/**/*.ts",
+        "src/subscribers/**/*.ts",
+        "src/workflows/**/*.ts",
+        "src/modules/**/index.ts",
+        "src/admin/i18n/index.ts",
+        "src/lib/inngest/**/*.ts"
+      ]
+    },
+    "packages/config/tailwind": {
+      "ignoreFiles": [
+        "postcss.config.js"
+      ]
+    }
+  }
+}
