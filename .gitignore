@@ -8,18 +8,34 @@ node_modules/
 .medusa/
 .cache/
 .jest-cache/
+*.jest-cache/
+*.jest-cache.bak/
 dist/
 out/
 build/
 *.tsbuildinfo
+*.swc
+*.eslintcache
 
 # Environment and secrets
 .env
-.env.local
-.env.*.local
-.env.development
-.env.production
-.env.test
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+*.der
+*.secret
+*.secrets
+*.credentials
+*.token
+secrets/
+credentials/
 
 # IDE and editors
 .idea/
@@ -36,6 +52,9 @@ Thumbs.db
 *.log
 *.pid
 *.tmp
+*.bak
+*.backup
+*.orig
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -63,6 +82,11 @@ test-results/
 .playwright-cache/
 playwright/.cache/
 tmp/
+*.har
+*.trace
+*.trace.zip
+*.webm
+*.mp4
 *.cookies
 *.cookie
 
@@ -74,6 +98,7 @@ tmp/
 .agent/
 .kiro/
 internal/docs/exclusive/
+internal/admin/
 .cursor/mcp.json
 .claude/
 .codex
@@ -88,3 +113,9 @@ yarn.lock
 
 .vercel
 .env*.local
+.specify/
+.tmp-payflow-test/
+.uvs-dev-runtime/
+bruno/
+**/__pycache__/
+**/__MACOSX/
