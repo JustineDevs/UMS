@@ -1,7 +1,25 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import {
+  AdminBreadcrumbs,
+  AdminEmptyState,
+  AdminErrorState,
+  AdminPageShell,
+  AdminSection,
+  AuditTimeline,
+} from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type LoyaltyAccount = {
   id: string;
@@ -27,6 +45,7 @@ export function LoyaltyPageClient() {
   const [accounts, setAccounts] = useState<LoyaltyAccount[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showEnroll, setShowEnroll] = useState(false);
   const [enrollEmail, setEnrollEmail] = useState("");
   const [showRewardForm, setShowRewardForm] = useState(false);
@@ -38,10 +57,14 @@ export function LoyaltyPageClient() {
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/loyalty");
-    if (res.ok) {
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/admin/loyalty");
+      if (!res.ok) throw new Error("Loyalty accounts could not be loaded.");
       const { data } = await res.json();
       setAccounts(data ?? []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Loyalty accounts could not be loaded.");
     }
     setLoading(false);
   }, []);
@@ -136,108 +159,116 @@ export function LoyaltyPageClient() {
       }
       inspector={<AuditTimeline title="Recent activity" />}
       actions={
-        <button
+        <Button
+          size="sm"
           type="button"
           onClick={() => setShowEnroll(true)}
-          className="bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-90"
         >
           Enroll Customer
-        </button>
+        </Button>
       }
     >
-      <div className="mb-6 flex gap-4">
-        <div className="flex bg-surface-container-low rounded-lg p-1">
-          <button onClick={() => setTab("accounts")} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded ${tab === "accounts" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant"}`}>
+      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-fit rounded-lg bg-muted p-1">
+          <Button variant={tab === "accounts" ? "outline" : "ghost"} size="sm" onClick={() => setTab("accounts")}>
             Accounts ({accounts.length})
-          </button>
-          <button onClick={() => setTab("rewards")} className={`px-4 py-2 text-xs font-bold uppercase tracking-widest rounded ${tab === "rewards" ? "bg-white shadow-sm text-primary" : "text-on-surface-variant"}`}>
+          </Button>
+          <Button variant={tab === "rewards" ? "outline" : "ghost"} size="sm" onClick={() => setTab("rewards")}>
             Rewards ({rewards.length})
-          </button>
+          </Button>
         </div>
-        <div className="flex-1 flex gap-2">
-          <input
+        <div className="flex flex-1 flex-wrap gap-2 sm:justify-end">
+          <Input
+            className="min-w-56 sm:max-w-xs"
             value={lookupValue}
             onChange={(e) => setLookupValue(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
             placeholder="Lookup by phone or QR token..."
-            className="flex-1 border border-outline-variant/20 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-primary/40"
           />
-          <button onClick={handleLookup} className="bg-surface-container-high px-4 py-2 text-xs font-bold uppercase tracking-widest hover:bg-surface-dim transition-colors rounded">
+          <Button variant="outline" size="sm" onClick={handleLookup}>
             Search
-          </button>
-          <button onClick={fetchAccounts} className="text-xs text-on-surface-variant hover:underline px-2">
+          </Button>
+          <Button variant="ghost" size="sm" onClick={fetchAccounts}>
             Reset
-          </button>
+          </Button>
         </div>
       </div>
 
       {tab === "accounts" && (
         loading ? (
-          <div className="text-center py-20 text-on-surface-variant text-sm">Loading...</div>
+          <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading...</div>
+        ) : loadError ? (
+          <AdminErrorState title="Loyalty unavailable" detail={loadError} onRetry={() => void fetchAccounts()} />
         ) : (
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-surface-container-low text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                  <th className="text-left px-6 py-4">Customer</th>
-                  <th className="text-right px-6 py-4">Balance</th>
-                  <th className="text-right px-6 py-4">Lifetime</th>
-                  <th className="text-center px-6 py-4">Tier</th>
-                  <th className="text-right px-6 py-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead className="text-right">Lifetime</TableHead>
+                  <TableHead className="text-center">Tier</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {accounts.map((a) => (
-                  <tr key={a.id} className="border-t border-outline-variant/10 hover:bg-surface-container-low/50 transition-colors">
-                    <td className="px-6 py-4">
+                  <TableRow key={a.id}>
+                    <TableCell>
                       <p className="text-sm font-medium">{a.customer_email}</p>
-                      {a.phone && <p className="text-xs text-on-surface-variant">{a.phone}</p>}
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm font-bold">{a.points_balance.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right text-sm text-on-surface-variant">{a.lifetime_points.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${tierColor[a.tier] ?? "bg-slate-100"}`}>
+                      {a.phone && <p className="text-xs text-muted-foreground">{a.phone}</p>}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{a.points_balance.toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">{a.lifetime_points.toLocaleString()}</TableCell>
+                    <TableCell className="text-center">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tierColor[a.tier] ?? "bg-muted text-muted-foreground"}`}>
                         {a.tier}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button onClick={() => setPointsModal(a)} className="text-xs text-primary hover:underline">
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="link" size="sm" onClick={() => setPointsModal(a)}>
                         Adjust Points
-                      </button>
-                    </td>
-                  </tr>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
                 ))}
                 {accounts.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-on-surface-variant">No loyalty accounts found.</td></tr>
+                  <TableRow><TableCell colSpan={5}><AdminEmptyState title="No loyalty accounts found" description="Enroll a customer or search by phone or QR token to get started." /></TableCell></TableRow>
                 )}
-              </tbody>
-            </table>
-          </div>
+              </TableBody>
+            </Table>
+          </Card>
         )
       )}
 
       {tab === "rewards" && (
-        <div className="space-y-4">
-          <div className="flex justify-end">
-            <button onClick={() => setShowRewardForm(true)} className="bg-secondary text-on-secondary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity">
+        <AdminSection
+          title="Rewards"
+          description="Configure the rewards customers can redeem with their points."
+          actions={<Button size="sm" onClick={() => setShowRewardForm(true)}>
               Add Reward
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            </Button>}
+        >
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {rewards.map((r) => (
-              <div key={r.id} className="bg-surface-container-lowest rounded-xl p-6 shadow-sm">
-                <h3 className="font-bold font-headline text-sm">{r.name}</h3>
-                <p className="text-xs text-on-surface-variant mt-1 capitalize">{r.reward_type}</p>
-                <p className="text-2xl font-extrabold mt-3">{r.points_cost.toLocaleString()}</p>
-                <p className="text-[10px] uppercase tracking-widest text-on-surface-variant">points required</p>
-              </div>
+              <Card key={r.id}>
+                <CardHeader><CardTitle className="text-sm">{r.name}</CardTitle></CardHeader>
+                <CardContent>
+                  <p className="text-xs capitalize text-muted-foreground">{r.reward_type}</p>
+                  <p className="mt-3 text-2xl font-semibold tabular-nums">{r.points_cost.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">points required</p>
+                </CardContent>
+              </Card>
             ))}
             {rewards.length === 0 && (
-              <p className="text-sm text-on-surface-variant col-span-full text-center py-12">No rewards configured.</p>
+              <div className="col-span-full"><AdminEmptyState title="No rewards configured" description="Create a reward to make points redeemable." action={<Button size="sm" onClick={() => setShowRewardForm(true)}>Add reward</Button>} /></div>
             )}
           </div>
-        </div>
+        </AdminSection>
       )}
+
+      </div>
 
       {showEnroll && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -245,8 +276,8 @@ export function LoyaltyPageClient() {
             <h2 className="text-lg font-bold font-headline">Enroll Customer</h2>
             <input required type="email" placeholder="Customer email" value={enrollEmail} onChange={(e) => setEnrollEmail(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowEnroll(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Enroll</button>
+              <Button type="button" variant="outline" onClick={() => setShowEnroll(false)}>Cancel</Button>
+              <Button type="submit">Enroll</Button>
             </div>
           </form>
         </div>
@@ -265,8 +296,8 @@ export function LoyaltyPageClient() {
               <option value="custom">Custom</option>
             </select>
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowRewardForm(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Create</button>
+              <Button type="button" variant="outline" onClick={() => setShowRewardForm(false)}>Cancel</Button>
+              <Button type="submit">Create</Button>
             </div>
           </form>
         </div>
@@ -281,8 +312,8 @@ export function LoyaltyPageClient() {
             <input required type="number" placeholder="Points (negative to deduct)" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <input required placeholder="Reason" value={pointsReason} onChange={(e) => setPointsReason(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setPointsModal(null)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Submit</button>
+              <Button type="button" variant="outline" onClick={() => setPointsModal(null)}>Cancel</Button>
+              <Button type="submit">Submit</Button>
             </div>
           </form>
         </div>

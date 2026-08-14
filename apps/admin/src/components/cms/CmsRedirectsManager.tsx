@@ -1,7 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
+import { sanitizeSameOriginUrl } from "@universal-music-store/sdk";
 import { useCallback, useEffect, useState } from "react";
 
 type Row = {
@@ -15,17 +16,23 @@ type Row = {
 
 export function CmsRedirectsManager() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<Row[]>([]);
-  const [fromPath, setFromPath] = useState("/old-path");
-  const [toPath, setToPath] = useState("/new-path");
+  const [fromPath, setFromPath] = useState("");
+  const [toPath, setToPath] = useState("");
   const [preserveQuery, setPreserveQuery] = useState(false);
   const [testPath, setTestPath] = useState("/");
   const [testResult, setTestResult] = useState<string>("");
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     fetch("/api/admin/cms/redirects")
       .then(async (r) => {
         const j = (await r.json()) as { data?: Row[]; error?: string };
@@ -33,7 +40,10 @@ export function CmsRedirectsManager() {
         return j.data ?? [];
       })
       .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, []);
 
   useEffect(() => {
@@ -42,13 +52,17 @@ export function CmsRedirectsManager() {
 
   const add = async () => {
     if (!canWrite) return;
+    if (!fromPath.trim() || !toPath.trim()) {
+      setError("From and To paths are required.");
+      return;
+    }
     setError(null);
     const r = await fetch("/api/admin/cms/redirects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        from_path: fromPath,
-        to_path: toPath,
+        from_path: fromPath.trim(),
+        to_path: toPath.trim(),
         status_code: 301,
         active: true,
         preserve_query: preserveQuery,
@@ -70,7 +84,9 @@ export function CmsRedirectsManager() {
 
   const runTest = async () => {
     setTestResult("");
-    const r = await fetch(`/api/admin/cms/redirects/resolve?path=${encodeURIComponent(testPath)}`);
+    const r = await fetch(
+      `/api/admin/cms/redirects/resolve?path=${encodeURIComponent(testPath)}`,
+    );
     const j = (await r.json()) as { data?: unknown; error?: string };
     if (!r.ok) {
       setTestResult(j.error ?? "Error");
@@ -80,7 +96,8 @@ export function CmsRedirectsManager() {
   };
 
   const exportCsv = () => {
-    window.open("/api/admin/cms/redirects/export", "_blank");
+    const url = sanitizeSameOriginUrl("/api/admin/cms/redirects/export", window.location.origin);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const importCsv = async (file: File | null) => {
@@ -92,7 +109,10 @@ export function CmsRedirectsManager() {
       headers: { "Content-Type": "text/csv" },
       body: text,
     });
-    const j = (await r.json()) as { data?: { imported: number; warnings: string[] }; error?: string };
+    const j = (await r.json()) as {
+      data?: { imported: number; warnings: string[] };
+      error?: string;
+    };
     if (!r.ok) {
       setError(j.error ?? "Import failed");
       return;
@@ -120,7 +140,9 @@ export function CmsRedirectsManager() {
     load();
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
+  const selectedCount = Object.values(selected).filter(Boolean).length;
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -129,8 +151,8 @@ export function CmsRedirectsManager() {
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-slate-800">Test resolver</h3>
         <p className="text-xs text-slate-600">
-          Enter a storefront path. Response includes chain, loops, and duplicate from_path warnings
-          from the full table.
+          Enter a storefront path. Response includes chain, loops, and duplicate
+          from_path warnings from the full table.
         </p>
         <div className="flex flex-wrap gap-2 items-end">
           <input
@@ -147,7 +169,9 @@ export function CmsRedirectsManager() {
           </button>
         </div>
         {testResult ? (
-          <pre className="max-h-56 overflow-auto rounded bg-slate-50 p-3 text-xs">{testResult}</pre>
+          <pre className="max-h-56 overflow-auto rounded bg-slate-50 p-3 text-xs">
+            {testResult}
+          </pre>
         ) : null}
       </section>
 
@@ -165,12 +189,13 @@ export function CmsRedirectsManager() {
             type="file"
             accept=".csv,text/csv"
             className="sr-only"
+            disabled={!canWrite}
             onChange={(e) => void importCsv(e.target.files?.[0] ?? null)}
           />
         </label>
         <button
           type="button"
-          disabled={!canWrite}
+          disabled={!canWrite || selectedCount === 0}
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
           onClick={() => void bulkActive(true)}
         >
@@ -178,7 +203,7 @@ export function CmsRedirectsManager() {
         </button>
         <button
           type="button"
-          disabled={!canWrite}
+          disabled={!canWrite || selectedCount === 0}
           className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm disabled:opacity-50"
           onClick={() => void bulkActive(false)}
         >
@@ -193,6 +218,7 @@ export function CmsRedirectsManager() {
             className="mt-1 block rounded border border-slate-200 px-2 py-1 text-sm"
             value={fromPath}
             onChange={(e) => setFromPath(e.target.value)}
+            placeholder="/old-path"
           />
         </label>
         <label className="text-xs font-medium text-slate-600">
@@ -201,6 +227,7 @@ export function CmsRedirectsManager() {
             className="mt-1 block rounded border border-slate-200 px-2 py-1 text-sm"
             value={toPath}
             onChange={(e) => setToPath(e.target.value)}
+            placeholder="/new-path"
           />
         </label>
         <label className="flex items-center gap-2 text-xs text-slate-700">
@@ -213,15 +240,23 @@ export function CmsRedirectsManager() {
         </label>
         <button
           type="button"
-          disabled={!canWrite}
-          className="rounded-lg bg-primary px-3 py-2 text-sm text-white"
+          disabled={!canWrite || !fromPath.trim() || !toPath.trim()}
+          className="rounded-lg bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
           onClick={() => void add()}
         >
           Add
         </button>
       </div>
 
-      <ul className="space-y-2 text-sm">
+      {loadingRows ? (
+        <p className="text-sm text-slate-600">Loading redirects...</p>
+      ) : null}
+      {!loadingRows && rows.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+          No redirects have been configured.
+        </p>
+      ) : null}
+      <ul className="space-y-2 text-sm" aria-label="Redirect rules">
         {rows.map((r) => (
           <li
             key={r.id}
@@ -231,15 +266,21 @@ export function CmsRedirectsManager() {
               <input
                 type="checkbox"
                 checked={Boolean(selected[r.id])}
-                onChange={(e) => setSelected((s) => ({ ...s, [r.id]: e.target.checked }))}
+                onChange={(e) =>
+                  setSelected((s) => ({ ...s, [r.id]: e.target.checked }))
+                }
               />
               <span>
-                <code>{r.from_path}</code> → <code>{r.to_path}</code> ({r.status_code})
-                {r.active ? "" : " · off"}
+                <code>{r.from_path}</code> → <code>{r.to_path}</code> (
+                {r.status_code}){r.active ? "" : " · off"}
                 {r.preserve_query ? " · +query" : ""}
               </span>
             </label>
-            <button type="button" className="text-red-700 text-xs underline" onClick={() => void remove(r.id)}>
+            <button
+              type="button"
+              className="text-red-700 text-xs underline"
+              onClick={() => void remove(r.id)}
+            >
               Delete
             </button>
           </li>

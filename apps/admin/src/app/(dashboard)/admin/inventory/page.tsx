@@ -49,7 +49,15 @@ export default async function InventoryPage({
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          <div
+            className="mb-4 h-5 w-56 animate-pulse rounded bg-surface-container-low"
+            role="status"
+            aria-label="Loading inventory preferences"
+          />
+        }
+      >
         <InventoryDefaultQuerySync />
       </Suspense>
       <InventoryTableWithRefresh

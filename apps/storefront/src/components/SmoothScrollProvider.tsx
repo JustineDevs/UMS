@@ -24,7 +24,7 @@ const SmoothScrollContext = createContext<SmoothScrollContextValue>({
   setScrollLocked: () => {},
 });
 
-export function useSmoothScroll() {
+function useSmoothScroll() {
   return useContext(SmoothScrollContext);
 }
 

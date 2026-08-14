@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import {
   getPaymentPlatformMetrics,
+  listPaymentProviderArtifacts,
   listRecentPaymentAttempts,
   type PaymentAttemptRow,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export type ReconciliationRow = {
   date: string;
@@ -36,6 +38,16 @@ export type ReconciliationSummary = {
     staleReason: string | null;
     updatedAt: string;
   }>;
+  providerReconciliationArtifacts: Array<{
+    provider: string;
+    status: string;
+    externalId: string;
+    jobId: string | null;
+    periodStart: string | null;
+    periodEnd: string | null;
+    idempotencyKey: string | null;
+    updatedAt: string;
+  }>;
 };
 
 const PROVIDER_CONFIRMED_STATUSES = new Set([
@@ -62,7 +74,7 @@ function bucketDate(row: PaymentAttemptRow): string {
 
 function reconciliationProviders(input: string): string[] {
   return input === "all"
-    ? ["stripe", "paypal", "paymongo", "maya", "cod"]
+    ? ["stripe", "paypal", "xendit", "cod"]
     : [input];
 }
 
@@ -71,6 +83,16 @@ export async function GET(request: Request) {
   if (!staff.ok) return staff.response;
   const sup = adminSupabaseOr503("reconciliation");
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(
+    sup.client,
+    staff.session.user?.email,
+  );
+  if (!organization) {
+    return NextResponse.json(
+      { error: "Organization membership is not configured" },
+      { status: 403 },
+    );
+  }
 
   const { searchParams } = new URL(request.url);
   const days = Math.min(Number(searchParams.get("days")) || 7, 90);
@@ -102,8 +124,17 @@ export async function GET(request: Request) {
     }
   }
 
-  const metrics = await getPaymentPlatformMetrics(sup.client);
-  const recentAttempts = await listRecentPaymentAttempts(sup.client, 500);
+  const metrics = await getPaymentPlatformMetrics(sup.client, organization.id);
+  const recentAttempts = await listRecentPaymentAttempts(sup.client, 500, organization.id);
+  const reconciliationArtifacts = await listPaymentProviderArtifacts(sup.client, {
+    organization_id: organization.id,
+    provider:
+      provider === "stripe" || provider === "paypal" || provider === "xendit"
+        ? provider
+        : "all",
+    artifactTypes: ["reconciliation"],
+    limit: 25,
+  });
   const rowMap = new Map(rows.map((row) => [`${row.date}:${row.provider}`, row]));
 
   const dayFloor = new Date(now);
@@ -187,6 +218,23 @@ export async function GET(request: Request) {
     paymentAttemptsStaleFinalize: metrics?.paymentAttemptsStaleFinalize ?? 0,
     paymentAttemptsNeedsReview: metrics?.paymentAttemptsNeedsReview ?? 0,
     recentProblemAttempts,
+    providerReconciliationArtifacts: reconciliationArtifacts.map((row) => ({
+      provider: row.provider,
+      status: row.status,
+      externalId: row.external_id,
+      jobId:
+        typeof row.metadata?.job_id === "string" ? row.metadata.job_id : null,
+      periodStart:
+        typeof row.metadata?.period_start === "string"
+          ? row.metadata.period_start
+          : null,
+      periodEnd:
+        typeof row.metadata?.period_end === "string"
+          ? row.metadata.period_end
+          : null,
+      idempotencyKey: row.idempotency_key,
+      updatedAt: row.updated_at,
+    })),
   };
 
   return NextResponse.json(summary);

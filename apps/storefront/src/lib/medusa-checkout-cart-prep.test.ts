@@ -3,10 +3,11 @@ import test from "node:test";
 
 import {
   cartToTotalsPreview,
+  medusaCartToCheckoutLines,
   reconcileMedusaCartGrandTotalMajor,
 } from "./medusa-checkout-cart-prep";
 
-test("reconcileMedusaCartGrandTotalMajor uses component totals when cart total is low", () => {
+test("reconcileMedusaCartGrandTotalMajor trusts Medusa total (no subtotal+tax recomputation)", () => {
   const reconciled = reconcileMedusaCartGrandTotalMajor(
     {
       subtotal: 10_000,
@@ -18,7 +19,7 @@ test("reconcileMedusaCartGrandTotalMajor uses component totals when cart total i
     "php",
   );
 
-  assert.deepEqual(reconciled, { totalMajor: 117, reconciled: true });
+  assert.deepEqual(reconciled, { totalMajor: 100, reconciled: false });
 });
 
 test("cartToTotalsPreview aggregates repeated variants and unit-price fallbacks", () => {
@@ -62,4 +63,22 @@ test("cartToTotalsPreview aggregates repeated variants and unit-price fallbacks"
   assert.deepEqual(preview.productIds, ["prod_1", "prod_2"]);
   assert.deepEqual(preview.variantIds, ["variant_1", "variant_2"]);
   assert.deepEqual(preview.shippingMethodIds, ["ship_standard"]);
+  assert.deepEqual(preview.shippingOptions, []);
+  assert.equal(preview.appliedShippingOptionId, null);
+});
+
+test("medusaCartToCheckoutLines extracts active cart quantities for inventory checks", () => {
+  assert.deepEqual(
+    medusaCartToCheckoutLines({
+      items: [
+        { variant_id: " variant_1 ", quantity: 2.9 },
+        { variant: { id: "variant_2" }, quantity: 1 },
+        { variant_id: "variant_ignored", quantity: 0 },
+      ],
+    }),
+    [
+      { variantId: "variant_1", quantity: 2 },
+      { variantId: "variant_2", quantity: 1 },
+    ],
+  );
 });

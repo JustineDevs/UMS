@@ -1,10 +1,21 @@
 import type { AdminApiErrorCode } from "@/lib/staff-api-response";
+import { buildPosSaleFeatureMetadata } from "@universal-music-store/platform-data";
 
 export type PosCommitSaleInput = {
   items?: Array<{ variantId: string; quantity: number }>;
   email?: string;
   offlineSaleId?: string;
   shiftId?: string;
+  paymentTerminalId?: string;
+  paymentMethod?: "cash" | "card" | "wallet";
+  paymentReference?: string;
+  receiptReference?: string;
+  posFeatures?: {
+    orderTag?: string;
+    eInvoiceRequested?: boolean;
+    eInvoiceCustomerEmail?: string;
+    eInvoiceCustomerTin?: string;
+  };
 };
 
 export type PosCommitSaleRouteResult =
@@ -40,10 +51,10 @@ type PosCommitSaleLogicInput = {
   assertStock: (
     _items: Array<{ variantId: string; quantity: number }>,
   ) => Promise<
-    | { ok: true }
-    | { ok: false; message: string; code: AdminApiErrorCode }
+    { ok: true } | { ok: false; message: string; code: AdminApiErrorCode }
   >;
   loadShiftStatus: (_shiftId: string) => Promise<"open" | "closed" | "missing">;
+  assertTerminalReady?: (_terminalId: string) => Promise<boolean>;
   evaluatePolicy: (_input: {
     stockVerified: true;
     hasOpenShift: boolean;
@@ -61,7 +72,18 @@ type PosCommitSaleLogicInput = {
     _orderId: string,
     _metadata: Record<string, unknown>,
   ) => Promise<void>;
-  rememberCompletedReplay: (_idempotencyKey: string, _orderNumber: string) => void;
+  recordSaleLedger?: (_input: {
+    orderId: string;
+    orderNumber: string;
+    shiftId?: string;
+    terminalId?: string;
+    totalMinor: number;
+    idempotencyKey?: string;
+  }) => Promise<boolean>;
+  rememberCompletedReplay: (
+    _idempotencyKey: string,
+    _orderNumber: string,
+  ) => void;
 };
 
 export async function posCommitSaleRouteLogic(
@@ -114,7 +136,8 @@ export async function posCommitSaleRouteLogic(
       ? input.body.offlineSaleId.trim()
       : "";
   if (offlineSaleId) {
-    const existing = await input.findExistingOrderByOfflineSaleId(offlineSaleId);
+    const existing =
+      await input.findExistingOrderByOfflineSaleId(offlineSaleId);
     if (existing) {
       return {
         status: 200,
@@ -137,7 +160,44 @@ export async function posCommitSaleRouteLogic(
 
   const shiftId =
     typeof input.body.shiftId === "string" ? input.body.shiftId.trim() : "";
-  const shiftStatus = shiftId ? await input.loadShiftStatus(shiftId) : "missing";
+  const shiftStatus = shiftId
+    ? await input.loadShiftStatus(shiftId)
+    : "missing";
+  const terminalId =
+    typeof input.body.paymentTerminalId === "string"
+      ? input.body.paymentTerminalId.trim()
+      : "";
+  const paymentMethod = input.body.paymentMethod ?? "cash";
+  const paymentReference = input.body.paymentReference?.trim() ?? "";
+  if (paymentMethod !== "cash" && !terminalId && !paymentReference) {
+    return {
+      status: 409,
+      body: {
+        error: "A certified terminal or provider payment reference is required",
+        code: "POS_POLICY_DENIED",
+      },
+      logPhase: "error",
+      logDetail: {
+        message:
+          "A certified terminal or provider payment reference is required",
+      },
+    };
+  }
+  if (
+    terminalId &&
+    input.assertTerminalReady &&
+    !(await input.assertTerminalReady(terminalId))
+  ) {
+    return {
+      status: 409,
+      body: {
+        error: "Payment terminal is not certified and ready",
+        code: "POS_POLICY_DENIED",
+      },
+      logPhase: "error",
+      logDetail: { message: "Payment terminal is not certified and ready" },
+    };
+  }
   const policy = input.evaluatePolicy({
     stockVerified: true,
     hasOpenShift: shiftStatus === "open",
@@ -160,6 +220,23 @@ export async function posCommitSaleRouteLogic(
   const metadata: Record<string, unknown> = {};
   if (offlineSaleId) metadata.pos_offline_id = offlineSaleId;
   if (shiftId) metadata.pos_shift_id = shiftId;
+  if (terminalId) metadata.pos_payment_terminal_id = terminalId;
+  if (input.body.paymentMethod)
+    metadata.pos_payment_method = input.body.paymentMethod;
+  if (input.body.paymentReference?.trim()) {
+    metadata.pos_payment_reference = input.body.paymentReference
+      .trim()
+      .slice(0, 160);
+  }
+  if (input.body.receiptReference?.trim()) {
+    metadata.pos_receipt_reference = input.body.receiptReference
+      .trim()
+      .slice(0, 160);
+  }
+  Object.assign(
+    metadata,
+    buildPosSaleFeatureMetadata(input.body.posFeatures ?? {}),
+  );
 
   const draftOrder = await input.createDraftOrder({
     email: (input.body.email?.trim() || "pos@instore.local").slice(0, 320),
@@ -188,7 +265,9 @@ export async function posCommitSaleRouteLogic(
   }
 
   const orderNumber =
-    order.display_id != null ? String(order.display_id) : String(order.id ?? "");
+    order.display_id != null
+      ? String(order.display_id)
+      : String(order.id ?? "");
   const orderId = order.id != null ? String(order.id) : undefined;
 
   if (!orderNumber) {
@@ -206,7 +285,42 @@ export async function posCommitSaleRouteLogic(
   }
 
   if (input.idempotencyKey?.trim()) {
+    if (input.recordSaleLedger && orderId) {
+      const recorded = await input.recordSaleLedger({
+        orderId,
+        orderNumber,
+        shiftId: shiftId || undefined,
+        terminalId: terminalId || undefined,
+        totalMinor:
+          typeof order.total === "number" && Number.isFinite(order.total)
+            ? Math.round(order.total)
+            : 0,
+        idempotencyKey: input.idempotencyKey,
+      });
+      if (!recorded) {
+        return {
+          status: 503,
+          body: {
+            error: "POS sale ledger unavailable",
+            code: "SUPABASE_NOT_CONFIGURED",
+          },
+          logPhase: "error",
+          logDetail: { message: "POS sale ledger unavailable", orderId },
+        };
+      }
+    }
     input.rememberCompletedReplay(input.idempotencyKey, orderNumber);
+  } else if (input.recordSaleLedger && orderId) {
+    await input.recordSaleLedger({
+      orderId,
+      orderNumber,
+      shiftId: shiftId || undefined,
+      terminalId: terminalId || undefined,
+      totalMinor:
+        typeof order.total === "number" && Number.isFinite(order.total)
+          ? Math.round(order.total)
+          : 0,
+    });
   }
 
   return {

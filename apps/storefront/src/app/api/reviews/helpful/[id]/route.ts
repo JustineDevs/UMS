@@ -71,7 +71,7 @@ export async function POST(
         { status: 409 },
       );
     }
-    return Response.json({ error: "Unable to record vote" }, { status: 500 });
+    return Response.json({ error: "Unable to record vote" }, { status: 503 });
   }
 
   const newVotes = Number(review.helpful_votes ?? 0) + 1;

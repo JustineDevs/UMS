@@ -12,7 +12,7 @@ export async function register() {
   ensureStorefrontRuntimeEnvLoaded({ cwd: storefrontDir });
 
   const { assertMedusaStorefrontEnvProduction } = await import(
-    "@apparel-commerce/sdk"
+    "@universal-music-store/sdk"
   );
   assertMedusaStorefrontEnvProduction();
 

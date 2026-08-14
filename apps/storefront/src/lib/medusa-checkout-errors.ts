@@ -3,7 +3,17 @@
  * abandoned carts after partial checkout steps.
  */
 
-export function extractMedusaErrorText(err: unknown): string {
+import { isMedusaAdminConfigurationError } from "./medusa-admin-configuration-error";
+
+const INTERNAL_ENV_ERROR_SNIPPETS = [
+  /MEDUSA_SECRET_API_KEY/i,
+  /MEDUSA_ADMIN_API_SECRET/i,
+  /NEXT_PUBLIC_MEDUSA_/i,
+  /\.env\.local/i,
+  /repo root \.env\.local/i,
+] as const;
+
+function extractMedusaErrorText(err: unknown): string {
   if (err instanceof Error) {
     const anyErr = err as Error & {
       response?: { data?: unknown; status?: number };
@@ -27,7 +37,13 @@ export function extractMedusaErrorText(err: unknown): string {
 }
 
 export function formatMedusaCheckoutError(err: unknown): string {
+  if (isMedusaAdminConfigurationError(err)) {
+    return "Checkout is temporarily unavailable. Please try again shortly or contact support if this continues.";
+  }
   const raw = extractMedusaErrorText(err);
+  if (INTERNAL_ENV_ERROR_SNIPPETS.some((re) => re.test(raw))) {
+    return "Checkout is temporarily unavailable. Please try again shortly or contact support if this continues.";
+  }
   const lower = raw.toLowerCase();
   if (
     lower.includes("inventory") ||
@@ -87,21 +103,32 @@ export async function tryDeleteStoreCart(
   publishableKey: string,
 ): Promise<void> {
   const root = baseUrl.replace(/\/$/, "");
-  const url = `${root}/store/carts/${encodeURIComponent(cartId)}`;
   try {
-    const res = await fetch(url, {
-      method: "DELETE",
-      headers: {
-        "x-publishable-api-key": publishableKey,
-      },
-    });
-    if (!res.ok && process.env.NODE_ENV === "development") {
-      const t = await res.text().catch(() => "");
-      console.warn("[checkout] rollback DELETE cart:", res.status, t.slice(0, 200));
-    }
+    const res = await fetch(
+      `${root}/store/carts/${encodeURIComponent(cartId)}?fields=id,*items`,
+      { headers: { "x-publishable-api-key": publishableKey } },
+    );
+    if (res.status === 404 || !res.ok) return;
+    const payload = (await res.json().catch(() => null)) as {
+      cart?: { items?: Array<{ id?: string }> };
+    } | null;
+    await Promise.all(
+      (payload?.cart?.items ?? [])
+        .map((item) => item.id?.trim())
+        .filter((id): id is string => Boolean(id))
+        .map((lineId) =>
+          fetch(
+            `${root}/store/carts/${encodeURIComponent(cartId)}/line-items/${encodeURIComponent(lineId)}`,
+            {
+              method: "DELETE",
+              headers: { "x-publishable-api-key": publishableKey },
+            },
+          ),
+        ),
+    );
   } catch (e) {
     if (process.env.NODE_ENV === "development") {
-      console.warn("[checkout] rollback DELETE cart failed:", e);
+      console.warn("[checkout] rollback cart cleanup failed:", e);
     }
   }
 }

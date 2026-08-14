@@ -37,12 +37,25 @@ describe("medusaVariantRawIsSellable", () => {
         manage_inventory: true,
         inventory_quantity: null,
       }),
-      false,
+      true,
+    );
+    assert.equal(
+      medusaVariantRawIsSellable({
+        manage_inventory: true,
+      }),
+      true,
     );
   });
 
   it("is optimistic when manage_inventory is undefined and quantity absent", () => {
     assert.equal(medusaVariantRawIsSellable({}), true);
+  });
+
+  it("is optimistic when manage_inventory is true but quantity is omitted in the Store API payload", () => {
+    assert.equal(
+      medusaVariantRawIsSellable({ manage_inventory: true }),
+      true,
+    );
   });
 
   it("uses numeric quantity when present even if manage_inventory undefined", () => {
@@ -58,15 +71,15 @@ describe("medusaVariantRawIsSellable", () => {
 });
 
 describe("medusaProductRawHasSellableVariant", () => {
-  it("is false when all variants are out of stock", () => {
+  it("is true when variants are missing stock quantities", () => {
     assert.equal(
       medusaProductRawHasSellableVariant({
         variants: [
-          { manage_inventory: true, inventory_quantity: 0 },
+          { manage_inventory: true, inventory_quantity: null },
           { manage_inventory: true, inventory_quantity: null },
         ],
       }),
-      false,
+      true,
     );
   });
 
@@ -87,8 +100,8 @@ describe("catalogProductFromMedusaRaw", () => {
   it("returns null when every variant is out of stock", () => {
     const raw = {
       id: "prod_1",
-      title: "Tee",
-      handle: "tee",
+      title: "Guitar",
+      handle: "guitar",
       variants: [
         {
           id: "var_1",
@@ -105,21 +118,21 @@ describe("catalogProductFromMedusaRaw", () => {
   it("keeps only in-stock variants", () => {
     const raw = {
       id: "prod_1",
-      title: "Tee",
-      handle: "tee",
+      title: "Guitar",
+      handle: "guitar",
       variants: [
         {
           id: "var_oos",
           manage_inventory: true,
           inventory_quantity: 0,
-          options: [{ option: { title: "Size" }, value: "S" }],
+          options: [{ option: { title: "Type" }, value: "Electric" }],
           calculated_price: { calculated_amount: 10000 },
         },
         {
           id: "var_ok",
           manage_inventory: true,
           inventory_quantity: 5,
-          options: [{ option: { title: "Size" }, value: "M" }],
+          options: [{ option: { title: "Type" }, value: "Acoustic" }],
           calculated_price: { calculated_amount: 10000 },
         },
       ],

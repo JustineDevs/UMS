@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { sanitizeSameOriginUrl } from "@universal-music-store/sdk";
 
 export function ShareProductButton({
   title,
@@ -15,13 +16,15 @@ export function ShareProductButton({
 
   const handleShare = useCallback(async () => {
     if (typeof navigator === "undefined") return;
+    const safeUrl = sanitizeSameOriginUrl(url, window.location.origin);
+    if (!safeUrl) return;
 
     if (navigator.share) {
       try {
         await navigator.share({
           title,
           text: description,
-          url,
+          url: safeUrl,
         });
         return;
       } catch {
@@ -30,7 +33,7 @@ export function ShareProductButton({
     }
 
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(safeUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {

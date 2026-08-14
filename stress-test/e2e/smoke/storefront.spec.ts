@@ -48,4 +48,5 @@ test.describe("storefront smoke", () => {
     await expect(addBtn).not.toContainText("Loading", { timeout: 45_000 });
     await expect(addBtn).toBeEnabled({ timeout: 45_000 });
   });
+
 });

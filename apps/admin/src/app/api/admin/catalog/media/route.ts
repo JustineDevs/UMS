@@ -1,16 +1,20 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   CMS_MEDIA_TAG_CATALOG_PRODUCT,
   insertCmsMedia,
   listCmsMedia,
   type ListCmsMediaOptions,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
+import {
+  requireStaffApiSession,
+  requireStaffApiSessionAny,
+} from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 const BUCKET = "catalog";
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -31,18 +35,12 @@ function guessVideoMimeFromName(name: string): string {
 /** Lists `cms_media` rows tagged for the catalog bucket (same rows as CMS media library, scoped). */
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (
-    !staffSessionAllows(session, "catalog:read") &&
-    !staffSessionAllows(session, "catalog:write")
-  ) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSessionAny(["catalog:read", "catalog:write"]);
+  if (!auth.ok) return auth.response;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sp = req.nextUrl.searchParams;
   const opts: ListCmsMediaOptions = {
     limit: Math.min(Number(sp.get("limit")) || 200, 500),
@@ -50,22 +48,25 @@ export async function GET(req: NextRequest) {
     mimePrefix: sp.get("mime") ?? undefined,
     sort: (sp.get("sort") as ListCmsMediaOptions["sort"]) || "created_desc",
     tag: CMS_MEDIA_TAG_CATALOG_PRODUCT,
+    organizationId: organization.id,
   };
   const data = await listCmsMedia(sup.client, opts);
-  return correlatedJson(cid, { data });
+  return correlatedJson(cid, {
+    data,
+    // The browser session can hydrate after this request (and local auth has
+    // no NextAuth cookie), so expose the server's already-authorized result.
+    canWrite: staffSessionAllows(auth.session, "catalog:write"),
+  });
 }
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "catalog:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("catalog:write");
+  if (!auth.ok) return auth.response;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sb = sup.client;
 
   let form: FormData;
@@ -173,9 +174,13 @@ export async function POST(req: NextRequest) {
     display_name: safe,
     byte_size: file.size,
     tags: [CMS_MEDIA_TAG_CATALOG_PRODUCT],
+    organization_id: organization.id,
   });
   if (!row) {
+    await sb.storage.from(BUCKET).remove([path]).catch(() => undefined);
     return correlatedJson(cid, { error: "Unable to save metadata" }, { status: 500 });
   }
   return correlatedJson(cid, { data: row });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/catalog/media:POST", post);

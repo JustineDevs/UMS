@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import {
+  AdminBreadcrumbs,
+  AdminErrorState,
+  AdminEmptyState,
+  AdminPageShell,
+  AuditTimeline,
+} from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type Employee = {
   id: string;
@@ -24,9 +40,10 @@ type FormData = {
 
 const EMPTY_FORM: FormData = { full_name: "", email: "", phone: "", role: "staff", hired_at: "" };
 
-export function EmployeesPageClient() {
+export function UsersPageClient() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
@@ -39,10 +56,14 @@ export function EmployeesPageClient() {
 
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/employees");
-    if (res.ok) {
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/admin/employees");
+      if (!res.ok) throw new Error("Users could not be loaded.");
       const { data } = await res.json();
       setEmployees(data ?? []);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Users could not be loaded.");
     }
     setLoading(false);
   }, []);
@@ -139,89 +160,89 @@ export function EmployeesPageClient() {
 
   return (
     <AdminPageShell
-      title="Employees"
-      subtitle="Manage staff, assign roles, and configure PINs."
+      title="Users"
+      subtitle="Manage staff accounts, assign roles, and configure PINs."
       breadcrumbs={
         <AdminBreadcrumbs
-          items={[{ label: "Dashboard", href: "/admin" }, { label: "Employees" }]}
+          items={[{ label: "Dashboard", href: "/admin" }, { label: "Users" }]}
         />
       }
       actions={
-        <button
+        <Button
+          size="sm"
           type="button"
           onClick={openCreate}
-          className="flex items-center gap-2 bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-90"
         >
-          <span className="material-symbols-outlined text-base">person_add</span>
-          Add Employee
-        </button>
+          Add User
+        </Button>
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
       {loading ? (
-        <div className="text-center py-20 text-on-surface-variant text-sm">Loading...</div>
+        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading...</div>
+      ) : loadError ? (
+        <AdminErrorState title="Users unavailable" detail={loadError} onRetry={() => void fetchEmployees()} />
       ) : (
-        <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-surface-container-low text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                <th className="text-left px-6 py-4">Name</th>
-                <th className="text-left px-6 py-4">Email</th>
-                <th className="text-left px-6 py-4">Role</th>
-                <th className="text-center px-6 py-4">Status</th>
-                <th className="text-right px-6 py-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {employees.map((emp) => (
-                <tr key={emp.id} className="border-t border-outline-variant/10 hover:bg-surface-container-low/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium">{emp.full_name}</td>
-                  <td className="px-6 py-4 text-sm text-on-surface-variant">{emp.email ?? "-"}</td>
-                  <td className="px-6 py-4">
-                    <span className="bg-surface-container-high px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider">
+                <TableRow key={emp.id}>
+                  <TableCell className="font-medium">{emp.full_name}</TableCell>
+                  <TableCell className="text-muted-foreground">{emp.email ?? "-"}</TableCell>
+                  <TableCell>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
                       {emp.role}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 text-center">
+                  </TableCell>
+                  <TableCell className="text-center">
                     <span className={`inline-block w-2 h-2 rounded-full ${emp.is_active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                  </td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={() => openEdit(emp)} className="text-xs text-primary hover:underline">Edit</button>
-                    <button onClick={() => toggleActive(emp)} className="text-xs text-on-surface-variant hover:underline">
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
+                    <Button variant="link" size="sm" onClick={() => openEdit(emp)}>Edit</Button>
+                    <Button variant="link" size="sm" onClick={() => toggleActive(emp)}>
                       {emp.is_active ? "Deactivate" : "Activate"}
-                    </button>
-                    <button onClick={() => setPinModal({ id: emp.id, name: emp.full_name })} className="text-xs text-secondary hover:underline">
+                    </Button>
+                    <Button variant="link" size="sm" onClick={() => setPinModal({ id: emp.id, name: emp.full_name })}>
                       Set PIN
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="link"
+                      size="sm"
                       type="button"
                       onClick={() => {
                         setDeleteError(null);
                         setDeleteModal({ id: emp.id, name: emp.full_name });
                       }}
-                      className="text-xs text-red-700 hover:underline"
                     >
                       Delete
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ))}
               {employees.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-on-surface-variant">
-                    No employees found. Add your first employee above.
-                  </td>
-                </tr>
+                <TableRow><TableCell colSpan={5}><AdminEmptyState title="No users found" description="Add your first user to configure staff access and POS operations." action={<Button size="sm" onClick={openCreate}>Add user</Button>} /></TableCell></TableRow>
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">{editId ? "Edit Employee" : "Add Employee"}</h2>
+            <h2 className="text-lg font-bold font-headline">{editId ? "Edit User" : "Add User"}</h2>
             <div>
               <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Full Name</label>
               <input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
@@ -229,7 +250,7 @@ export function EmployeesPageClient() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Email</label>
-                <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+                <input type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Phone</label>
@@ -252,10 +273,10 @@ export function EmployeesPageClient() {
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-2">
-              <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container-high rounded transition-colors">Cancel</button>
-              <button type="submit" disabled={saving} className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50">
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button type="submit" disabled={saving}>
                 {saving ? "Saving..." : editId ? "Update" : "Create"}
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -264,7 +285,7 @@ export function EmployeesPageClient() {
       {deleteModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Delete employee</h2>
+            <h2 className="text-lg font-bold font-headline">Delete user</h2>
             <p className="text-sm text-on-surface-variant">
               Remove{" "}
               <span className="font-semibold text-on-surface">{deleteModal.name}</span>{" "}
@@ -277,25 +298,25 @@ export function EmployeesPageClient() {
               </p>
             ) : null}
             <div className="flex gap-3 justify-end pt-2">
-              <button
+              <Button
+                variant="outline"
                 type="button"
                 disabled={deleting}
                 onClick={() => {
                   setDeleteModal(null);
                   setDeleteError(null);
                 }}
-                className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container-high rounded transition-colors disabled:opacity-50"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 type="button"
                 disabled={deleting}
                 onClick={() => void confirmDeleteEmployee()}
-                className="bg-red-700 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {deleting ? "Deleting…" : "Delete"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -319,8 +340,8 @@ export function EmployeesPageClient() {
               autoFocus
             />
             <div className="flex gap-3 justify-end pt-2">
-              <button type="button" onClick={() => { setPinModal(null); setPinValue(""); }} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-container-high rounded transition-colors">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity">Save PIN</button>
+              <Button type="button" variant="outline" onClick={() => { setPinModal(null); setPinValue(""); }}>Cancel</Button>
+              <Button type="submit">Save PIN</Button>
             </div>
           </form>
         </div>

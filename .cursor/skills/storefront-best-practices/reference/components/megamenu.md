@@ -12,7 +12,7 @@
 
 ## Overview
 
-Megamenu is a large, full-width dropdown navigation showing multiple columns of categories, links, and promotional content. Opens from navbar trigger items (e.g., "Shop", "Men", "Women").
+Megamenu is a large, full-width dropdown navigation showing multiple columns of categories, links, and promotional content. Opens from navbar trigger items (e.g., "Shop", "Guitars", "Accessories & Gear").
 
 **Assumed knowledge**: AI agents know how to build dropdown menus with hover/click triggers. This focuses on ecommerce megamenu patterns.
 
@@ -29,7 +29,7 @@ Megamenu is a large, full-width dropdown navigation showing multiple columns of 
 - Large product catalog (10+ top-level categories)
 - Deep hierarchy (parent → child → grandchild levels)
 - Want to showcase featured products/campaigns
-- Multiple segments (Men, Women, Kids, etc.)
+- Multiple segments (Guitars, Bass, Drums, etc.)
 - Visual storytelling needed
 
 **Use simple dropdown when:**
@@ -40,7 +40,7 @@ Megamenu is a large, full-width dropdown navigation showing multiple columns of 
 
 **Common megamenu triggers:**
 - "Shop" (all categories)
-- "Men", "Women", "Kids" (segmented)
+- "Guitars", "Drums", "Pianos", "Accessories & Gear" (segmented)
 - "New Arrivals" (curated)
 - "Sale" (promotional)
 
@@ -61,12 +61,12 @@ Fetch categories dynamically from ecommerce backend - never hardcode categories.
 **Example:**
 
 ```plaintext
-Electronics (header)
-  Laptops
-  Desktops
-  Monitors
-  Accessories
-  View All Electronics
+Instruments (header)
+  Guitars
+  Drums
+  Pianos
+  Accessories & Gear
+  View All Instruments
 ```
 
 **Column 4-5: Promotional/Featured**
@@ -110,7 +110,7 @@ Electronics (header)
 ```
 ┌─────────────────────────────────────────────────┐
 │ NAVBAR (position: relative)                     │
-│  [Logo]  [Shop ▼]  [Men]  [Women]  [Cart]      │
+│  [Logo]  [Shop ▼]  [Guitars]  [Bass]  [Cart]    │
 └─────────────────────────────────────────────────┘
   ┌───────────────────────────────────────────────┐
   │ MEGAMENU (absolute, left: 0, full width)      │

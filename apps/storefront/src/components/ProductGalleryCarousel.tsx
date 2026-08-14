@@ -1,6 +1,6 @@
 "use client";
 
-import type { ProductGallerySlide } from "@apparel-commerce/types";
+import type { ProductGallerySlide } from "@universal-music-store/types";
 import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -9,6 +9,10 @@ import {
   youtubeEmbedUrlAutoplay,
   youtubeThumbnailUrl,
 } from "@/lib/product-media";
+import {
+  isKnownUnavailableExternalImage,
+  shouldUnoptimizeImage,
+} from "@/lib/image-helpers";
 import { ProductImageZoom } from "./ProductImageZoom";
 
 function VideoSlide({ url, title }: { url: string; title: string }) {
@@ -81,13 +85,18 @@ function GalleryVideoThumbnail({ url }: { url: string }) {
 
   if (urlLooksLikeRasterImage(url)) {
     return (
-      <Image
-        src={url}
-        alt=""
-        fill
-        sizes="80px"
-        className="object-cover"
-      />
+      isKnownUnavailableExternalImage(url) ? (
+        <div className="h-full w-full bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high" />
+      ) : (
+        <Image
+          src={url}
+          alt=""
+          fill
+          sizes="80px"
+          className="object-cover"
+          unoptimized={shouldUnoptimizeImage(url)}
+        />
+      )
     );
   }
   if (poster && !posterFailed) {
@@ -184,12 +193,18 @@ export function ProductGalleryCarousel({
       <div className={mainStageClass}>
         <div className="relative h-[500px] w-full md:h-[716px]">
           {slide && effectiveGallerySlideKind(slide) === "image" ? (
-            <ProductImageZoom
-              src={slide.url}
-              alt={productName}
-              sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 46vw"
-              priority={safe === 0}
-            />
+            isKnownUnavailableExternalImage(slide.url) ? (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high p-8 text-center text-sm text-on-surface-variant">
+                Image unavailable
+              </div>
+            ) : (
+              <ProductImageZoom
+                src={slide.url}
+                alt={productName}
+                sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 46vw"
+                priority={safe === 0}
+              />
+            )
           ) : slide && effectiveGallerySlideKind(slide) === "video" ? (
             <VideoSlide key={slide.url} url={slide.url} title={productName} />
           ) : null}
@@ -263,13 +278,18 @@ export function ProductGalleryCarousel({
               }`}
             >
               {effectiveGallerySlideKind(s) === "image" ? (
-                <Image
-                  src={s.url}
-                  alt=""
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                />
+                isKnownUnavailableExternalImage(s.url) ? (
+                  <div className="h-full w-full bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high" />
+                ) : (
+                  <Image
+                    src={s.url}
+                    alt=""
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                    unoptimized={shouldUnoptimizeImage(s.url)}
+                  />
+                )
               ) : (
                 <GalleryVideoThumbnail url={s.url} />
               )}

@@ -105,7 +105,7 @@ This is a critical ecommerce decision that affects user experience, SEO, and tec
 
 **Implementation:**
 ```typescript
-// URL structure: /products?page=2&category=shirts
+// URL structure: /products?page=2&category=guitars
 // Each page has unique URL for SEO
 ```
 
@@ -121,10 +121,10 @@ This is a critical ecommerce decision that affects user experience, SEO, and tec
 - Exploratory browsing behavior
 - Mobile-first experience
 - Seamless discovery flow
-- Fashion/visual shopping
+- Instrument / visual shopping
 
 **Product characteristics:**
-- Visual-heavy products (fashion, art, photography)
+- Visual-heavy products (instruments, art, photography)
 - Impulse purchases
 - Discovery-focused (Pinterest-style)
 
@@ -143,7 +143,7 @@ This is a critical ecommerce decision that affects user experience, SEO, and tec
 
 **Best for:**
 - Mobile-first stores (>60% mobile traffic)
-- Fashion, home decor, visual products
+- Instruments, audio gear, visual products
 - Younger demographic (18-34)
 - Discovery-focused shopping
 
@@ -205,7 +205,7 @@ Combine patterns based on context:
 - Few filter options (2-4 key filters)
 - Maximize grid space (full-width layout)
 - Simple product categories
-- Visual-first products (fashion)
+- Visual-first products (instruments)
 
 **Layout:**
 - Horizontal filter bar above grid
@@ -236,7 +236,7 @@ Combine patterns based on context:
 - Mobile (< 768px): 2 columns
 
 **Adjust based on product type:**
-- Fashion/lifestyle: 3-4 columns (more visible at once)
+- Instrument/accessory: 3-4 columns (more visible at once)
 - Electronics/detailed: 2-3 columns (larger cards, more detail)
 - Furniture/large items: 2-3 columns (showcase details)
 
@@ -260,7 +260,7 @@ Combine patterns based on context:
 - Multi-select checkboxes
 - Hierarchical (parent-child categories)
 - Show product count per category
-- Example: "Shirts (24)" "T-Shirts (12)"
+- Example: "Guitars (24)" "Pedals (12)"
 
 **Price range filter:**
 - Range slider (drag min/max)
@@ -284,7 +284,7 @@ Combine patterns based on context:
 
 **Filter persistence:**
 - Save in URL parameters (shareable, bookmarkable)
-- Example: `/products?category=shirts&price=0-50&color=blue`
+- Example: `/products?category=guitars&price=0-50&color=blue`
 - Restore filters on page reload
 - Clear all filters should reset URL
 
@@ -305,7 +305,7 @@ Combine patterns based on context:
 - **Featured** (default): Store's recommended order (bestsellers, promoted)
 - **Price: Low to High**: Budget-conscious shoppers
 - **Price: High to Low**: Premium product seekers
-- **Newest**: Fashion, tech, time-sensitive products
+- **Newest**: Instruments, tech, time-sensitive products
 - **Best Selling**: Social proof, popular choices
 - **Top Rated**: Quality-focused shoppers
 

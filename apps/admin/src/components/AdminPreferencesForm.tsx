@@ -6,7 +6,7 @@ import {
   readAdminPreferences,
   writeAdminPreferences,
   type AdminPreferences,
-} from "@apparel-commerce/user-preferences";
+} from "@universal-music-store/user-preferences";
 
 export function AdminPreferencesForm() {
   const [prefs, setPrefs] = useState<AdminPreferences>(defaultAdminPreferences);

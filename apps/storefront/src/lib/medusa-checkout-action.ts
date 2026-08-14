@@ -22,6 +22,7 @@ export type CheckoutAction =
       providerId: string;
       stripeClientSecret?: string;
       paypalOrderId?: string;
+      xenditComponentsSdkKey?: string;
       paymentSessionId?: string;
     }
   | { kind: "manual"; providerId: string; paymentSessionId: string }
@@ -84,15 +85,6 @@ export function resolveCheckoutAction(
     return { kind: "qr", imageUrl: qrImage, payload: qrPayload };
   }
 
-  const stripeClientSecret =
-    typeof data.client_secret === "string" ? data.client_secret : undefined;
-  const paypalOrderId =
-    typeof data.paypal_order_id === "string"
-      ? data.paypal_order_id
-      : typeof data.id === "string" && providerId.includes("paypal")
-        ? data.id
-        : undefined;
-
   const checkoutUrlRaw =
     typeof data.checkout_url === "string"
       ? data.checkout_url
@@ -100,18 +92,49 @@ export function resolveCheckoutAction(
         ? data.approval_url
         : "";
 
-  if (stripeClientSecret || paypalOrderId) {
+  const xenditComponentsSdkKey =
+    typeof data.components_sdk_key === "string" && data.components_sdk_key.trim()
+      ? data.components_sdk_key.trim()
+      : undefined;
+  if (providerId.toLowerCase().includes("xendit") && xenditComponentsSdkKey) {
     return {
       kind: "embedded",
       providerId,
-      stripeClientSecret,
-      paypalOrderId,
+      xenditComponentsSdkKey,
       paymentSessionId: typeof session.id === "string" ? session.id : undefined,
     };
   }
 
   if (checkoutUrlRaw && checkoutUrlRaw.startsWith("https://")) {
     return { kind: "redirect", url: checkoutUrlRaw };
+  }
+
+  const isStripe = providerId.toLowerCase().includes("stripe");
+  const stripeClientSecret =
+    typeof data.client_secret === "string" ? data.client_secret : undefined;
+  if (isStripe && stripeClientSecret) {
+    return {
+      kind: "error",
+      message:
+        "Stripe Payment Element (client_secret) is not supported on this storefront. Use Stripe Checkout (hosted redirect) from Medusa.",
+    };
+  }
+
+  const paypalOrderId =
+    typeof data.paypal_order_id === "string"
+      ? data.paypal_order_id
+      : typeof data.id === "string" && providerId.includes("paypal")
+        ? data.id
+        : undefined;
+
+  if (paypalOrderId) {
+    return {
+      kind: "embedded",
+      providerId,
+      stripeClientSecret: undefined,
+      paypalOrderId,
+      paymentSessionId: typeof session.id === "string" ? session.id : undefined,
+    };
   }
 
   return {

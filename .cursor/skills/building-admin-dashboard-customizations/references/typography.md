@@ -63,7 +63,7 @@ import { Text } from "@medusajs/ui"
 ```tsx
 <div className="flex flex-col gap-y-1">
   <Text size="small" leading="compact" weight="plus">
-    Premium T-Shirt
+    Premium Guitar
   </Text>
   <Text size="small" leading="compact" className="text-ui-fg-subtle">
     Size: Large • Color: Blue
@@ -147,7 +147,7 @@ Medusa UI provides semantic color classes:
       Category
     </Text>
     <Text size="small" leading="compact" weight="plus">
-      Clothing
+      Instruments
     </Text>
   </div>
   <div className="flex flex-col gap-y-1">
@@ -169,7 +169,7 @@ Medusa UI provides semantic color classes:
     SKU:
   </Text>
   <Text size="small" leading="compact" weight="plus">
-    SHIRT-001
+    GUITAR-001
   </Text>
 </div>
 ```
@@ -179,7 +179,7 @@ Medusa UI provides semantic color classes:
 ```tsx
 <div className="flex flex-col gap-y-2">
   <Text size="small" leading="compact" weight="plus">
-    Premium Cotton T-Shirt
+    Premium Electric Guitar
   </Text>
   <div className="flex items-center gap-x-2 text-ui-fg-subtle">
     <Text size="small" leading="compact">

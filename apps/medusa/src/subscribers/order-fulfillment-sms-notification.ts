@@ -3,7 +3,7 @@ import { Modules } from "@medusajs/framework/utils";
 import { inngest } from "../lib/inngest/client";
 
 /**
- * Fires an Inngest event `maharlika/fulfillment.created` when a fulfillment is created.
+ * Fires an Inngest event `universal-music-store/fulfillment.created` when a fulfillment is created.
  * Inngest handles retry logic, backoff, and delivery guarantees.
  */
 export default async function orderFulfillmentSmsNotification({
@@ -13,9 +13,12 @@ export default async function orderFulfillmentSmsNotification({
   const apiKey = process.env.SEMAPHORE_API_KEY?.trim();
   if (!apiKey) return;
 
+  const { DEFAULT_PUBLIC_SITE_ORIGIN } = await import(
+    "@universal-music-store/sdk"
+  );
   const storefrontUrl =
     process.env.STOREFRONT_PUBLIC_URL?.trim() ??
-    "https://maharlika-apparel-custom.vercel.app";
+    DEFAULT_PUBLIC_SITE_ORIGIN;
 
   try {
     const fulfillmentModule = container.resolve(Modules.FULFILLMENT);
@@ -43,7 +46,7 @@ export default async function orderFulfillmentSmsNotification({
 
     if (process.env.INNGEST_EVENT_KEY) {
       await inngest.send({
-        name: "maharlika/fulfillment.created",
+        name: "universal-music-store/fulfillment.created",
         data: { phone, displayId, trackingNumber, trackingUrl },
       });
     } else {

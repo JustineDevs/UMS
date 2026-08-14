@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { OnboardingClient } from "./onboarding-client";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Welcome",
-  robots: { index: false, follow: false },
-};
+  description: "Complete your onboarding details.",
+  path: "/onboarding",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default function OnboardingPage() {
   return (

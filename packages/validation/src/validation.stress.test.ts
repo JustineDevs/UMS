@@ -1,6 +1,6 @@
 /**
  * Stress test: validation logic with mock data to capture edge cases and regressions.
- * Run: pnpm --filter @apparel-commerce/validation test
+ * Run: pnpm --filter @universal-music-store/validation test
  */
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -25,9 +25,14 @@ test("productListQuerySchema: accepts full valid input", () => {
   const input = {
     limit: 20,
     offset: 0,
-    category: "Shirts",
-    size: "M",
-    color: "Black",
+    category: "Guitars",
+    type: "Electric Guitar",
+    finish: "Black",
+    pickupConfig: "H-S-H",
+    bodyWood: "Mahogany",
+    condition: "New",
+    skillLevel: "Intermediate",
+    shippingSpeed: "Express",
     q: "polo",
     sort: "price_asc" as const,
   };
@@ -69,9 +74,9 @@ test("productListQuerySchema: rejects offset > 50000", () => {
 });
 
 test("productListQuerySchema: trims category", () => {
-  const r = productListQuerySchema.safeParse({ category: "  T-Shirts  " });
+  const r = productListQuerySchema.safeParse({ category: "  Guitars  " });
   assert.equal(r.success, true);
-  if (r.success) assert.equal(r.data.category, "T-Shirts");
+  if (r.success) assert.equal(r.data.category, "Guitars");
 });
 
 test("productListQuerySchema: rejects category longer than 120 chars", () => {
@@ -126,13 +131,19 @@ test("productListQuerySchema: q 81 chars truncated to 80 by preprocess", () => {
   if (r.success) assert.equal(r.data.q?.length, 80);
 });
 
-test("productListQuerySchema: size max 40 chars", () => {
-  const r = productListQuerySchema.safeParse({ size: "a".repeat(41) });
+test("productListQuerySchema: type max 80 chars", () => {
+  const r = productListQuerySchema.safeParse({ type: "a".repeat(80) });
+  assert.equal(r.success, true);
+  if (r.success) assert.equal(r.data.type?.length, 80);
+});
+
+test("productListQuerySchema: type 81 chars rejected", () => {
+  const r = productListQuerySchema.safeParse({ type: "a".repeat(81) });
   assert.equal(r.success, false);
 });
 
-test("productListQuerySchema: color max 80 chars", () => {
-  const r = productListQuerySchema.safeParse({ color: "a".repeat(81) });
+test("productListQuerySchema: finish max 80 chars", () => {
+  const r = productListQuerySchema.safeParse({ finish: "a".repeat(81) });
   assert.equal(r.success, false);
 });
 

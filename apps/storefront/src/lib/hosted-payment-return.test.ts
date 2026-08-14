@@ -12,7 +12,7 @@ import {
 
 test("normalizeHostedReturnProvider falls back to stripe", () => {
   assert.equal(normalizeHostedReturnProvider(undefined), "stripe");
-  assert.equal(normalizeHostedReturnProvider("maya"), "maya");
+  assert.equal(normalizeHostedReturnProvider("xendit"), "xendit");
   assert.equal(normalizeHostedReturnProvider("PAYPAL"), "paypal");
 });
 
@@ -24,20 +24,20 @@ test("normalizeHostedReturnStatus defaults to success", () => {
 
 test("providerLabelForHostedReturn exposes user-facing labels", () => {
   assert.equal(providerLabelForHostedReturn("stripe"), "Stripe");
-  assert.equal(providerLabelForHostedReturn("paymongo"), "PayMongo");
+  assert.equal(providerLabelForHostedReturn("xendit"), "Xendit");
 });
 
 test("buildHostedReturn messages stay explicit and user-facing", () => {
   assert.match(
-    buildHostedReturnMissingCorrelationMessage("maya"),
-    /Maya payment/i,
+    buildHostedReturnMissingCorrelationMessage("xendit"),
+    /Xendit/i,
   );
   assert.match(
     buildHostedReturnStatusMessage("paypal", "cancel"),
     /PayPal/i,
   );
   assert.match(
-    buildHostedReturnStatusMessage("paymongo", "failure"),
+    buildHostedReturnStatusMessage("xendit", "failure"),
     /try again/i,
   );
 });

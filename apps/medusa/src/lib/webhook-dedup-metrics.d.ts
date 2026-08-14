@@ -1,4 +1,4 @@
 export function logWebhookDedupDuplicate(
-  provider: "stripe" | "paypal" | "paymongo" | "maya" | "jnt",
+  provider: "stripe" | "paypal" | "xendit" | "jnt",
   dedupId: string,
 ): void;

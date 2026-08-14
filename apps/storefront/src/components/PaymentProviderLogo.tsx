@@ -4,16 +4,14 @@ import Image from "next/image";
 import { useState } from "react";
 import type { PaymentProviderKey } from "@/lib/medusa-checkout";
 
-/** Local SVGs in /public (Shopify payment_icons, MIT — matches GCash / PayMaya brand marks; Brandfetch CDN needs a client id). */
-const LOCAL: Partial<Record<PaymentProviderKey, string>> = {
-  PAYMONGO: "/images/payments/gcash.svg",
-  MAYA: "/images/payments/paymaya.svg",
-};
+/** Local SVGs in /public (Shopify payment_icons, MIT). */
+const LOCAL: Partial<Record<PaymentProviderKey, string>> = {};
 
 /** Brand marks via Simple Icons CDN (https://simpleicons.org). */
 const CDN: Partial<Record<PaymentProviderKey, string>> = {
   STRIPE: "https://cdn.simpleicons.org/stripe/635BFF",
   PAYPAL: "https://cdn.simpleicons.org/paypal/00457C",
+  XENDIT: "https://cdn.simpleicons.org/xendit/00B3B0",
 };
 
 export function PaymentProviderLogo({

@@ -1,6 +1,6 @@
 /**
  * Structured commerce observability hooks (stdout / client telemetry).
- * Events align with .omx/plans/test-spec-maharlika-cross-app-commerce-architecture.md § Observability.
+ * Events align with .omx/plans/test-spec-universal-music-store-cross-app-commerce-architecture.md § Observability.
  */
 
 export type CommerceObservabilityEvent =

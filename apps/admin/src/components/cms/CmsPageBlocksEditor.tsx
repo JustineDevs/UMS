@@ -1,6 +1,6 @@
 "use client";
 
-import type { CmsBlock, CmsPageBlockPresetRow } from "@apparel-commerce/platform-data";
+import type { CmsBlock, CmsPageBlockPresetRow } from "@universal-music-store/platform-data";
 import {
   DndContext,
   closestCenter,

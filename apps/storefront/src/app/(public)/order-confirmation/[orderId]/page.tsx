@@ -1,15 +1,24 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { fetchMedusaTrackByOrderId, fetchMedusaTrackByCartId } from "@/lib/medusa-track-fetch";
-import { SITE_NAME } from "@/lib/seo";
+import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
+import {
+  fetchMedusaTrackByOrderId,
+  fetchMedusaTrackByCartId,
+  type TrackPayload,
+} from "@/lib/medusa-track-fetch";
+import { SITE_NAME, buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: `Order Confirmed | ${SITE_NAME}`,
-  robots: { index: false },
-};
+  description: "Order confirmation and delivery summary.",
+  path: "/order-confirmation",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 type OrderLine = {
   id: string;
@@ -19,27 +28,28 @@ type OrderLine = {
   thumbnail?: string | null;
 };
 
+type ConfirmOrder = TrackPayload["order"] & {
+  display_id?: number;
+  email?: string;
+  items?: OrderLine[];
+  shipping_total?: number;
+  subtotal?: number;
+  tax_total?: number;
+  total?: number;
+  shipping_address?: {
+    first_name?: string;
+    last_name?: string;
+    address_1?: string;
+    address_2?: string;
+    city?: string;
+    province?: string;
+    postal_code?: string;
+  } | null;
+};
+
 type ConfirmPayload = {
-  order: {
-    id?: string;
-    display_id?: number;
-    status?: string;
-    email?: string;
-    items?: OrderLine[];
-    shipping_total?: number;
-    subtotal?: number;
-    tax_total?: number;
-    total?: number;
-    shipping_address?: {
-      first_name?: string;
-      last_name?: string;
-      address_1?: string;
-      address_2?: string;
-      city?: string;
-      province?: string;
-      postal_code?: string;
-    } | null;
-  };
+  order: ConfirmOrder;
+  shipments: TrackPayload["shipments"];
 };
 
 async function fetchOrderData(orderId: string): Promise<{ ok: boolean; data: ConfirmPayload | null }> {
@@ -80,7 +90,7 @@ export default async function OrderConfirmationPage({
     );
   }
 
-  const { order } = data;
+  const { order, shipments } = data;
   const displayId = order.display_id ?? orderId;
   const items: OrderLine[] = Array.isArray(order.items) ? order.items : [];
   const total = typeof order.total === "number" ? order.total / 100 : null;
@@ -132,6 +142,7 @@ export default async function OrderConfirmationPage({
                       fill
                       className="object-cover"
                       sizes="64px"
+                      unoptimized={shouldUnoptimizeImage(item.thumbnail)}
                     />
                   </div>
                 )}
@@ -150,7 +161,7 @@ export default async function OrderConfirmationPage({
         </section>
       )}
 
-      {(total !== null || addrLine) && (
+      {(total !== null || addrLine || shipments.length > 0) && (
         <section className="mb-6 space-y-2 rounded-lg border border-outline-variant/20 p-4 text-sm">
           {addrLine && (
             <div>
@@ -169,7 +180,42 @@ export default async function OrderConfirmationPage({
           )}
           <div>
             <span className="font-medium text-primary">Estimated delivery: </span>
-            <span className="text-on-surface-variant">3–7 business days</span>
+            <span className="text-on-surface-variant">
+              {shipments.find((s) => s.expected_delivery)
+                ? "Carrier ETA available in tracking"
+                : "3–7 business days"}
+            </span>
+          </div>
+        </section>
+      )}
+
+      {shipments.length > 0 && (
+        <section className="mb-6 rounded-lg border border-outline-variant/20 p-4 text-sm">
+          <h2 className="mb-3 font-headline text-sm font-bold uppercase tracking-widest text-primary">
+            Shipment status
+          </h2>
+          <div className="space-y-3">
+            {shipments.map((s) => (
+              <div key={s.id} className="rounded border border-outline-variant/15 bg-surface-container-lowest p-3">
+                <p className="font-medium text-primary">
+                  {s.tracking_number ?? "Awaiting tracking number"}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {(s.carrier_slug ?? "carrier").replace(/-/g, " ").toUpperCase()} ·{" "}
+                  {(s.status ?? "pending").replace(/_/g, " ")}
+                </p>
+                {sanitizeTrustedPublicUrl(s.tracking_url) ? (
+                  <a
+                    href={sanitizeTrustedPublicUrl(s.tracking_url) ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-block text-xs font-semibold text-primary underline"
+                  >
+                    Open public tracking
+                  </a>
+                ) : null}
+              </div>
+            ))}
           </div>
         </section>
       )}

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type EmployeeRole = "admin" | "manager" | "cashier" | "staff";
 
@@ -24,6 +24,7 @@ export type CreateEmployeeInput = {
   role?: EmployeeRole;
   hired_at?: string;
   user_id?: string;
+  metadata?: Record<string, unknown>;
 };
 
 export type UpdateEmployeeInput = Partial<CreateEmployeeInput> & {
@@ -96,6 +97,7 @@ export async function createEmployee(
       role: input.role ?? "staff",
       hired_at: input.hired_at ?? null,
       user_id: input.user_id ?? null,
+      metadata: input.metadata ?? {},
     })
     .select("*")
     .single();
@@ -108,7 +110,9 @@ export async function updateEmployee(
   id: string,
   input: UpdateEmployeeInput,
 ): Promise<Employee> {
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
   if (input.full_name !== undefined) patch.full_name = input.full_name;
   if (input.email !== undefined) patch.email = input.email;
   if (input.phone !== undefined) patch.phone = input.phone;

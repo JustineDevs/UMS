@@ -4,16 +4,18 @@ export type CartLine = {
   slug: string;
   name: string;
   sku: string;
-  size: string;
-  color: string;
+  type: string;
+  finish: string;
   price: number;
+  /** Product thumbnail URL for checkout display. */
+  thumbnail?: string;
 };
 
 /** Browser-only bag until checkout builds a Medusa cart; line prices here are for display. */
-const STORAGE_KEY = "apparel-commerce-cart-v1";
+const STORAGE_KEY = "ums-commerce-cart-v2";
 
 function isBrowser(): boolean {
-  return typeof window !== "undefined" && typeof sessionStorage !== "undefined";
+  return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
 function normalizeCartLine(line: unknown): CartLine | null {
@@ -25,16 +27,20 @@ function normalizeCartLine(line: unknown): CartLine | null {
       ? Math.floor(row.quantity)
       : 0;
   if (!variantId || quantity < 1) return null;
+  const thumb = typeof row.thumbnail === "string" && row.thumbnail.trim()
+    ? row.thumbnail.trim()
+    : undefined;
   return {
     variantId,
     quantity,
     slug: typeof row.slug === "string" ? row.slug.trim() : "",
     name: typeof row.name === "string" ? row.name.trim() : "",
     sku: typeof row.sku === "string" ? row.sku.trim() : "",
-    size: typeof row.size === "string" ? row.size.trim() : "",
-    color: typeof row.color === "string" ? row.color.trim() : "",
+    type: typeof row.type === "string" ? row.type.trim() : "",
+    finish: typeof row.finish === "string" ? row.finish.trim() : "",
     price:
       typeof row.price === "number" && Number.isFinite(row.price) ? row.price : 0,
+    ...(thumb ? { thumbnail: thumb } : {}),
   };
 }
 
@@ -59,13 +65,13 @@ export function normalizeCartLines(lines: unknown): CartLine[] {
 
 export function readCart(): CartLine[] {
   if (!isBrowser()) return [];
-  const raw = sessionStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
     return [];
   }
   const normalized = normalizeCartLines(parsed);
@@ -77,7 +83,7 @@ export function readCart(): CartLine[] {
 
 export function writeCart(lines: CartLine[]): void {
   if (!isBrowser()) return;
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeCartLines(lines)));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizeCartLines(lines)));
 }
 
 export function addCartLine(line: CartLine): void {
@@ -109,5 +115,5 @@ export function updateLineQuantity(variantId: string, quantity: number): void {
 
 export function clearCart(): void {
   if (!isBrowser()) return;
-  sessionStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY);
 }

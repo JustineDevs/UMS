@@ -59,7 +59,7 @@ async function run(opts = {}) {
 
 function help() {
   console.log(`
-  apparel-commerce-commit linear [--issue <id>]
+  universal-music-store-commit linear [--issue <id>]
 
   Print Linear issue trailer for commit messages.
   Uses current branch to resolve issue ID if --issue not given.

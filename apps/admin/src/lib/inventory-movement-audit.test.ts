@@ -32,8 +32,17 @@ test("recordInventoryMovementAudit sends quantity_delta as after minus before", 
   });
 
   assert.ok(inserted);
-  assert.strictEqual(inserted.quantity_before, 5);
-  assert.strictEqual(inserted.quantity_after, 8);
-  assert.strictEqual(inserted.quantity_delta, 3);
-  assert.strictEqual(inserted.reference_type, "catalog_product_update");
+  if (!inserted) {
+    throw new Error("Expected audit insert payload");
+  }
+  const payload = inserted as {
+    quantity_before: number;
+    quantity_after: number;
+    quantity_delta: number;
+    reference_type: string;
+  };
+  assert.strictEqual(payload.quantity_before, 5);
+  assert.strictEqual(payload.quantity_after, 8);
+  assert.strictEqual(payload.quantity_delta, 3);
+  assert.strictEqual(payload.reference_type, "catalog_product_update");
 });

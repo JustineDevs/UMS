@@ -32,10 +32,13 @@ test("buildCatalogPreviewModel preserves previewable media and cartesian variant
     handle: "weekend-tee",
     description: "Heavy cotton tee",
     status: "published",
-    brand: "Maharlika",
+    brand: "Universal Music Store",
     currencyCode: "php",
     pricePhp: "1299",
-    imageUrls: ["https://cdn.example.com/front.jpg", "https://cdn.example.com/back.jpg"],
+    imageUrls: [
+      "https://cdn.example.com/front.jpg",
+      "https://cdn.example.com/back.jpg",
+    ],
     videoUrls: ["https://www.youtube.com/watch?v=12345678901"],
     categoryLabels: ["Tees", "Featured", "Tees"],
     sizes: ["S", "M"],
@@ -46,7 +49,7 @@ test("buildCatalogPreviewModel preserves previewable media and cartesian variant
   assert.deepEqual(model.categoryLabels, ["Tees", "Featured"]);
   assert.equal(model.variants.length, 4);
   assert.equal(model.cardPriceLabel, "PHP 1,299");
-  assert.equal(model.brand, "Maharlika");
+  assert.equal(model.brand, "Universal Music Store");
 });
 
 test("buildCatalogPreviewModel treats gallery png as image and mp4 as video", () => {

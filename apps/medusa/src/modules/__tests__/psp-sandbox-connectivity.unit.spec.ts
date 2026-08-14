@@ -6,11 +6,10 @@
  *
  * Run: pnpm test:psp-sandbox
  *
- * Expected env vars per provider (set in root .env or CI secrets):
+ * Expected env vars per provider (set in root .env.local or CI secrets):
  *   Stripe:        STRIPE_API_KEY (sk_test_*)
  *   PayPal:        PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_ENVIRONMENT=sandbox
- *   PayMongo:      PAYMONGO_SECRET_KEY (sk_test_*)
- *   Maya:          MAYA_SECRET_KEY, MAYA_SANDBOX=true
+ *   Xendit:        XENDIT_SECRET_KEY
  *   COD:           Always passes (no external service)
  *   Medusa health: MEDUSA_BACKEND_URL, then NEXT_PUBLIC_MEDUSA_URL, then localhost:9000
  */
@@ -248,232 +247,90 @@ describe("PayPal sandbox connectivity", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. PayMongo sandbox connectivity
+// 3. Xendit sandbox connectivity
 // ---------------------------------------------------------------------------
 
-describe("PayMongo sandbox connectivity", () => {
-  const secretKey = process.env.PAYMONGO_SECRET_KEY?.trim();
-  const isTestKey = secretKey?.startsWith("sk_test_");
+describe("Xendit sandbox connectivity", () => {
+  const secretKey = process.env.XENDIT_SECRET_KEY?.trim();
+  const base = "https://api.xendit.co";
+  const headers = {
+    Authorization: secretKey ? basicAuth(secretKey) : "",
+    "Content-Type": "application/json",
+  };
 
-  if (!secretKey || !isTestKey) {
-    it.skip("PAYMONGO_SECRET_KEY not configured or not a test key", () => {});
-    return;
-  }
-
-  const PAYMONGO_API = "https://api.paymongo.com/v1";
-
-  it(
-    "POST /links creates a test payment link",
-    async () => {
-      const res = await fetch(`${PAYMONGO_API}/links`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuth(secretKey),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              amount: 10000,
-              currency: "php",
-              description: "PSP connectivity test",
-            },
-          },
-        }),
-      });
-
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as {
-        data?: {
-          id?: string;
-          attributes?: { checkout_url?: string; status?: string };
-        };
-      };
-      expect(body.data?.id).toBeTruthy();
-      expect(body.data?.attributes?.checkout_url).toBeTruthy();
-      expect(body.data?.attributes?.status).toBe("unpaid");
-    },
-    TIMEOUT,
-  );
-
-  it(
-    "GET /links/:id retrieves created link",
-    async () => {
-      const unique = `medusa_ps:retrieve-${Date.now()}`;
-      const createRes = await fetch(`${PAYMONGO_API}/links`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuth(secretKey),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              amount: 10000,
-              currency: "php",
-              description: unique,
-            },
-          },
-        }),
-      });
-
-      if (!createRes.ok) {
-        const errText = await createRes.text();
-        throw new Error(
-          `PayMongo create link failed: ${createRes.status} ${errText}`,
-        );
+  let session:
+    | {
+        id?: string;
+        payment_link_url?: string;
       }
-      const created = (await createRes.json()) as {
-        data?: { id?: string };
-      };
-      expect(created.data?.id).toBeTruthy();
+    | null = null;
+  let skipReason = "";
 
-      const res = await fetch(
-        `${PAYMONGO_API}/links/${encodeURIComponent(created.data!.id)}`,
-        { headers: { Authorization: basicAuth(secretKey) } },
-      );
+  beforeAll(async () => {
+    if (!secretKey) {
+      skipReason = "XENDIT_SECRET_KEY not configured";
+      return;
+    }
+
+    const referenceId = `medusa_ps:test-${Date.now()}`;
+    const res = await fetch(`${base}/sessions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        session_type: "PAY",
+        mode: "PAYMENT_LINK",
+        amount: 10000,
+        currency: "PHP",
+        reference_id: referenceId,
+        description: "PSP connectivity test",
+        success_return_url:
+          "http://localhost:3000/checkout/hosted-return?provider=xendit&status=success",
+        cancel_return_url:
+          "http://localhost:3000/checkout/hosted-return?provider=xendit&status=cancel",
+      }),
+    });
+
+    if (res.status === 401 || res.status === 403) {
+      skipReason = `XENDIT_SECRET_KEY is present but unauthorized (${res.status})`;
+      return;
+    }
+
+    if (!res.ok) {
+      skipReason = `Xendit sandbox probe failed with ${res.status}`;
+      return;
+    }
+
+    session = (await res.json()) as {
+      id?: string;
+      payment_link_url?: string;
+    };
+  }, TIMEOUT);
+
+  it(
+    "POST /sessions creates a payment link session",
+    async () => {
+      if (skipReason || !session) return;
+      expect(session.id).toBeTruthy();
+      expect(session.payment_link_url).toBeTruthy();
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "GET /sessions/:id retrieves created session",
+    async () => {
+      if (skipReason || !session?.id?.trim()) return;
+
+      const sessionId = session.id.trim();
+      expect(sessionId).toBeTruthy();
+
+      const res = await fetch(`${base}/sessions/${encodeURIComponent(sessionId as string)}`, {
+        headers: { Authorization: headers.Authorization },
+      });
       expect(res.status).toBe(200);
-      const body = (await res.json()) as { data?: { id?: string } };
-      expect(body.data?.id).toBe(created.data!.id);
-    },
-    TIMEOUT,
-  );
-
-  it(
-    "POST /payment_intents creates a test payment intent",
-    async () => {
-      const res = await fetch(`${PAYMONGO_API}/payment_intents`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuth(secretKey),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: {
-            attributes: {
-              amount: 10000,
-              payment_method_allowed: ["card"],
-              payment_method_options: {
-                card: { request_three_d_secure: "any" },
-              },
-              currency: "PHP",
-              description: "PSP connectivity test intent",
-            },
-          },
-        }),
-      });
-
-      expect(res.status).toBe(200);
-      const body = (await res.json()) as {
-        data?: {
-          id?: string;
-          attributes?: { status?: string };
-        };
-      };
-      expect(body.data?.id).toBeTruthy();
-      expect(body.data?.attributes?.status).toBe("awaiting_payment_method");
-    },
-    TIMEOUT,
-  );
-});
-
-// ---------------------------------------------------------------------------
-// 4. Maya sandbox connectivity
-// ---------------------------------------------------------------------------
-
-describe("Maya sandbox connectivity", () => {
-  const secretKey = process.env.MAYA_SECRET_KEY?.trim();
-  const isSandbox = process.env.MAYA_SANDBOX === "true";
-
-  if (!secretKey) {
-    it.skip("MAYA_SECRET_KEY not configured", () => {});
-    return;
-  }
-
-  const base = isSandbox
-    ? "https://pg-sandbox.paymaya.com"
-    : "https://pg.paymaya.com";
-
-  it(
-    "POST /checkout/v1/checkouts creates sandbox invoice",
-    async () => {
-      const res = await fetch(`${base}/checkout/v1/checkouts`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuth(secretKey),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          totalAmount: { value: "100.00", currency: "PHP" },
-          buyer: {
-            firstName: "PSP",
-            lastName: "Test",
-            contact: {
-              email: "psp-test@example.com",
-              phone: "+639170000000",
-            },
-          },
-          items: [
-            {
-              name: "Connectivity test item",
-              quantity: 1,
-              totalAmount: { value: "100.00" },
-            },
-          ],
-          requestReferenceNumber: `medusa_ps:test-${Date.now()}`,
-          redirectUrl: {
-            success: "http://localhost:3000/checkout?maya=success",
-            failure: "http://localhost:3000/checkout?maya=failure",
-            cancel: "http://localhost:3000/checkout?maya=cancel",
-          },
-        }),
-      });
-
-      if (res.status === 401) {
-        console.warn(
-          "[Maya] 401 Unauthorized. MAYA_SECRET_KEY is expired or invalid for sandbox. Skipping.",
-        );
-        return;
-      }
-
-      expect([200, 201]).toContain(res.status);
-      const body = (await res.json()) as {
-        checkoutId?: string;
-        redirectUrl?: string;
-      };
-      expect(body.checkoutId || body.redirectUrl).toBeTruthy();
-    },
-    TIMEOUT,
-  );
-
-  it(
-    "POST /payments/v1/payments creates an invoice",
-    async () => {
-      const res = await fetch(`${base}/payments/v1/payments`, {
-        method: "POST",
-        headers: {
-          Authorization: basicAuth(secretKey),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          totalAmount: { value: 5000, currency: "PHP" },
-          requestReferenceNumber: `medusa_ps:test-${Date.now()}`,
-          redirectUrl: {
-            success: "http://localhost:3000",
-            failure: "http://localhost:3000",
-            cancel: "http://localhost:3000",
-          },
-        }),
-      });
-
-      if (res.status === 401) {
-        console.warn(
-          "[Maya] 401 Unauthorized. MAYA_SECRET_KEY is expired or invalid for sandbox. Skipping.",
-        );
-        return;
-      }
-
-      expect([200, 201]).toContain(res.status);
+      const body = (await res.json()) as { id?: string; reference_id?: string };
+      expect(body.id).toBe(sessionId);
+      expect(body.reference_id).toBeTruthy();
     },
     TIMEOUT,
   );

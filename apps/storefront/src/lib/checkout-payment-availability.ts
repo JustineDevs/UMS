@@ -11,7 +11,7 @@ export type CheckoutPaymentAvailabilitySource = "medusa" | "env";
  * `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS`.
  *
  * If that API is unavailable, this env-only fallback runs:
- * - Set `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS` to a comma-separated list (STRIPE, PAYPAL, PAYMONGO, MAYA, COD).
+ * - Set `NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS` to a comma-separated list (STRIPE, PAYPAL, XENDIT, COD).
  * - If unset: **all** of those keys are shown as selectable. `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` only picks
  *   which option is pre-selected (default highlight). Each method must still be attached to your Medusa region
  *   or payment session creation will fail for that choice.
@@ -36,15 +36,11 @@ export function getEnvOnlyCheckoutPaymentAvailability(): {
       enabled = [];
     }
   } else {
-    const def =
-      process.env.NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID?.trim() ||
-      "pp_stripe_stripe";
-    const entry = Object.entries(PAYMENT_PROVIDER_IDS).find(([, id]) => id === def);
-    const primary = entry
-      ? (entry[0] as PaymentProviderKey)
-      : ("STRIPE" as PaymentProviderKey);
-    const rest = allKeys.filter((k) => k !== primary);
-    enabled = [primary, ...rest];
+    // When NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS is unset, show only COD as the safe default.
+    // Operators must explicitly list providers in NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS to enable PSPs.
+    // Showing all providers when keys are missing causes phantom availability — users select a PSP
+    // that fails at payment session creation because its API keys were never configured.
+    enabled = ["COD" as PaymentProviderKey];
   }
 
   const available = Object.fromEntries(
@@ -101,20 +97,31 @@ export function resolveCheckoutPaymentAvailability(
   preferredKey: PaymentProviderKey;
   source: CheckoutPaymentAvailabilitySource;
 } {
-  if (Array.isArray(medusaRegionKeys) && medusaRegionKeys.length > 0) {
+  if (medusaRegionKeys === null || medusaRegionKeys === undefined) {
     return {
-      ...mergeMedusaRegionWithEnvAllowlist(medusaRegionKeys),
+      ...getEnvOnlyCheckoutPaymentAvailability(),
+      source: "env",
+    };
+  }
+  if (medusaRegionKeys.length === 0) {
+    const allKeys = Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[];
+    const available = Object.fromEntries(
+      allKeys.map((k) => [k, false]),
+    ) as Record<PaymentProviderKey, boolean>;
+    return {
+      available,
+      preferredKey: "STRIPE",
       source: "medusa",
     };
   }
   return {
-    ...getEnvOnlyCheckoutPaymentAvailability(),
-    source: "env",
+    ...mergeMedusaRegionWithEnvAllowlist(medusaRegionKeys),
+    source: "medusa",
   };
 }
 
 /** @deprecated Prefer `resolveCheckoutPaymentAvailability` after loading region keys from the API. */
-export function getCheckoutPaymentAvailability(): {
+function getCheckoutPaymentAvailability(): {
   available: Record<PaymentProviderKey, boolean>;
   preferredKey: PaymentProviderKey;
 } {

@@ -71,7 +71,7 @@ export const GUIDE_DEMO_CATALOG: readonly GuideDemoCatalogEntry[] = [
   {
     key: "employees",
     file: "demo-employees.html",
-    title: "Employees",
+    title: "Users",
     audience: "People managers",
     outcome: "See who is active and who still needs onboarding.",
     summary: "Roster, roles, and invite state.",
@@ -127,7 +127,7 @@ export const GUIDE_DEMO_CATALOG: readonly GuideDemoCatalogEntry[] = [
   {
     key: "storefront",
     file: "demo-storefront.html",
-    title: "Storefront home",
+    title: "Homepage content",
     audience: "Brand and ecommerce leads",
     outcome: "Preview how homepage payload edits are staged (mock).",
     summary: "Hero modules and publish bar (illustrative).",

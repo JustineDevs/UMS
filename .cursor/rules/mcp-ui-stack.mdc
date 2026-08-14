@@ -6,6 +6,6 @@ alwaysApply: false
 
 # MCP UI stack
 
-Production UI uses Tailwind and `@apparel-commerce/ui` in `packages/ui`. Extend that package instead of adding MUI, Mantine, Chakra, HeroUI, DaisyUI, or Kibo as app dependencies unless an ADR says otherwise. Those MCPs are for pattern reference only.
+Production UI uses Tailwind and `@universal-music-store/ui` in `packages/ui`. Extend that package instead of adding MUI, Mantine, Chakra, HeroUI, DaisyUI, or Kibo as app dependencies unless an ADR says otherwise. Those MCPs are for pattern reference only.
 
-Read `internal/docs/MCP-UI-STACK.md` and `AGENT.md` MCP section. Enabled server keys live in `.cursor/mcp.json`. Use GSAP MCP patterns for motion; align with `HomeScrollExperience` and reduced-motion checks.
+Read `AGENT.md` and `AGENT.md` MCP section. Enabled server keys live in `.cursor/mcp.json`. Use GSAP MCP patterns for motion; align with `HomeScrollExperience` and reduced-motion checks.

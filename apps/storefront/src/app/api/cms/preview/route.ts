@@ -3,7 +3,7 @@ import {
   createSupabaseClient,
   getCmsBlogPostBySlugPreview,
   getCmsPageBySlugPreview,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 import {
   getRequestIp,

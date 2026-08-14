@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPaymentAttemptByCorrelationId } from "@apparel-commerce/platform-data";
+import { getPaymentAttemptByCorrelationId } from "@universal-music-store/platform-data";
 
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";

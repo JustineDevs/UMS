@@ -1,37 +1,33 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { upsertCmsRedirect } from "@apparel-commerce/platform-data";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
+import { upsertCmsRedirect } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { cmsRedirectBulkSchema } from "@/lib/cms-route-contracts";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
-export async function PATCH(req: NextRequest) {
+async function patch(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
   if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-  const b = body as { ids?: string[]; active?: boolean };
-  const ids = Array.isArray(b.ids) ? b.ids.filter((x) => typeof x === "string") : [];
-  if (!ids.length || typeof b.active !== "boolean") {
-    return correlatedJson(cid, { error: "ids[] and active required" }, { status: 400 });
-  }
+  const parsed = cmsRedirectBulkSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return correlatedJson(cid, { error: "Invalid redirect bulk payload" }, { status: 400 });
+  const { ids, active } = parsed.data;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, session.user.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
   let updated = 0;
   for (const id of ids) {
-    const { data } = await sup.client.from("cms_redirects").select("*").eq("id", id).maybeSingle();
+    const { data } = await sup.client.from("cms_redirects").select("*").eq("id", id).eq("organization_id", organization.id).maybeSingle();
     if (!data) continue;
     const r = data as Record<string, unknown>;
     const row = await upsertCmsRedirect(sup.client, {
@@ -39,10 +35,13 @@ export async function PATCH(req: NextRequest) {
       from_path: String(r.from_path ?? ""),
       to_path: String(r.to_path ?? ""),
       status_code: Number(r.status_code) as 301 | 302 | 307 | 308,
-      active: b.active,
+      active,
       preserve_query: Boolean(r.preserve_query),
+      organization_id: organization.id,
     });
     if (row) updated++;
   }
   return correlatedJson(cid, { data: { updated } });
 }
+
+export const PATCH = withAdminMutationIdempotency("/admin/cms/redirects/bulk:PATCH", patch);

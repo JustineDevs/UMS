@@ -1,4 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Terms",
+  description: "Store terms, payment notes, order acceptance, and consumer policy summary.",
+  path: "/terms",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function TermsPage() {
   return (
@@ -8,7 +17,7 @@ export default function TermsPage() {
       </h1>
       <p className="mb-6">
         By using this storefront you agree to purchase goods from{" "}
-        <strong>Maharlika Apparel Custom</strong> under the prices,
+        <strong>Universal Music Store</strong> under the prices,
         descriptions, and policies shown at checkout. Product images and
         measurements are illustrative; minor variance may occur between batches.
       </p>

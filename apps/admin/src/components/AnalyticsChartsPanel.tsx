@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
@@ -8,7 +8,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import {
   Area,
   AreaChart,
@@ -54,6 +54,9 @@ function formatShortDate(isoDate: string): string {
 }
 
 export function AnalyticsChartsPanel({ payload }: Props) {
+  const [chartReady, setChartReady] = useState(false);
+  useEffect(() => setChartReady(true), []);
+
   const parsed = useMemo(
     () => analyticsChartsPayloadSchema.safeParse(payload),
     [payload],
@@ -183,7 +186,9 @@ export function AnalyticsChartsPanel({ payload }: Props) {
                 nameKey="name"
                 cx="50%"
                 cy="50%"
+                id="analytics-status-breakdown"
                 innerRadius={56}
+                isAnimationActive={chartReady}
                 outerRadius={96}
                 paddingAngle={2}
                 label={({ name, percent }) =>

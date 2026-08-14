@@ -1,8 +1,9 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 
 type MediaRow = {
   id: string;
@@ -21,18 +22,22 @@ const MAX_BYTES = 25 * 1024 * 1024;
 
 export function CmsMediaManager() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<MediaRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [mime, setMime] = useState("");
-  const [sort, setSort] = useState<"created_desc" | "created_asc" | "name_asc" | "name_desc">(
-    "created_desc",
-  );
+  const [sort, setSort] = useState<
+    "created_desc" | "created_asc" | "name_asc" | "name_desc"
+  >("created_desc");
   const [tag, setTag] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [editAlt, setEditAlt] = useState("");
@@ -40,6 +45,8 @@ export function CmsMediaManager() {
   const [refsText, setRefsText] = useState<string | null>(null);
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     const sp = new URLSearchParams();
     sp.set("limit", "200");
     if (q.trim()) sp.set("q", q.trim());
@@ -53,7 +60,10 @@ export function CmsMediaManager() {
         return j.data ?? [];
       })
       .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, [q, mime, sort, tag]);
 
   useEffect(() => {
@@ -65,7 +75,9 @@ export function CmsMediaManager() {
     if (!files.length || !canWrite) return;
     for (const file of files) {
       if (file.size > MAX_BYTES) {
-        setError(`"${file.name}" exceeds ${Math.round(MAX_BYTES / (1024 * 1024))} MB.`);
+        setError(
+          `"${file.name}" exceeds ${Math.round(MAX_BYTES / (1024 * 1024))} MB.`,
+        );
         return;
       }
     }
@@ -82,6 +94,7 @@ export function CmsMediaManager() {
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.open("POST", "/api/admin/cms/media");
+          xhr.setRequestHeader("Idempotency-Key", crypto.randomUUID());
           xhr.upload.onprogress = (ev) => {
             if (ev.lengthComputable) {
               const base = (i / files.length) * 100;
@@ -166,8 +179,16 @@ export function CmsMediaManager() {
   };
 
   const softDelete = async (id: string) => {
-    if (!confirm("Soft-delete this asset? Storage file remains until purged separately.")) return;
-    const r = await fetch(`/api/admin/cms/media/${id}`, { method: "DELETE" });
+    if (
+      !confirm(
+        "Soft-delete this asset? Storage file remains until purged separately.",
+      )
+    )
+      return;
+    const r = await fetch(`/api/admin/cms/media/${id}`, {
+      method: "DELETE",
+      headers: { "Idempotency-Key": crypto.randomUUID() },
+    });
     if (!r.ok) setError("Delete failed");
     else {
       setOpenId(null);
@@ -175,7 +196,8 @@ export function CmsMediaManager() {
     }
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
     <div className="space-y-6">
@@ -223,30 +245,28 @@ export function CmsMediaManager() {
         </label>
       </div>
 
-      <div
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        onClick={() => canWrite && !uploading && inputRef.current?.click()}
+      <label
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         className={[
           "rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-          dragOver ? "border-primary bg-primary/5" : "border-slate-300 bg-slate-50/80",
-          canWrite && !uploading ? "cursor-pointer hover:border-slate-400" : "opacity-60",
+          dragOver
+            ? "border-primary bg-primary/5"
+            : "border-slate-300 bg-slate-50/80",
+          canWrite && !uploading
+            ? "cursor-pointer hover:border-slate-400"
+            : "opacity-60",
         ].join(" ")}
       >
         <p className="text-sm font-medium text-slate-800">
-          {uploading ? `Uploading${uploadPct != null ? ` ${uploadPct}%` : "…"}` : "Drop files or click"}
+          {uploading
+            ? `Uploading${uploadPct != null ? ` ${uploadPct}%` : "…"}`
+            : "Drop files or click"}
         </p>
         <p className="mt-2 text-xs text-slate-600">
-          Max {Math.round(MAX_BYTES / (1024 * 1024))} MB per file. Types: images, video, PDF, docs, zip.
+          Max {Math.round(MAX_BYTES / (1024 * 1024))} MB per file. Types:
+          images, video, PDF, docs, zip.
         </p>
         <input
           ref={inputRef}
@@ -258,11 +278,22 @@ export function CmsMediaManager() {
           aria-label="Upload media files"
           onChange={(e) => void onFileInput(e.target.files)}
         />
-      </div>
+      </label>
 
-      <ul className="grid gap-4 sm:grid-cols-2">
+      {loadingRows ? (
+        <p className="text-sm text-slate-600">Loading media...</p>
+      ) : null}
+      {!loadingRows && rows.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+          No media assets match the current filters.
+        </p>
+      ) : null}
+      <ul className="grid gap-4 sm:grid-cols-2" aria-label="Media assets">
         {rows.map((m) => (
-          <li key={m.id} className="rounded-lg border border-slate-200 p-3 text-sm break-all">
+          <li
+            key={m.id}
+            className="rounded-lg border border-slate-200 p-3 text-sm break-all"
+          >
             <button
               type="button"
               className="text-left text-primary underline"
@@ -270,14 +301,14 @@ export function CmsMediaManager() {
             >
               {m.display_name || m.public_url.slice(-40)}
             </button>
-            <a
-              href={m.public_url}
+            {sanitizeTrustedPublicUrl(m.public_url) ? <a
+              href={sanitizeTrustedPublicUrl(m.public_url) ?? undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 text-xs text-slate-500 underline"
             >
               open
-            </a>
+            </a> : null}
             {m.mime_type ? (
               <p className="mt-1 text-[11px] text-slate-500">{m.mime_type}</p>
             ) : null}
@@ -288,11 +319,14 @@ export function CmsMediaManager() {
             ) : null}
             {m.alt_text ? (
               <p className="mt-2 text-xs text-slate-600">
-                <span className="font-medium text-slate-700">Alt:</span> {m.alt_text}
+                <span className="font-medium text-slate-700">Alt:</span>{" "}
+                {m.alt_text}
               </p>
             ) : null}
             {m.tags?.length ? (
-              <p className="text-[11px] text-slate-500">Tags: {m.tags.join(", ")}</p>
+              <p className="text-[11px] text-slate-500">
+                Tags: {m.tags.join(", ")}
+              </p>
             ) : null}
 
             {openId === m.id ? (
@@ -339,7 +373,9 @@ export function CmsMediaManager() {
                   </button>
                 </div>
                 {refsText ? (
-                  <pre className="max-h-40 overflow-auto rounded bg-slate-50 p-2 text-[10px]">{refsText}</pre>
+                  <pre className="max-h-40 overflow-auto rounded bg-slate-50 p-2 text-[10px]">
+                    {refsText}
+                  </pre>
                 ) : null}
               </div>
             ) : null}

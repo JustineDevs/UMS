@@ -1,6 +1,6 @@
 /**
  * Medusa-local Supabase helpers for payment webhooks and health.
- * Duplicates a subset of @apparel-commerce/platform-data so Medusa's Node16/CJS
+ * Duplicates a subset of @universal-music-store/platform-data so Medusa's Node16/CJS
  * backend build does not typecheck the platform-data ESM barrel (TS2835/TS1479).
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";

@@ -36,6 +36,7 @@ From project root:
 - `pnpm test:e2e:smoke` — Grep `@smoke` only
 - `pnpm test:e2e:workflow` — Grep `@workflow`
 - `pnpm test:e2e:checkout` — Checkout harness + commerce journey + medusa checkout smoke
+- `pnpm test:e2e:stress` — Multi-PSP orchestrated journey (see `e2e/README.md`)
 - `pnpm test:e2e:admin` — Admin operations flow (`@admin`)
 - `pnpm test:e2e:matrix` — `e2e/components` + `e2e/layouts`
 - `pnpm test:e2e:chaos` — Network chaos / resilience spec
@@ -51,7 +52,7 @@ Focused runs: `node stress-test/scripts/run-e2e.js --grep @layout` or pass a sin
 
 For `flows/admin-operations-flow.spec.ts` and `flows/admin-e2e-credentials.spec.ts`:
 
-1. Root `.env`: `ADMIN_ALLOWED_EMAILS` (first email is the actor), `NEXTAUTH_SECRET` (password on `/sign-in/e2e`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the usual admin/Medusa vars used by `pnpm run dev`.
+1. Root `.env.local`: `ADMIN_ALLOWED_EMAILS` (first email is the actor), `NEXTAUTH_SECRET` (password on `/sign-in/e2e`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the usual admin/Medusa vars used by `pnpm run dev`.
 2. Run `pnpm e2e:ensure-staff` once per environment. If the first email is **staff** in Supabase, the script sets `staff_permission_grants` to `*`. If that user is already **admin**, the script makes no changes (admin sessions already resolve to wildcard permissions).
 3. Playwright must target the admin origin: `PLAYWRIGHT_ADMIN_NEXTAUTH_URL=http://localhost:3001` (already defaulted in `playwright.config.ts` for the admin dev server).
 

@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
-import { registerPaymentAttempt } from "@apparel-commerce/platform-data";
+import { registerPaymentAttempt } from "@universal-music-store/platform-data";
 
+import { getStorefrontSession } from "@/lib/auth";
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
-import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
+import { loadCustomerProfile } from "@/lib/server-customer-profile";
+import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
+import { readVerifiedMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
+import { minorUnitDivisor } from "@/lib/medusa-money";
+import {
+  reconcileCheckoutIntentQuote,
+  registerCheckoutIntentRouteLogic,
+} from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
+import { capturePostHogEvent } from "@universal-music-store/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +33,12 @@ type Body = {
  * Registers a durable payment/checkout attempt (ledger row) before redirecting to a hosted PSP.
  */
 export async function POST(req: Request) {
+  const session = await getStorefrontSession();
+  const sessionEmail = session?.user?.email?.trim().toLowerCase();
+  if (!sessionEmail) {
+    return NextResponse.json({ error: "Sign in before checkout" }, { status: 401 });
+  }
+
   const rl = await applyRateLimit(req, "checkout-intents", 60, 60_000);
   if (!rl.ok) {
     return rl.response;
@@ -42,8 +57,16 @@ export async function POST(req: Request) {
   }
 
   const provider = typeof body.provider === "string" ? body.provider.trim().toLowerCase() : "";
-  if (!provider) {
+  if (!provider || !["cod", "stripe", "paypal", "xendit"].includes(provider)) {
     return NextResponse.json({ error: "provider is required" }, { status: 400 });
+  }
+
+  const profile = await loadCustomerProfile(sessionEmail);
+  if (!isStorefrontProfileComplete(profile)) {
+    return NextResponse.json(
+      { error: "Complete your delivery profile before checkout" },
+      { status: 400 },
+    );
   }
 
   const amountMinor =
@@ -54,25 +77,45 @@ export async function POST(req: Request) {
     typeof body.currencyCode === "string" && body.currencyCode.trim()
       ? body.currencyCode.trim()
       : "PHP";
+  let authoritative;
+  try {
+    authoritative = await readVerifiedMedusaCartTotalsPreview(cartId);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not reconcile checkout cart",
+      },
+      { status: 409 },
+    );
+  }
+
+  const submittedQuoteFingerprint =
+    typeof body.quoteFingerprint === "string" ? body.quoteFingerprint.trim() : "";
+  const quoteMismatch = reconcileCheckoutIntentQuote({
+    submittedQuoteFingerprint,
+    authoritativeQuoteFingerprint: authoritative.quoteFingerprint,
+  });
+  if (quoteMismatch) {
+    return NextResponse.json(quoteMismatch.body, { status: quoteMismatch.status });
+  }
+  const authoritativeAmountMinor = Math.max(
+    0,
+    Math.round(authoritative.total * minorUnitDivisor(authoritative.currencyCode)),
+  );
 
   const sb = createStorefrontServiceSupabase();
   const result = await registerCheckoutIntentRouteLogic({
+    organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
     cartId,
     provider,
-    amountMinor,
-    currencyCode,
-    quoteFingerprint:
-      typeof body.quoteFingerprint === "string" ? body.quoteFingerprint.trim() : undefined,
-    variantIds: Array.isArray(body.variantIds)
-      ? body.variantIds.filter(
-          (value): value is string => typeof value === "string" && value.trim().length > 0,
-        )
-      : undefined,
-    productIds: Array.isArray(body.productIds)
-      ? body.productIds.filter(
-          (value): value is string => typeof value === "string" && value.trim().length > 0,
-        )
-      : undefined,
+    amountMinor: authoritativeAmountMinor || amountMinor,
+    currencyCode: authoritative.currencyCode || currencyCode,
+    quoteFingerprint: authoritative.quoteFingerprint,
+    variantIds: authoritative.variantIds,
+    productIds: authoritative.productIds,
     medusaPaymentSessionId: body.medusaPaymentSessionId,
     providerSessionId: body.providerSessionId,
     idempotencyKey: body.idempotencyKey,
@@ -92,8 +135,33 @@ export async function POST(req: Request) {
       cartId,
       provider,
       reused: b.reused === true,
-      quoteFingerprint:
-        typeof body.quoteFingerprint === "string" ? body.quoteFingerprint.trim() : null,
+      quoteFingerprint: authoritative.quoteFingerprint,
+    });
+    void capturePostHogEvent({
+      event: "checkout_intent_registered",
+      distinctId: cartId,
+      properties: {
+        correlationId: b.correlationId ?? null,
+        cartId,
+        provider,
+        reused: b.reused === true,
+        quoteFingerprint: authoritative.quoteFingerprint,
+      },
+    });
+  }
+
+  if (result.status >= 400) {
+    void capturePostHogEvent({
+      event: "checkout_intent_registration_failed",
+      distinctId: cartId,
+      properties: {
+        cartId,
+        provider,
+        status: result.status,
+        error: typeof result.body === "object" && result.body && "error" in result.body
+          ? String((result.body as { error?: unknown }).error ?? "")
+          : null,
+      },
     });
   }
 

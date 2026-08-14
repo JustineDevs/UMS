@@ -9,14 +9,19 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 
 type Props = {
   value: string;
   category?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   minPrice?: number;
   maxPrice?: number;
   search?: string;
@@ -25,9 +30,14 @@ type Props = {
 export function ShopSortSelect({
   value,
   category,
-  size,
-  color,
+  type,
+  finish,
   brand,
+  pickupConfig,
+  bodyWood,
+  condition,
+  skillLevel,
+  shippingSpeed,
   minPrice,
   maxPrice,
   search,
@@ -38,9 +48,14 @@ export function ShopSortSelect({
   function apply(sort: string) {
     const params = new URLSearchParams();
     if (category) params.set("category", category);
-    if (size) params.set("size", size);
-    if (color) params.set("color", color);
+    if (type) params.set("type", type);
+    if (finish) params.set("finish", finish);
     if (brand) params.set("brand", brand);
+    if (pickupConfig) params.set("pickupConfig", pickupConfig);
+    if (bodyWood) params.set("bodyWood", bodyWood);
+    if (condition) params.set("condition", condition);
+    if (skillLevel) params.set("skillLevel", skillLevel);
+    if (shippingSpeed) params.set("shippingSpeed", shippingSpeed);
     if (minPrice != null && Number.isFinite(minPrice)) {
       params.set("minPrice", String(minPrice));
     }

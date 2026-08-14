@@ -1,9 +1,8 @@
 const PROVIDER_FLAGS: Record<string, string> = {
   stripe: "FEATURE_FLAG_STRIPE",
   paypal: "FEATURE_FLAG_PAYPAL",
-  paymongo: "FEATURE_FLAG_PAYMONGO",
-  maya: "FEATURE_FLAG_MAYA",
-  aftership: "FEATURE_FLAG_AFTERSHIP",
+  xendit: "FEATURE_FLAG_XENDIT",
+  pancake_pos: "FEATURE_FLAG_PANCAKE_POS",
 };
 
 export function isProviderEnabled(provider: string): boolean {

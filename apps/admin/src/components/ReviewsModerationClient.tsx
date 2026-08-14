@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@apparel-commerce/ui";
+import { Button } from "@universal-music-store/ui";
 
 type ReviewRow = {
   id: string;

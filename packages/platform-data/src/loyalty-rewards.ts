@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type RewardType = "discount" | "free_item" | "free_shipping" | "custom";
 

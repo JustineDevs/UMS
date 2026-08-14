@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type LoyaltyTier = "standard" | "silver" | "gold" | "platinum";
 

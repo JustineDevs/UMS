@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { authOptions } from "@/lib/auth";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import {
   collectCommerceProductLookupRows,
   parseCommerceProductLookupParams,
@@ -45,7 +44,7 @@ function mapCommerceLookupRow(raw: unknown) {
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -57,14 +56,13 @@ export async function GET(req: NextRequest) {
   const lookup = parseCommerceProductLookupParams(req.nextUrl.searchParams);
   try {
     const filtered = await collectCommerceProductLookupRows(lookup, async ({ limit, offset, query }) => {
-      const params = new URLSearchParams();
-      params.set("limit", String(limit));
-      params.set("offset", String(offset));
-      if (query) params.set("q", query);
-      params.set(
-        "fields",
-        "+id,+title,+handle,+thumbnail,+status,+variants,*variants,*variants.prices,*categories",
-      );
+      const params = new URLSearchParams({
+        limit: String(limit),
+        offset: String(offset),
+        ...(query ? { q: query } : {}),
+        fields:
+          "+id,+title,+handle,+thumbnail,+status,+variants,*variants,*variants.prices,*categories",
+      });
       const path = `/admin/products?${params.toString()}`;
       const res = await medusaAdminFetch(path);
       const json = (await res.json()) as Record<string, unknown>;

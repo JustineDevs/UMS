@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { medusaCartIdSchema } from "@apparel-commerce/validation";
+import { medusaCartIdSchema } from "@universal-music-store/validation";
 
 import { MEDUSA_CART_COOKIE } from "./cart-cookie";
 import { createStorefrontMedusaSdk } from "./medusa-sdk";

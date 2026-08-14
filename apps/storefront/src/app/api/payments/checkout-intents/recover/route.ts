@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findOpenPaymentAttemptForCart } from "@apparel-commerce/platform-data";
+import { findOpenPaymentAttemptForCart } from "@universal-music-store/platform-data";
 
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
@@ -43,6 +43,6 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Recover failed";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 503 });
   }
 }

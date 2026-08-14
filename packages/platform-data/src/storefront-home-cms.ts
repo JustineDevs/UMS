@@ -1,12 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
-/** One home-page tile (Shorts / Shirts / Jackets style blocks). */
+/** One home-page tile for an instrument-led storefront. */
 export type StorefrontHomeTile = {
   href: string;
   title: string;
   linkLabel: string;
-  /** Shown on the wide tile only (e.g. Jackets). */
+  /** Shown on the wide tile only (e.g. featured accessories & gear). */
   subtitle?: string;
   /** Optional image URL (https). Empty = solid background. */
   imageUrl: string;
@@ -14,7 +14,21 @@ export type StorefrontHomeTile = {
   variant: "large" | "small" | "wide";
 };
 
+export type StorefrontHomeSectionLayout = {
+  maxWidth?: string;
+  minHeight?: string;
+  paddingBlock?: string;
+  paddingInline?: string;
+};
+
 export type StorefrontHomePayload = {
+  domOverrides?: Record<string, Record<string, string>>;
+  sectionLayout?: {
+    hero?: StorefrontHomeSectionLayout;
+    tiles?: StorefrontHomeSectionLayout;
+    latest?: StorefrontHomeSectionLayout;
+    newsletter?: StorefrontHomeSectionLayout;
+  };
   hero: {
     line1: string;
     line2: string;
@@ -23,6 +37,15 @@ export type StorefrontHomePayload = {
     ctaLabel: string;
     ctaHref: string;
     imageUrl: string;
+    mediaType: "image" | "video";
+    videoUrl: string;
+    layout?: StorefrontHomeSectionLayout;
+    style: {
+      headlineFont: "headline" | "body" | "mono";
+      textTone: "brand" | "neutral" | "muted";
+      headlineSize: "compact" | "default" | "hero";
+      contentWidth: "standard" | "wide" | "extra";
+    };
   };
   tiles: [StorefrontHomeTile, StorefrontHomeTile, StorefrontHomeTile];
   latestSection: {
@@ -40,47 +63,57 @@ export type StorefrontHomePayload = {
 
 export const DEFAULT_STOREFRONT_HOME_PAYLOAD: StorefrontHomePayload = {
   hero: {
-    line1: "MAHARLIKA",
-    line2: "APPAREL CUSTOM",
+    line1: "UNIVERSAL",
+    line2: "MUSIC STORE",
     lead:
-      "Maharlika Apparel Custom is an online store for custom shorts, shirts, and jackets. Browse, order, and track shipments.",
+      "Universal Music Store is an online store for guitars, bass, drums, pianos, and accessories & gear. Browse, order, and track shipments.",
     showPrivacyLink: true,
     ctaLabel: "Shop Now",
     ctaHref: "/shop",
     imageUrl: "",
+    mediaType: "image",
+    videoUrl: "",
+    style: {
+      headlineFont: "headline",
+      textTone: "brand",
+      headlineSize: "hero",
+      contentWidth: "wide",
+    },
   },
   tiles: [
     {
-      href: "/shop?category=Shorts",
-      title: "Shorts",
-      linkLabel: "Explore Collection",
+      href: "/shop?category=Guitars",
+      title: "Guitars",
+      subtitle: "Electric, acoustic, and bass models",
+      linkLabel: "Explore collection",
       imageUrl: "",
       variant: "large",
     },
     {
-      href: "/shop?category=Shirt",
-      title: "Shirts",
-      linkLabel: "Shop shirts",
+      href: "/shop?category=Drums",
+      title: "Drums",
+      subtitle: "Kits, cymbals, and percussion",
+      linkLabel: "Shop drums",
       imageUrl: "",
       variant: "small",
     },
     {
-      href: "/shop?category=Jacket",
-      title: "Jackets",
-      subtitle: "Layers & outerwear",
+      href: "/shop?category=Accessories%20%26%20Gear",
+      title: "Accessories & Gear",
+      subtitle: "Cables, pedals, and studio essentials",
       linkLabel: "",
       imageUrl: "",
       variant: "wide",
     },
   ],
   latestSection: {
-    title: "THE LATEST DROP",
+    title: "THE LATEST DROPS",
     viewAllLabel: "View All Products",
     viewAllHref: "/shop",
   },
   newsletter: {
-    title: "STAY WITH MAHARLIKA",
-    body: "New drops, restocks, and studio notes from Maharlika Apparel Custom.",
+    title: "STAY IN TUNE",
+    body: "New drops, restocks, and studio notes from Universal Music Store.",
     placeholder: "email@address.com",
     buttonLabel: "Subscribe",
   },
@@ -95,14 +128,54 @@ function pickString(r: Record<string, unknown>, key: string, fallback: string): 
   return typeof v === "string" ? v : fallback;
 }
 
+function sanitizeHomeImageUrl(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === "medusa-public-images.s3.eu-west-1.amazonaws.com") return "";
+    if (hostname.endsWith("fbcdn.net")) return "";
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+}
+
 function pickBool(r: Record<string, unknown>, key: string, fallback: boolean): boolean {
   const v = r[key];
   return typeof v === "boolean" ? v : fallback;
 }
 
+function pickEnum<T extends string>(
+  r: Record<string, unknown>,
+  key: string,
+  fallback: T,
+  values: readonly T[],
+): T {
+  const v = r[key];
+  return typeof v === "string" && (values as readonly string[]).includes(v) ? (v as T) : fallback;
+}
+
+function mergeLayout(partial: unknown): StorefrontHomeSectionLayout | undefined {
+  if (!isRecord(partial)) return undefined;
+  const clean = (value: unknown) => {
+    if (typeof value !== "string" || value.length > 40) return undefined;
+    return /^[0-9a-zA-Z.%(),\-\s]+$/.test(value.trim()) ? value.trim() : undefined;
+  };
+  const layout = {
+    maxWidth: clean(partial.maxWidth),
+    minHeight: clean(partial.minHeight),
+    paddingBlock: clean(partial.paddingBlock),
+    paddingInline: clean(partial.paddingInline),
+  };
+  return Object.values(layout).some(Boolean) ? layout : undefined;
+}
+
 function mergeHero(partial: unknown): StorefrontHomePayload["hero"] {
   const d = DEFAULT_STOREFRONT_HOME_PAYLOAD.hero;
   if (!isRecord(partial)) return { ...d };
+  const style = isRecord(partial.style) ? partial.style : {};
   return {
     line1: pickString(partial, "line1", d.line1),
     line2: pickString(partial, "line2", d.line2),
@@ -110,7 +183,31 @@ function mergeHero(partial: unknown): StorefrontHomePayload["hero"] {
     showPrivacyLink: pickBool(partial, "showPrivacyLink", d.showPrivacyLink),
     ctaLabel: pickString(partial, "ctaLabel", d.ctaLabel),
     ctaHref: pickString(partial, "ctaHref", d.ctaHref),
-    imageUrl: pickString(partial, "imageUrl", d.imageUrl),
+    imageUrl: sanitizeHomeImageUrl(pickString(partial, "imageUrl", d.imageUrl)),
+    mediaType: pickEnum(partial, "mediaType", d.mediaType, ["image", "video"]),
+    videoUrl: sanitizeHomeImageUrl(pickString(partial, "videoUrl", d.videoUrl)),
+    layout: mergeLayout(partial.layout),
+    style: {
+      headlineFont: pickEnum(
+        style,
+        "headlineFont",
+        d.style.headlineFont,
+        ["headline", "body", "mono"],
+      ),
+      textTone: pickEnum(style, "textTone", d.style.textTone, ["brand", "neutral", "muted"]),
+      headlineSize: pickEnum(
+        style,
+        "headlineSize",
+        d.style.headlineSize,
+        ["compact", "default", "hero"],
+      ),
+      contentWidth: pickEnum(
+        style,
+        "contentWidth",
+        d.style.contentWidth,
+        ["standard", "wide", "extra"],
+      ),
+    },
   };
 }
 
@@ -130,7 +227,7 @@ function mergeTile(
     title: pickString(partial, "title", fallback.title),
     linkLabel: pickString(partial, "linkLabel", fallback.linkLabel),
     subtitle: typeof subtitle === "string" ? subtitle : fallback.subtitle,
-    imageUrl: pickString(partial, "imageUrl", fallback.imageUrl),
+    imageUrl: sanitizeHomeImageUrl(pickString(partial, "imageUrl", fallback.imageUrl)),
     variant,
   };
 }
@@ -176,6 +273,17 @@ export function mergeStorefrontHomePayload(raw: unknown): StorefrontHomePayload 
     return cloneDefaultPayload();
   }
   return {
+    domOverrides: isRecord(raw.domOverrides)
+      ? Object.fromEntries(Object.entries(raw.domOverrides).filter(([, value]) => isRecord(value)).map(([id, value]) => [id, value as Record<string, string>]))
+      : undefined,
+    sectionLayout: isRecord(raw.sectionLayout)
+      ? {
+          hero: mergeLayout(raw.sectionLayout.hero),
+          tiles: mergeLayout(raw.sectionLayout.tiles),
+          latest: mergeLayout(raw.sectionLayout.latest),
+          newsletter: mergeLayout(raw.sectionLayout.newsletter),
+        }
+      : undefined,
     hero: mergeHero(raw.hero),
     tiles: mergeTiles(raw.tiles),
     latestSection: mergeLatest(raw.latestSection),

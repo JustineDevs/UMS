@@ -1,4 +1,4 @@
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaStoreBaseUrl } from "@universal-music-store/sdk";
 import { getMedusaSecretKey } from "@/lib/medusa-pos";
 
 /**

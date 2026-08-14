@@ -1,10 +1,68 @@
-# Medusa backend for Render — build from monorepo root
-FROM node:20-slim AS base
-RUN corepack enable && corepack prepare pnpm@9 --activate
+FROM node:20.19.4-slim AS base
+LABEL org.opencontainers.image.title="Universal Music Store Medusa"
+LABEL org.opencontainers.image.description="Medusa backend for the Universal Music Store"
+LABEL org.opencontainers.image.version="0.0.1"
+LABEL org.opencontainers.image.licenses="MIT"
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/medusa ./apps/medusa
+COPY packages ./packages
 RUN pnpm install --frozen-lockfile
-RUN pnpm exec turbo run build --filter=medusa
+
+FROM deps AS dev
+ENV NODE_ENV=development
+ENV TS_NODE_SWC=true
+ENV XDG_CONFIG_HOME=/tmp/medusa-config
+ENV APPDATA=/tmp/medusa-config
+ENV LOCALAPPDATA=/tmp/medusa-config
+COPY --from=deps /app/node_modules ./node_modules
 WORKDIR /app/apps/medusa
-CMD ["pnpm", "run", "start"]
+EXPOSE 9000
+CMD ["node", "./scripts/run-dev.cjs"]
+
+FROM deps AS build
+ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+ARG MEDUSA_BACKEND_URL=http://localhost:9000
+ENV DATABASE_URL=$DATABASE_URL
+ENV MEDUSA_BACKEND_URL=$MEDUSA_BACKEND_URL
+ENV NODE_ENV=development
+ENV XDG_CONFIG_HOME=/tmp/medusa-config
+ENV APPDATA=/tmp/medusa-config
+ENV LOCALAPPDATA=/tmp/medusa-config
+WORKDIR /app/apps/medusa
+RUN pnpm --filter @universal-music-store/platform-data build && pnpm --filter @universal-music-store/sdk build && pnpm run build
+RUN mkdir -p public && cp -R .medusa/server/public/admin public/admin
+
+FROM base AS runtime
+ENV NODE_ENV=production
+ENV TS_NODE_SWC=true
+ENV HOME=/home/medusa
+ENV XDG_CONFIG_HOME=/tmp/medusa-config
+ENV APPDATA=/tmp/medusa-config
+ENV LOCALAPPDATA=/tmp/medusa-config
+
+RUN useradd --create-home --uid 1001 --shell /bin/bash medusa
+
+WORKDIR /app
+COPY --from=build --chown=medusa:medusa /app/package.json ./package.json
+COPY --from=build --chown=medusa:medusa /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=build --chown=medusa:medusa /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=build --chown=medusa:medusa /app/turbo.json ./turbo.json
+COPY --from=build --chown=medusa:medusa /app/node_modules ./node_modules
+COPY --from=build --chown=medusa:medusa /app/packages ./packages
+COPY --from=build --chown=medusa:medusa /app/apps/medusa ./apps/medusa
+
+USER medusa
+WORKDIR /app/apps/medusa
+EXPOSE 9000
+STOPSIGNAL SIGTERM
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s CMD node -e "fetch('http://127.0.0.1:9000/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["pnpm", "exec", "medusa", "start"]

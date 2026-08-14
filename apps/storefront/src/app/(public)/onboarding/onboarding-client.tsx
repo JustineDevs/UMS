@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import {
   isPhilippinesMobilePhone,
   type StorefrontShippingAddress,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 import { useEffect, useState } from "react";
 
 function emptyAddress(): StorefrontShippingAddress {
@@ -15,6 +15,7 @@ function emptyAddress(): StorefrontShippingAddress {
     fullName: "",
     phone: "",
     line1: "",
+    barangay: "",
     city: "",
     province: "",
     country: "PH",
@@ -46,8 +47,12 @@ export function OnboardingClient() {
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    void fetch("/api/account/profile/status")
+    void fetch("/api/account/profile/status", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
       .then(async (r) => {
+        if (!r.ok) throw new Error(`Profile status request failed (${r.status})`);
         const j = (await r.json()) as {
           complete?: boolean;
           profile?: {
@@ -96,10 +101,13 @@ export function OnboardingClient() {
     if (
       !addr.fullName.trim() ||
       !addr.line1.trim() ||
+      !addr.barangay?.trim() ||
       !addr.city.trim() ||
       !addr.province.trim()
     ) {
-      setErr("Fill in the delivery contact, street, city, and province.");
+      setErr(
+        "Fill in the delivery contact, street, barangay, city, and province.",
+      );
       return;
     }
     if (!isPhilippinesMobilePhone(addr.phone)) {
@@ -202,6 +210,16 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.line1}
               onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
+            />
+          </label>
+          <label className="block text-xs font-medium text-on-surface-variant">
+            Barangay
+            <input
+              required
+              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
+              value={addr.barangay ?? ""}
+              onChange={(e) => setAddr({ ...addr, barangay: e.target.value })}
+              placeholder="Required for couriers (e.g. J&T)"
             />
           </label>
           <label className="block text-xs font-medium text-on-surface-variant">

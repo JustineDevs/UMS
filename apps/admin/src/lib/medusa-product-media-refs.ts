@@ -1,4 +1,4 @@
-import type { CmsMediaReferenceHit } from "@apparel-commerce/platform-data";
+import type { CmsMediaReferenceHit } from "@universal-music-store/platform-data";
 import { medusaAdminFetch } from "./medusa-admin-http";
 import { getMedusaAdminProductEditUrl } from "./medusa-catalog-bridge";
 import { getMedusaSecretKey } from "./medusa-pos";

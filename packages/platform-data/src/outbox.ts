@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PAYMENT_OUTBOX_EVENT_TYPES } from "./payment-outbox-events";
+import { PAYMENT_OUTBOX_EVENT_TYPES } from "./payment-outbox-events.js";
 
 export type OutboxEvent = {
   id?: string;

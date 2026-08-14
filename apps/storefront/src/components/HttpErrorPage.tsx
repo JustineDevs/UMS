@@ -15,7 +15,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import { getHttpErrorCopy } from "@/lib/http-error-copy";
 
 type HttpErrorPageProps = {

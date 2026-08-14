@@ -1,6 +1,9 @@
 "use client";
 
-import { CMS_FORM_KEYS, staffHasPermission } from "@apparel-commerce/platform-data";
+import {
+  CMS_FORM_KEYS,
+  staffHasPermission,
+} from "@universal-music-store/platform-data";
 import { useSession } from "next-auth/react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 
@@ -16,11 +19,15 @@ type Sub = {
 
 function PayloadPretty({ payload }: { payload: Record<string, unknown> }) {
   const entries = Object.entries(payload);
-  if (entries.length === 0) return <p className="text-xs text-slate-500">Empty</p>;
+  if (entries.length === 0)
+    return <p className="text-xs text-slate-500">Empty</p>;
   return (
     <dl className="grid gap-2 text-xs">
       {entries.map(([k, v]) => (
-        <div key={k} className="rounded border border-slate-100 bg-slate-50/80 px-2 py-1">
+        <div
+          key={k}
+          className="rounded border border-slate-100 bg-slate-50/80 px-2 py-1"
+        >
           <dt className="font-medium text-slate-700">{k}</dt>
           <dd className="mt-0.5 break-all font-mono text-slate-600">
             {typeof v === "object" ? JSON.stringify(v) : String(v)}
@@ -33,10 +40,14 @@ function PayloadPretty({ payload }: { payload: Record<string, unknown> }) {
 
 export function CmsFormsTable() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<Sub[]>([]);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
   const [formKey, setFormKey] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -63,6 +74,8 @@ export function CmsFormsTable() {
   }, []);
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     const sp = new URLSearchParams();
     sp.set("limit", String(limit));
     sp.set("offset", String(offset));
@@ -71,12 +84,23 @@ export function CmsFormsTable() {
     if (to.trim()) sp.set("to", to.trim());
     fetch(`/api/admin/cms/forms/submissions?${sp.toString()}`)
       .then(async (r) => {
-        const j = (await r.json()) as { data?: Sub[]; meta?: { total?: number }; error?: string };
+        const j = (await r.json()) as {
+          data?: Sub[];
+          meta?: { total?: number };
+          error?: string;
+        };
         if (!r.ok) throw new Error(j.error ?? r.statusText);
         setRows(j.data ?? []);
-        setTotal(typeof j.meta?.total === "number" ? j.meta.total : j.data?.length ?? 0);
+        setTotal(
+          typeof j.meta?.total === "number"
+            ? j.meta.total
+            : (j.data?.length ?? 0),
+        );
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, [formKey, from, to, limit, offset]);
 
   useEffect(() => {
@@ -126,7 +150,8 @@ export function CmsFormsTable() {
     return `/api/admin/cms/forms/submissions/export?${sp.toString()}`;
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   const page = Math.floor(offset / limit) + 1;
   const pages = Math.max(1, Math.ceil(total / limit));
@@ -138,14 +163,20 @@ export function CmsFormsTable() {
       <section className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-sm">
         <h3 className="font-semibold text-slate-900">Delivery and spam</h3>
         <p className="mt-2 text-xs text-slate-600">
-          Storefront POST <code className="rounded bg-white px-1">/api/forms/[formKey]</code> is rate-limited
-          to 20 requests per minute per IP. Honeypot fields <code className="rounded bg-white px-1">_hp</code>{" "}
-          or <code className="rounded bg-white px-1">_honeypot</code> must stay empty or the submission is
-          accepted silently without storing (bots).
+          Storefront POST{" "}
+          <code className="rounded bg-white px-1">/api/forms/[formKey]</code> is
+          rate-limited to 20 requests per minute per IP. Honeypot fields{" "}
+          <code className="rounded bg-white px-1">_hp</code> or{" "}
+          <code className="rounded bg-white px-1">_honeypot</code> must stay
+          empty or the submission is accepted silently without storing (bots).
         </p>
         <p className="mt-2 text-xs text-slate-600">
-          When <code className="rounded bg-white px-1">SUPABASE_SERVICE_ROLE_KEY</code> is set on the
-          storefront, successful inserts trigger a JSON POST to the webhook URL below.
+          When{" "}
+          <code className="rounded bg-white px-1">
+            SUPABASE_SERVICE_ROLE_KEY
+          </code>{" "}
+          is set on the storefront, successful inserts trigger a JSON POST to
+          the webhook URL below.
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <label className="block text-xs font-medium text-slate-700">
@@ -231,65 +262,100 @@ export function CmsFormsTable() {
         <table className="w-full min-w-[640px] text-left text-sm border-collapse">
           <thead>
             <tr className="border-b border-slate-200">
-              <th className="py-2 pr-4">When</th>
-              <th className="py-2 pr-4">Form</th>
-              <th className="py-2 pr-4">Spam</th>
-              <th className="py-2 pr-4">Read</th>
-              <th className="py-2">Payload</th>
+              <th scope="col" className="py-2 pr-4">
+                When
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Form
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Spam
+              </th>
+              <th scope="col" className="py-2 pr-4">
+                Read
+              </th>
+              <th scope="col" className="py-2">
+                Payload
+              </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <Fragment key={r.id}>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="py-2 pr-4 whitespace-nowrap text-xs">
-                    {new Date(r.created_at).toLocaleString()}
-                  </td>
-                  <td className="py-2 pr-4">{r.form_key}</td>
-                  <td className="py-2 pr-4 text-xs">{r.spam_score}</td>
-                  <td className="py-2 pr-4 text-xs">{r.read_at ? "yes" : "no"}</td>
-                  <td className="py-2">
-                    <button
-                      type="button"
-                      className="text-primary underline text-xs"
-                      onClick={() => setExpanded(expanded === r.id ? null : r.id)}
-                    >
-                      {expanded === r.id ? "Collapse" : "Expand"}
-                    </button>
-                    {expanded !== r.id ? (
-                      <span className="ml-2 font-mono text-[10px] text-slate-500 break-all line-clamp-2">
-                        {JSON.stringify(r.payload)}
-                      </span>
-                    ) : null}
-                  </td>
-                </tr>
-                {expanded === r.id ? (
-                  <tr className="border-b border-slate-100 bg-slate-50/80">
-                    <td colSpan={5} className="px-4 py-3">
-                      <PayloadPretty payload={r.payload} />
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={!canWrite}
-                          className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
-                          onClick={() => void markRead(r.id, !r.read_at)}
-                        >
-                          {r.read_at ? "Mark unread" : "Mark read"}
-                        </button>
-                        <label className="flex items-center gap-1 text-xs">
-                          Assign
-                          <input
-                            defaultValue={r.assigned_to ?? ""}
-                            className="w-40 rounded border border-slate-200 px-1 py-0.5 font-mono text-[11px]"
-                            onBlur={(e) => void assign(r.id, e.target.value)}
-                          />
-                        </label>
-                      </div>
+            {loadingRows ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-8 text-center text-sm text-slate-600"
+                >
+                  Loading submissions...
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="py-8 text-center text-sm text-slate-600"
+                >
+                  No form submissions match the current filters.
+                </td>
+              </tr>
+            ) : (
+              rows.map((r) => (
+                <Fragment key={r.id}>
+                  <tr className="border-b border-slate-100 align-top">
+                    <td className="py-2 pr-4 whitespace-nowrap text-xs">
+                      {new Date(r.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-2 pr-4">{r.form_key}</td>
+                    <td className="py-2 pr-4 text-xs">{r.spam_score}</td>
+                    <td className="py-2 pr-4 text-xs">
+                      {r.read_at ? "yes" : "no"}
+                    </td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        className="text-primary underline text-xs"
+                        onClick={() =>
+                          setExpanded(expanded === r.id ? null : r.id)
+                        }
+                      >
+                        {expanded === r.id ? "Collapse" : "Expand"}
+                      </button>
+                      {expanded !== r.id ? (
+                        <span className="ml-2 font-mono text-[10px] text-slate-500 break-all line-clamp-2">
+                          {JSON.stringify(r.payload)}
+                        </span>
+                      ) : null}
                     </td>
                   </tr>
-                ) : null}
-              </Fragment>
-            ))}
+                  {expanded === r.id ? (
+                    <tr className="border-b border-slate-100 bg-slate-50/80">
+                      <td colSpan={5} className="px-4 py-3">
+                        <PayloadPretty payload={r.payload} />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={!canWrite}
+                            className="rounded border border-slate-300 px-2 py-1 text-xs disabled:opacity-50"
+                            onClick={() => void markRead(r.id, !r.read_at)}
+                          >
+                            {r.read_at ? "Mark unread" : "Mark read"}
+                          </button>
+                          <label className="flex items-center gap-1 text-xs">
+                            Assign
+                            <input
+                              defaultValue={r.assigned_to ?? ""}
+                              disabled={!canWrite}
+                              className="w-40 rounded border border-slate-200 px-1 py-0.5 font-mono text-[11px]"
+                              onBlur={(e) => void assign(r.id, e.target.value)}
+                            />
+                          </label>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              ))
+            )}
           </tbody>
         </table>
       </div>

@@ -1,4 +1,4 @@
-# Maharlika Admin App — Full Architecture and Reference
+# Universal Music Store Admin App — Full Architecture and Reference
 
 This document is the **complete high-level reference** for `apps/admin` (Next.js 15): architecture, folder layout, UI shell, every navigation item, every dashboard page, every `lib` module, every `components` file, every API route, permission keys, Medusa wiring patterns, middleware, auth, and environment variables. It reflects the codebase **as implemented**.
 
@@ -36,11 +36,11 @@ This document is the **complete high-level reference** for `apps/admin` (Next.js
 
 The admin is a **staff-only** browser app. It integrates:
 
-| System | Responsibility |
-|--------|----------------|
-| **Medusa** (`apps/medusa`, HTTP default `:9000`) | Commerce system of record: products, variants, orders, inventory, regions, payment providers, POS-backed operations |
-| **Supabase** | Staff users (OAuth linkage), RBAC (`staff_permission_grants`), platform tables: CMS, loyalty, employees, devices, campaigns, segments, storefront home payload, channel events, chat intake archive, etc. |
-| **Next.js API Routes** | Server-side secrets (`MEDUSA_SECRET_API_KEY`), `medusaAdminFetch`, `@medusajs/js-sdk`, Supabase service role |
+| System                                           | Responsibility                                                                                                                                                                                            |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Medusa** (`apps/medusa`, HTTP default `:9000`) | Commerce system of record: products, variants, orders, inventory, regions, payment providers, POS-backed operations                                                                                       |
+| **Supabase**                                     | Staff users (OAuth linkage), RBAC (`staff_permission_grants`), platform tables: CMS, loyalty, employees, devices, campaigns, segments, storefront home payload, channel events, chat intake archive, etc. |
+| **Next.js API Routes**                           | Server-side secrets (`MEDUSA_SECRET_API_KEY`), `medusaAdminFetch`, `@medusajs/js-sdk`, Supabase service role                                                                                              |
 
 ```
                          +------------------+
@@ -72,30 +72,30 @@ The admin is a **staff-only** browser app. It integrates:
 
 1. `GET /admin/...` matched by `middleware.ts` → NextAuth session required; JWT must have `role` `admin` or `staff`.
 2. Server page calls `requirePagePermission("<key>")` where implemented (see [section 13](#13-app-router-pages-every-route)); on deny → redirect `/admin?denied=<key>`.
-3. Data: **Medusa** via bridges + `medusa-admin-http` / `medusa-pos.ts`, or **Supabase** via `tryCreateSupabaseClient` + `@apparel-commerce/platform-data`.
+3. Data: **Medusa** via bridges + `medusa-admin-http` / `medusa-pos.ts`, or **Supabase** via `tryCreateSupabaseClient` + `@universal-music-store/platform-data`.
 
 ### 1.1 Sidebar destinations vs system of record (summary)
 
 These match the **16** primary nav labels in `AdminSidebar.tsx`. Use this table before reading [section 19](#19-feature-areas-architecture-layout-ascii-flow-medusa-wiring) for full detail.
 
-| Area (nav label) | Route prefix | Primary data | Medusa in this app |
-|------------------|--------------|--------------|--------------------|
-| **Dashboard** | `/admin` | Orders + inventory snapshots | Yes: `medusa-order-bridge`, `medusa-inventory-bridge` (`medusaAdminFetch` → `/admin/orders`, `/admin/products` inventory) |
-| **Products** | `/admin/catalog` | Product catalog | Yes: `medusa-catalog-bridge` (`medusaAdminFetch` → `/admin/products`) |
-| **Inventory** | `/admin/inventory` | Stock levels | Yes: `medusa-inventory-bridge` + `/api/admin/inventory` |
-| **Orders** | `/admin/orders` | Orders | Yes: `medusa-order-bridge` + `/api/medusa/orders/*` |
-| **POS** | `/admin/pos` | Cart, draft order, sale | Yes: **`getMedusaStoreSdk`** + **`getMedusaAdminSdk`** in `/api/pos/medusa/*` |
-| **Analytics** | `/admin/analytics` | Aggregates | Yes (derived): `fetchMedusaOrdersForAdmin` in `analytics-bridge` + optional `/api/admin/analytics/*` |
-| **CRM** | `/admin/crm` | Customers | Yes: `customers-bridge` (`medusaAdminFetch` → `/admin/customers`) |
-| **Employees** | `/admin/employees` | Staff roster, PIN | No: Supabase via `/api/admin/employees` |
-| **Loyalty** | `/admin/loyalty` | Programs, points | No: Supabase via `/api/admin/loyalty/*` |
-| **Campaigns** | `/admin/campaigns` | Campaigns, segments | No: Supabase via `/api/admin/campaigns`, `/api/admin/segments` |
-| **Devices** | `/admin/devices` | Hardware registry | No: Supabase via `/api/admin/devices` |
-| **Channels** | `/admin/channels` | Webhook audit | No: Supabase `channel-events-bridge` |
-| **Chat orders** | `/admin/chat-orders` | Intake queue | Supabase list; intake route **may** call Medusa to place orders (`getMedusaAdminSdk` in `integrations/chat-orders/intake`) |
-| **Payments** | `/admin/settings/payments` | Regions + providers | Yes: `payment-providers-bridge` (`medusaAdminFetch` → regions + payment providers) |
-| **Storefront** (home) | `/admin/settings/storefront` | Homepage payload | No: Supabase `/api/admin/storefront-home` |
-| **Content** | `/admin/cms` and children | Pages, nav, blog, etc. | Partial: CMS is Supabase; **Product lookup** uses `medusaAdminFetch` (`/api/admin/commerce/products/search`) |
+| Area (nav label)      | Route prefix                 | Primary data                 | Medusa in this app                                                                                                         |
+| --------------------- | ---------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**         | `/admin`                     | Orders + inventory snapshots | Yes: `medusa-order-bridge`, `medusa-inventory-bridge` (`medusaAdminFetch` → `/admin/orders`, `/admin/products` inventory)  |
+| **Products**          | `/admin/catalog`             | Product catalog              | Yes: `medusa-catalog-bridge` (`medusaAdminFetch` → `/admin/products`)                                                      |
+| **Inventory**         | `/admin/inventory`           | Stock levels                 | Yes: `medusa-inventory-bridge` + `/api/admin/inventory`                                                                    |
+| **Orders**            | `/admin/orders`              | Orders                       | Yes: `medusa-order-bridge` + `/api/medusa/orders/*`                                                                        |
+| **POS**               | `/admin/pos`                 | Cart, draft order, sale      | Yes: **`getMedusaStoreSdk`** + **`getMedusaAdminSdk`** in `/api/pos/medusa/*`                                              |
+| **Analytics**         | `/admin/analytics`           | Aggregates                   | Yes (derived): `fetchMedusaOrdersForAdmin` in `analytics-bridge` + optional `/api/admin/analytics/*`                       |
+| **CRM**               | `/admin/crm`                 | Customers                    | Yes: `customers-bridge` (`medusaAdminFetch` → `/admin/customers`)                                                          |
+| **Employees**         | `/admin/employees`           | Staff roster, PIN            | No: Supabase via `/api/admin/employees`                                                                                    |
+| **Loyalty**           | `/admin/loyalty`             | Programs, points             | No: Supabase via `/api/admin/loyalty/*`                                                                                    |
+| **Campaigns**         | `/admin/campaigns`           | Campaigns, segments          | No: Supabase via `/api/admin/campaigns`, `/api/admin/segments`                                                             |
+| **Devices**           | `/admin/devices`             | Hardware registry            | No: Supabase via `/api/admin/devices`                                                                                      |
+| **Channels**          | `/admin/channels`            | Webhook audit                | No: Supabase `channel-events-bridge`                                                                                       |
+| **Chat orders**       | `/admin/chat-orders`         | Intake queue                 | Supabase list; intake route **may** call Medusa to place orders (`getMedusaAdminSdk` in `integrations/chat-orders/intake`) |
+| **Payments**          | `/admin/settings/payments`   | Regions + providers          | Yes: `payment-providers-bridge` (`medusaAdminFetch` → regions + payment providers)                                         |
+| **Storefront** (home) | `/admin/settings/storefront` | Homepage payload             | No: Supabase `/api/admin/storefront-home`                                                                                  |
+| **Content**           | `/admin/cms` and children    | Pages, nav, blog, etc.       | Partial: CMS is Supabase; **Product lookup** uses `medusaAdminFetch` (`/api/admin/commerce/products/search`)               |
 
 **Medusa SDK usage recap:**
 
@@ -106,16 +106,16 @@ These match the **16** primary nav labels in `AdminSidebar.tsx`. Use this table 
 
 ## 2. Technology stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 15 (App Router) |
-| UI | React 18, Tailwind CSS (shared config), Google fonts: Plus Jakarta Sans (`--font-headline`), Inter (`--font-body`) |
-| Icons | Material Symbols Outlined (linked in `app/layout.tsx`) |
-| Session | NextAuth.js, JWT strategy, Google OAuth provider |
-| Commerce client | `@medusajs/js-sdk`, raw `fetch` via `medusaAdminFetch` |
-| Shared env / URLs | `@apparel-commerce/sdk` (`medusa-env.ts`, etc.) |
-| RBAC / platform data | `@apparel-commerce/database` re-exporting `@apparel-commerce/platform-data` |
-| Analytics (Vercel) | `VercelWebAnalytics` component in root layout |
+| Layer                | Technology                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Framework            | Next.js 15 (App Router)                                                                                            |
+| UI                   | React 18, Tailwind CSS (shared config), Google fonts: Plus Jakarta Sans (`--font-headline`), Inter (`--font-body`) |
+| Icons                | Material Symbols Outlined (linked in `app/layout.tsx`)                                                             |
+| Session              | NextAuth.js, JWT strategy, Google OAuth provider                                                                   |
+| Commerce client      | `@medusajs/js-sdk`, raw `fetch` via `medusaAdminFetch`                                                             |
+| Shared env / URLs    | `@universal-music-store/sdk` (`medusa-env.ts`, etc.)                                                               |
+| RBAC / platform data | `@universal-music-store/database` re-exporting `@universal-music-store/platform-data`                              |
+| Analytics (Vercel)   | `VercelWebAnalytics` component in root layout                                                                      |
 
 ---
 
@@ -222,11 +222,11 @@ All authenticated admin UI lives under the **route group** `src/app/(dashboard)/
 </div>
 ```
 
-| Piece | Role |
-|-------|------|
-| Outer `flex min-h-screen` | Full viewport height; sidebar and main sit in one row. |
-| `AdminSidebar` | Fixed `w-72` panel on the left (see §5.2). It is **not** in the document flow for width, so the main column must reserve space. |
-| `ml-72 flex-1` | **288px** left margin matches `w-72` so page content starts to the right of the fixed sidebar. `flex-1` lets the main column fill remaining width. |
+| Piece                     | Role                                                                                                                                               |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Outer `flex min-h-screen` | Full viewport height; sidebar and main sit in one row.                                                                                             |
+| `AdminSidebar`            | Fixed `w-72` panel on the left (see §5.2). It is **not** in the document flow for width, so the main column must reserve space.                    |
+| `ml-72 flex-1`            | **288px** left margin matches `w-72` so page content starts to the right of the fixed sidebar. `flex-1` lets the main column fill remaining width. |
 
 **What is not in this layout:** Page titles, padding, and `<main>` are chosen **per page** (commonly `main.min-h-screen.p-8.lg:p-12`). The shell only provides the sidebar + offset column.
 
@@ -240,18 +240,18 @@ All authenticated admin UI lives under the **route group** `src/app/(dashboard)/
 <aside className="h-screen w-72 fixed left-0 top-0 bg-slate-50 flex flex-col p-4 gap-2 z-50">
 ```
 
-| Class fragment | Effect |
-|----------------|--------|
-| `h-screen w-72` | Full height, **288px** wide. |
-| `fixed left-0 top-0` | Stays visible while the main column scrolls. |
-| `bg-slate-50` | Light gray background for the whole rail. |
-| `flex flex-col p-4 gap-2` | Vertical stack, padding, spacing between blocks. |
-| `z-50` | Draws above normal main content when overlapping (e.g. small viewports). |
+| Class fragment            | Effect                                                                   |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `h-screen w-72`           | Full height, **288px** wide.                                             |
+| `fixed left-0 top-0`      | Stays visible while the main column scrolls.                             |
+| `bg-slate-50`             | Light gray background for the whole rail.                                |
+| `flex flex-col p-4 gap-2` | Vertical stack, padding, spacing between blocks.                         |
+| `z-50`                    | Draws above normal main content when overlapping (e.g. small viewports). |
 
 **Block 1 — Brand (top, not scrollable with nav)**
 
 - Wrapper: `div.px-2.py-5`.
-- **Logo:** `Link` to `/admin` wraps `next/image` with `src="/brand/maharlika-logo-design.svg"` (served from `apps/admin/public/brand/`), `unoptimized`, intrinsic 1536×1024, `className="block h-28 w-auto max-w-[min(100%,260px)] object-contain object-left"`.
+- **Logo:** `Link` to `/admin` wraps `next/image` with `src="/brand/uvs-logo-landscape.png"` (served from `apps/admin/public/brand/`), `unoptimized`, intrinsic 1536×1024, `className="block h-28 w-auto max-w-[min(100%,260px)] object-contain object-left"`.
 - **Tagline:** `p` with `text-[10px] text-slate-400 font-medium tracking-widest uppercase` — text **"Store back office"**.
 
 **Block 2 — Navigation (middle, scrolls if needed)**
@@ -344,37 +344,37 @@ All authenticated admin UI lives under the **route group** `src/app/(dashboard)/
 
 ### 5.4 Main column: default chrome and banners
 
-| Topic | Detail |
-|-------|--------|
-| **Wrapper** | Layout only adds `ml-72 flex-1`. No global padding on this wrapper. |
-| **Typical page root** | Many routes render `<main className="min-h-screen p-8 lg:p-12">` for consistent **32px / 48px** padding on large screens. |
+| Topic                          | Detail                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wrapper**                    | Layout only adds `ml-72 flex-1`. No global padding on this wrapper.                                                                                                                                                                                                                                                                       |
+| **Typical page root**          | Many routes render `<main className="min-h-screen p-8 lg:p-12">` for consistent **32px / 48px** padding on large screens.                                                                                                                                                                                                                 |
 | **Permission denial redirect** | Failed `requirePagePermission` sends the user to **`/admin?denied=<key>`**. The **Dashboard** (`/admin`) reads `searchParams.denied` and shows an **amber** banner: short copy plus the raw permission key in monospace for admins. Other pages do not all repeat this pattern; the dashboard is the natural landing screen after denial. |
-| **Commerce unavailable** | When Medusa cannot be reached, bridges set flags (e.g. `commerceUnavailable`). The Dashboard shows a **non-technical** gray panel and optional `AdminTechnicalDetails` for developers. |
-| **Horizontal scroll** | Logo link uses `overflow-x-auto` so an oversized asset does not break the column. |
+| **Commerce unavailable**       | When Medusa cannot be reached, bridges set flags (e.g. `commerceUnavailable`). The Dashboard shows a **non-technical** gray panel and optional `AdminTechnicalDetails` for developers.                                                                                                                                                    |
+| **Horizontal scroll**          | Logo link uses `overflow-x-auto` so an oversized asset does not break the column.                                                                                                                                                                                                                                                         |
 
 ### 5.5 Sidebar navigation index
 
 **File:** `src/components/AdminSidebar.tsx`  
 **Filter:** `staffHasPermission(perms, item.permission)` — grants come from session; `*` in `platform-data` grants all.
 
-| # | `href` | Label | Material icon | `permission` |
-|---|--------|-------|----------------|--------------|
-| 1 | `/admin` | Dashboard | `dashboard` | `dashboard:read` |
-| 2 | `/admin/catalog` | Products | `shopping_bag` | `catalog:read` |
-| 3 | `/admin/inventory` | Inventory | `inventory_2` | `inventory:read` |
-| 4 | `/admin/orders` | Orders | `shopping_cart` | `orders:read` |
-| 5 | `/admin/pos` | POS | `dock` | `pos:use` |
-| 6 | `/admin/analytics` | Analytics | `bar_chart` | `analytics:read` |
-| 7 | `/admin/crm` | CRM | `groups` | `crm:read` |
-| 8 | `/admin/employees` | Employees | `badge` | `employees:read` |
-| 9 | `/admin/loyalty` | Loyalty | `loyalty` | `loyalty:read` |
-| 10 | `/admin/campaigns` | Campaigns | `campaign` | `campaigns:read` |
-| 11 | `/admin/devices` | Devices | `devices` | `devices:manage` |
-| 12 | `/admin/channels` | Channels | `hub` | `channels:manage` |
-| 13 | `/admin/chat-orders` | Chat orders | `chat` | `chat_orders:manage` |
-| 14 | `/admin/settings/payments` | Payments | `payments` | `settings:read` |
-| 15 | `/admin/settings/storefront` | Storefront home | `web` | `settings:read` |
-| 16 | `/admin/cms` | Content | `article` | `content:read` |
+| #   | `href`                       | Label           | Material icon   | `permission`         |
+| --- | ---------------------------- | --------------- | --------------- | -------------------- |
+| 1   | `/admin`                     | Dashboard       | `dashboard`     | `dashboard:read`     |
+| 2   | `/admin/catalog`             | Products        | `shopping_bag`  | `catalog:read`       |
+| 3   | `/admin/inventory`           | Inventory       | `inventory_2`   | `inventory:read`     |
+| 4   | `/admin/orders`              | Orders          | `shopping_cart` | `orders:read`        |
+| 5   | `/admin/pos`                 | POS             | `dock`          | `pos:use`            |
+| 6   | `/admin/analytics`           | Analytics       | `bar_chart`     | `analytics:read`     |
+| 7   | `/admin/crm`                 | CRM             | `groups`        | `crm:read`           |
+| 8   | `/admin/employees`           | Employees       | `badge`         | `employees:read`     |
+| 9   | `/admin/loyalty`             | Loyalty         | `loyalty`       | `loyalty:read`       |
+| 10  | `/admin/campaigns`           | Campaigns       | `campaign`      | `campaigns:read`     |
+| 11  | `/admin/devices`             | Devices         | `devices`       | `devices:manage`     |
+| 12  | `/admin/channels`            | Channels        | `hub`           | `channels:manage`    |
+| 13  | `/admin/chat-orders`         | Chat orders     | `chat`          | `chat_orders:manage` |
+| 14  | `/admin/settings/payments`   | Payments        | `payments`      | `settings:read`      |
+| 15  | `/admin/settings/storefront` | Storefront home | `web`           | `settings:read`      |
+| 16  | `/admin/cms`                 | Content         | `article`       | `content:read`       |
 
 **Active state:** `pathname === href` OR (`href !== "/admin"` AND `pathname.startsWith(href)`). Nested routes (e.g. `/admin/orders/ord_123`) highlight **Orders**, not Dashboard.
 
@@ -462,17 +462,17 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 
 **File:** `src/middleware.ts`
 
-| Matcher | Behavior |
-|---------|----------|
-| `/admin/:path*` | NextAuth `withAuth`; `authorized`: `token.role` is `admin` or `staff` |
-| `/api/admin/:path*` | Same |
-| `/api/integrations/:path*` | Same, except exceptions below |
+| Matcher                    | Behavior                                                              |
+| -------------------------- | --------------------------------------------------------------------- |
+| `/admin/:path*`            | NextAuth `withAuth`; `authorized`: `token.role` is `admin` or `staff` |
+| `/api/admin/:path*`        | Same                                                                  |
+| `/api/integrations/:path*` | Same, except exceptions below                                         |
 
 **Exceptions (no session required for these paths):**
 
-| Path | Behavior |
-|------|----------|
-| `/api/integrations/channels/webhook` | `NextResponse.next()` — external channel partners POST here |
+| Path                                   | Behavior                                                                                           |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `/api/integrations/channels/webhook`   | `NextResponse.next()` — external channel partners POST here                                        |
 | `/api/integrations/chat-orders/intake` | `NextResponse.next()` only if header `x-internal-key` equals `INTERNAL_CHAT_INTAKE_KEY` (when set) |
 
 **Sign-in page configured:** `pages: { signIn: "/api/auth/signin" }` (NextAuth default route).
@@ -556,77 +556,77 @@ receipts:send
 
 ### Env resolution
 
-**Package:** `@apparel-commerce/sdk` — `getMedusaStoreBaseUrl`, `getMedusaSecretApiKey`, `getMedusaPublishableKey`, `getMedusaRegionId`, `getMedusaSalesChannelId`, `getMedusaPaymentProviderId`.
+**Package:** `@universal-music-store/sdk` — `getMedusaStoreBaseUrl`, `getMedusaSecretApiKey`, `getMedusaPublishableKey`, `getMedusaRegionId`, `getMedusaSalesChannelId`, `getMedusaPaymentProviderId`.
 
 ---
 
 ## 10. Lib modules (each file, role, Medusa link)
 
-| File | Role | Medusa / external |
-|------|------|-------------------|
-| `medusa-admin-http.ts` | `medusaAdminFetch` — HTTP to Admin API with secret Basic auth | Yes |
-| `medusa-pos.ts` | `getMedusaStoreSdk`, `getMedusaAdminSdk`, `getMedusaSecretKey`, `optionRowsToSizeColor`, `variantPricePhpFromCalculated` | Yes |
-| `medusa-order-bridge.ts` | Orders list/detail, JSON, metadata patch; `commerceUnavailable` on network error | Yes (`medusaAdminFetch`) |
-| `medusa-inventory-bridge.ts` | Product variants + inventory levels for admin inventory table | Yes |
-| `medusa-catalog-bridge.ts` | Product list for catalog page; `getMedusaAdminAppBaseUrl`, product edit URLs | Yes |
-| `payment-providers-bridge.ts` | Regions + payment providers bundle for Payments settings | Yes |
-| `customers-bridge.ts` | CRM customer list via Medusa | Yes |
-| `analytics-bridge.ts` | Summary + charts from order data via `fetchMedusaOrdersForAdmin` | Yes (derived) |
-| `analytics-chart.ts` | Chart payload building + tests | Medusa-derived |
-| `auth.ts` | NextAuth options | Supabase |
-| `require-page-permission.ts` | Server redirect guard | — |
-| `require-admin-supabase.ts` | Supabase client or 503 for admin APIs | Supabase |
-| `requireStaffSession.ts` | Staff session check helper | NextAuth |
-| `channel-events-bridge.ts` | Channel webhook events list | Supabase |
-| `chat-intake-bridge.ts` | Chat order intake rows | Supabase |
-| `channel-webhook-policy.ts` | Webhook policy validation + tests | — |
-| `terminal-print.ts` | Receipt / drawer via terminal-agent or API proxy | Optional agent |
-| `offline-pos.ts` | Offline sale queue + sync | POS API |
-| `use-offline-sync.ts` | Client hook for offline sync | — |
-| `admin-sse-hub.ts` | SSE hub for admin | — |
-| `staff-api-response.ts` | Correlated JSON helpers | — |
-| `admin-api-log.ts` | Logging | — |
-| `request-correlation.ts` | Correlation IDs | — |
-| `courier-registry.ts` | Courier labels for fulfillment | — |
-| `payment-provider-display-name.ts` | Human labels for Medusa provider IDs | — |
-| `*.test.ts` | Unit tests co-located with modules | — |
+| File                               | Role                                                                                                                     | Medusa / external        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| `medusa-admin-http.ts`             | `medusaAdminFetch` — HTTP to Admin API with secret Basic auth                                                            | Yes                      |
+| `medusa-pos.ts`                    | `getMedusaStoreSdk`, `getMedusaAdminSdk`, `getMedusaSecretKey`, `optionRowsToSizeColor`, `variantPricePhpFromCalculated` | Yes                      |
+| `medusa-order-bridge.ts`           | Orders list/detail, JSON, metadata patch; `commerceUnavailable` on network error                                         | Yes (`medusaAdminFetch`) |
+| `medusa-inventory-bridge.ts`       | Product variants + inventory levels for admin inventory table                                                            | Yes                      |
+| `medusa-catalog-bridge.ts`         | Product list for catalog page; `getMedusaAdminAppBaseUrl`, product edit URLs                                             | Yes                      |
+| `payment-providers-bridge.ts`      | Regions + payment providers bundle for Payments settings                                                                 | Yes                      |
+| `customers-bridge.ts`              | CRM customer list via Medusa                                                                                             | Yes                      |
+| `analytics-bridge.ts`              | Summary + charts from order data via `fetchMedusaOrdersForAdmin`                                                         | Yes (derived)            |
+| `analytics-chart.ts`               | Chart payload building + tests                                                                                           | Medusa-derived           |
+| `auth.ts`                          | NextAuth options                                                                                                         | Supabase                 |
+| `require-page-permission.ts`       | Server redirect guard                                                                                                    | —                        |
+| `require-admin-supabase.ts`        | Supabase client or 503 for admin APIs                                                                                    | Supabase                 |
+| `requireStaffSession.ts`           | Staff session check helper                                                                                               | NextAuth                 |
+| `channel-events-bridge.ts`         | Channel webhook events list                                                                                              | Supabase                 |
+| `chat-intake-bridge.ts`            | Chat order intake rows                                                                                                   | Supabase                 |
+| `channel-webhook-policy.ts`        | Webhook policy validation + tests                                                                                        | —                        |
+| `terminal-print.ts`                | Receipt / drawer via terminal-agent or API proxy                                                                         | Optional agent           |
+| `offline-pos.ts`                   | Offline sale queue + sync                                                                                                | POS API                  |
+| `use-offline-sync.ts`              | Client hook for offline sync                                                                                             | —                        |
+| `admin-sse-hub.ts`                 | SSE hub for admin                                                                                                        | —                        |
+| `staff-api-response.ts`            | Correlated JSON helpers                                                                                                  | —                        |
+| `admin-api-log.ts`                 | Logging                                                                                                                  | —                        |
+| `request-correlation.ts`           | Correlation IDs                                                                                                          | —                        |
+| `courier-registry.ts`              | Courier labels for fulfillment                                                                                           | —                        |
+| `payment-provider-display-name.ts` | Human labels for Medusa provider IDs                                                                                     | —                        |
+| `*.test.ts`                        | Unit tests co-located with modules                                                                                       | —                        |
 
 ---
 
 ## 11. Components (each file, usage)
 
-| File | Purpose |
-|------|---------|
-| `AdminSidebar.tsx` | Fixed nav; permission-filtered links (see section 5.3) |
-| `AdminTechnicalDetails.tsx` | Client: collapsible `<details>` for IT/developer copy |
-| `NextAuthSessionProvider.tsx` | SessionProvider wrapper |
-| `LenisProvider.tsx` | Smooth scroll |
-| `VercelWebAnalytics.tsx` | Vercel analytics |
-| `StorefrontHomeEditor.tsx` | Client: homepage CMS JSON editor; calls `/api/admin/storefront-home` |
-| `PaymentProviderLabel.tsx` | Friendly label for payment provider id |
-| `ChatIntakeForm.tsx` | Chat intake form posting to integrations API |
-| `InventoryTableWithRefresh.tsx` | Client inventory table + refresh via `/api/admin/inventory` |
-| `FulfillmentPanel.tsx` | Order fulfillment; `fetch` to `/api/medusa/shipments`, `/api/integrations/couriers` |
-| `AnalyticsChartsPanel.tsx` | Renders chart payload from `analytics-bridge` |
+| File                            | Purpose                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AdminSidebar.tsx`              | Fixed nav; permission-filtered links (see section 5.3)                                                                                                                   |
+| `AdminTechnicalDetails.tsx`     | Client: collapsible `<details>` for IT/developer copy                                                                                                                    |
+| `NextAuthSessionProvider.tsx`   | SessionProvider wrapper                                                                                                                                                  |
+| `LenisProvider.tsx`             | Smooth scroll                                                                                                                                                            |
+| `VercelWebAnalytics.tsx`        | Vercel analytics                                                                                                                                                         |
+| `StorefrontHomeEditor.tsx`      | Client: homepage CMS JSON editor; calls `/api/admin/storefront-home`                                                                                                     |
+| `PaymentProviderLabel.tsx`      | Friendly label for payment provider id                                                                                                                                   |
+| `ChatIntakeForm.tsx`            | Chat intake form posting to integrations API                                                                                                                             |
+| `InventoryTableWithRefresh.tsx` | Client inventory table + refresh via `/api/admin/inventory`                                                                                                              |
+| `FulfillmentPanel.tsx`          | Order fulfillment; `fetch` to `/api/medusa/shipments`, `/api/integrations/couriers`                                                                                      |
+| `AnalyticsChartsPanel.tsx`      | Renders chart payload from `analytics-bridge`                                                                                                                            |
 | `catalog/ProductEditorForm.tsx` | Client: create/edit product form; `fetch` to `/api/admin/catalog/products` and `/api/admin/catalog/products/[id]` (see [section 18](#18-product-editor-and-catalog-api)) |
-| `cms/CmsPagesManager.tsx` | CMS pages CRUD UI |
-| `cms/CmsNavigationEditor.tsx` | Navigation JSON |
-| `cms/CmsAnnouncementEditor.tsx` | Announcement bar |
-| `cms/CmsCategoryEditor.tsx` | Category storytelling |
-| `cms/CmsMediaManager.tsx` | Media uploads |
-| `cms/CmsBlogManager.tsx` | Blog list |
-| `cms/CmsFormsTable.tsx` | Form submissions |
-| `cms/CmsRedirectsManager.tsx` | Redirects |
-| `cms/CmsExperimentsManager.tsx` | A/B experiments |
-| `cms/CmsCommerceSearch.tsx` | Product search for CMS; `GET /api/admin/commerce/products/search` |
+| `cms/CmsPagesManager.tsx`       | CMS pages CRUD UI                                                                                                                                                        |
+| `cms/CmsNavigationEditor.tsx`   | Navigation JSON                                                                                                                                                          |
+| `cms/CmsAnnouncementEditor.tsx` | Announcement bar                                                                                                                                                         |
+| `cms/CmsCategoryEditor.tsx`     | Category storytelling                                                                                                                                                    |
+| `cms/CmsMediaManager.tsx`       | Media uploads                                                                                                                                                            |
+| `cms/CmsBlogManager.tsx`        | Blog list                                                                                                                                                                |
+| `cms/CmsFormsTable.tsx`         | Form submissions                                                                                                                                                         |
+| `cms/CmsRedirectsManager.tsx`   | Redirects                                                                                                                                                                |
+| `cms/CmsExperimentsManager.tsx` | A/B experiments                                                                                                                                                          |
+| `cms/CmsCommerceSearch.tsx`     | Product search for CMS; `GET /api/admin/commerce/products/search`                                                                                                        |
 
 ---
 
 ## 12. Domain layer
 
-| File | Exports |
-|------|---------|
-| `domain/index.ts` | `export * as commerce from "./commerce"` |
+| File                 | Exports                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `domain/index.ts`    | `export * as commerce from "./commerce"`                                                                            |
 | `domain/commerce.ts` | Facade: `listProducts`, `fullCatalogEditorUrl`, `productEditorUrl`, types — implemented via `medusa-catalog-bridge` |
 
 **Intent:** Pages may import `@/domain/commerce` so commerce engine details stay behind facades.
@@ -639,37 +639,37 @@ For **what each screen shows** in the main column (UI-focused), see [§5.6](#56-
 
 Legend: **Perm** = `requirePagePermission`. **Data** = primary backend. **Medusa** = how Medusa is used.
 
-| Route | Type | Perm | Primary components / notes | Data | Medusa |
-|-------|------|------|------------------------------|------|--------|
-| `/` | RSC | — | `redirect("/admin")` | — | — |
-| `/admin` | RSC | `dashboard:read` | KPI cards, recent orders, stock alerts | Orders + inventory bridges | `fetchMedusaOrdersForAdmin`, `fetchMedusaInventoryForAdmin` |
-| `/admin/catalog` | RSC | `catalog:read` | Product table, search form GET `?q=`, links to Medusa Dashboard | `fetchMedusaProductsListForAdmin` | Admin API |
-| `/admin/catalog/new` | RSC | `catalog:write` | `ProductEditorForm` mode create | Form → `POST /api/admin/catalog/products` (§18) | Implemented |
-| `/admin/orders` | RSC | `orders:read` | Orders table | `fetchMedusaOrdersForAdmin` | Admin API |
-| `/admin/orders/[orderId]` | RSC | `orders:read` | Order detail + `FulfillmentPanel` | `fetchMedusaOrderDetailForAdmin`, APIs | Admin API + metadata routes |
-| `/admin/inventory` | RSC | `inventory:read` | `InventoryTableWithRefresh` | `fetchMedusaInventoryForAdmin`, `/api/admin/inventory` | Admin API |
-| `/admin/pos` | Client | — *(middleware only)* | Full POS: cart, lookup, draft, commit, terminal print | `/api/pos/medusa/*`, offline queue | Store + Admin SDK |
-| `/admin/analytics` | RSC | `analytics:read` | Summary tiles, `AnalyticsChartsPanel`, retention/sales panels | `analytics-bridge` | Derived from orders |
-| `/admin/crm` | RSC | `crm:read` | Customer list | `fetchMedusaCustomersForAdmin` | Admin API |
-| `/admin/campaigns` | Client | — | Campaigns UI | `/api/admin/campaigns` | Supabase |
-| `/admin/loyalty` | Client | — | Loyalty accounts/rewards | `/api/admin/loyalty/*` | Supabase |
-| `/admin/employees` | Client | — | Employee CRUD, PIN | `/api/admin/employees` | Supabase |
-| `/admin/devices` | Client | — | Device registry | `/api/admin/devices` | Supabase |
-| `/admin/channels` | RSC | `channels:manage` | Channel events table | `fetchRecentChannelEvents` | Supabase |
-| `/admin/chat-orders` | RSC | `chat_orders:manage` | `ChatIntakeForm` + list | `fetchRecentChatIntake` | Supabase |
-| `/admin/settings/payments` | RSC | `settings:read` | Payment tables, `PaymentProviderLabel` | `fetchMedusaPaymentProvidersBundle` | Admin API regions/products |
-| `/admin/settings/storefront` | RSC | `settings:read` | `StorefrontHomeEditor` | `/api/admin/storefront-home` | Supabase |
-| `/admin/cms` | RSC | `content:read` | Hub grid of CMS sections | — | — |
-| `/admin/cms/pages` | RSC | `content:read` | `CmsPagesManager` | `/api/admin/cms/pages` | Supabase |
-| `/admin/cms/navigation` | RSC | `content:read` | `CmsNavigationEditor` | `/api/admin/cms/navigation` | Supabase |
-| `/admin/cms/announcement` | RSC | `content:read` | `CmsAnnouncementEditor` | `/api/admin/cms/announcement` | Supabase |
-| `/admin/cms/categories` | RSC | `content:read` | `CmsCategoryEditor` | `/api/admin/cms/category-content` | Supabase |
-| `/admin/cms/media` | RSC | `content:read` | `CmsMediaManager` | `/api/admin/cms/media` | Supabase |
-| `/admin/cms/blog` | RSC | `content:read` | `CmsBlogManager` | `/api/admin/cms/blog` | Supabase |
-| `/admin/cms/forms` | RSC | `content:read` | `CmsFormsTable` | `/api/admin/cms/forms/submissions` | Supabase |
-| `/admin/cms/redirects` | RSC | `content:read` | `CmsRedirectsManager` | `/api/admin/cms/redirects` | Supabase |
-| `/admin/cms/experiments` | RSC | `content:read` | `CmsExperimentsManager` | `/api/admin/cms/experiments` | Supabase |
-| `/admin/cms/commerce` | RSC | `content:read` | `CmsCommerceSearch` | `/api/admin/commerce/products/search` | Medusa Admin API |
+| Route                        | Type   | Perm                  | Primary components / notes                                      | Data                                                   | Medusa                                                      |
+| ---------------------------- | ------ | --------------------- | --------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------- |
+| `/`                          | RSC    | —                     | `redirect("/admin")`                                            | —                                                      | —                                                           |
+| `/admin`                     | RSC    | `dashboard:read`      | KPI cards, recent orders, stock alerts                          | Orders + inventory bridges                             | `fetchMedusaOrdersForAdmin`, `fetchMedusaInventoryForAdmin` |
+| `/admin/catalog`             | RSC    | `catalog:read`        | Product table, search form GET `?q=`, links to Medusa Dashboard | `fetchMedusaProductsListForAdmin`                      | Admin API                                                   |
+| `/admin/catalog/new`         | RSC    | `catalog:write`       | `ProductEditorForm` mode create                                 | Form → `POST /api/admin/catalog/products` (§18)        | Implemented                                                 |
+| `/admin/orders`              | RSC    | `orders:read`         | Orders table                                                    | `fetchMedusaOrdersForAdmin`                            | Admin API                                                   |
+| `/admin/orders/[orderId]`    | RSC    | `orders:read`         | Order detail + `FulfillmentPanel`                               | `fetchMedusaOrderDetailForAdmin`, APIs                 | Admin API + metadata routes                                 |
+| `/admin/inventory`           | RSC    | `inventory:read`      | `InventoryTableWithRefresh`                                     | `fetchMedusaInventoryForAdmin`, `/api/admin/inventory` | Admin API                                                   |
+| `/admin/pos`                 | Client | — _(middleware only)_ | Full POS: cart, lookup, draft, commit, terminal print           | `/api/pos/medusa/*`, offline queue                     | Store + Admin SDK                                           |
+| `/admin/analytics`           | RSC    | `analytics:read`      | Summary tiles, `AnalyticsChartsPanel`, retention/sales panels   | `analytics-bridge`                                     | Derived from orders                                         |
+| `/admin/crm`                 | RSC    | `crm:read`            | Customer list                                                   | `fetchMedusaCustomersForAdmin`                         | Admin API                                                   |
+| `/admin/campaigns`           | Client | —                     | Campaigns UI                                                    | `/api/admin/campaigns`                                 | Supabase                                                    |
+| `/admin/loyalty`             | Client | —                     | Loyalty accounts/rewards                                        | `/api/admin/loyalty/*`                                 | Supabase                                                    |
+| `/admin/employees`           | Client | —                     | Employee CRUD, PIN                                              | `/api/admin/employees`                                 | Supabase                                                    |
+| `/admin/devices`             | Client | —                     | Device registry                                                 | `/api/admin/devices`                                   | Supabase                                                    |
+| `/admin/channels`            | RSC    | `channels:manage`     | Channel events table                                            | `fetchRecentChannelEvents`                             | Supabase                                                    |
+| `/admin/chat-orders`         | RSC    | `chat_orders:manage`  | `ChatIntakeForm` + list                                         | `fetchRecentChatIntake`                                | Supabase                                                    |
+| `/admin/settings/payments`   | RSC    | `settings:read`       | Payment tables, `PaymentProviderLabel`                          | `fetchMedusaPaymentProvidersBundle`                    | Admin API regions/products                                  |
+| `/admin/settings/storefront` | RSC    | `settings:read`       | `StorefrontHomeEditor`                                          | `/api/admin/storefront-home`                           | Supabase                                                    |
+| `/admin/cms`                 | RSC    | `content:read`        | Hub grid of CMS sections                                        | —                                                      | —                                                           |
+| `/admin/cms/pages`           | RSC    | `content:read`        | `CmsPagesManager`                                               | `/api/admin/cms/pages`                                 | Supabase                                                    |
+| `/admin/cms/navigation`      | RSC    | `content:read`        | `CmsNavigationEditor`                                           | `/api/admin/cms/navigation`                            | Supabase                                                    |
+| `/admin/cms/announcement`    | RSC    | `content:read`        | `CmsAnnouncementEditor`                                         | `/api/admin/cms/announcement`                          | Supabase                                                    |
+| `/admin/cms/categories`      | RSC    | `content:read`        | `CmsCategoryEditor`                                             | `/api/admin/cms/category-content`                      | Supabase                                                    |
+| `/admin/cms/media`           | RSC    | `content:read`        | `CmsMediaManager`                                               | `/api/admin/cms/media`                                 | Supabase                                                    |
+| `/admin/cms/blog`            | RSC    | `content:read`        | `CmsBlogManager`                                                | `/api/admin/cms/blog`                                  | Supabase                                                    |
+| `/admin/cms/forms`           | RSC    | `content:read`        | `CmsFormsTable`                                                 | `/api/admin/cms/forms/submissions`                     | Supabase                                                    |
+| `/admin/cms/redirects`       | RSC    | `content:read`        | `CmsRedirectsManager`                                           | `/api/admin/cms/redirects`                             | Supabase                                                    |
+| `/admin/cms/experiments`     | RSC    | `content:read`        | `CmsExperimentsManager`                                         | `/api/admin/cms/experiments`                           | Supabase                                                    |
+| `/admin/cms/commerce`        | RSC    | `content:read`        | `CmsCommerceSearch`                                             | `/api/admin/commerce/products/search`                  | Medusa Admin API                                            |
 
 **Note:** Client-only pages (`pos`, `campaigns`, `loyalty`, `employees`, `devices`) rely on **middleware** for authentication; **API routes** enforce `staffHasPermission` per handler. Prefer adding `requirePagePermission` to those pages over time for consistent UX.
 
@@ -681,104 +681,104 @@ Paths are relative to `src/app/api/`.
 
 ### Auth
 
-| Path | Purpose |
-|------|---------|
+| Path                          | Purpose           |
+| ----------------------------- | ----------------- |
 | `auth/[...nextauth]/route.ts` | NextAuth handlers |
 
 ### Staff admin — CMS
 
-| Path | Purpose |
-|------|---------|
-| `admin/cms/pages/route.ts` | List/create CMS pages |
-| `admin/cms/pages/[id]/route.ts` | Get/update/delete one page |
-| `admin/cms/navigation/route.ts` | Navigation payload |
-| `admin/cms/announcement/route.ts` | Announcement bar |
-| `admin/cms/category-content/route.ts` | Category CMS blocks |
-| `admin/cms/media/route.ts` | Media list/upload |
-| `admin/cms/blog/route.ts` | Blog posts list/create |
-| `admin/cms/blog/[id]/route.ts` | One blog post |
-| `admin/cms/forms/submissions/route.ts` | Form submissions |
-| `admin/cms/redirects/route.ts` | Redirects list/upsert |
-| `admin/cms/redirects/[id]/route.ts` | One redirect |
-| `admin/cms/experiments/route.ts` | Experiments |
-| `admin/cms/experiments/[id]/route.ts` | One experiment |
+| Path                                   | Purpose                    |
+| -------------------------------------- | -------------------------- |
+| `admin/cms/pages/route.ts`             | List/create CMS pages      |
+| `admin/cms/pages/[id]/route.ts`        | Get/update/delete one page |
+| `admin/cms/navigation/route.ts`        | Navigation payload         |
+| `admin/cms/announcement/route.ts`      | Announcement bar           |
+| `admin/cms/category-content/route.ts`  | Category CMS blocks        |
+| `admin/cms/media/route.ts`             | Media list/upload          |
+| `admin/cms/blog/route.ts`              | Blog posts list/create     |
+| `admin/cms/blog/[id]/route.ts`         | One blog post              |
+| `admin/cms/forms/submissions/route.ts` | Form submissions           |
+| `admin/cms/redirects/route.ts`         | Redirects list/upsert      |
+| `admin/cms/redirects/[id]/route.ts`    | One redirect               |
+| `admin/cms/experiments/route.ts`       | Experiments                |
+| `admin/cms/experiments/[id]/route.ts`  | One experiment             |
 
 ### Staff admin — commerce helpers
 
-| Path | Purpose |
-|------|---------|
-| `admin/commerce/products/search/route.ts` | `medusaAdminFetch` → `/admin/products` (search for CMS) |
-| `admin/catalog/products/route.ts` | `POST` — create product (`catalog:write`, Medusa Admin SDK) |
-| `admin/catalog/products/[id]/route.ts` | `PATCH` / `DELETE` — update/delete product (`catalog:write`) |
+| Path                                      | Purpose                                                      |
+| ----------------------------------------- | ------------------------------------------------------------ |
+| `admin/commerce/products/search/route.ts` | `medusaAdminFetch` → `/admin/products` (search for CMS)      |
+| `admin/catalog/products/route.ts`         | `POST` — create product (`catalog:write`, Medusa Admin SDK)  |
+| `admin/catalog/products/[id]/route.ts`    | `PATCH` / `DELETE` — update/delete product (`catalog:write`) |
 
 ### Staff admin — Medusa / storefront / ops
 
-| Path | Purpose |
-|------|---------|
-| `admin/medusa/payment-providers/route.ts` | Payment provider list helper |
-| `admin/storefront-home/route.ts` | Storefront home payload |
-| `admin/inventory/route.ts` | Inventory JSON for client refresh |
-| `admin/inventory/stream/route.ts` | Inventory streaming |
-| `admin/employees/route.ts` | Employees CRUD |
-| `admin/employees/[id]/route.ts` | One employee |
-| `admin/employees/[id]/pin/route.ts` | PIN |
-| `admin/shifts/route.ts` | POS shifts |
-| `admin/shifts/[id]/close/route.ts` | Close shift |
-| `admin/voids/route.ts` | POS voids |
-| `admin/loyalty/route.ts` | Loyalty |
-| `admin/loyalty/points/route.ts` | Points |
-| `admin/loyalty/lookup/route.ts` | Lookup |
-| `admin/loyalty/rewards/route.ts` | Rewards |
-| `admin/segments/route.ts` | Segments |
-| `admin/segments/[id]/members/route.ts` | Segment members |
-| `admin/campaigns/route.ts` | Campaigns |
-| `admin/campaigns/[id]/execute/route.ts` | Execute campaign |
-| `admin/receipts/route.ts` | Receipts |
-| `admin/analytics/clv/route.ts` | CLV |
-| `admin/analytics/retention/route.ts` | Retention |
-| `admin/analytics/sales-trends/route.ts` | Sales trends |
-| `admin/offline-queue/route.ts` | Offline queue |
-| `admin/pin-approval/route.ts` | PIN approval |
-| `admin/devices/route.ts` | Devices |
-| `admin/devices/[id]/route.ts` | One device |
-| `admin/terminal-print/route.ts` | Proxy print to terminal-agent |
-| `admin/terminal-open-drawer/route.ts` | Open drawer |
-| `admin/sse/route.ts` | Server-sent events |
+| Path                                      | Purpose                           |
+| ----------------------------------------- | --------------------------------- |
+| `admin/medusa/payment-providers/route.ts` | Payment provider list helper      |
+| `admin/storefront-home/route.ts`          | Storefront home payload           |
+| `admin/inventory/route.ts`                | Inventory JSON for client refresh |
+| `admin/inventory/stream/route.ts`         | Inventory streaming               |
+| `admin/employees/route.ts`                | Employees CRUD                    |
+| `admin/employees/[id]/route.ts`           | One employee                      |
+| `admin/employees/[id]/pin/route.ts`       | PIN                               |
+| `admin/shifts/route.ts`                   | POS shifts                        |
+| `admin/shifts/[id]/close/route.ts`        | Close shift                       |
+| `admin/voids/route.ts`                    | POS voids                         |
+| `admin/loyalty/route.ts`                  | Loyalty                           |
+| `admin/loyalty/points/route.ts`           | Points                            |
+| `admin/loyalty/lookup/route.ts`           | Lookup                            |
+| `admin/loyalty/rewards/route.ts`          | Rewards                           |
+| `admin/segments/route.ts`                 | Segments                          |
+| `admin/segments/[id]/members/route.ts`    | Segment members                   |
+| `admin/campaigns/route.ts`                | Campaigns                         |
+| `admin/campaigns/[id]/execute/route.ts`   | Execute campaign                  |
+| `admin/receipts/route.ts`                 | Receipts                          |
+| `admin/analytics/clv/route.ts`            | CLV                               |
+| `admin/analytics/retention/route.ts`      | Retention                         |
+| `admin/analytics/sales-trends/route.ts`   | Sales trends                      |
+| `admin/offline-queue/route.ts`            | Offline queue                     |
+| `admin/pin-approval/route.ts`             | PIN approval                      |
+| `admin/devices/route.ts`                  | Devices                           |
+| `admin/devices/[id]/route.ts`             | One device                        |
+| `admin/terminal-print/route.ts`           | Proxy print to terminal-agent     |
+| `admin/terminal-open-drawer/route.ts`     | Open drawer                       |
+| `admin/sse/route.ts`                      | Server-sent events                |
 
 ### POS (Medusa SDK)
 
-| Path | Purpose |
-|------|---------|
-| `pos/medusa/lookup/route.ts` | Barcode/SKU lookup — store + admin SDK |
-| `pos/medusa/draft-order/route.ts` | Draft order |
-| `pos/medusa/commit-sale/route.ts` | Commit sale |
-| `pos/medusa/quick-products/route.ts` | Quick product buttons |
-| `pos/medusa/suggestions/route.ts` | Search suggestions |
+| Path                                 | Purpose                                |
+| ------------------------------------ | -------------------------------------- |
+| `pos/medusa/lookup/route.ts`         | Barcode/SKU lookup — store + admin SDK |
+| `pos/medusa/draft-order/route.ts`    | Draft order                            |
+| `pos/medusa/commit-sale/route.ts`    | Commit sale                            |
+| `pos/medusa/quick-products/route.ts` | Quick product buttons                  |
+| `pos/medusa/suggestions/route.ts`    | Search suggestions                     |
 
 ### Medusa order utilities
 
-| Path | Purpose |
-|------|---------|
+| Path                               | Purpose               |
+| ---------------------------------- | --------------------- |
 | `medusa/orders/[orderId]/route.ts` | Order JSON / metadata |
-| `medusa/shipments/route.ts` | Shipments + metadata |
+| `medusa/shipments/route.ts`        | Shipments + metadata  |
 
 ### Integrations
 
-| Path | Purpose |
-|------|---------|
-| `integrations/channels/webhook/route.ts` | Inbound channel events (middleware bypass) |
-| `integrations/chat-orders/intake/route.ts` | Chat intake (internal key) |
-| `integrations/couriers/route.ts` | Courier registry for fulfillment |
+| Path                                       | Purpose                                    |
+| ------------------------------------------ | ------------------------------------------ |
+| `integrations/channels/webhook/route.ts`   | Inbound channel events (middleware bypass) |
+| `integrations/chat-orders/intake/route.ts` | Chat intake (internal key)                 |
+| `integrations/couriers/route.ts`           | Courier registry for fulfillment           |
 
 ---
 
 ## 15. Data ownership (ADR summary)
 
-| Data | Owner |
-|------|--------|
-| Products, orders, cart, pricing, inventory in Medusa | **Medusa** |
-| Staff users, RBAC, CMS rows, loyalty, employees, devices, campaigns, segments, channel events, chat archive, storefront home in Supabase | **Supabase** |
-| Customer-facing catalog display on public site | Medusa **Store API** (storefront app) |
+| Data                                                                                                                                     | Owner                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Products, orders, cart, pricing, inventory in Medusa                                                                                     | **Medusa**                            |
+| Staff users, RBAC, CMS rows, loyalty, employees, devices, campaigns, segments, channel events, chat archive, storefront home in Supabase | **Supabase**                          |
+| Customer-facing catalog display on public site                                                                                           | Medusa **Store API** (storefront app) |
 
 Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supabase-scope.md`.
 
@@ -786,23 +786,26 @@ Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supaba
 
 ## 16. Environment variables (admin-relevant)
 
-**From repo `.env.example` and `@apparel-commerce/sdk`:**
+**From repo `.env.example` and `@universal-music-store/sdk`:**
 
-| Variable | Used for |
-|----------|----------|
-| `NEXTAUTH_URL`, `NEXTAUTH_SECRET` | NextAuth session |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Admin Google sign-in |
-| `ADMIN_ALLOWED_EMAILS` | Optional allowlist for new staff OAuth users |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` | Staff DB, RBAC, platform APIs |
-| `MEDUSA_BACKEND_URL`, `NEXT_PUBLIC_MEDUSA_URL` | Medusa base URL |
-| `MEDUSA_SECRET_API_KEY` | Admin API (`medusaAdminFetch`, admin SDK) |
-| `MEDUSA_PUBLISHABLE_API_KEY`, `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Store API |
-| `MEDUSA_REGION_ID`, `NEXT_PUBLIC_MEDUSA_REGION_ID` | Region for pricing |
-| `MEDUSA_SALES_CHANNEL_ID`, `NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID` | Sales channel |
-| `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` | Default payment provider hint |
-| `CHANNEL_WEBHOOK_SECRET` | Channel webhook HMAC |
-| `INTERNAL_CHAT_INTAKE_KEY` | Chat intake API key |
-| `NEXT_PUBLIC_TERMINAL_AGENT_URL`, `TERMINAL_AGENT_URL`, `TERMINAL_AGENT_SECRET`, `NEXT_PUBLIC_TERMINAL_PRINT_VIA_API` | POS printing |
+| Variable                                                                                                              | Used for                                     |
+| --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `NEXTAUTH_URL`, `NEXTAUTH_SECRET`                                                                                     | NextAuth session                             |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                            | Admin Google sign-in                         |
+| `ADMIN_ALLOWED_EMAILS`                                                                                                | Optional allowlist for new staff OAuth users |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`                                                      | Staff DB, RBAC, platform APIs                |
+| `MEDUSA_BACKEND_URL`, `NEXT_PUBLIC_MEDUSA_URL`                                                                        | Medusa base URL                              |
+| `MEDUSA_SECRET_API_KEY`                                                                                               | Admin API (`medusaAdminFetch`, admin SDK)    |
+| `MEDUSA_PUBLISHABLE_API_KEY`, `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY`                                                    | Store API                                    |
+| `MEDUSA_REGION_ID`, `NEXT_PUBLIC_MEDUSA_REGION_ID`                                                                    | Region for pricing                           |
+| `MEDUSA_SALES_CHANNEL_ID`, `NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID`                                                      | Sales channel                                |
+| `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID`                                                                              | Default payment provider hint                |
+| `CHANNEL_WEBHOOK_SECRET`                                                                                              | Channel webhook HMAC                         |
+| `INTERNAL_CHAT_INTAKE_KEY`                                                                                            | Chat intake API key                          |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                  | Distributed admin rate limiting              |
+| `ADMIN_STEP_UP_REQUIRED`, `ADMIN_STEP_UP_SECRET`                                                                      | Short-lived assertions for dangerous writes  |
+| `TERMINAL_DEVICE_BINDING_REQUIRED`                                                                                   | Device token/IP binding for drawer commands  |
+| `NEXT_PUBLIC_TERMINAL_AGENT_URL`, `TERMINAL_AGENT_URL`, `TERMINAL_AGENT_SECRET`, `NEXT_PUBLIC_TERMINAL_PRINT_VIA_API` | POS printing                                 |
 
 ---
 
@@ -830,11 +833,11 @@ Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supaba
 
 **Workflow and operator notes** (Supabase overlay; see `lib/admin-workflow.ts`, `lib/staff-audit.ts`, `lib/commerce-boundary.ts`):
 
-| Route | Method | Notes |
-|-------|--------|--------|
-| `/api/admin/workflow/transition` | POST | JSON: `entity_type`, `entity_id`, `to_state`, optional `notes`. Session plus per-entity write permission. |
-| `/api/admin/operator-notes` | GET | Query: `entity_type`, `entity_id`. Session plus matching read permission. |
-| `/api/admin/operator-notes` | POST | JSON: `entity_type`, `entity_id`, `body`. Session plus matching write permission. |
+| Route                            | Method | Notes                                                                                                     |
+| -------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `/api/admin/workflow/transition` | POST   | JSON: `entity_type`, `entity_id`, `to_state`, optional `notes`. Session plus per-entity write permission. |
+| `/api/admin/operator-notes`      | GET    | Query: `entity_type`, `entity_id`. Session plus matching read permission.                                 |
+| `/api/admin/operator-notes`      | POST   | JSON: `entity_type`, `entity_id`, `body`. Session plus matching write permission.                         |
 
 ---
 
@@ -869,11 +872,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.1 Dashboard
 
-| | |
-|--|--|
-| **Architecture** | Landing overview: order totals, recent orders, inventory health. Read-only aggregation for staff with `dashboard:read`. |
-| **Codebase** | `app/(dashboard)/admin/page.tsx`, `lib/medusa-order-bridge.ts`, `lib/medusa-inventory-bridge.ts`, `components/AdminTechnicalDetails.tsx` |
-| **Medusa** | **`medusaAdminFetch`** only (no JS SDK on this page). Fetches `/admin/orders` and product/inventory endpoints as implemented in bridges. |
+|                  |                                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Landing overview: order totals, recent orders, inventory health. Read-only aggregation for staff with `dashboard:read`.                  |
+| **Codebase**     | `app/(dashboard)/admin/page.tsx`, `lib/medusa-order-bridge.ts`, `lib/medusa-inventory-bridge.ts`, `components/AdminTechnicalDetails.tsx` |
+| **Medusa**       | **`medusaAdminFetch`** only (no JS SDK on this page). Fetches `/admin/orders` and product/inventory endpoints as implemented in bridges. |
 
 **Layout ASCII**
 
@@ -897,11 +900,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.2 Products
 
-| | |
-|--|--|
-| **Architecture** | Browse Medusa catalog from admin; deep links into **Medusa Admin** UI for full edit (URL from `medusa-catalog-bridge`). |
-| **Codebase** | `admin/catalog/page.tsx`, `lib/medusa-catalog-bridge.ts`, `domain/commerce.ts` |
-| **Medusa** | **`medusaAdminFetch`** → `GET /admin/products` (query params for search). Add-product UI: `catalog/new/page.tsx` + `ProductEditorForm` → `POST /api/admin/catalog/products` (§18). |
+|                  |                                                                                                                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Browse Medusa catalog from admin; deep links into **Medusa Admin** UI for full edit (URL from `medusa-catalog-bridge`).                                                            |
+| **Codebase**     | `admin/catalog/page.tsx`, `lib/medusa-catalog-bridge.ts`, `domain/commerce.ts`                                                                                                     |
+| **Medusa**       | **`medusaAdminFetch`** → `GET /admin/products` (query params for search). Add-product UI: `catalog/new/page.tsx` + `ProductEditorForm` → `POST /api/admin/catalog/products` (§18). |
 
 **Layout ASCII**
 
@@ -922,11 +925,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.3 Inventory
 
-| | |
-|--|--|
-| **Architecture** | Variant-level stock table; client refresh hits JSON API that mirrors Medusa inventory. |
-| **Codebase** | `admin/inventory/page.tsx`, `lib/medusa-inventory-bridge.ts`, `components/InventoryTableWithRefresh.tsx`, `api/admin/inventory/route.ts` |
-| **Medusa** | **`medusaAdminFetch`** in bridge for initial SSR; refresh path uses `/api/admin/inventory` which reads Medusa-backed data server-side. |
+|                  |                                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Variant-level stock table; client refresh hits JSON API that mirrors Medusa inventory.                                                   |
+| **Codebase**     | `admin/inventory/page.tsx`, `lib/medusa-inventory-bridge.ts`, `components/InventoryTableWithRefresh.tsx`, `api/admin/inventory/route.ts` |
+| **Medusa**       | **`medusaAdminFetch`** in bridge for initial SSR; refresh path uses `/api/admin/inventory` which reads Medusa-backed data server-side.   |
 
 **Layout ASCII**
 
@@ -947,11 +950,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.4 Orders
 
-| | |
-|--|--|
-| **Architecture** | Order list and order detail with fulfillment; metadata and shipments via Next API routes wrapping Medusa. |
-| **Codebase** | `admin/orders/page.tsx`, `admin/orders/[orderId]/page.tsx`, `lib/medusa-order-bridge.ts`, `components/FulfillmentPanel.tsx`, `api/medusa/orders/[orderId]/route.ts`, `api/medusa/shipments/route.ts` |
-| **Medusa** | **`medusaAdminFetch`** in `medusa-order-bridge` for lists and detail. Fulfillment panel calls app routes that talk to Medusa Admin API patterns. |
+|                  |                                                                                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Order list and order detail with fulfillment; metadata and shipments via Next API routes wrapping Medusa.                                                                                            |
+| **Codebase**     | `admin/orders/page.tsx`, `admin/orders/[orderId]/page.tsx`, `lib/medusa-order-bridge.ts`, `components/FulfillmentPanel.tsx`, `api/medusa/orders/[orderId]/route.ts`, `api/medusa/shipments/route.ts` |
+| **Medusa**       | **`medusaAdminFetch`** in `medusa-order-bridge` for lists and detail. Fulfillment panel calls app routes that talk to Medusa Admin API patterns.                                                     |
 
 **Layout ASCII (list)**
 
@@ -981,11 +984,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.5 POS
 
-| | |
-|--|--|
-| **Architecture** | In-browser register: lookup, draft orders, commit sale, quick buttons, offline queue, optional thermal print via `/api/admin/terminal-*`. |
-| **Codebase** | `admin/pos/page.tsx` (client), `api/pos/medusa/*/route.ts`, `lib/medusa-pos.ts`, `lib/offline-pos.ts`, `lib/terminal-print.ts` |
-| **Medusa** | **Primary consumer of JS SDK:** **`getMedusaStoreSdk()`** (Store API: products, cart behavior) and **`getMedusaAdminSdk()`** (Admin API: draft orders, completing sales) inside **route handlers**, not in the browser directly. Secrets stay on server. |
+|                  |                                                                                                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | In-browser register: lookup, draft orders, commit sale, quick buttons, offline queue, optional thermal print via `/api/admin/terminal-*`.                                                                                                                |
+| **Codebase**     | `admin/pos/page.tsx` (client), `api/pos/medusa/*/route.ts`, `lib/medusa-pos.ts`, `lib/offline-pos.ts`, `lib/terminal-print.ts`                                                                                                                           |
+| **Medusa**       | **Primary consumer of JS SDK:** **`getMedusaStoreSdk()`** (Store API: products, cart behavior) and **`getMedusaAdminSdk()`** (Admin API: draft orders, completing sales) inside **route handlers**, not in the browser directly. Secrets stay on server. |
 
 **Layout ASCII**
 
@@ -1007,11 +1010,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.6 Analytics
 
-| | |
-|--|--|
-| **Architecture** | Dashboards built from **order history** pulled via existing order bridge; extra metrics may use `/api/admin/analytics/*`. |
-| **Codebase** | `admin/analytics/page.tsx`, `lib/analytics-bridge.ts`, `lib/analytics-chart.ts`, `components/AnalyticsChartsPanel.tsx` |
-| **Medusa** | **Indirect:** `fetchMedusaOrdersForAdmin` → **`medusaAdminFetch`** under the hood. No separate analytics API on Medusa required for baseline charts. |
+|                  |                                                                                                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Dashboards built from **order history** pulled via existing order bridge; extra metrics may use `/api/admin/analytics/*`.                            |
+| **Codebase**     | `admin/analytics/page.tsx`, `lib/analytics-bridge.ts`, `lib/analytics-chart.ts`, `components/AnalyticsChartsPanel.tsx`                               |
+| **Medusa**       | **Indirect:** `fetchMedusaOrdersForAdmin` → **`medusaAdminFetch`** under the hood. No separate analytics API on Medusa required for baseline charts. |
 
 **Layout ASCII**
 
@@ -1033,11 +1036,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.7 CRM
 
-| | |
-|--|--|
-| **Architecture** | Customer list from Medusa Admin customers API. |
-| **Codebase** | `admin/crm/page.tsx`, `lib/customers-bridge.ts` |
-| **Medusa** | **`medusaAdminFetch`** → `GET /admin/customers`. |
+|                  |                                                  |
+| ---------------- | ------------------------------------------------ |
+| **Architecture** | Customer list from Medusa Admin customers API.   |
+| **Codebase**     | `admin/crm/page.tsx`, `lib/customers-bridge.ts`  |
+| **Medusa**       | **`medusaAdminFetch`** → `GET /admin/customers`. |
 
 **Layout ASCII**
 
@@ -1057,11 +1060,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.8 Employees
 
-| | |
-|--|--|
-| **Architecture** | Platform staff roster and PIN; not Medusa customers. |
-| **Codebase** | `admin/employees/page.tsx`, `api/admin/employees/route.ts`, `api/admin/employees/[id]/route.ts`, `api/admin/employees/[id]/pin/route.ts` |
-| **Medusa** | **None** for standard flows. |
+|                  |                                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Platform staff roster and PIN; not Medusa customers.                                                                                     |
+| **Codebase**     | `admin/employees/page.tsx`, `api/admin/employees/route.ts`, `api/admin/employees/[id]/route.ts`, `api/admin/employees/[id]/pin/route.ts` |
+| **Medusa**       | **None** for standard flows.                                                                                                             |
 
 **Layout ASCII**
 
@@ -1081,11 +1084,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.9 Loyalty
 
-| | |
-|--|--|
-| **Architecture** | Loyalty accounts, points, rewards in platform DB. |
-| **Codebase** | `admin/loyalty/page.tsx`, `api/admin/loyalty/*/route.ts` |
-| **Medusa** | **None** in typical admin UI; redemption integration with carts would be separate. |
+|                  |                                                                                    |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| **Architecture** | Loyalty accounts, points, rewards in platform DB.                                  |
+| **Codebase**     | `admin/loyalty/page.tsx`, `api/admin/loyalty/*/route.ts`                           |
+| **Medusa**       | **None** in typical admin UI; redemption integration with carts would be separate. |
 
 **Layout ASCII**
 
@@ -1104,11 +1107,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.10 Campaigns
 
-| | |
-|--|--|
-| **Architecture** | Marketing campaigns and execution; segments stored in platform DB. |
-| **Codebase** | `admin/campaigns/page.tsx`, `api/admin/campaigns/route.ts`, `api/admin/campaigns/[id]/execute/route.ts`, `api/admin/segments/route.ts` |
-| **Medusa** | **None** unless you add cross-links in business logic later. |
+|                  |                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Marketing campaigns and execution; segments stored in platform DB.                                                                     |
+| **Codebase**     | `admin/campaigns/page.tsx`, `api/admin/campaigns/route.ts`, `api/admin/campaigns/[id]/execute/route.ts`, `api/admin/segments/route.ts` |
+| **Medusa**       | **None** unless you add cross-links in business logic later.                                                                           |
 
 **Layout ASCII**
 
@@ -1127,11 +1130,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.11 Devices
 
-| | |
-|--|--|
-| **Architecture** | Register printers, terminals, or POS hardware metadata. |
-| **Codebase** | `admin/devices/page.tsx`, `api/admin/devices/route.ts`, `api/admin/devices/[id]/route.ts` |
-| **Medusa** | **None**. |
+|                  |                                                                                           |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| **Architecture** | Register printers, terminals, or POS hardware metadata.                                   |
+| **Codebase**     | `admin/devices/page.tsx`, `api/admin/devices/route.ts`, `api/admin/devices/[id]/route.ts` |
+| **Medusa**       | **None**.                                                                                 |
 
 **Layout ASCII**
 
@@ -1150,11 +1153,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.12 Channels
 
-| | |
-|--|--|
-| **Architecture** | Audit log of inbound channel webhook events (partner integrations). |
-| **Codebase** | `admin/channels/page.tsx`, `lib/channel-events-bridge.ts`, `api/integrations/channels/webhook/route.ts` |
-| **Medusa** | **None** for the admin table. Webhook handler persists events for review. |
+|                  |                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Audit log of inbound channel webhook events (partner integrations).                                     |
+| **Codebase**     | `admin/channels/page.tsx`, `lib/channel-events-bridge.ts`, `api/integrations/channels/webhook/route.ts` |
+| **Medusa**       | **None** for the admin table. Webhook handler persists events for review.                               |
 
 **Layout ASCII**
 
@@ -1174,11 +1177,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.13 Chat orders
 
-| | |
-|--|--|
-| **Architecture** | Chat or manual order intake list; form may post to integrations API. |
-| **Codebase** | `admin/chat-orders/page.tsx`, `components/ChatIntakeForm.tsx`, `lib/chat-intake-bridge.ts`, `api/integrations/chat-orders/intake/route.ts` |
-| **Medusa** | **Intake route** may use **`getMedusaAdminSdk()`** to create or attach commerce records when an order is placed from chat (see handler implementation). List view is Supabase. |
+|                  |                                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Architecture** | Chat or manual order intake list; form may post to integrations API.                                                                                                           |
+| **Codebase**     | `admin/chat-orders/page.tsx`, `components/ChatIntakeForm.tsx`, `lib/chat-intake-bridge.ts`, `api/integrations/chat-orders/intake/route.ts`                                     |
+| **Medusa**       | **Intake route** may use **`getMedusaAdminSdk()`** to create or attach commerce records when an order is placed from chat (see handler implementation). List view is Supabase. |
 
 **Layout ASCII**
 
@@ -1199,11 +1202,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.14 Payments
 
-| | |
-|--|--|
-| **Architecture** | Read-only view of **regions** and **payment providers** configured in Medusa (which providers are enabled per region). |
-| **Codebase** | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `components/PaymentProviderLabel.tsx`, `api/admin/medusa/payment-providers/route.ts` |
-| **Medusa** | **`medusaAdminFetch`** to list regions and payment collections / providers (see bridge). |
+|                  |                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | Read-only view of **regions** and **payment providers** configured in Medusa (which providers are enabled per region).                                      |
+| **Codebase**     | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `components/PaymentProviderLabel.tsx`, `api/admin/medusa/payment-providers/route.ts` |
+| **Medusa**       | **`medusaAdminFetch`** to list regions and payment collections / providers (see bridge).                                                                    |
 
 **Layout ASCII**
 
@@ -1222,11 +1225,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.15 Storefront (home)
 
-| | |
-|--|--|
+|                  |                                                                                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | **Architecture** | Edit **homepage payload** consumed by the public storefront (Supabase-stored JSON or structured document), not Medusa product rows. |
-| **Codebase** | `admin/settings/storefront/page.tsx`, `components/StorefrontHomeEditor.tsx`, `api/admin/storefront-home/route.ts` |
-| **Medusa** | **None** for persistence. Catalog tiles on the public site still **read** products from Medusa on the storefront app. |
+| **Codebase**     | `admin/settings/storefront/page.tsx`, `components/StorefrontHomeEditor.tsx`, `api/admin/storefront-home/route.ts`                   |
+| **Medusa**       | **None** for persistence. Catalog tiles on the public site still **read** products from Medusa on the storefront app.               |
 
 **Layout ASCII**
 
@@ -1245,11 +1248,11 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 
 ### 19.16 Content
 
-| | |
-|--|--|
-| **Architecture** | CMS hub under `/admin/cms`: pages, navigation, blog, media, redirects, experiments, etc. All **platform content** except live catalog SKUs. |
-| **Codebase** | `admin/cms/**/page.tsx`, `components/cms/*`, `api/admin/cms/**` |
-| **Medusa** | **Only** where staff need product IDs/handles inside content: **`/admin/cms/commerce`** → `GET /api/admin/commerce/products/search` → **`medusaAdminFetch`** → `/admin/products` search. Everything else is Supabase. |
+|                  |                                                                                                                                                                                                                       |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Architecture** | CMS hub under `/admin/cms`: pages, navigation, blog, media, redirects, experiments, etc. All **platform content** except live catalog SKUs.                                                                           |
+| **Codebase**     | `admin/cms/**/page.tsx`, `components/cms/*`, `api/admin/cms/**`                                                                                                                                                       |
+| **Medusa**       | **Only** where staff need product IDs/handles inside content: **`/admin/cms/commerce`** → `GET /api/admin/commerce/products/search` → **`medusaAdminFetch`** → `/admin/products` search. Everything else is Supabase. |
 
 **Layout ASCII (hub)**
 
@@ -1310,8 +1313,8 @@ Gives staff a same-day snapshot of commerce health: recent orders and inventory 
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                                                      | Should have                                      | Could have                                                     | Won’t have (this phase)                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------- |
 | Signed-in overview with recent orders and a clear “commerce unavailable” state | Cross-links into Orders and Inventory deep views | Customizable KPI set or date-range filters on the landing page | Full BI or drill-down analytics on the dashboard itself |
 
 ---
@@ -1335,8 +1338,8 @@ Lets staff **see** the Medusa catalog in-app and **create or adjust** simple pro
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                                                             | Should have                                       | Could have                                          | Won’t have (this phase)                             |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
 | List + search; create single-variant products with price/SKU/thumbnail as implemented | Inline edit for single-variant products via PATCH | Multi-variant matrix, PIM fields, scheduled publish | Full replacement of Medusa Admin product experience |
 
 ---
@@ -1358,8 +1361,8 @@ Shows variant-level inventory from Medusa so staff can spot low or out-of-stock 
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                | Should have                        | Could have                                              | Won’t have (this phase)                                                  |
+| ---------------------------------------- | ---------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Read-only stock view aligned with Medusa | One-click refresh from the browser | Bulk export, location-level breakdown, automated alerts | Writing stock adjustments only in Supabase (Medusa owns inventory truth) |
 
 ---
@@ -1383,8 +1386,8 @@ Exposes Medusa orders for customer service: find an order, inspect line items, a
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                | Should have                                            | Could have                                           | Won’t have (this phase)            |
+| ---------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------- | ---------------------------------- |
 | List + detail with accurate Medusa state | Fulfillment panel and shipment metadata as implemented | Refund/dispute UI if not already in Medusa workflows | Duplicate order ledger in Supabase |
 
 ---
@@ -1406,8 +1409,8 @@ In-store selling: lookup, cart, draft order, commit sale, and hardware-adjacent 
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                             | Should have                                | Could have                     | Won’t have (this phase)         |
+| ----------------------------------------------------- | ------------------------------------------ | ------------------------------ | ------------------------------- |
 | Reliable sale capture against Medusa (draft → commit) | Barcode/SKU lookup and quick product tiles | Full offline reconciliation UX | Non-Medusa cart source of truth |
 
 ---
@@ -1428,8 +1431,8 @@ Turns order history into trends (sales, retention, CLV-style panels) so managers
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                                    | Should have                         | Could have                             | Won’t have (this phase)                  |
+| ------------------------------------------------------------ | ----------------------------------- | -------------------------------------- | ---------------------------------------- |
 | Read-only charts derived from Medusa orders (as implemented) | Consistent date ranges across tiles | Cohort exports, custom metrics builder | Real-time sub-second streaming analytics |
 
 ---
@@ -1450,8 +1453,8 @@ Lists Medusa customers for outreach and in-store recognition; detail depth depen
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                            | Should have                                   | Could have                                         | Won’t have (this phase)                          |
+| ------------------------------------ | --------------------------------------------- | -------------------------------------------------- | ------------------------------------------------ |
 | Searchable customer list from Medusa | Customer detail view with order history links | Segments merged with marketing tools beyond §20.10 | Standalone CRM replacing Medusa customer records |
 
 ---
@@ -1472,9 +1475,9 @@ Manages **store staff** records and PIN behavior in Supabase, separate from Medu
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
-| CRUD + PIN flows needed for POS policy | Clear permission alignment with `staff_permission_grants` | Bulk import, HR fields | Full HRIS payroll |
+| Must have                              | Should have                                               | Could have             | Won’t have (this phase) |
+| -------------------------------------- | --------------------------------------------------------- | ---------------------- | ----------------------- |
+| CRUD + PIN flows needed for POS policy | Clear permission alignment with `staff_permission_grants` | Bulk import, HR fields | Full HRIS payroll       |
 
 ---
 
@@ -1494,8 +1497,8 @@ Operates loyalty accounts and point movements stored in **Supabase**, layered on
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                         | Should have             | Could have                                  | Won’t have (this phase)                          |
+| ------------------------------------------------- | ----------------------- | ------------------------------------------- | ------------------------------------------------ |
 | Staff can view/adjust loyalty per implemented API | Auditable point changes | Tiered programs with automated rules engine | Loyalty ledger duplicated as canonical in Medusa |
 
 ---
@@ -1516,8 +1519,8 @@ Plans outbound or operational campaigns against **segments** stored in Supabase 
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                              | Should have                         | Could have                                | Won’t have (this phase)                       |
+| -------------------------------------- | ----------------------------------- | ----------------------------------------- | --------------------------------------------- |
 | Create/list campaigns tied to segments | Safe execute path with confirmation | A/B content linkage to §20.15 experiments | Full ESP integration in-app for all providers |
 
 ---
@@ -1538,8 +1541,8 @@ Registers POS terminals, printers, or other devices so operations knows what is 
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                 | Should have                     | Could have         | Won’t have (this phase)              |
+| ----------------------------------------- | ------------------------------- | ------------------ | ------------------------------------ |
 | Device list and basic CRUD as implemented | Heartbeat or last-seen metadata | Remote wipe or MDM | Full device fleet management product |
 
 ---
@@ -1560,8 +1563,8 @@ Shows **webhook and sync events** landing in Supabase for integrations (audit an
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                | Should have                   | Could have     | Won’t have (this phase)                          |
+| ---------------------------------------- | ----------------------------- | -------------- | ------------------------------------------------ |
 | Visible audit trail for channel payloads | Filters by channel and status | Replay from UI | Editing commerce data directly from channel rows |
 
 ---
@@ -1582,8 +1585,8 @@ Surfaces **which payment providers Medusa exposes per region** so staff can conf
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                    | Should have                          | Could have                             | Won’t have (this phase)                                        |
+| -------------------------------------------- | ------------------------------------ | -------------------------------------- | -------------------------------------------------------------- |
 | Read-only clarity of provider IDs per region | Friendly labels for common providers | Comparison to live storefront checkout | Changing provider secrets from this UI (belongs in Medusa/env) |
 
 ---
@@ -1604,8 +1607,8 @@ Edits the **storefront home** document the public site reads from Supabase (hero
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                            | Should have                               | Could have                    | Won’t have (this phase)                |
+| ------------------------------------ | ----------------------------------------- | ----------------------------- | -------------------------------------- |
 | Save/load validated homepage payload | Preview link or draft vs published states | Visual drag-drop page builder | Full site theming/CSS from this screen |
 
 ---
@@ -1638,8 +1641,8 @@ Owns **marketing and editorial** surfaces: pages, nav, blog, media, redirects, e
 
 **MoSCoW**
 
-| Must have | Should have | Could have | Won’t have (this phase) |
-|-----------|-------------|------------|-------------------------|
+| Must have                                                  | Should have                                   | Could have                        | Won’t have (this phase)                      |
+| ---------------------------------------------------------- | --------------------------------------------- | --------------------------------- | -------------------------------------------- |
 | CRUD for pages, nav, blog, media, redirects as implemented | Experiments aligned with storefront rendering | Full WYSIWYG for every block type | Storing product price or stock in CMS tables |
 
 ---
@@ -1653,4 +1656,4 @@ When you add a route, API, bridge, or sidebar item:
 
 ---
 
-*End of `apps/admin/admin.md` — full reference as requested.*
+_End of `apps/admin/admin.md` — full reference as requested._

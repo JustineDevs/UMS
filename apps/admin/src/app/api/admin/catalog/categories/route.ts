@@ -1,6 +1,6 @@
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { authOptions } from "@/lib/auth";
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
+import { staffSessionAllows } from "@universal-music-store/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
 import {
   createAdminProductCategory,
   listAdminProductCategories,
@@ -10,9 +10,9 @@ import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
+async function post(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
@@ -45,3 +45,5 @@ export async function GET(req: Request) {
   const categories = await listAdminProductCategories();
   return correlatedJson(correlationId, { categories });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/catalog/categories:POST", post);

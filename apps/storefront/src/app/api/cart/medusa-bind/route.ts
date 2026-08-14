@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
+import { withBotIdProtection } from "@/lib/botid-protection";
 import {
   applyRateLimit,
   parseJsonBody,
@@ -8,7 +9,7 @@ import {
   writeCartCookie,
 } from "@/lib/cart-api-helpers";
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const rl = await applyRateLimit(req, "cart-bind", 40, 60_000);
   if (!rl.ok) return rl.response;
 
@@ -31,3 +32,5 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = withBotIdProtection(handlePOST);

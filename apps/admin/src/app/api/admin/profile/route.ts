@@ -1,18 +1,17 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
-export async function PATCH(req: NextRequest) {
+async function patch(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("settings:write");
   if (!staff.ok) {
     return tagResponse(staff.response, cid);
   }
-  const session = await getServerSession(authOptions);
+  const session = staff.session;
   if (!session?.user?.email) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -44,3 +43,5 @@ export async function PATCH(req: NextRequest) {
 
   return correlatedJson(cid, { ok: true, name: name.length > 0 ? name : null });
 }
+
+export const PATCH = withAdminMutationIdempotency("/admin/profile:PATCH", patch);

@@ -115,24 +115,60 @@ test("validateMedusaProcessEnv: throws when PayPal client ID set without webhook
   );
 });
 
+test("validateMedusaProcessEnv: throws when Xendit secret is set without webhook token", () => {
+  setupValidProd();
+  process.env.XENDIT_SECRET_KEY = "xendit-secret";
+  delete process.env.XENDIT_WEBHOOK_TOKEN;
+  assert.throws(
+    () => validateMedusaProcessEnv(),
+    /XENDIT_WEBHOOK_TOKEN.*required/,
+  );
+});
+
 test("validateMedusaProcessEnv: passes when PayPal client ID, secret, and webhook ID all set", () => {
   setupValidProd();
   process.env.PAYPAL_CLIENT_ID = "AZDxjDScFpQ";
   process.env.PAYPAL_CLIENT_SECRET = "EJp8vlxYBq";
   process.env.PAYPAL_WEBHOOK_ID = "5GP028458E2496506";
+  process.env.PAYPAL_ENVIRONMENT = "production";
   assert.doesNotThrow(() => validateMedusaProcessEnv());
+});
+
+test("validateMedusaProcessEnv: throws when PayPal client ID set but PAYPAL_ENVIRONMENT not production", () => {
+  setupValidProd();
+  process.env.PAYPAL_CLIENT_ID = "AZDxjDScFpQ";
+  process.env.PAYPAL_CLIENT_SECRET = "EJp8vlxYBq";
+  process.env.PAYPAL_WEBHOOK_ID = "5GP028458E2496506";
+  process.env.PAYPAL_ENVIRONMENT = "sandbox";
+  assert.throws(
+    () => validateMedusaProcessEnv(),
+    /PAYPAL_ENVIRONMENT must be production/,
+  );
 });
 
 test("validateMedusaProcessEnv: passes when no optional payment providers configured", () => {
   setupValidProd();
   delete process.env.PAYPAL_CLIENT_ID;
   delete process.env.STRIPE_API_KEY;
-  delete process.env.PAYMONGO_SECRET_KEY;
+  delete process.env.XENDIT_SECRET_KEY;
+  delete process.env.XENDIT_WEBHOOK_TOKEN;
   assert.doesNotThrow(() => validateMedusaProcessEnv());
 });
 
-test("validateMedusaProcessEnv: warns about TRACKING_HMAC_SECRET when Resend configured", () => {
+test("validateMedusaProcessEnv: throws in production when Resend configured but TRACKING_HMAC_SECRET missing", () => {
   setupValidProd();
+  process.env.RESEND_API_KEY = "re_xxx";
+  process.env.RESEND_FROM_EMAIL = "noreply@example.com";
+  delete process.env.TRACKING_HMAC_SECRET;
+  assert.throws(
+    () => validateMedusaProcessEnv(),
+    /TRACKING_HMAC_SECRET is required in production when Resend is configured/,
+  );
+});
+
+test("validateMedusaProcessEnv: warns in development when Resend configured but TRACKING_HMAC_SECRET missing", () => {
+  process.env.NODE_ENV = "development";
+  process.env.DATABASE_URL = "postgres://x";
   process.env.RESEND_API_KEY = "re_xxx";
   process.env.RESEND_FROM_EMAIL = "noreply@example.com";
   delete process.env.TRACKING_HMAC_SECRET;

@@ -1,30 +1,38 @@
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { createPortal } from "react-dom";
 import { cva, type VariantProps } from "class-variance-authority";
+import {
+  Dialog,
+  DialogClose,
+  DialogPortal,
+  DialogTrigger,
+  DialogOverlay,
+  useDialogContext,
+} from "./dialog";
 import { cn } from "../../lib/utils";
 
-const Sheet = DialogPrimitive.Root;
-const SheetTrigger = DialogPrimitive.Trigger;
-const SheetClose = DialogPrimitive.Close;
-const SheetPortal = DialogPrimitive.Portal;
+const Sheet = Dialog;
+const SheetTrigger = DialogTrigger;
+const SheetClose = DialogClose;
+const SheetPortal = DialogPortal;
 
 const SheetOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
+  <DialogOverlay
+    ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-sm",
       className,
     )}
     {...props}
-    ref={ref}
   />
 ));
-SheetOverlay.displayName = DialogPrimitive.Overlay.displayName;
+SheetOverlay.displayName = "SheetOverlay";
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-lg transition ease-in-out data-[state=open]:duration-300 data-[state=closed]:duration-200",
+  "fixed z-50 gap-4 border border-outline-variant/25 bg-surface-container-lowest p-6 shadow-lg transition ease-in-out",
   {
     variants: {
       side: {
@@ -40,26 +48,53 @@ const sheetVariants = cva(
   },
 );
 
-interface SheetContentProps
-  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+interface SheetContentProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof sheetVariants> {}
 
-const SheetContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
-  SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(sheetVariants({ side }), className)}
-      {...props}
-    >
-      {children}
-    </DialogPrimitive.Content>
-  </SheetPortal>
-));
-SheetContent.displayName = DialogPrimitive.Content.displayName;
+const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
+  ({ side = "right", className, children, ...props }, ref) => {
+    const { open, setOpen, titleId, descriptionId } = useDialogContext();
+
+    React.useEffect(() => {
+      if (!open || typeof window === "undefined") {
+        return;
+      }
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          setOpen(false);
+        }
+      };
+
+      window.addEventListener("keydown", onKeyDown);
+      return () => window.removeEventListener("keydown", onKeyDown);
+    }, [open, setOpen]);
+
+    if (!open) {
+      return null;
+    }
+
+    const sheetPositionClass = sheetVariants({ side });
+
+    return createPortal(
+      <>
+        <SheetOverlay />
+        <div
+          ref={ref}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          aria-describedby={descriptionId}
+          className={cn(sheetPositionClass, className)}
+          {...props}
+        >
+          {children}
+        </div>
+      </>,
+      document.body,
+    );
+  },
+);
+SheetContent.displayName = "SheetContent";
 
 const SheetHeader = ({
   className,
@@ -90,28 +125,28 @@ const SheetFooter = ({
 SheetFooter.displayName = "SheetFooter";
 
 const SheetTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+  HTMLHeadingElement,
+  React.HTMLAttributes<HTMLHeadingElement>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Title
+  <h2
     ref={ref}
     className={cn("text-lg font-semibold text-primary", className)}
     {...props}
   />
 ));
-SheetTitle.displayName = DialogPrimitive.Title.displayName;
+SheetTitle.displayName = "SheetTitle";
 
 const SheetDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
+  <p
     ref={ref}
     className={cn("text-sm text-on-surface-variant", className)}
     {...props}
   />
 ));
-SheetDescription.displayName = DialogPrimitive.Description.displayName;
+SheetDescription.displayName = "SheetDescription";
 
 export {
   Sheet,

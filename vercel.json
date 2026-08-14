@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm exec turbo run build --filter=@apparel-commerce/storefront",
-  "installCommand": "pnpm install"
+  "buildCommand": "pnpm exec turbo run build --filter=@universal-music-store/storefront",
+  "installCommand": "pnpm install --frozen-lockfile"
 }

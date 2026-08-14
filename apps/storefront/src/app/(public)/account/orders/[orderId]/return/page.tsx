@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
@@ -5,6 +6,11 @@ import { getServerSession } from "next-auth/next";
 import { OrderReturnForm, type ReturnLine } from "@/components/OrderReturnForm";
 import { authOptions } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+
+export const metadata: Metadata = {
+  title: "Request a return",
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
+};
 
 type OrderRow = {
   id?: string;

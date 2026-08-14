@@ -4,7 +4,7 @@ import {
   isStaffRbacStrictEnv,
   staffHasPermission,
   staffSessionAllows,
-} from "./permissions";
+} from "./permissions.js";
 
 describe("staffHasPermission", () => {
   beforeEach(() => {
@@ -40,6 +40,10 @@ describe("staffHasPermission", () => {
   it("requires explicit key when list is non-empty without wildcard", () => {
     assert.equal(staffHasPermission(["pos:use"], "pos:use"), true);
     assert.equal(staffHasPermission(["pos:use"], "crm:read"), false);
+  });
+
+  it("explicit integration admin grants are respected", () => {
+    assert.equal(staffHasPermission(["integrations:manage"], "integrations:manage"), true);
   });
 });
 

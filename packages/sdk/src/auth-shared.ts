@@ -19,7 +19,7 @@ export function loadGoogleCredentials(appLabel: string): {
 
   if (process.env.NODE_ENV === "development" && !configured) {
     console.warn(
-      `[${appLabel} auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Google sign-in will not work. Check root .env.`,
+      `[${appLabel} auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Google sign-in will not work. Check root .env.local.`,
     );
   }
 
@@ -27,6 +27,7 @@ export function loadGoogleCredentials(appLabel: string): {
 }
 
 export type SharedSessionUser = {
+  id?: string;
   email?: string | null;
   name?: string | null;
   image?: string | null;
@@ -42,15 +43,27 @@ export function buildSharedJwtCallback() {
   return async function jwtCallback({
     token,
     user,
+    account,
   }: {
     token: Record<string, unknown>;
-    user?: { email?: string | null; name?: string | null; image?: string | null; role?: string } | null;
+    user?: {
+      id?: string;
+      email?: string | null;
+      name?: string | null;
+      image?: string | null;
+      role?: string;
+    } | null;
+    account?: { providerAccountId?: string } | null;
   }): Promise<Record<string, unknown>> {
     if (user) {
+      if (user.id) token.id = user.id;
       if (user.email) token.email = user.email;
       if (user.name !== undefined) token.name = user.name;
       if (user.image !== undefined) token.picture = user.image;
       if (user.role) token.role = user.role;
+    }
+    if (!token.id && account?.providerAccountId) {
+      token.id = account.providerAccountId;
     }
     return token;
   };
@@ -69,6 +82,8 @@ export function buildSharedSessionCallback() {
     token: Record<string, unknown>;
   }) {
     if (session.user) {
+      session.user.id =
+        (token.id as string | undefined) ?? (token.sub as string | undefined) ?? session.user.id;
       session.user.email = (token.email as string | undefined) ?? undefined;
       session.user.name = (token.name as string | undefined) ?? undefined;
       session.user.image = (token.picture as string | undefined) ?? undefined;

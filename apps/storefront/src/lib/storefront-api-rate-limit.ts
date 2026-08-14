@@ -78,16 +78,19 @@ async function rateLimitUpstash(
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000));
   const auth = { Authorization: `Bearer ${token}` };
 
-  const incrRes = await fetch(`${root}/incr/${k}`, { headers: auth });
+  const signal = AbortSignal.timeout(2_000);
+  const incrRes = await fetch(`${root}/incr/${k}`, { headers: auth, signal });
   if (!incrRes.ok) return null;
   const count = parseUpstashRestNumber(await incrRes.text());
   if (count === null) return null;
   if (count === 1) {
-    await fetch(`${root}/expire/${k}/${windowSec}`, { headers: auth });
+    await fetch(`${root}/expire/${k}/${windowSec}`, { headers: auth, signal });
   }
   if (count > max) {
-    const ttlRes = await fetch(`${root}/ttl/${k}`, { headers: auth });
-    const ttlParsed = ttlRes.ok ? parseUpstashRestNumber(await ttlRes.text()) : null;
+    const ttlRes = await fetch(`${root}/ttl/${k}`, { headers: auth, signal });
+    const ttlParsed = ttlRes.ok
+      ? parseUpstashRestNumber(await ttlRes.text())
+      : null;
     const ttlRaw = ttlParsed !== null ? ttlParsed : -1;
     const ttl = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : windowSec;
     return { ok: false, retryAfterSec: Math.max(1, ttl) };
@@ -118,9 +121,13 @@ export async function rateLimitFixedWindow(
     useUpstashForRateLimit = upstashEnvConfigured();
   }
   if (useUpstashForRateLimit) {
-    const remote = await rateLimitUpstash(key, max, windowMs);
-    if (remote !== null) {
-      return remote;
+    try {
+      const remote = await rateLimitUpstash(key, max, windowMs);
+      if (remote !== null) {
+        return remote;
+      }
+    } catch {
+      // A remote limiter outage must not strand public checkout routes.
     }
     useUpstashForRateLimit = false;
   }
@@ -128,6 +135,8 @@ export async function rateLimitFixedWindow(
 }
 
 export function getRequestIp(req: Request): string {
+  const cf = req.headers.get("cf-connecting-ip")?.trim();
+  if (cf) return cf.slice(0, 128);
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();

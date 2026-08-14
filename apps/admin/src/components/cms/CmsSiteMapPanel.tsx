@@ -1,6 +1,9 @@
 "use client";
 
-import type { CmsNavLink, CmsNavigationPayload } from "@apparel-commerce/platform-data";
+import type {
+  CmsNavLink,
+  CmsNavigationPayload,
+} from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type PageRow = {
@@ -44,10 +47,13 @@ function hrefMentionsCmsSlug(href: string, slug: string): boolean {
   const needle = `/p/${slug}`;
   const t = href.trim();
   if (!t) return false;
-  if (t === needle || t.startsWith(`${needle}?`) || t.startsWith(`${needle}#`)) return true;
+  if (t === needle || t.startsWith(`${needle}?`) || t.startsWith(`${needle}#`))
+    return true;
   try {
     const u = new URL(t, "https://placeholder.local");
-    return u.pathname === needle || u.pathname === `/p/${encodeURIComponent(slug)}`;
+    return (
+      u.pathname === needle || u.pathname === `/p/${encodeURIComponent(slug)}`
+    );
   } catch {
     return t.includes(needle);
   }
@@ -58,12 +64,14 @@ export function CmsSiteMapPanel() {
   const [nav, setNav] = useState<CmsNavigationPayload | null>(null);
   const [navHasDraft, setNavHasDraft] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [localeFilter, setLocaleFilter] = useState<string>("");
   const [onlyPublishedNotInNav, setOnlyPublishedNotInNav] = useState(false);
   const [onlyBrokenParent, setOnlyBrokenParent] = useState(false);
 
   const load = useCallback(() => {
     setErr(null);
+    setLoading(true);
     Promise.all([
       fetch("/api/admin/cms/pages").then(async (r) => {
         const j = (await r.json()) as { data?: PageRow[]; error?: string };
@@ -85,14 +93,20 @@ export function CmsSiteMapPanel() {
         setNav(navRes.data ?? null);
         setNavHasDraft(Boolean(navRes.meta?.hasDraft));
       })
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Load failed"));
+      .catch((e: unknown) =>
+        setErr(e instanceof Error ? e.message : "Load failed"),
+      )
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const hrefs = useMemo(() => (nav ? collectNavHrefs(nav) : new Set<string>()), [nav]);
+  const hrefs = useMemo(
+    () => (nav ? collectNavHrefs(nav) : new Set<string>()),
+    [nav],
+  );
 
   const localeOptions = useMemo(() => {
     const s = new Set<string>();
@@ -121,10 +135,14 @@ export function CmsSiteMapPanel() {
       }
       const parentKey = p.parent_slug?.trim() ?? "";
       const brokenParent =
-        parentKey.length > 0 ? !slugLocaleKeys.has(`${p.locale}:${parentKey}`) : false;
+        parentKey.length > 0
+          ? !slugLocaleKeys.has(`${p.locale}:${parentKey}`)
+          : false;
       const notes: string[] = [];
       if (p.status === "published" && !linked) {
-        notes.push("Published but no header/footer link points to /p/this slug");
+        notes.push(
+          "Published but no header/footer link points to /p/this slug",
+        );
       }
       if (brokenParent) {
         notes.push(`Parent "${parentKey}" missing for locale ${p.locale}`);
@@ -136,7 +154,8 @@ export function CmsSiteMapPanel() {
   const filteredRows = useMemo(() => {
     return tableRows.filter((r) => {
       if (localeFilter && r.locale !== localeFilter) return false;
-      if (onlyPublishedNotInNav && (r.status !== "published" || r.linked)) return false;
+      if (onlyPublishedNotInNav && (r.status !== "published" || r.linked))
+        return false;
       if (onlyBrokenParent && !r.brokenParent) return false;
       return true;
     });
@@ -160,7 +179,8 @@ export function CmsSiteMapPanel() {
         </button>
         {navHasDraft ? (
           <p className="text-xs text-amber-800">
-            Navigation has an unpublished draft. This table reflects merged draft + live links.
+            Navigation has an unpublished draft. This table reflects merged
+            draft + live links.
           </p>
         ) : null}
       </div>
@@ -228,46 +248,80 @@ export function CmsSiteMapPanel() {
         .{" "}
         {orphanPublished > 0 ? (
           <span className="font-medium text-amber-900">
-            {orphanPublished} published page(s) have no link in the current navigation payload.
+            {orphanPublished} published page(s) have no link in the current
+            navigation payload.
           </span>
         ) : (
           <span>Every published page appears in at least one nav href.</span>
         )}
         {brokenParentCount > 0 ? (
           <span className="block mt-1 text-slate-700">
-            {brokenParentCount} page(s) reference a parent slug that does not exist for the same
-            locale.
+            {brokenParentCount} page(s) reference a parent slug that does not
+            exist for the same locale.
           </span>
         ) : null}
         <span className="block mt-2 text-xs text-slate-500">
-          To change page content or slugs, use the Pages screen from this Content section.
+          To change page content or slugs, use the Pages screen from this
+          Content section.
         </span>
       </p>
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="px-3 py-2">Slug</th>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">Locale</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Parent</th>
-              <th className="px-3 py-2">In nav</th>
-              <th className="px-3 py-2">Notes</th>
+              <th scope="col" className="px-3 py-2">
+                Slug
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Title
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Locale
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Status
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Parent
+              </th>
+              <th scope="col" className="px-3 py-2">
+                In nav
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Notes
+              </th>
             </tr>
           </thead>
           <tbody>
-            {filteredRows.length === 0 ? (
+            {loading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-sm text-slate-500">
+                <td
+                  colSpan={7}
+                  className="px-3 py-8 text-center text-sm text-slate-500"
+                >
+                  Loading site map...
+                </td>
+              </tr>
+            ) : filteredRows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-3 py-8 text-center text-sm text-slate-500"
+                >
                   No rows match the current filters.
                 </td>
               </tr>
             ) : (
               filteredRows.map((r) => (
-                <tr key={r.id} className="border-b border-slate-100 last:border-0">
+                <tr
+                  key={r.id}
+                  className="border-b border-slate-100 last:border-0"
+                >
                   <td className="px-3 py-2 font-mono text-xs">{r.slug}</td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-xs" title={r.title}>
+                  <td
+                    className="max-w-[200px] truncate px-3 py-2 text-xs"
+                    title={r.title}
+                  >
                     {r.title}
                   </td>
                   <td className="px-3 py-2">{r.locale}</td>
@@ -276,7 +330,9 @@ export function CmsSiteMapPanel() {
                     {r.parent_slug?.trim() || "—"}
                   </td>
                   <td className="px-3 py-2">{r.linked ? "Yes" : "No"}</td>
-                  <td className="max-w-md px-3 py-2 text-xs text-slate-600">{r.notes || "—"}</td>
+                  <td className="max-w-md px-3 py-2 text-xs text-slate-600">
+                    {r.notes || "—"}
+                  </td>
                 </tr>
               ))
             )}

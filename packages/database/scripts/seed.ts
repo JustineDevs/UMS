@@ -5,9 +5,10 @@ import { config } from "dotenv";
 import pg from "pg";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-config({ path: join(__dirname, "../../../.env") });
+const repoRoot = join(__dirname, "../../../");
+config({ path: join(repoRoot, ".env.local"), override: true });
 
-/** Legacy/app Postgres only — never Medusa’s DATABASE_URL (see apps/medusa/.env). */
+/** Legacy/app Postgres only — never Medusa’s DATABASE_URL (see apps/medusa/.env.local). */
 const databaseUrl = process.env.LEGACY_DATABASE_URL;
 if (!databaseUrl) {
   console.error(
@@ -45,13 +46,18 @@ async function main(): Promise<void> {
       const currentPort = new URL(databaseUrl).port;
       const altPort = currentPort === "5432" ? 6543 : 5432;
       const altUrl = switchPoolerPort(databaseUrl, altPort);
-      console.log(`Session pooler (${currentPort}) failed, trying transaction pooler (${altPort})...`);
+      console.log(
+        `Session pooler (${currentPort}) failed, trying transaction pooler (${altPort})...`,
+      );
       try {
         await runSeed(altUrl);
         console.log(`Seed completed (port ${altPort}).`);
         return;
       } catch (e) {
-        console.error(`Port ${altPort} also failed:`, e instanceof Error ? e.message : e);
+        console.error(
+          `Port ${altPort} also failed:`,
+          e instanceof Error ? e.message : e,
+        );
       }
     }
     console.error("Seed failed:", msg);

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type VoidAction = "void_item" | "void_order" | "refund" | "discount_override";
 
@@ -34,6 +34,7 @@ function rowToVoid(row: Record<string, unknown>): PosVoid {
 }
 
 export type RecordVoidInput = {
+  organization_id?: string;
   shift_id?: string;
   employee_id: string;
   approved_by?: string;
@@ -52,6 +53,7 @@ export async function recordVoid(
   const { data, error } = await supabase
     .from("pos_voids")
     .insert({
+      organization_id: input.organization_id ?? null,
       shift_id: input.shift_id ?? null,
       employee_id: input.employee_id,
       approved_by: input.approved_by ?? null,
@@ -71,7 +73,7 @@ export async function recordVoid(
 
 export async function listVoids(
   supabase: SupabaseClient,
-  opts?: { shiftId?: string; limit?: number },
+  opts?: { shiftId?: string; limit?: number; organizationId?: string },
 ): Promise<PosVoid[]> {
   let q = supabase
     .from("pos_voids")
@@ -81,6 +83,7 @@ export async function listVoids(
   if (opts?.shiftId) {
     q = q.eq("shift_id", opts.shiftId);
   }
+  if (opts?.organizationId) q = q.eq("organization_id", opts.organizationId);
   const { data, error } = await q;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];

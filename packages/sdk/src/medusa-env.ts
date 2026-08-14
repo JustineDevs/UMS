@@ -4,7 +4,7 @@
  * Treats empty or whitespace-only values as unset (prevents "Invalid URL" when env is "").
  *
  * Server-side catalog fetches run in Node (Next.js RCS), not in the visitor's browser.
- * If MEDUSA_BACKEND_URL is still http://localhost:9000 (copied from local .env) but
+ * If MEDUSA_BACKEND_URL is still http://localhost:9000 (copied from local .env.local) but
  * NEXT_PUBLIC_MEDUSA_URL is a non-loopback URL (e.g. deployed Medusa on Render), we prefer
  * the public URL so hosted storefronts do not call the host's own localhost.
  */
@@ -45,6 +45,14 @@ export function getMedusaStoreBaseUrl(): string {
   } catch {
     return "http://localhost:9000";
   }
+}
+
+/**
+ * Admin and server-side Medusa clients use the same resolved backend origin,
+ * but this name makes the caller intent explicit.
+ */
+export function getMedusaAdminBaseUrl(): string {
+  return getMedusaStoreBaseUrl();
 }
 
 export function getMedusaSecretApiKey(): string | undefined {

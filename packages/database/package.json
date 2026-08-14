@@ -1,5 +1,5 @@
 {
-  "name": "@apparel-commerce/database",
+  "name": "@universal-music-store/database",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -20,13 +20,12 @@
     "test": "node --import tsx/esm --test src/compliance.test.ts"
   },
   "dependencies": {
-    "@apparel-commerce/platform-data": "workspace:*",
-    "@apparel-commerce/types": "workspace:*",
+    "@universal-music-store/platform-data": "workspace:*",
     "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
-    "@apparel-commerce/config-eslint": "workspace:*",
-    "@apparel-commerce/config-typescript": "workspace:*",
+    "@universal-music-store/config-eslint": "workspace:*",
+    "@universal-music-store/config-typescript": "workspace:*",
     "@types/pg": "^8.11.0",
     "dotenv": "^16.4.0",
     "eslint": "^9.0.0",

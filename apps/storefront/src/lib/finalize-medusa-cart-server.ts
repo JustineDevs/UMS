@@ -1,4 +1,4 @@
-import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 

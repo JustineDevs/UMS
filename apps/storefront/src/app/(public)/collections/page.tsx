@@ -3,18 +3,16 @@ import type { Metadata } from "next";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries } from "@/lib/catalog-fetch";
 import { shopHref } from "@/lib/shop-url";
-import { canonicalUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import { buildPageMetadata, SEO_KEYWORDS, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Collections",
-  description: `Browse by category (shorts, shirts, jackets). ${SITE_DESCRIPTION}`,
-  alternates: { canonical: canonicalUrl("/collections") },
-};
-
-/** Category entry points; counts when available from the shop. */
-const FEATURED_LABELS = ["Shorts", "Shirt", "Jacket"] as const;
+  description: `Browse the catalog by category. ${SITE_DESCRIPTION}`,
+  path: "/collections",
+  keywords: [...SEO_KEYWORDS.collections],
+});
 
 export default async function CollectionsPage() {
   const catRes = await fetchCategorySummaries();
@@ -28,7 +26,9 @@ export default async function CollectionsPage() {
     );
   }
   const summaries = catRes.summaries;
-  const byName = new Map(summaries.map((s) => [s.category, s.count]));
+  // Render the complete catalog summary. The shop remains the source of truth;
+  // silently truncating categories made published collections undiscoverable.
+  const featured = summaries;
 
   return (
     <main className="storefront-page-shell max-w-[1200px]">
@@ -40,13 +40,14 @@ export default async function CollectionsPage() {
           Collections
         </h1>
         <p className="font-body text-on-surface-variant max-w-2xl leading-relaxed">
-          Open the shop with a category filter applied (shorts, shirts, jackets).
-          Product counts update from the catalog.
+          Open the shop with a live category filter applied. Product counts update from the catalog,
+          so this page stays aligned with whatever your store actually carries.
         </p>
       </header>
       <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {FEATURED_LABELS.map((label) => {
-          const count = byName.get(label) ?? 0;
+        {featured.map((entry) => {
+          const label = entry.category;
+          const count = entry.count;
           return (
             <li key={label}>
               <Link
@@ -69,6 +70,11 @@ export default async function CollectionsPage() {
           );
         })}
       </ul>
+      {featured.length === 0 ? (
+        <p className="mt-8 text-center text-sm text-on-surface-variant">
+          No categories have been published yet. Add products in the catalog first.
+        </p>
+      ) : null}
       <p className="mt-12 text-center">
         <Link
           href="/shop"

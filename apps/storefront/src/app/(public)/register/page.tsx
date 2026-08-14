@@ -7,12 +7,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Register",
-};
+  description: "Create an account with Google sign-in.",
+  path: "/register",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default async function RegisterPage({
   searchParams,

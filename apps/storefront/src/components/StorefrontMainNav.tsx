@@ -1,9 +1,13 @@
 "use client";
 
-import type { CmsNavLink, CmsNavigationPayload } from "@apparel-commerce/platform-data";
+import type { CmsNavLink, CmsNavigationPayload } from "@universal-music-store/platform-data";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  isKnownUnavailableExternalImage,
+  shouldUnoptimizeImage,
+} from "@/lib/image-helpers";
 
 type FlatItem = { href: string; label: string; badge?: string };
 
@@ -129,13 +133,20 @@ function MegaTrigger({
               >
                 {link.featured.imageUrl ? (
                   <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-surface-container-low">
-                    <Image
-                      src={link.featured.imageUrl}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      sizes="160px"
-                    />
+                    {isKnownUnavailableExternalImage(link.featured.imageUrl) ? (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high text-[10px] font-medium text-on-surface-variant">
+                        Image unavailable
+                      </div>
+                    ) : (
+                      <Image
+                        src={link.featured.imageUrl}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="160px"
+                        unoptimized={shouldUnoptimizeImage(link.featured.imageUrl)}
+                      />
+                    )}
                   </div>
                 ) : null}
                 <span className="text-xs font-semibold uppercase tracking-wide text-primary">

@@ -1,19 +1,18 @@
-import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
+import { staffSessionAllows } from "@universal-music-store/database";
 import {
   getStorefrontHomeContent,
   mergeStorefrontHomePayload,
   upsertStorefrontHomeContent,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { getStaffSession } from "@/lib/requireStaffSession";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -24,12 +23,12 @@ export async function GET(req: NextRequest) {
   if ("response" in sup) return sup.response;
   const sb = sup.client;
   const data = await getStorefrontHomeContent(sb);
-  return correlatedJson(cid, { data });
+  return correlatedJson(cid, { data, devMode: process.env.AUTH_DISABLED === "true" });
 }
 
-export async function PUT(req: NextRequest) {
+async function put(req: Request) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -49,3 +48,5 @@ export async function PUT(req: NextRequest) {
   await upsertStorefrontHomeContent(sb, merged);
   return correlatedJson(cid, { data: merged });
 }
+
+export const PUT = withAdminMutationIdempotency("/admin/storefront-home:PUT", put);

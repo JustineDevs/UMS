@@ -1,124 +1,159 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import type { Product } from "@apparel-commerce/types";
+import { useRouter } from "next/navigation";
+import type { Product } from "@universal-music-store/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
 import { WishlistToggle } from "@/components/WishlistToggle";
-import {
-  cssColorForVariantColorLabel,
-  swatchNeedsLightStroke,
-} from "@/lib/variant-color-swatch";
+import { BackInStockNotify } from "@/components/BackInStockNotify";
+import { trackAddToCart } from "@/lib/analytics";
 
-export function AddToCartSection({ product }: { product: Product }) {
+export function AddToCartSection({
+  product,
+  testId = "pdp-add-to-bag",
+}: {
+  product: Product;
+  testId?: string;
+}) {
   const router = useRouter();
-  const pathname = usePathname();
-  const { status } = useSession();
-  const sizes = useMemo(
-    () => [...new Set(product.variants.map((v) => v.size))].sort(),
+  const types = useMemo(
+    () => [...new Set(product.variants.map((v) => v.type))].sort(),
     [product.variants],
   );
-  const colors = useMemo(
-    () => [...new Set(product.variants.map((v) => v.color))],
+  const finishes = useMemo(
+    () => [...new Set(product.variants.map((v) => v.finish))].sort(),
     [product.variants],
   );
   const defaultPair = useMemo(() => {
     const v0 = product.variants[0];
-    return { size: v0?.size ?? "", color: v0?.color ?? "" };
+    return { type: v0?.type ?? "", finish: v0?.finish ?? "" };
   }, [product.variants]);
-  const [size, setSize] = useState(defaultPair.size);
-  const [color, setColor] = useState(defaultPair.color);
+  const [type, setType] = useState(defaultPair.type);
+  const [finish, setFinish] = useState(defaultPair.finish);
 
   useEffect(() => {
-    setSize(defaultPair.size);
-    setColor(defaultPair.color);
-  }, [product.slug, defaultPair.size, defaultPair.color]);
+    setType(defaultPair.type);
+    setFinish(defaultPair.finish);
+  }, [product.slug, defaultPair.type, defaultPair.finish]);
 
   const variant = useMemo(
-    () => product.variants.find((v) => v.size === size && v.color === color),
-    [product.variants, size, color],
+    () => product.variants.find((v) => v.type === type && v.finish === finish),
+    [product.variants, type, finish],
   );
+
+  const LOW_STOCK_THRESHOLD = 5;
+  const stockQty =
+    variant?.manageInventory && typeof variant.inventoryQuantity === "number"
+      ? variant.inventoryQuantity
+      : null;
+  const isLowStock = stockQty !== null && stockQty > 0 && stockQty <= LOW_STOCK_THRESHOLD;
+  const isOutOfStock = variant !== undefined && !variant.isActive;
+  const allVariantsOos = product.variants.length > 0 && product.variants.every((v) => !v.isActive);
 
   function handleAddToBag() {
     if (!variant) return;
-    if (status !== "authenticated") {
-      const next = pathname || `/shop/${product.slug}`;
-      router.push(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
-      return;
-    }
+    const thumb = product.images?.[0]?.imageUrl ?? undefined;
     const line: CartLine = {
       variantId: variant.id,
       quantity: 1,
       slug: product.slug,
       name: product.name,
       sku: variant.sku,
-      size: variant.size,
-      color: variant.color,
+      type: variant.type,
+      finish: variant.finish,
       price: variant.price,
+      ...(thumb ? { thumbnail: thumb } : {}),
     };
     addCartLine(line);
-    router.push("/checkout");
+    trackAddToCart({
+      slug: product.slug,
+      id: product.id,
+      variantId: variant.id,
+      price: variant.price,
+      quantity: 1,
+      name: product.name,
+    });
+    router.push("/cart");
+  }
+
+  if (allVariantsOos) {
+    return (
+      <div className="space-y-6">
+        <p className="text-sm font-medium text-on-surface-variant">
+          This product is currently out of stock.
+        </p>
+        <BackInStockNotify
+          productId={product.id}
+          productSlug={product.slug}
+        />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-10">
       <div className="space-y-4">
-        <p className="text-xs font-label font-bold uppercase tracking-wider">
-          Color:{" "}
-          <span className="text-secondary font-normal">{color || "None"}</span>
-        </p>
-        <div className="flex flex-wrap gap-3">
-          {colors.map((c) => {
-            const fill = cssColorForVariantColorLabel(c);
-            const light = swatchNeedsLightStroke(fill);
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                style={{ backgroundColor: fill }}
-                className={`w-10 h-10 rounded-full transition-all ${
-                  color === c
-                    ? "ring-2 ring-primary scale-105"
-                    : light
-                      ? "ring-1 ring-outline-variant hover:ring-primary"
-                      : "ring-1 ring-black/20 hover:ring-primary"
-                }`}
-                title={c}
-                aria-label={`Color ${c}`}
-                aria-pressed={color === c}
-              />
-            );
-          })}
+        <div className="flex justify-between items-end">
+          <p className="text-xs font-label font-bold uppercase tracking-wider">
+            Type
+          </p>
+          <span className="text-xs font-label text-secondary">Select one</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {types.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`py-3 text-sm font-medium transition-all ${
+                type === t
+                  ? "bg-primary text-on-primary"
+                  : "bg-surface-container-low hover:bg-surface-container-high"
+              }`}
+              aria-pressed={type === t}
+            >
+              {t}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="space-y-4">
         <div className="flex justify-between items-end">
           <p className="text-xs font-label font-bold uppercase tracking-wider">
-            Size
+            Finish
           </p>
           <span className="text-xs font-label text-secondary">Select one</span>
         </div>
-        <div className="grid grid-cols-4 gap-2">
-          {sizes.map((s) => (
+        <div className="grid grid-cols-2 gap-2">
+          {finishes.map((f) => (
             <button
-              key={s}
+              key={f}
               type="button"
-              onClick={() => setSize(s)}
+              onClick={() => setFinish(f)}
               className={`py-3 text-sm font-medium transition-all ${
-                size === s
+                finish === f
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-low hover:bg-surface-container-high"
               }`}
-              aria-pressed={size === s}
+              aria-pressed={finish === f}
             >
-              {s}
+              {f}
             </button>
           ))}
         </div>
       </div>
+
+      {isLowStock && stockQty !== null && (
+        <p className="text-sm font-medium text-error" role="alert">
+          Only {stockQty} left in stock
+        </p>
+      )}
+      {isOutOfStock && (
+        <p className="text-sm font-medium text-on-surface-variant" role="alert">
+          Out of stock
+        </p>
+      )}
 
       <div className="flex flex-col gap-3 pt-4 min-[400px]:flex-row min-[400px]:items-stretch">
         <WishlistToggle
@@ -129,16 +164,14 @@ export function AddToCartSection({ product }: { product: Product }) {
         />
         <button
           type="button"
-          data-testid="pdp-add-to-bag"
-          disabled={!variant || status === "loading"}
+          data-testid={testId}
+          disabled={!variant || isOutOfStock}
           onClick={handleAddToBag}
           className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
-          {status === "authenticated"
-            ? "Add to bag and checkout"
-            : status === "loading"
-              ? "Loading…"
-              : "Sign in to add to bag"}
+          {isOutOfStock
+            ? "Out of stock"
+            : "Add to bag and checkout"}
         </button>
       </div>
     </div>

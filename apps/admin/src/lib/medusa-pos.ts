@@ -6,7 +6,7 @@ import {
   getMedusaSecretApiKey,
   getMedusaStoreBaseUrl,
   withSalesChannelId,
-} from "@apparel-commerce/sdk";
+} from "@universal-music-store/sdk";
 
 export function getMedusaSecretKey(): string | undefined {
   return getMedusaSecretApiKey();

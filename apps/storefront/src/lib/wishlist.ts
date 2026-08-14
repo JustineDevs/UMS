@@ -1,4 +1,4 @@
-const KEY = "maharlika_wishlist_v1";
+const KEY = "universal_music_store_wishlist_v1";
 const MAX_WISHLIST_SIZE = 200;
 
 export type WishlistEntry = {
@@ -46,6 +46,31 @@ export function getWishlist(): WishlistEntry[] {
 function write(entries: WishlistEntry[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(KEY, JSON.stringify(entries));
+  window.dispatchEvent(new CustomEvent("wishlistchange"));
+}
+
+export async function persistWishlistMutation(
+  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId">,
+  action: "add" | "remove",
+): Promise<void> {
+  const response = await fetch("/api/wishlist", {
+    method: action === "add" ? "POST" : "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(
+      action === "add"
+        ? {
+            slug: entry.slug,
+            name: entry.name,
+            ...(entry.medusaProductId?.trim()
+              ? { medusaProductId: entry.medusaProductId.trim() }
+              : {}),
+          }
+        : { slug: entry.slug },
+    ),
+  });
+  if (!response.ok) {
+    throw new Error("Saved items could not be synchronized.");
+  }
 }
 
 export function wishlistContains(slug: string, medusaProductId?: string): boolean {
@@ -126,6 +151,11 @@ export function onWishlistChange(callback: () => void): () => void {
   function handler(e: StorageEvent) {
     if (e.key === KEY) callback();
   }
+  const localHandler = () => callback();
   window.addEventListener("storage", handler);
-  return () => window.removeEventListener("storage", handler);
+  window.addEventListener("wishlistchange", localHandler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener("wishlistchange", localHandler);
+  };
 }

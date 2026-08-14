@@ -23,20 +23,20 @@ Use `pnpm --filter <package-name> test` (or the script defined in that package, 
 
 Common filters (from workspace `package.json` names):
 
-- `@apparel-commerce/platform-data`
-- `@apparel-commerce/sdk`
-- `@apparel-commerce/validation`
-- `@apparel-commerce/rate-limits`
-- `@apparel-commerce/api`
-- `@apparel-commerce/database`
-- `@apparel-commerce/admin`
-- `@apparel-commerce/storefront`
+- `@universal-music-store/platform-data`
+- `@universal-music-store/sdk`
+- `@universal-music-store/validation`
+- `@universal-music-store/rate-limits`
+- `@universal-music-store/api`
+- `@universal-music-store/database`
+- `@universal-music-store/admin`
+- `@universal-music-store/storefront`
 - `medusa` (see `apps/medusa/package.json` for `test:unit`, `test:stress`)
 
 Example: only SDK tests:
 
 ```bash
-pnpm --filter @apparel-commerce/sdk test
+pnpm --filter @universal-music-store/sdk test
 ```
 
 ## E2E prerequisites

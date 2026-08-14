@@ -40,13 +40,28 @@ function killPortWindows(port) {
 }
 
 function killPortUnix(port) {
+  let killed = false;
   try {
-    execSync(`lsof -ti:${port} | xargs kill -9 2>/dev/null`, {
+    execSync(`fuser -k -n tcp ${port} 2>/dev/null`, {
+      stdio: "ignore",
+    });
+    killed = true;
+  } catch {
+    // Try lsof fallback below.
+  }
+
+  if (killed) {
+    console.log(`[kill-ports] Killed process on port ${port}`);
+    return;
+  }
+
+  try {
+    execSync(`lsof -tiTCP:${port} -sTCP:LISTEN | xargs kill -9 2>/dev/null`, {
       stdio: "ignore",
     });
     console.log(`[kill-ports] Killed process on port ${port}`);
   } catch {
-    // No process on port
+    // No process on port.
   }
 }
 

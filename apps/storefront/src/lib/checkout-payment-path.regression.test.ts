@@ -7,7 +7,8 @@
  * - Payment amounts match the confirmed Medusa total within tolerance
  */
 
-import { describe, it, expect } from "@jest/globals";
+import assert from "node:assert/strict";
+import test from "node:test";
 
 type MedusaPriceStatus = "idle" | "loading" | "ready" | "error";
 
@@ -37,66 +38,62 @@ function isUserSafeErrorMessage(msg: string): boolean {
   return FORBIDDEN_PATTERNS.every((p) => !p.test(msg));
 }
 
-describe("canProceedToPayment guard logic", () => {
-  it("blocks pay when medusaPriceStatus is loading", () => {
-    const result = canProceedToPayment("loading", "complete", 1);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe("totals_loading");
-  });
-
-  it("blocks pay when medusaPriceStatus is idle", () => {
-    const result = canProceedToPayment("idle", "complete", 1);
-    expect(result.ok).toBe(false);
-  });
-
-  it("blocks pay when medusaPriceStatus is error", () => {
-    const result = canProceedToPayment("error", "complete", 1);
-    expect(result.ok).toBe(false);
-  });
-
-  it("allows pay when medusaPriceStatus is ready and profile complete", () => {
-    const result = canProceedToPayment("ready", "complete", 2);
-    expect(result.ok).toBe(true);
-  });
-
-  it("blocks pay when cart is empty even with ready status", () => {
-    const result = canProceedToPayment("ready", "complete", 0);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe("empty_cart");
-  });
-
-  it("blocks pay when profile gate is incomplete", () => {
-    const result = canProceedToPayment("ready", "incomplete", 3);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe("profile_incomplete");
-  });
+test("canProceedToPayment blocks pay when medusaPriceStatus is loading", () => {
+  const result = canProceedToPayment("loading", "complete", 1);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "totals_loading");
 });
 
-describe("Payment amount match", () => {
-  const TOLERANCE_MINOR_UNITS = 1;
-
-  function amountsMatch(confirmedTotal: number, bagTotal: number, minorDivisor: number): boolean {
-    return Math.abs(confirmedTotal - bagTotal) * minorDivisor <= TOLERANCE_MINOR_UNITS;
-  }
-
-  it("considers equal totals as matching", () => {
-    expect(amountsMatch(1500, 1500, 100)).toBe(true);
-  });
-
-  it("considers sub-minor-unit diff as matching", () => {
-    expect(amountsMatch(1500.005, 1500, 100)).toBe(true);
-  });
-
-  it("considers diff > 1 minor unit as mismatch", () => {
-    expect(amountsMatch(1500.02, 1500, 100)).toBe(false);
-  });
-
-  it("considers significant price change as mismatch", () => {
-    expect(amountsMatch(1600, 1500, 100)).toBe(false);
-  });
+test("canProceedToPayment blocks pay when medusaPriceStatus is idle", () => {
+  const result = canProceedToPayment("idle", "complete", 1);
+  assert.equal(result.ok, false);
 });
 
-describe("handlePay error message safety", () => {
+test("canProceedToPayment blocks pay when medusaPriceStatus is error", () => {
+  const result = canProceedToPayment("error", "complete", 1);
+  assert.equal(result.ok, false);
+});
+
+test("canProceedToPayment allows pay when medusaPriceStatus is ready and profile complete", () => {
+  const result = canProceedToPayment("ready", "complete", 2);
+  assert.equal(result.ok, true);
+});
+
+test("canProceedToPayment blocks pay when cart is empty even with ready status", () => {
+  const result = canProceedToPayment("ready", "complete", 0);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "empty_cart");
+});
+
+test("canProceedToPayment blocks pay when profile gate is incomplete", () => {
+  const result = canProceedToPayment("ready", "incomplete", 3);
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "profile_incomplete");
+});
+
+test("Payment amount match considers equal totals as matching", () => {
+  assert.equal(amountsMatch(1500, 1500, 100), true);
+});
+
+test("Payment amount match considers sub-minor-unit diff as matching", () => {
+  assert.equal(amountsMatch(1500.005, 1500, 100), true);
+});
+
+test("Payment amount match considers diff > 1 minor unit as mismatch", () => {
+  assert.equal(amountsMatch(1500.02, 1500, 100), false);
+});
+
+test("Payment amount match considers significant price change as mismatch", () => {
+  assert.equal(amountsMatch(1600, 1500, 100), false);
+});
+
+function amountsMatch(confirmedTotal: number, bagTotal: number, minorDivisor: number): boolean {
+  return Math.abs(confirmedTotal - bagTotal) * minorDivisor <= TOLERANCE_MINOR_UNITS;
+}
+
+const TOLERANCE_MINOR_UNITS = 1;
+
+test("handlePay error message safety accepts user-safe messages", () => {
   const SAFE_MESSAGES = [
     "Add your delivery address and contact details before you continue to payment.",
     "Choose an available way to pay, or ask the shop owner to turn on that option.",
@@ -108,16 +105,14 @@ describe("handlePay error message safety", () => {
   ];
 
   for (const msg of SAFE_MESSAGES) {
-    it(`message is user-safe: "${msg.slice(0, 60)}..."`, () => {
-      expect(isUserSafeErrorMessage(msg)).toBe(true);
-    });
+    assert.equal(isUserSafeErrorMessage(msg), true);
   }
+});
 
-  it("detects leaked env variable as unsafe", () => {
-    expect(isUserSafeErrorMessage("Error: MEDUSA_SECRET_API_KEY is undefined")).toBe(false);
-  });
-
-  it("detects stack trace as unsafe", () => {
-    expect(isUserSafeErrorMessage("TypeError: Cannot read property at Object.<anonymous>")).toBe(false);
-  });
+test("handlePay error message safety rejects leaked env variables and stack traces", () => {
+  assert.equal(isUserSafeErrorMessage("Error: MEDUSA_SECRET_API_KEY is undefined"), false);
+  assert.equal(
+    isUserSafeErrorMessage("TypeError: Cannot read property at Object.<anonymous>"),
+    false,
+  );
 });

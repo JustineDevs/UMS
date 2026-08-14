@@ -2,14 +2,17 @@ import {
   getPaymentAttemptByCorrelationId,
   incrementFinalizeAttempts,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
+import { getStorefrontSession } from "@/lib/auth";
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { handleCodPlaceOrderRequest } from "@/lib/cod-place-order-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { loadCustomerProfile } from "@/lib/server-customer-profile";
+import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +20,18 @@ export const dynamic = "force-dynamic";
  * Server-owned COD order placement: browser must not call Medusa `cart.complete` directly.
  */
 export async function POST(req: Request) {
+  const session = await getStorefrontSession();
+  const email = session?.user?.email?.trim().toLowerCase();
+  if (!email) {
+    return Response.json({ error: "Sign in before placing a COD order" }, { status: 401 });
+  }
+  if (!isStorefrontProfileComplete(await loadCustomerProfile(email))) {
+    return Response.json(
+      { error: "Complete your delivery profile before placing a COD order" },
+      { status: 400 },
+    );
+  }
+
   const sb = createStorefrontServiceSupabase();
   return handleCodPlaceOrderRequest(req, {
     applyRateLimit: async (request) =>

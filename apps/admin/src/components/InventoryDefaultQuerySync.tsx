@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { readAdminPreferences } from "@apparel-commerce/user-preferences";
+import { readAdminPreferences } from "@universal-music-store/user-preferences";
 
 /**
  * When visiting /admin/inventory with no query, apply saved default page size from local preferences.

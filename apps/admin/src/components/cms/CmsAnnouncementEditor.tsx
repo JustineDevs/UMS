@@ -1,7 +1,7 @@
 "use client";
 
-import { staffHasPermission, type CmsAnnouncementRow } from "@apparel-commerce/platform-data";
-import { sanitizeCmsHtml } from "@apparel-commerce/validation";
+import { staffHasPermission, type CmsAnnouncementRow } from "@universal-music-store/platform-data";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 

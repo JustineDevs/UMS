@@ -1,4 +1,4 @@
-import { listRecentPaymentAttempts } from "@apparel-commerce/platform-data";
+import { listRecentPaymentAttempts } from "@universal-music-store/platform-data";
 
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";

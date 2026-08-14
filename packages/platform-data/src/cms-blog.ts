@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isCmsPubliclyVisible } from "./cms-public-visibility";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
-import type { CmsBlogPostRow, CmsPublishStatus } from "./cms-types";
+import { isCmsPubliclyVisible } from "./cms-public-visibility.js";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
+import type { CmsBlogPostRow, CmsPublishStatus } from "./cms-types.js";
 
 function rowToBlog(r: Record<string, unknown>): CmsBlogPostRow {
   const tags = r.tags;
@@ -31,11 +31,13 @@ function rowToBlog(r: Record<string, unknown>): CmsBlogPostRow {
   };
 }
 
-export async function listCmsBlogPosts(supabase: SupabaseClient): Promise<CmsBlogPostRow[]> {
-  const { data, error } = await supabase
+export async function listCmsBlogPosts(supabase: SupabaseClient, organizationId?: string): Promise<CmsBlogPostRow[]> {
+  let query = supabase
     .from("cms_blog_posts")
     .select("*")
     .order("updated_at", { ascending: false });
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-blog] list", error.message);
@@ -48,13 +50,15 @@ export async function getCmsBlogPostBySlugAdmin(
   supabase: SupabaseClient,
   slug: string,
   locale: string,
+  organizationId?: string,
 ): Promise<CmsBlogPostRow | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_blog_posts")
     .select("*")
     .eq("slug", slug)
-    .eq("locale", locale)
-    .maybeSingle();
+    .eq("locale", locale);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-blog] getCmsBlogPostBySlugAdmin", error.message);
@@ -67,8 +71,11 @@ export async function getCmsBlogPostBySlugAdmin(
 export async function getCmsBlogPostById(
   supabase: SupabaseClient,
   id: string,
+  organizationId?: string,
 ): Promise<CmsBlogPostRow | null> {
-  const { data, error } = await supabase.from("cms_blog_posts").select("*").eq("id", id).maybeSingle();
+  let query = supabase.from("cms_blog_posts").select("*").eq("id", id);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-blog] getById", error.message);
@@ -82,6 +89,7 @@ export type UpsertCmsBlogInput = Partial<CmsBlogPostRow> & {
   slug: string;
   title: string;
   locale?: string;
+  organization_id?: string;
 };
 
 export async function upsertCmsBlogPost(
@@ -90,8 +98,8 @@ export async function upsertCmsBlogPost(
 ): Promise<CmsBlogPostRow | null> {
   const locale = input.locale ?? "en";
   const existing = input.id
-    ? await getCmsBlogPostById(supabase, input.id)
-    : await getCmsBlogPostBySlugAdmin(supabase, input.slug, locale);
+    ? await getCmsBlogPostById(supabase, input.id, input.organization_id)
+    : await getCmsBlogPostBySlugAdmin(supabase, input.slug, locale, input.organization_id);
 
   const row = {
     slug: input.slug,
@@ -124,6 +132,7 @@ export async function upsertCmsBlogPost(
       input.rss_include !== undefined ? input.rss_include : existing?.rss_include ?? true,
     json_ld: input.json_ld !== undefined ? input.json_ld : existing?.json_ld ?? null,
     updated_at: new Date().toISOString(),
+    organization_id: input.organization_id ?? null,
   };
 
   if (existing) {
@@ -131,6 +140,7 @@ export async function upsertCmsBlogPost(
       .from("cms_blog_posts")
       .update(row)
       .eq("id", existing.id)
+      .eq("organization_id", input.organization_id ?? "")
       .select("*")
       .single();
     if (error) {
@@ -155,8 +165,14 @@ export async function upsertCmsBlogPost(
   return rowToBlog(data as Record<string, unknown>);
 }
 
-export async function deleteCmsBlogPost(supabase: SupabaseClient, id: string): Promise<boolean> {
-  const { error } = await supabase.from("cms_blog_posts").delete().eq("id", id);
+export async function deleteCmsBlogPost(
+  supabase: SupabaseClient,
+  id: string,
+  organizationId?: string,
+): Promise<boolean> {
+  let query = supabase.from("cms_blog_posts").delete().eq("id", id);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { error } = await query;
   if (error) {
     console.error("[cms-blog] delete", error.message);
     return false;
@@ -168,13 +184,15 @@ export async function getCmsBlogPostBySlugPublic(
   supabase: SupabaseClient,
   slug: string,
   locale: string,
+  organizationId?: string,
 ): Promise<CmsBlogPostRow | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_blog_posts")
     .select("*")
     .eq("slug", slug)
-    .eq("locale", locale)
-    .maybeSingle();
+    .eq("locale", locale);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-blog] getCmsBlogPostBySlugPublic", error.message);
@@ -192,13 +210,16 @@ export async function listCmsBlogPostsPublic(
   supabase: SupabaseClient,
   locale: string,
   limit = 30,
+  organizationId?: string,
 ): Promise<CmsBlogPostRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_blog_posts")
     .select("*")
     .eq("locale", locale)
     .order("published_at", { ascending: false })
     .limit(limit);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-blog] listCmsBlogPostsPublic", error.message);
@@ -212,10 +233,13 @@ export async function listCmsBlogPostsPublic(
 
 export async function listCmsBlogPostsForSitemapPublic(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<{ slug: string; locale: string; updated_at: string }[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_blog_posts")
     .select("slug, locale, updated_at, status, scheduled_publish_at");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-blog] listCmsBlogPostsForSitemapPublic", error.message);

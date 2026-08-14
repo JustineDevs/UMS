@@ -64,6 +64,7 @@ test("handleMedusaTotalsPreviewRequest returns profile gaps for COD previews", a
   const profile = {
     displayName: "Shopper Example",
     phone: "+639171234567",
+    avatarUrl: null,
     shippingAddresses: [],
   };
   const res = await handleMedusaTotalsPreviewRequest(
@@ -107,6 +108,15 @@ test("handleMedusaTotalsPreviewRequest normalizes inputs and uses the standard p
     productIds: ["prod_1"],
     shippingMethodIds: ["ship_1"],
     regionId: "reg_1",
+    shippingOptions: [
+      {
+        id: "ship_1",
+        name: "Standard shipping",
+        priceMajor: 10,
+        currencyCode: "PHP",
+      },
+    ],
+    appliedShippingOptionId: "ship_1",
   };
 
   const res = await handleMedusaTotalsPreviewRequest(
@@ -142,6 +152,7 @@ test("handleMedusaTotalsPreviewRequest normalizes inputs and uses the standard p
       lines: [{ variantId: "variant_1", quantity: 2 }],
       email: "alt@example.com",
       loyaltyPointsToRedeem: 3,
+      shippingOptionId: undefined,
     },
   ]);
   assert.equal(events[0]?.event, "checkout_quote_generated");
@@ -167,16 +178,27 @@ test("handleMedusaTotalsPreviewRequest uses the COD payload when the profile is 
     productIds: ["prod_1"],
     shippingMethodIds: ["ship_1"],
     regionId: "reg_1",
+    shippingOptions: [
+      {
+        id: "ship_1",
+        name: "Standard shipping",
+        priceMajor: 10,
+        currencyCode: "PHP",
+      },
+    ],
+    appliedShippingOptionId: "ship_1",
   };
   const calls: Array<Record<string, unknown>> = [];
   const profile = {
     displayName: "Shopper Example",
     phone: "+639171234567",
+    avatarUrl: null,
     shippingAddresses: [
       {
         fullName: "Shopper Example",
         phone: "+639171234567",
         line1: "1 Sample Street",
+        barangay: "Central",
         city: "Quezon City",
         province: "Metro Manila",
         country: "PH",
@@ -191,6 +213,7 @@ test("handleMedusaTotalsPreviewRequest uses the COD payload when the profile is 
       last_name: "Example",
       phone: "+639171234567",
       address_1: "1 Sample Street",
+      address_2: "Barangay Central",
       city: "Quezon City",
       province: "metro manila",
       country_code: "ph",
@@ -201,6 +224,7 @@ test("handleMedusaTotalsPreviewRequest uses the COD payload when the profile is 
       last_name: "Example",
       phone: "+639171234567",
       address_1: "1 Sample Street",
+      address_2: "Barangay Central",
       city: "Quezon City",
       province: "metro manila",
       country_code: "ph",
@@ -236,6 +260,7 @@ test("handleMedusaTotalsPreviewRequest uses the COD payload when the profile is 
     {
       lines: [{ variantId: "variant_1", quantity: 1 }],
       loyaltyPointsToRedeem: undefined,
+      shippingOptionId: undefined,
       codCartPayload,
     },
   ]);

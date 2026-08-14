@@ -12,8 +12,8 @@ Status values: **present**, **partial**, **missing**. Evidence paths point at th
 | Payments orchestration | present | `apps/medusa/src/modules/*-payment`, `stripe-checkout-payment/service.ts` | Provider keys and webhook delivery are external dependencies | Medusa payment providers |
 | Checkout completion | partial | `complete-medusa-cart/route.ts`, `checkout/stripe-return/page.tsx` | Webhook vs complete race mitigated with retries | Storefront API + client retries |
 | POS / terminal | partial | `apps/terminal-agent`, `apps/admin` offline queue routes | Not full register-grade stack | terminal-agent + admin POS flows |
-| Fulfillment / tracking | partial | AfterShip hooks in `apps/medusa`, tracking URL in SDK | Depends on carrier metadata | Medusa subscribers + webhooks |
-| Observability | partial | `apps/storefront/src/lib/checkout-telemetry.ts` (`checkout_completion` JSON lines), `apps/medusa/src/lib/webhook-dedup-metrics.ts` (duplicate webhook events), AfterShip `cod_capture_on_delivery` logs, `logAdminApiEvent` on admin refund | No central metrics UI; aggregate logs in your host | Ops pipeline / APM |
+| Fulfillment / tracking | partial | Shipment tracking hooks in `apps/medusa`, tracking URL in SDK | Depends on carrier metadata | Medusa subscribers + webhooks |
+| Observability | partial | `apps/storefront/src/lib/checkout-telemetry.ts` (`checkout_completion` JSON lines), `apps/medusa/src/lib/webhook-dedup-metrics.ts` (duplicate webhook events), COD delivery logs, `logAdminApiEvent` on admin refund | No central metrics UI; aggregate logs in your host | Ops pipeline / APM |
 | Agent-hub documentation package | present | `.cursor/skills/agent-hub/*` | Doc-only; not runtime | N/A |
 
 ## Reading order

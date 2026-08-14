@@ -1,12 +1,12 @@
 # PRODUCT REQUIREMENT DOCUMENT (PRD)
 
-**Apparel Commerce Platform – Composable POS + Storefront + Fulfillment**
+**Universal Music Store Platform – Composable POS + Storefront + Fulfillment**
 
 ***
 
 ## Executive Summary
 
-This document specifies product requirements for an apparel commerce stack for a shorts and apparel retail business in the Philippines. The implementation is **Medusa-first** for commerce (catalog, cart, orders, payments, inventory records) with a Next.js storefront and admin, Supabase for staff and operational data, and integrations such as AfterShip for tracking. **Inventory and reservations** follow Medusa and configured modules. **POS** features are workflow scaffolding unless you deploy a full register process. Marketing language should not claim a fully unified omnichannel engine unless those behaviors are deployed and tested end to end.
+This document specifies product requirements for a music commerce stack for a retail business in the Philippines. The implementation is **Medusa-first** for commerce (catalog, cart, orders, payments, inventory records) with a Next.js storefront and admin, Supabase for staff and operational data, and a carrier tracking provider for shipment updates. **Inventory and reservations** follow Medusa and configured modules. **POS** features are workflow scaffolding unless you deploy a full register process. Marketing language should not claim a fully unified omnichannel engine unless those behaviors are deployed and tested end to end.
 
 ***
 
@@ -14,9 +14,9 @@ This document specifies product requirements for an apparel commerce stack for a
 
 | Field | Details |
 |---|---|
-| **Project Name** | Apparel Commerce Platform |
+| **Project Name** | Universal Music Store Platform |
 | **Client** | [Client Name] |
-| **Business Focus** | Apparel retail (shorts, clothing, uniforms) |
+| **Business Focus** | Music retail (instruments, accessories, gear) |
 | **Primary Markets** | Philippines and regional markets |
 | **Target Launch** | Q2 2026 |
 | **Status** | In Planning |
@@ -30,7 +30,7 @@ This document specifies product requirements for an apparel commerce stack for a
 2. **Reduce inventory drift** – Medusa inventory records as commerce truth; visibility depends on configuration
 3. **Enable global tax compliance** – Hosted payments handle VAT and sales tax
 4. **Reduce fulfillment friction** – Integrated tracking and label generation for J&T Express
-5. **Support high-volume apparel SKUs** – Handle size/color variants efficiently
+5. **Support high-volume catalog SKUs** – Handle variant combinations efficiently
 6. **Build scalable infrastructure** – Architect for multi-location retail growth
 
 ***
@@ -38,7 +38,7 @@ This document specifies product requirements for an apparel commerce stack for a
 ## Target Audience / User Personas
 
 ### Persona 1: Online Customer
-- **Goal**: Browse, purchase, and track apparel orders online
+- **Goal**: Browse, purchase, and track orders online
 - **Pain Point**: Need fast checkout, real-time tracking, easy returns
 - **Frequency**: Occasional, varies seasonally
 
@@ -71,7 +71,7 @@ This document specifies product requirements for an apparel commerce stack for a
 #### A1. Home Page
 - Hero banner with seasonal promotions
 - Featured product collections
-- Category links (Shorts, Tees, Activewear, etc.)
+- Category links (Guitars, amps, pedals, etc.)
 - Search and basic filtering
 
 **Why**: Drives discoverability and first impression
@@ -104,7 +104,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 #### A5. Checkout Page
 - Billing and shipping address capture
-- Hosted payment flow via configured Medusa payment providers (e.g. Stripe, PayPal, PayMongo, Maya)
+- Hosted payment flow via configured Medusa payment providers (e.g. Stripe, PayPal, Xendit)
 - Order review before payment
 - Payment success confirmation
 
@@ -112,7 +112,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 #### A6. Order Tracking Page
 - Order status display (Pending Payment → Paid → Ready to Ship → Shipped → Delivered)
-- Real-time J&T Express tracking from AfterShip
+- Real-time J&T Express tracking from the shipment tracking provider
 - Estimated delivery date
 - Carrier contact info and support
 
@@ -159,7 +159,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 #### B4. Orders Fulfillment Hub
 - Paid orders awaiting fulfillment
-- Print J&T Express label from AfterShip
+- Print J&T Express label from the shipment tracking provider
 - Mark order as "Ready to Ship"
 - Mark order as "Shipped" with tracking number
 - Exception handling (failed labels, returns, cancellations)
@@ -179,14 +179,14 @@ This document specifies product requirements for an apparel commerce stack for a
 ### C. Inventory Model (Core)
 
 #### C1. Product Variants
-- Parent product: Shorts, T-shirt, etc.
-- Variants: Each size-color combination is a unique SKU
-- Example: SHRT-BLK-MED, SHRT-BLK-LRG, SHRT-NAV-MED
+- Parent product: Guitars, amplifiers, pedals, etc.
+- Variants: Each type-finish combination is a unique SKU
+- Example: GTR-ELC-BLK, GTR-ACO-WHT, AMP-COMBO
 - Barcode per variant
 - Price and cost per variant
 - Status (active/inactive)
 
-**Why**: Apparel stock lives at size-color level, not parent level
+**Why**: Inventory lives at variant level, not parent level
 
 #### C2. Inventory Locations
 - Warehouse (primary stock)
@@ -238,7 +238,7 @@ This document specifies product requirements for an apparel commerce stack for a
 **Why**: Historical accuracy; catalog changes don't mutate order history
 
 #### D3. Payment Records
-- Payment provider: per enabled Medusa integration (e.g. Stripe, PayPal, PayMongo, Maya)
+- Payment provider: per enabled Medusa integration (e.g. Stripe, PayPal, Xendit)
 - Payment status: Pending, Paid, Failed, Refunded
 - External payment ID
 - Payment timestamp
@@ -250,7 +250,7 @@ This document specifies product requirements for an apparel commerce stack for a
 - Order reference
 - Carrier: J&T Express Philippines
 - Tracking number
-- AfterShip tracking ID
+- Tracking ID
 - Label URL
 - Shipment status (pending, label created, in transit, out for delivery, delivered, failed, returned)
 - Last checkpoint from carrier
@@ -286,7 +286,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 ***
 
-### F. Shipping & Logistics (AfterShip + J&T Express)
+### F. Shipping & Logistics
 
 #### F1. Shipment Creation
 - Create J&T Express label from admin interface
@@ -297,7 +297,7 @@ This document specifies product requirements for an apparel commerce stack for a
 **Why**: Integrated workflow; no external tab switching
 
 #### F2. Tracking Sync
-- Real-time or polling-based sync with AfterShip
+- Real-time or polling-based sync with the shipment tracking provider
 - Shipment status updates customer tracking page
 - Exception handling (failed delivery, returned to sender)
 - Notification webhooks for status changes
@@ -305,7 +305,7 @@ This document specifies product requirements for an apparel commerce stack for a
 **Why**: Customer visibility; reduces support burden
 
 #### F3. Multi-Carrier Ready
-- AfterShip architecture supports future carrier additions
+- The tracking architecture supports future carrier additions
 - J&T Express Philippines initially; GCash/Lalamove optional later
 
 **Why**: Future scalability without re-architecture
@@ -382,12 +382,12 @@ This document specifies product requirements for an apparel commerce stack for a
 - **Styling**: Tailwind CSS + shadcn/ui
 - **Auth**: NextAuth/Auth.js with Google provider
 - **Payments**: Medusa payment modules and official PSP SDKs or typed clients where applicable
-- **Shipping**: AfterShip SDK + J&T Express Philippines
+- **Shipping**: shipment tracking provider + J&T Express Philippines
 
 ### Deployment
 - **Storefront**: Vercel or similar (auto-deploy from `main` branch)
 - **Admin**: Same Vercel app or separate instance
-- **API**: Node.js service on Render, Railway, or similar
+- **API**: Node.js service on Fly.io or similar
 - **Database**: Supabase managed Postgres
 - **CI/CD**: GitHub Actions for lint, build, test; branch-based auto-deploy
 
@@ -401,7 +401,7 @@ This document specifies product requirements for an apparel commerce stack for a
 | POS transaction time | < 2 minutes | Staff efficiency |
 | Inventory accuracy | 98%+ | Prevents overselling |
 | Order-to-ship time | < 24 hours | Competitive advantage |
-| Customer support tickets (shipping) | < 5% of orders | AfterShip tracking reduces inquiries |
+| Customer support tickets (shipping) | < 5% of orders | Tracking reduces inquiries |
 | Payment success rate | > 98% | PSP uptime and checkout quality |
 | Uptime | 99.5% | SLA commitment |
 
@@ -418,14 +418,14 @@ This document specifies product requirements for an apparel commerce stack for a
 - Gift cards or store credit
 - Email marketing automation
 - Advanced warehouse management (pick lists, cycle counting)
-- Custom shipping integrations beyond J&T + AfterShip
+- Custom shipping integrations beyond J&T
 
 ***
 
 ## Assumptions & Constraints
 
 ### Assumptions
-- Business has active J&T Express account and AfterShip integration available
+- Business has active J&T Express account and tracking integration available
 - Customers and staff have email access for authentication
 - Product catalog will not exceed 500 parent products initially (10,000+ variants)
 - Single warehouse / up to 2 retail locations initially
@@ -445,7 +445,7 @@ This document specifies product requirements for an apparel commerce stack for a
 | **Phase 1: Foundation** | Weeks 1–2 | Monorepo setup, database schema, auth scaffold, API skeleton |
 | **Phase 2: Catalog** | Weeks 2–3 | Product catalog, variant management, inventory APIs, admin UI |
 | **Phase 3: Checkout** | Weeks 3–4 | Storefront, cart, payment provider integration, payment webhooks |
-| **Phase 4: Fulfillment** | Weeks 4–5 | POS, orders hub, AfterShip integration, tracking page |
+| **Phase 4: Fulfillment** | Weeks 4–5 | POS, orders hub, tracking integration, tracking page |
 | **Phase 5: QA & Launch** | Weeks 5–6 | Testing, staging deploy, production launch, SOP handoff |
 
 ***
@@ -464,11 +464,11 @@ This document specifies product requirements for an apparel commerce stack for a
 
 ## Glossary
 
-- **SKU**: Stock-Keeping Unit – unique identifier for a variant (e.g., SHRT-BLK-MED)
-- **Variant**: A size-color combination of a product (e.g., Black T-shirt in Medium)
+- **SKU**: Stock-Keeping Unit – unique identifier for a variant (e.g., GTR-ELC-BLK)
+- **Variant**: A type-finish combination of a product (e.g., Black electric guitar variant)
 - **POS**: Point-of-Sale terminal for in-store transactions
 - **OMS**: Order Management System
-- **AfterShip**: Third-party shipping tracking and label provider
+- **Tracking provider**: Third-party shipping tracking and label provider
 - **Payment processor**: Third-party PSP (e.g. Stripe, PayPal) as configured per deployment
 - **Webhook**: HTTP callback from external service (payment confirmed, shipment updated)
 
@@ -489,7 +489,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 # PROGRAMMING SERVICE AGREEMENT
 
-**Apparel Commerce Platform Development**
+**Universal Music Store Platform Development**
 
 ***
 
@@ -505,7 +505,7 @@ This document specifies product requirements for an apparel commerce stack for a
 
 ## 2. SERVICES OVERVIEW
 
-Provider agrees to design, develop, and deliver an apparel commerce platform (the "Project") as defined in this Agreement and the attached Product Requirement Document ("PRD").
+Provider agrees to design, develop, and deliver a music commerce platform (the "Project") as defined in this Agreement and the attached Product Requirement Document ("PRD").
 
 The Project includes:
 - Customer storefront (web)
@@ -513,7 +513,7 @@ The Project includes:
 - Order management system
 - Inventory management system
 - Integration with configured payment providers for checkout and webhooks
-- Integration with AfterShip and J&T Express for shipping
+- Integration with the tracking provider and J&T Express for shipping
 
 ***
 
@@ -529,7 +529,7 @@ Provider will deliver the following components:
 4. **Admin dashboard** with inventory, orders, and analytics
 5. **POS terminal** for in-store sales
 6. **Payment provider integration** with webhook processing
-7. **AfterShip and J&T Express integration** for shipment tracking
+7. **Shipment tracking and J&T Express integration** for shipment tracking
 8. **Deployment configuration** for production environments (CI/CD, Docker if applicable)
 9. **Documentation** including setup guides, API docs, and operational SOPs
 
@@ -542,7 +542,7 @@ Provider will use the following technology stack:
 - Database: PostgreSQL via Supabase
 - Monorepo: Turborepo + pnpm
 - Auth: NextAuth/Auth.js with Google OAuth
-- Deployment: Vercel (storefront/admin), Render or similar (API)
+- Deployment: Vercel (storefront/admin), Fly.io or similar (API)
 - CI/CD: GitHub Actions
 
 Any deviation from this stack requires written approval from Client.
@@ -674,7 +674,7 @@ Provider does NOT warrant:
 
 - Uninterrupted uptime or zero defects
 - Specific performance benchmarks beyond those in the PRD
-- Third-party services (payment processors, AfterShip, Supabase) availability
+- Third-party services (payment processors, shipping provider, Supabase) availability
 - Fitness for purposes not described in this Agreement
 
 ### 8.3 Limitation of Liability
@@ -692,8 +692,8 @@ In no event shall Provider be liable for:
 Client agrees to:
 
 - Provide timely feedback and approval on deliverables
-- Provide third-party API keys (payment processors, AfterShip, Google OAuth)
-- Arrange and pay for hosting services (Vercel, Supabase, Render, etc.)
+- Provide third-party API keys (payment processors, shipping provider, Google OAuth)
+- Arrange and pay for hosting services (Vercel, Supabase, Fly.io, etc.)
 - Test the application thoroughly before production launch
 - Maintain regular backups
 
@@ -789,8 +789,8 @@ Client will pay for and maintain:
 
 - Vercel hosting (storefront/admin)
 - Supabase Postgres database
-- Render or similar (API server)
-- Third-party API services (payment processors, AfterShip, Google Cloud)
+- Fly.io or similar (API server)
+- Third-party API services (payment processors, shipping provider, Google Cloud)
 - Email/domain services
 
 Estimated monthly infrastructure cost: **[Amount] PHP**, variable based on usage.
@@ -944,7 +944,7 @@ Company (if applicable): ________________________
 **Client will provide by [Date]:**
 
 - Payment provider API keys and webhook secrets as required for enabled integrations (live and test)
-- AfterShip API Key
+- Tracking provider API Key
 - Google Cloud OAuth Client ID and Secret
 - Supabase project URL and API key (if Client creates account)
 

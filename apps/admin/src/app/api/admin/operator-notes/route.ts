@@ -1,11 +1,11 @@
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
+import { staffSessionAllows } from "@universal-music-store/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
 import {
   createOperatorNote,
   listOperatorNotes,
 } from "@/lib/admin-operator-notes";
 import type { EntityWorkflowType } from "@/lib/admin-workflow";
-import { authOptions } from "@/lib/auth";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
@@ -21,6 +21,7 @@ const ENTITY_NOTE_PERMS: Record<
   inventory_adjustment: { read: "inventory:read", write: "inventory:write" },
   campaign: { read: "campaigns:read", write: "campaigns:write" },
   cms_page: { read: "content:read", write: "content:write" },
+  chat_order: { read: "chat_orders:manage", write: "chat_orders:manage" },
 };
 
 function isEntityWorkflowType(v: string): v is EntityWorkflowType {
@@ -29,7 +30,7 @@ function isEntityWorkflowType(v: string): v is EntityWorkflowType {
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
@@ -60,9 +61,9 @@ export async function GET(req: Request) {
   return correlatedJson(correlationId, { notes });
 }
 
-export async function POST(req: Request) {
+async function post(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user?.email) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
@@ -101,3 +102,5 @@ export async function POST(req: Request) {
   }
   return correlatedJson(correlationId, { id: row.id }, { status: 201 });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/operator-notes:POST", post);

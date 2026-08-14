@@ -23,14 +23,12 @@ FAIL_ON_SENSITIVE=true
 
 # Security: Sensitive file patterns (regex patterns)
 SENSITIVE_PATTERNS=(
-    "^\.env$"
     "^\.env\.local$"
     "^\.env\.[^.]*\.local$"
     "^\.env\.production$"
     "^\.env\.development$"
     "^\.env\.test$"
     "^\.env\.staging$"
-    "\.env$"
     "\.secrets?$"
     "secrets/"
     "\.secret$"
@@ -125,7 +123,7 @@ validate_files() {
         
         print_color $YELLOW ""
         print_color $YELLOW "🔒 Security Recommendations:"
-        print_color $YELLOW "  1. Ensure .env is in .gitignore"
+        print_color $YELLOW "  1. Ensure .env.local is in .gitignore"
         print_color $YELLOW "  2. Use .env.example as a template"
         print_color $YELLOW "  3. Never commit actual credentials or tokens"
         print_color $YELLOW "  4. Revoke any exposed credentials immediately"
@@ -167,7 +165,7 @@ show_help() {
     echo ""
     print_color $YELLOW "Security:"
     print_color $YELLOW "  The script automatically blocks commits of sensitive files:"
-    print_color $YELLOW "  - .env files (except .env.example)"
+    print_color $YELLOW "  - env files (except .env.example)"
     print_color $YELLOW "  - Secret files (.secrets, credentials.json, etc.)"
     print_color $YELLOW "  - Certificate and key files"
     print_color $YELLOW "  - MCP config files with secrets"

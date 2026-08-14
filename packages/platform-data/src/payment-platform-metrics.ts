@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type PaymentPlatformMetrics = {
   paymentAttemptsStaleFinalize: number;
@@ -9,7 +9,7 @@ export type PaymentPlatformMetrics = {
   jobsQueuedCount: number;
   jobsFailedRecentCount: number;
   webhookEventsUnprocessed: number;
-  /** COD rows where AfterShip reported delivered but ledger not marked captured */
+  /** COD rows where shipment delivery was recorded but ledger not marked captured */
   codDeliveredPendingCapture: number;
 };
 
@@ -17,8 +17,11 @@ const STALE_STATUSES = ["paid_awaiting_order", "finalizing_order", "paid"];
 
 export async function getPaymentPlatformMetrics(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<PaymentPlatformMetrics | null> {
   try {
+    const scoped = (query: any) =>
+      organizationId?.trim() ? query.eq("organization_id", organizationId.trim()) : query;
     const [
       stale,
       needsReview,
@@ -28,15 +31,15 @@ export async function getPaymentPlatformMetrics(
       webhooks,
       codRpc,
     ] = await Promise.all([
-      supabase
+      scoped(supabase
         .from("payment_attempts")
         .select("*", { count: "exact", head: true })
         .in("status", STALE_STATUSES)
-        .is("medusa_order_id", null),
-      supabase
+        .is("medusa_order_id", null)),
+      scoped(supabase
         .from("payment_attempts")
         .select("*", { count: "exact", head: true })
-        .eq("status", "needs_review"),
+        .eq("status", "needs_review")),
       supabase
         .from("outbox_events")
         .select("*", { count: "exact", head: true })

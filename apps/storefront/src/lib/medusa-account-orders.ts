@@ -1,6 +1,6 @@
-import { createStorefrontMedusaSdk } from "./medusa-sdk";
+import { medusaAdminFetch } from "./medusa-admin-fetch";
 import { medusaMinorToMajor } from "./medusa-money";
-import { getMedusaPublishableKey } from "./storefront-medusa-env";
+import { getMedusaSecretApiKey } from "./storefront-medusa-env";
 
 export type AccountOrder = {
   id: string;
@@ -25,8 +25,7 @@ export function computeAccountOrderStats(orders: AccountOrder[]): {
   return { orderCount, lifetimeSpend, averageOrderValue };
 }
 
-/** Store API order list rows (snake_case fields from expanded list query). */
-type OrderListRow = {
+type AdminOrderListRow = {
   id?: string;
   display_id?: string | number;
   email?: string | null;
@@ -37,27 +36,41 @@ type OrderListRow = {
   items?: unknown[];
 };
 
+/**
+ * Fetches orders for a customer by email using the Medusa Admin API.
+ * The Store API requires Medusa customer auth (which this storefront does not use).
+ * The Admin API with MEDUSA_SECRET_API_KEY allows server-side order lookup by email.
+ */
 export async function fetchCustomerOrders(
   email: string,
 ): Promise<{ orders: AccountOrder[]; error: string | null }> {
-  const key = getMedusaPublishableKey();
-  if (!key) {
-    return { orders: [], error: "Commerce is not configured." };
+  const secret = getMedusaSecretApiKey();
+  if (!secret) {
+    return { orders: [], error: "Commerce admin key is not configured." };
   }
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { orders } = await sdk.store.order.list({
-      fields:
-        "id,email,display_id,status,total,currency_code,created_at,*items",
-      limit: 20,
-      offset: 0,
-    } as never);
+    const params = new URLSearchParams({
+      fields: "id,email,display_id,status,total,currency_code,created_at,*items",
+      limit: "20",
+      offset: "0",
+      order: "-created_at",
+    });
 
-    if (!orders || !Array.isArray(orders)) {
+    const res = await medusaAdminFetch(
+      `/admin/orders?${params.toString()}`,
+      { method: "GET" },
+    );
+
+    if (!res.ok) {
       return { orders: [], error: null };
     }
 
-    const rows = orders as unknown as OrderListRow[];
+    const data = (await res.json()) as { orders?: unknown[] };
+    if (!data.orders || !Array.isArray(data.orders)) {
+      return { orders: [], error: null };
+    }
+
+    const rows = data.orders as AdminOrderListRow[];
     const normalizedEmail = email.toLowerCase();
 
     const mapped: AccountOrder[] = rows

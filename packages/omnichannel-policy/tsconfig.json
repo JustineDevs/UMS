@@ -1,5 +1,5 @@
 {
-  "extends": "@apparel-commerce/config-typescript/tsconfig.json",
+  "extends": "@universal-music-store/config-typescript/tsconfig.json",
   "compilerOptions": {
     "rootDir": "./src",
     "noEmit": true

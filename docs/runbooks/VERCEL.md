@@ -1,6 +1,6 @@
 # Vercel Deployment (Storefront)
 
-This runbook covers **only the Next.js storefront** on Vercel. Production also requires a reachable **Medusa** backend, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the storefront **payment recovery** cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. Admin and internal API apps deploy separately (for example Render or another host).
+This runbook covers **only the Next.js storefront** on Vercel. Production also requires a reachable **Medusa** backend on Fly.io, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the storefront **payment recovery** cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. The Fly deployment contract is in `docs/runbooks/FLY.md`.
 
 ## Required Environment Variables
 
@@ -8,7 +8,7 @@ Set these in Vercel → Project → Settings → Environment Variables. Without 
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://your-medusa.onrender.com` |
+| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://universal-music-store-medusa.fly.dev` |
 | `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key | From `medusa seed:ph` output |
 | `NEXT_PUBLIC_MEDUSA_REGION_ID` | Medusa region ID | From Medusa admin or seed |
 
@@ -22,6 +22,8 @@ Do not leave these empty. Empty values cause "Invalid URL" errors.
 
 The project requires Node 20. Set in Vercel: **Settings → General → Node.js Version → 20.x**.  
 The storefront has `engines.node: "20.x"` and `.nvmrc`; Vercel should pick 20.x. If builds still use Node 24, set it explicitly in the dashboard.
+
+Production storefront links should resolve to `https://universalmusic.vercel.app` unless a route-specific origin is documented elsewhere.
 
 ---
 
@@ -49,5 +51,5 @@ Set to **Next.js** (or leave auto-detect if it picks it up).
 ## Build & Output
 
 - **Install:** `cd ../.. && pnpm install` (from repo root for workspace)
-- **Build:** `cd ../.. && pnpm exec turbo run build --filter=@apparel-commerce/storefront`
+- **Build:** `cd ../.. && pnpm exec turbo run build --filter=@universal-music-store/storefront`
 - **Output:** `.next` in `apps/storefront` (auto-detected for Next.js)

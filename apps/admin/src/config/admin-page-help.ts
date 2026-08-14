@@ -14,7 +14,7 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     purpose:
       "Summary of how the store is doing: recent orders, stock signals, and shortcuts to everyday tasks.",
     usage:
-      "Review totals and alerts, then go to Orders, Inventory, or the register as needed. Add or adjust staff under Employees; your administrator handles who can sign in.",
+      "Review totals and alerts, then go to Orders, Inventory, or the register as needed. Add or adjust staff under Users; your administrator handles who can sign in.",
   },
   "/admin/orders": {
     purpose: "See every customer order, its status, amounts, and fulfillment progress in one list.",
@@ -50,7 +50,7 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
   "/admin/cms": {
     purpose: "Website content such as pages, navigation, blog posts, and promotional copy.",
     usage:
-      "Choose a section from the hub. Preview before you publish; the live site shows published content only. Stock levels and prices stay in the catalog, not here.",
+      "Manage the homepage and every other content surface from Pages and the CMS tools. Preview before you publish; the live site shows published content only. Stock levels and prices stay in the catalog, not here.",
   },
   "/admin/cms/blog": {
     purpose: "Articles and updates for your site blog.",
@@ -81,8 +81,8 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     usage: "Add from and to pairs, publish, then open the old address in a browser to confirm it lands correctly.",
   },
   "/admin/cms/pages": {
-    purpose: "Marketing and information pages built from content blocks.",
-    usage: "Create the page, add blocks, preview, then publish. Match navigation entries to the page addresses you choose.",
+    purpose: "The single CMS workspace for the storefront homepage and marketing or information pages.",
+    usage: "Homepage is the first managed page in this list. Create other pages, add blocks, preview, then publish. Match navigation entries to the page addresses you choose.",
   },
   "/admin/cms/categories": {
     purpose: "Group content for editors and, where used, for how visitors browse related material.",
@@ -109,10 +109,6 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     purpose: "Personal options for using this back office.",
     usage: "Adjust what helps your daily work; many changes apply the next time you load a page.",
   },
-  "/admin/settings/storefront": {
-    purpose: "Settings the public shop reads, such as addresses and feature switches.",
-    usage: "Keep these aligned with how the site is deployed. After changes, walk through a test checkout on the live or staging site.",
-  },
   "/admin/workflow": {
     purpose: "Checklists or notes for how your team runs day-to-day operations.",
     usage: "Update when procedures change so new and existing staff see the same steps.",
@@ -121,7 +117,7 @@ export const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     purpose: "Registers, terminals, and hardware your team uses, for sync and records.",
     usage: "Register each device with a clear name that matches the name used when opening a shift on the register.",
   },
-  "/admin/employees": {
+  "/admin/users": {
     purpose: "Staff list, roles, and PINs used at the register and for approvals.",
     usage: "Add people, set PINs where your policy requires them, and keep sign-in access aligned with your administrator.",
   },
@@ -181,6 +177,9 @@ const sortedHelpKeys = Object.keys(ADMIN_PAGE_HELP).sort(
 
 export function getAdminPageHelp(pathname: string): AdminPageHelpEntry | null {
   const p = (pathname || "/admin").replace(/\/$/, "") || "/admin";
+  if (p === "/admin/crm") {
+    return null;
+  }
   if (ADMIN_PAGE_HELP[p]) {
     return ADMIN_PAGE_HELP[p];
   }

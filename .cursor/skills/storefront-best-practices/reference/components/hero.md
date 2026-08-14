@@ -80,7 +80,7 @@ Hero section is the prominent banner at top of homepage, immediately below navig
 - Fallback image for slow connections
 
 **Best for:**
-- Fashion brands (show products in motion)
+- Music brands (show instruments in motion)
 - Lifestyle products (demonstrate usage)
 - High-budget campaigns
 - Brand storytelling with motion

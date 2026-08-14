@@ -17,7 +17,7 @@ const ADMIN_OPERATION_PATHS: readonly string[] = [
   "/admin/devices",
   "/admin/reviews",
   "/admin/loyalty",
-  "/admin/employees",
+  "/admin/users",
   "/admin/campaigns",
   "/admin/analytics",
   "/admin/crm",
@@ -28,7 +28,7 @@ const ADMIN_OPERATION_PATHS: readonly string[] = [
   "/admin/chat-orders",
   "/admin/settings/integrations",
   "/admin/settings/preferences",
-  "/admin/settings/storefront",
+  "/admin/cms/builder",
   "/admin/finance/reconciliation",
 ];
 
@@ -48,7 +48,7 @@ test.describe("@admin Admin operations E2E", () => {
     if (login === "skip_no_env") {
       test.skip(
         true,
-        "Set ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET in root .env (Playwright loads via playwright.config).",
+        "Set ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET in root .env.local (Playwright loads via playwright.config).",
       );
     }
 
@@ -72,5 +72,29 @@ test.describe("@admin Admin operations E2E", () => {
         expect(onPath, `Expected to load ${path}; got ${page.url()} (run pnpm e2e:ensure-staff for * grants).`).toBeTruthy();
       });
     }
+  });
+
+  test("CMS nested DOM edits are persisted to history", async ({ page }) => {
+    test.setTimeout(120_000);
+    const login = await e2eAdminLogin(page);
+    if (login === "skip_no_ui" || login === "skip_no_env") test.skip(true, "Admin E2E auth is not configured.");
+
+    await page.goto(`${adminBase}/admin/cms/builder`, { waitUntil: "domcontentloaded" });
+    const canvas = page.locator('iframe[title="Storefront canvas"]').contentFrame();
+    const nested = canvas.locator('[data-cms-id^="cms-dom-"][data-cms-block-id]').first();
+    await expect(nested).toBeVisible({ timeout: 30_000 });
+    await nested.click({ force: true });
+
+    const padding = page.locator("label").filter({ hasText: "padding" }).last().locator("input");
+    await expect(padding).toBeVisible();
+    await padding.fill("24px");
+    await padding.blur();
+    const undo = page.getByRole("button", { name: "Undo" });
+    const redo = page.getByRole("button", { name: "Redo" });
+    await expect(undo).toBeEnabled();
+    await undo.click();
+    await expect(redo).toBeEnabled();
+    await redo.click();
+    await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
   });
 });

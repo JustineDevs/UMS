@@ -4,6 +4,75 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --admin-primary: 0 0 0;
+  --admin-on-primary: 226 226 226;
+  --admin-primary-container: 59 59 59;
+  --admin-background: 247 249 251;
+  --admin-surface: 247 249 251;
+  --admin-surface-bright: 247 249 251;
+  --admin-surface-dim: 216 218 220;
+  --admin-surface-container-lowest: 255 255 255;
+  --admin-surface-container-low: 242 244 246;
+  --admin-surface-container: 236 238 240;
+  --admin-surface-container-high: 230 232 234;
+  --admin-surface-container-highest: 224 227 229;
+  --admin-on-background: 25 28 30;
+  --admin-on-surface: 25 28 30;
+  --admin-on-surface-variant: 71 71 71;
+  --admin-outline: 119 119 119;
+  --admin-outline-variant: 198 198 198;
+  --admin-secondary: 81 95 116;
+  --admin-secondary-container: 199 213 238;
+  --admin-on-secondary-container: 13 28 47;
+  --admin-on-secondary: 255 255 255;
+  --admin-tertiary: 49 60 79;
+  --admin-tertiary-container: 106 117 138;
+  --admin-on-tertiary-container: 255 255 255;
+  --admin-error: 186 26 26;
+  --admin-error-container: 255 218 214;
+  --admin-on-error: 255 255 255;
+  --admin-on-error-container: 65 0 2;
+  --admin-inverse-surface: 45 49 51;
+  --admin-inverse-on-surface: 239 241 243;
+  --admin-radius: 0.25rem;
+  --admin-card-radius: 0.75rem;
+  --admin-page-gutter: 1.5rem;
+  --admin-section-gap: 1.5rem;
+  --admin-card-gap: 1rem;
+  --admin-control-height: 2.25rem;
+  --admin-table-row-height: 3.25rem;
+  --admin-shadow-card: 0 1px 2px rgb(0 0 0 / 0.04);
+  --admin-motion-duration: 280ms;
+  --admin-body-font: Inter, sans-serif;
+  --admin-headline-font: "Plus Jakarta Sans", sans-serif;
+  --admin-chart-1: 160 160 160;
+  --admin-chart-2: 112 112 112;
+  --admin-chart-3: 82 82 82;
+  --admin-chart-4: 64 64 64;
+  --admin-chart-5: 40 40 40;
+  --background: rgb(var(--admin-background));
+  --foreground: rgb(var(--admin-on-background));
+  --card: rgb(var(--admin-surface-container-lowest));
+  --card-foreground: rgb(var(--admin-on-surface));
+  --popover: rgb(var(--admin-surface-container-lowest));
+  --popover-foreground: rgb(var(--admin-on-surface));
+  --muted: rgb(var(--admin-surface-container));
+  --muted-foreground: rgb(var(--admin-on-surface-variant));
+  --border: rgb(var(--admin-outline-variant));
+  --input: rgb(var(--admin-outline-variant));
+  --ring: rgb(var(--admin-outline));
+  --primary: rgb(var(--admin-primary));
+  --primary-foreground: rgb(var(--admin-on-primary));
+  --destructive: rgb(var(--admin-error));
+  --chart-1: rgb(var(--admin-chart-1));
+  --chart-2: rgb(var(--admin-chart-2));
+  --chart-3: rgb(var(--admin-chart-3));
+  --chart-4: rgb(var(--admin-chart-4));
+  --chart-5: rgb(var(--admin-chart-5));
+  --radius: var(--admin-radius);
+}
+
 @layer base {
   html.lenis {
     height: auto;
@@ -21,7 +90,38 @@
 }
 
 .material-symbols-outlined {
+  font-family: var(--font-material-symbols);
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+.admin-sidebar-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
+.admin-sidebar-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+[data-admin-shell] {
+  background: rgb(var(--admin-background));
+  color: rgb(var(--admin-on-background));
+}
+
+[data-admin-shell] .admin-page-reveal {
+  animation: admin-page-enter var(--admin-motion-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes admin-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-admin-shell] .admin-page-reveal {
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

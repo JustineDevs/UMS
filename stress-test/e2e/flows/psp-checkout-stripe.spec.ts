@@ -78,6 +78,18 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
   });
 
   test("admin sees Stripe order after successful payment", async ({ page }) => {
+    const availability = await page.request.get(
+      `${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000"}/api/checkout/available-payment-methods`,
+      { failOnStatusCode: false },
+    );
+    const availabilityBody = (await availability.json().catch(() => null)) as {
+      keys?: string[];
+    } | null;
+    if (!availabilityBody?.keys?.includes("STRIPE")) {
+      test.skip(true, "Stripe is not enabled for the current merchant context");
+      return;
+    }
+
     const result = await signInAsAdmin(page);
     if (result !== "ok") {
       test.skip(true, `Admin sign-in not available: ${result}`);

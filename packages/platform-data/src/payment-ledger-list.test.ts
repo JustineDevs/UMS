@@ -9,8 +9,35 @@ import {
 } from "./payment-ledger.js";
 
 describe("payment-ledger list aliases", () => {
-  it("listStalePaymentAttempts aliases listStuckPaymentAttempts", () => {
-    assert.equal(listStalePaymentAttempts, listStuckPaymentAttempts);
+  it("listStalePaymentAttempts delegates to listStuckPaymentAttempts", async () => {
+    const supabase = {
+      from() {
+        return {
+          select() {
+            return {
+              in() {
+                return {
+                  is() {
+                    return {
+                      order() {
+                        return {
+                          limit() {
+                            return Promise.resolve({ data: [], error: null });
+                          },
+                        };
+                      },
+                    };
+                  },
+                };
+              },
+            };
+          },
+        };
+      },
+    } as never;
+
+    await assert.doesNotReject(() => listStalePaymentAttempts(supabase, 10));
+    await assert.doesNotReject(() => listStuckPaymentAttempts(supabase, 10));
   });
 
   it("shouldReusePaymentAttempt only reuses identical quote fingerprints", () => {

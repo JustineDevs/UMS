@@ -1,9 +1,4 @@
-export type PosReturnReason =
-  | "defective"
-  | "wrong_item"
-  | "customer_changed_mind"
-  | "damaged_in_transit"
-  | "other";
+export type PosReturnReason = string;
 
 export type PosReturnRequest = {
   orderId: string;

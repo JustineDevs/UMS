@@ -10,6 +10,7 @@ test("isStorefrontProfileComplete requires barangay for Philippine addresses", (
   const missingBarangay = isStorefrontProfileComplete({
     displayName: "Maria Dela Cruz",
     phone: "09171234567",
+    avatarUrl: null,
     shippingAddresses: [
       {
         fullName: "Maria Dela Cruz",
@@ -29,6 +30,7 @@ test("listMissingProfileParts flags incomplete Philippine delivery addresses wit
   const missing = listMissingProfileParts({
     displayName: "Maria Dela Cruz",
     phone: "09171234567",
+    avatarUrl: null,
     shippingAddresses: [
       {
         fullName: "Maria Dela Cruz",

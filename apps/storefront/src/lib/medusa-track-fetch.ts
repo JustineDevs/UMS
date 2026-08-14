@@ -4,7 +4,7 @@ import {
   getMedusaRegionId,
 } from "./storefront-medusa-env";
 
-type TrackPayload = {
+export type TrackPayload = {
   order: Record<string, unknown> & {
     id?: string;
     order_number?: string;
@@ -15,16 +15,57 @@ type TrackPayload = {
     tracking_number?: string;
     status?: string;
     carrier_slug?: string;
+    expected_delivery?: string | null;
+    tracking_url?: string | null;
   }>;
 };
+
+/** Build a carrier-specific tracking URL. Supports J&T Express PH and common Philippine couriers. */
+function buildCarrierTrackingUrl(carrierSlug: string | undefined, trackingNumber: string | undefined): string | null {
+  if (!trackingNumber?.trim()) return null;
+  const slug = (carrierSlug ?? "").toLowerCase();
+  const tn = encodeURIComponent(trackingNumber.trim());
+  if (
+    slug === "pancake-pos" ||
+    slug === "pancake-pos-jt-ph" ||
+    slug === "jtexpress-ph" ||
+    slug === "jt" ||
+    slug === "jt-express" ||
+    slug === "jnt" ||
+    slug === "jnt-express" ||
+    slug === "j&t" ||
+    slug === "j-t-express-ph"
+  ) {
+    return `https://www.jtexpress.ph/index/query/gcsSearch.html?bills=${tn}`;
+  }
+  if (slug === "lbc") {
+    return `https://www.lbcexpress.com/track/?tracking_number=${tn}`;
+  }
+  if (slug === "2go" || slug === "2go-express") {
+    return `https://www.2go.com.ph/track-shipment/?tracking=${tn}`;
+  }
+  return null;
+}
 
 export function orderTrackStatusFromMedusa(order: Record<string, unknown>): string {
   const meta = (order.metadata ?? {}) as Record<string, unknown>;
   const after =
-    typeof meta.aftership_status === "string" ? meta.aftership_status : "";
+    typeof meta.pancake_pos_status === "string"
+      ? meta.pancake_pos_status
+      : typeof meta.jnt_status === "string"
+        ? meta.jnt_status
+        : "";
   if (after === "delivered") return "delivered";
   if (after === "out_for_delivery") return "shipped";
   if (after === "in_transit" || after === "pending") return "shipped";
+
+  if (
+    meta.payment_provider === "cod" &&
+    meta.cod_payment_status !== "captured" &&
+    meta.cod_capture_complete !== true
+  ) {
+    return "pending_payment";
+  }
 
   const pay = String(order.payment_status ?? "");
   if (pay !== "captured" && pay !== "partially_captured") {
@@ -50,32 +91,74 @@ function mapMedusaOrderToTrack(order: Record<string, unknown>): TrackPayload {
   >;
   const shipments: TrackPayload["shipments"] = [];
 
-  for (const f of fulfillments) {
-    const labels = (f.labels ?? []) as Array<Record<string, unknown>>;
-    if (labels.length > 0) {
-      for (const l of labels) {
+  const orderMeta = (order.metadata ?? {}) as Record<string, unknown>;
+  const jntEdd =
+    typeof orderMeta.pancake_pos_expected_delivery === "string"
+      ? orderMeta.pancake_pos_expected_delivery
+      : typeof orderMeta.jnt_expected_delivery === "string"
+        ? orderMeta.jnt_expected_delivery
+        : null;
+
+  const metadataShipments = Array.isArray(orderMeta.pancake_pos_shipments)
+    ? (orderMeta.pancake_pos_shipments as Array<Record<string, unknown>>)
+    : Array.isArray(orderMeta.fulfillment_shipments)
+      ? (orderMeta.fulfillment_shipments as Array<Record<string, unknown>>)
+      : [];
+
+  if (metadataShipments.length > 0) {
+    for (const shipment of metadataShipments) {
+      const trackingNumber =
+        typeof shipment.tracking_number === "string"
+          ? shipment.tracking_number
+          : undefined;
+      const carrierSlug =
+        typeof shipment.carrier_slug === "string"
+          ? shipment.carrier_slug
+          : undefined;
+      shipments.push({
+        id: String(shipment.id ?? "shipment"),
+        tracking_number: trackingNumber,
+        status:
+          typeof shipment.status === "string"
+            ? shipment.status
+            : orderTrackStatusFromMedusa(order),
+        carrier_slug: carrierSlug,
+        expected_delivery:
+          typeof shipment.expected_delivery === "string"
+            ? shipment.expected_delivery
+            : jntEdd,
+        tracking_url: buildCarrierTrackingUrl(carrierSlug, trackingNumber),
+      });
+    }
+  } else {
+    for (const f of fulfillments) {
+      const labels = (f.labels ?? []) as Array<Record<string, unknown>>;
+      const carrierSlug = typeof f.provider_id === "string" ? f.provider_id : undefined;
+      if (labels.length > 0) {
+        for (const l of labels) {
+          const trackingNumber = typeof l.tracking_number === "string" ? l.tracking_number : undefined;
+          shipments.push({
+            id: String(l.id ?? f.id ?? "lbl"),
+            tracking_number: trackingNumber,
+            status: orderTrackStatusFromMedusa(order),
+            carrier_slug: carrierSlug,
+            expected_delivery: jntEdd,
+            tracking_url: buildCarrierTrackingUrl(carrierSlug, trackingNumber),
+          });
+        }
+      } else {
         shipments.push({
-          id: String(l.id ?? f.id ?? "lbl"),
-          tracking_number:
-            typeof l.tracking_number === "string"
-              ? l.tracking_number
-              : undefined,
-          status: orderTrackStatusFromMedusa(order),
-          carrier_slug:
-            typeof f.provider_id === "string" ? f.provider_id : undefined,
+          id: String(f.id ?? "ful"),
+          tracking_number: undefined,
+          status:
+            typeof f.shipped_at === "string" || f.shipped_at
+              ? "shipped"
+              : "pending",
+          carrier_slug: carrierSlug,
+          expected_delivery: jntEdd,
+          tracking_url: null,
         });
       }
-    } else {
-      shipments.push({
-        id: String(f.id ?? "ful"),
-        tracking_number: undefined,
-        status:
-          typeof f.shipped_at === "string" || f.shipped_at
-            ? "shipped"
-            : "pending",
-        carrier_slug:
-          typeof f.provider_id === "string" ? f.provider_id : undefined,
-      });
     }
   }
 

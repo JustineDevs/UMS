@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "@apparel-commerce/platform-data";
+import { isMissingTableOrSchemaError } from "@universal-music-store/platform-data";
 
 export type InventoryMovementInsert = {
   actorEmail: string | null;
@@ -13,6 +13,7 @@ export type InventoryMovementInsert = {
   quantityBefore: number | null;
   quantityAfter: number;
   correlationId: string;
+  organizationId?: string | null;
 };
 
 export async function recordInventoryMovementAudit(
@@ -33,6 +34,7 @@ export async function recordInventoryMovementAudit(
     quantity_after: row.quantityAfter,
     quantity_delta: quantityDelta,
     correlation_id: row.correlationId,
+    organization_id: row.organizationId ?? null,
     metadata: {},
   });
   if (error && isMissingTableOrSchemaError(error)) {

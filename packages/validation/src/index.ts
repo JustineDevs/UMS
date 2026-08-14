@@ -13,6 +13,7 @@ export {
   storefrontProductSlugSchema,
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
+  storefrontReturnRequestBodySchema,
   type CmsBlockInput,
 } from "./http-schemas";
 
@@ -24,7 +25,9 @@ const PHILIPPINES_MOBILE_PHONE_ERROR =
 function buildOptionalIntegerQuerySchema(
   minimum: number,
   maximum: number,
-): z.ZodOptional<z.ZodPipeline<z.ZodEffects<z.ZodNumber, number, unknown>, z.ZodNumber>> {
+): z.ZodOptional<
+  z.ZodPipeline<z.ZodEffects<z.ZodNumber, number, unknown>, z.ZodNumber>
+> {
   return z.coerce
     .number()
     .transform((value) => Math.floor(value))
@@ -64,15 +67,25 @@ function preprocessProductSearchQuery(value: unknown): string | undefined {
   return trimmed.length === 0 ? undefined : trimmed.slice(0, 80);
 }
 
-export const productListSortSchema = z.enum(["newest", "name_asc", "price_asc", "price_desc"]);
+export const productListSortSchema = z.enum([
+  "newest",
+  "name_asc",
+  "price_asc",
+  "price_desc",
+]);
 
 export const productListQuerySchema = z.object({
   limit: buildOptionalIntegerQuerySchema(1, 100),
   offset: buildOptionalIntegerQuerySchema(0, 50_000),
   category: z.string().trim().min(1).max(120).optional(),
-  size: z.string().trim().min(1).max(40).optional(),
-  color: z.string().trim().min(1).max(80).optional(),
+  type: z.string().trim().min(1).max(80).optional(),
+  finish: z.string().trim().min(1).max(80).optional(),
   brand: z.string().trim().min(1).max(120).optional(),
+  pickupConfig: z.string().trim().min(1).max(80).optional(),
+  bodyWood: z.string().trim().min(1).max(80).optional(),
+  condition: z.string().trim().min(1).max(80).optional(),
+  skillLevel: z.string().trim().min(1).max(80).optional(),
+  shippingSpeed: z.string().trim().min(1).max(80).optional(),
   minPrice: buildOptionalNonNegativeNumberQuerySchema(),
   maxPrice: buildOptionalNonNegativeNumberQuerySchema(),
   /** Search product name or slug (ilike). */
@@ -132,12 +145,7 @@ export const storefrontShippingAddressSchema = z
     city: z.string().trim().min(1).max(100),
     province: z.string().trim().min(1).max(100),
     postalCode: z.string().trim().max(20).optional(),
-    country: z
-      .string()
-      .trim()
-      .toUpperCase()
-      .length(2)
-      .default("PH"),
+    country: z.string().trim().toUpperCase().length(2).default("PH"),
   })
   .superRefine((data, ctx) => {
     const cc = (data.country ?? "PH").toUpperCase();
@@ -160,7 +168,17 @@ export const storefrontCustomerProfilePatchSchema = z
   .object({
     displayName: z.string().trim().max(120).optional(),
     phone: z.string().trim().max(40).optional(),
-    shippingAddresses: z.array(storefrontShippingAddressSchema).max(5).optional(),
+    avatarUrl: z
+      .string()
+      .trim()
+      .url()
+      .max(500)
+      .optional()
+      .or(z.literal("")),
+    shippingAddresses: z
+      .array(storefrontShippingAddressSchema)
+      .max(5)
+      .optional(),
   })
   .superRefine((data, ctx) => {
     const ph = data.phone?.trim();

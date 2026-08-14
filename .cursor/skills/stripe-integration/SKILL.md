@@ -114,7 +114,7 @@ def create_checkout_session(amount, currency='usd'):
                 'price_data': {
                     'currency': currency,
                     'product_data': {
-                        'name': 'Blue T-shirt',
+                        'name': 'Blue Guitar',
                         'images': ['https://example.com/product.jpg'],
                     },
                     'unit_amount': amount,  # Amount in cents
@@ -147,7 +147,7 @@ def create_checkout_session_for_elements(amount, currency='usd'):
         line_items=[{
             'price_data': {
                 'currency': currency,
-                'product_data': {'name': 'Blue T-shirt'},
+                'product_data': {'name': 'Blue Guitar'},
                 'unit_amount': amount,
             },
             'quantity': 1,

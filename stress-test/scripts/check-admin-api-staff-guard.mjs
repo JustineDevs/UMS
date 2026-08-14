@@ -24,6 +24,8 @@ const GUARD_RES = [
   /\bINTERNAL_CHAT_INTAKE_KEY\b/,
   /\bx-internal-key\b/i,
   /\bgateChannelWebhookSecretConfigured\b/,
+  /x-nango-hmac-sha256/i,
+  /createHmac\(/,
 ];
 
 function walkRoutes(dir, out = []) {

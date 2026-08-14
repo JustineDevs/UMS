@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Search",
-};
+  description: "Search the shop by product name or keywords.",
+  path: "/search",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default function SearchPage() {
   return (
@@ -31,7 +36,7 @@ export default function SearchPage() {
             name="q"
             type="search"
             maxLength={80}
-            placeholder="e.g. linen shirt, bucket hat"
+            placeholder="e.g. electric guitar, bass amp"
             className="w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             autoComplete="off"
             enterKeyHint="search"

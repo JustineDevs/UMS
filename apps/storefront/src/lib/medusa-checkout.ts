@@ -40,10 +40,16 @@ export type MedusaCheckoutResult = {
   confirmedTotal: number;
   /** ISO currency code from the cart. */
   currencyCode: string;
+  /** Full authoritative totals breakdown from the actual payment cart. */
+  confirmedPreview?: MedusaCheckoutTotalsPreview;
   /** Stripe PaymentIntent client_secret when using Stripe Elements. */
   stripeClientSecret?: string;
   /** PayPal order ID when using PayPal JS SDK embedded buttons. */
   paypalOrderId?: string;
+  /** Xendit Components SDK key when using embedded channel selection. */
+  xenditComponentsSdkKey?: string;
+  /** Provider payment-session ID used for durable reconciliation. */
+  paymentSessionId?: string;
   /** Cash on delivery: cart was completed and an order was created. */
   codOrderPlaced?: boolean;
   /** Medusa order id when codOrderPlaced (e.g. order_...). */
@@ -66,8 +72,7 @@ export type MedusaCheckoutResult = {
 export const PAYMENT_PROVIDER_IDS = {
   STRIPE: "pp_stripe_stripe",
   PAYPAL: "pp_paypal_paypal",
-  PAYMONGO: "pp_paymongo_paymongo",
-  MAYA: "pp_maya_maya",
+  XENDIT: "pp_xendit_xendit",
   COD: "pp_cod_cod",
 } as const;
 
@@ -76,8 +81,7 @@ export type PaymentProviderKey = keyof typeof PAYMENT_PROVIDER_IDS;
 export const PAYMENT_PROVIDER_LABELS: Record<PaymentProviderKey, string> = {
   STRIPE: "Debit or credit card",
   PAYPAL: "PayPal balance or card",
-  PAYMONGO: "GCash",
-  MAYA: "PayMaya",
+  XENDIT: "GCash and bank transfer",
   COD: "Cash on delivery (COD)",
 };
 
@@ -93,6 +97,7 @@ export async function previewMedusaCheckoutTotals(input: {
   email?: string;
   loyaltyPointsToRedeem?: number;
   paymentMethod: PaymentProviderKey;
+  shippingOptionId?: string;
 }): Promise<MedusaCheckoutTotalsPreview> {
   if (typeof window === "undefined") {
     throw new Error("Checkout preview must run in the browser.");
@@ -106,6 +111,7 @@ export async function previewMedusaCheckoutTotals(input: {
       email: input.email,
       loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
       paymentMethod: input.paymentMethod,
+      shippingOptionId: input.shippingOptionId,
     }),
   });
   const data = (await res.json().catch(() => ({}))) as MedusaCheckoutTotalsPreview & {
@@ -140,6 +146,7 @@ export async function startMedusaCheckout(input: {
   loyaltyPointsToRedeem?: number;
   /** Required when provider is COD; from POST /api/checkout/cod-cart-payload. */
   codCartPayload?: CodCartPayload;
+  shippingOptionId?: string;
 }): Promise<MedusaCheckoutResult> {
   if (typeof window === "undefined") {
     throw new Error("Checkout must run in the browser.");
@@ -172,11 +179,22 @@ export async function startMedusaCheckout(input: {
         email: codFlow ? undefined : input.email?.trim(),
         codCartPayload: codFlow ? input.codCartPayload : undefined,
         loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
+        shippingOptionId: input.shippingOptionId,
       },
       codFlow,
     );
     cartId = ctx.cartId;
     const { sdk } = ctx;
+
+    const bindResponse = await fetch("/api/cart/medusa-bind", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cartId }),
+    });
+    if (!bindResponse.ok) {
+      throw new Error("Could not bind the checkout cart. Please try again.");
+    }
 
     const { cart: refreshedForPayment } = await sdk.store.cart.retrieve(cartId, {
       fields: "+payment_collection,*payment_collection.payment_sessions",
@@ -188,6 +206,12 @@ export async function startMedusaCheckout(input: {
         provider_id: providerId,
         data: {
           idempotency_key: cartId,
+          ...(process.env.NANGO_PAYMENT_CONNECTION_ID
+            ? { nango_connection_id: process.env.NANGO_PAYMENT_CONNECTION_ID }
+            : {}),
+          ...(process.env.NANGO_PAYMENT_PROVIDER_CONFIG_KEY
+            ? { nango_provider_config_key: process.env.NANGO_PAYMENT_PROVIDER_CONFIG_KEY }
+            : {}),
         },
       },
     );
@@ -211,6 +235,7 @@ export async function startMedusaCheckout(input: {
     let checkoutUrl = "";
     let stripeClientSecret: string | undefined;
     let paypalOid: string | undefined;
+    let xenditComponentsSdkKey: string | undefined;
     let walletUrl: string | undefined;
     let qrImageUrl: string | undefined;
     let qrPayload: string | undefined;
@@ -226,6 +251,7 @@ export async function startMedusaCheckout(input: {
     } else if (action.kind === "embedded") {
       stripeClientSecret = action.stripeClientSecret;
       paypalOid = action.paypalOrderId;
+      xenditComponentsSdkKey = action.xenditComponentsSdkKey;
     }
 
     const entry = Object.entries(PAYMENT_PROVIDER_IDS).find(
@@ -239,7 +265,12 @@ export async function startMedusaCheckout(input: {
       fields:
         "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
     } as never);
-    const preview = cartToTotalsPreview(priced);
+    const pricedPreview = cartToTotalsPreview(priced);
+    const preview: MedusaCheckoutTotalsPreview = {
+      ...pricedPreview,
+      shippingOptions: ctx.shippingOptions,
+      appliedShippingOptionId: ctx.appliedShippingOptionId,
+    };
 
     const redirectOrWalletPresent =
       action.kind === "redirect" ||
@@ -247,7 +278,7 @@ export async function startMedusaCheckout(input: {
       (action.kind === "qr" && Boolean(action.imageUrl?.startsWith("https://")));
     const embeddedPresent =
       action.kind === "embedded" &&
-      Boolean(stripeClientSecret || paypalOid);
+      Boolean(stripeClientSecret || paypalOid || xenditComponentsSdkKey);
     emitCommerceObservabilityClient("checkout_provider_action_resolved", {
       provider_id: providerId,
       region_id: regionId,
@@ -258,6 +289,7 @@ export async function startMedusaCheckout(input: {
       embedded_intent_present: embeddedPresent,
       stripe_client_secret_present: Boolean(stripeClientSecret),
       paypal_order_id_present: Boolean(paypalOid),
+      xendit_components_sdk_key_present: Boolean(xenditComponentsSdkKey),
       correlation_id: preview.quoteFingerprint,
     });
     const pricedObj =
@@ -320,6 +352,7 @@ export async function startMedusaCheckout(input: {
         providerLabel,
         confirmedTotal,
         currencyCode,
+        confirmedPreview: preview,
         codOrderPlaced: true,
         quoteFingerprint: preview.quoteFingerprint,
         variantIds: preview.variantIds,
@@ -334,8 +367,11 @@ export async function startMedusaCheckout(input: {
       providerLabel,
       confirmedTotal,
       currencyCode,
+      confirmedPreview: preview,
       stripeClientSecret,
       paypalOrderId: paypalOid,
+      xenditComponentsSdkKey,
+      paymentSessionId: typeof session?.id === "string" ? session.id : undefined,
       quoteFingerprint: preview.quoteFingerprint,
       variantIds: preview.variantIds,
       productIds: preview.productIds,

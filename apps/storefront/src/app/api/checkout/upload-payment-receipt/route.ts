@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import crypto from "node:crypto";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,16 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "ap
  *
  * Returns: { ok: true, receiptId: string, publicUrl: string }
  */
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
+  const ip = getRequestIp(req);
+  const rl = await rateLimitFixedWindow(`upload-payment-receipt:${ip}`, 6, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many requests", retryAfter: rl.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
   const supabaseKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
@@ -88,7 +99,7 @@ export async function POST(req: NextRequest) {
 
   if (uploadError) {
     console.error("[upload-payment-receipt] storage upload error:", uploadError);
-    return NextResponse.json({ error: "Upload failed. Try again." }, { status: 500 });
+    return NextResponse.json({ error: "Upload failed. Try again." }, { status: 503 });
   }
 
   const { data: urlData } = sb.storage
@@ -112,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   if (dbError) {
     console.error("[upload-payment-receipt] db insert error:", dbError);
-    return NextResponse.json({ error: "Failed to record receipt. Contact support." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to record receipt. Contact support." }, { status: 503 });
   }
 
   return NextResponse.json({
@@ -121,3 +132,5 @@ export async function POST(req: NextRequest) {
     publicUrl,
   });
 }
+
+export const POST = withBotIdProtection(handlePOST);

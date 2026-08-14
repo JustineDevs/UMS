@@ -1,17 +1,18 @@
-import type { PrinterAdapterCapabilities } from "@apparel-commerce/printer-core";
+import type { PrinterAdapterCapabilities } from "@universal-music-store/printer-core";
 
 /**
  * Declares hardware paths implemented in this agent build.
  */
 export function listAdapterCapabilities(): PrinterAdapterCapabilities[] {
-  const devOnlyMock: PrinterAdapterCapabilities[] =
+  const devOnlyAdapter: PrinterAdapterCapabilities[] =
     process.env.NODE_ENV === "production"
       ? []
-      : [{ id: "mock", label: "Mock (stdout / dev file)", available: true }];
+      : [{ id: "mock", label: "Development adapter (stdout / dev file)", available: true }];
 
   return [
     { id: "escpos-tcp", label: "ESC/POS over TCP (port 9100)", available: true },
-    ...devOnlyMock,
+    { id: "node-escpos-network", label: "node-escpos network adapter (port 9100)", available: true },
+    ...devOnlyAdapter,
     {
       id: "http-relay",
       label: "HTTP relay (POST application/octet-stream)",

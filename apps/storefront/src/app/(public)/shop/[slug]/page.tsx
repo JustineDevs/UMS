@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AddToCartSection } from "@/components/AddToCartSection";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
-import { ProductDetailsAccordions } from "@/components/ProductDetailsAccordions";
+import {
+  ProductDetailsAccordions,
+  ProductSpecifications,
+} from "@/components/ProductDetailsAccordions";
 import { ProductGalleryCarousel } from "@/components/ProductGalleryCarousel";
 import { ProductRatingNearTitle } from "@/components/ProductRatingNearTitle";
 import { ProductQaSection } from "@/components/ProductQaSection";
@@ -13,6 +16,7 @@ import { ShippingDeliveryEstimate } from "@/components/ShippingDeliveryEstimate"
 import { TrustBadgesStrip } from "@/components/TrustBadgesStrip";
 import { ProductViewTracker } from "@/components/ProductViewTracker";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
+import { ShareProductButton } from "@/components/ShareProductButton";
 import { fetchRelatedProducts } from "@/lib/catalog-fetch";
 import { getCachedProductBySlug } from "@/lib/cached-product";
 import { fetchProductQaEntries } from "@/lib/product-qa";
@@ -23,12 +27,25 @@ import {
 import {
   buildJsonLdProduct,
   buildJsonLdBreadcrumb,
+  buildPageMetadata,
   canonicalUrl,
+  SEO_KEYWORDS,
   SITE_NAME,
 } from "@/lib/seo";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 /** ISR-style caching; live stock is enforced at Medusa checkout. */
 export const revalidate = 120;
+
+export async function generateStaticParams() {
+  const { fetchProductSlugsForSitemap } = await import("@/lib/catalog-fetch");
+  try {
+    const slugs = await fetchProductSlugsForSitemap(500);
+    return slugs.map((slug) => ({ slug }));
+  } catch {
+    return [];
+  }
+}
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -46,27 +63,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const desc =
     product.seoDescription?.trim() ||
     product.description?.slice(0, 155) ||
-    `${product.name} — PHP ${minPrice.toLocaleString("en-PH")}. ${product.category ?? "Apparel"}. ${SITE_NAME}.`;
+    `${product.name} — PHP ${minPrice.toLocaleString("en-PH")}. ${product.category ?? "Music"}. ${SITE_NAME}.`;
 
-  return {
+  return buildPageMetadata({
     title: product.name,
     description: desc,
-    alternates: { canonical: canonicalUrl(`/shop/${slug}`) },
-    openGraph: {
-      title: product.name,
-      description: desc,
-      url: canonicalUrl(`/shop/${slug}`),
-      siteName: SITE_NAME,
-      type: "website",
-      images: image ? [{ url: image, alt: product.name }] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: product.name,
-      description: desc,
-      images: image ? [image] : undefined,
-    },
-  };
+    path: `/shop/${slug}`,
+    keywords: [
+      ...SEO_KEYWORDS.product,
+      ...(product.category ? [product.category] : []),
+      ...(product.brand ? [product.brand] : []),
+    ],
+    openGraphType: "website",
+    image: image,
+    imageAlt: product.name,
+  });
 }
 
 export default async function ProductPage({ params }: Props) {
@@ -99,11 +110,20 @@ export default async function ProductPage({ params }: Props) {
     relatedRes.kind === "ok" ? relatedRes.products : [];
 
   const minPrice = Math.min(...product.variants.map((v) => v.price));
-  const sizeRun = [...new Set(product.variants.map((v) => v.size))]
+  const typeRun = [...new Set(product.variants.map((v) => v.type))]
     .filter(Boolean)
     .sort();
+  const compareParams = new URLSearchParams();
+  if (product.category?.trim()) compareParams.set("category", product.category.trim());
+  if (product.brand?.trim()) compareParams.set("brand", product.brand.trim());
+  if (typeRun[0]) compareParams.set("type", typeRun[0]);
+  const compareHref = `/shop${compareParams.toString() ? `?${compareParams.toString()}` : ""}`;
 
-  const productJsonLd = buildJsonLdProduct(product);
+  const productJsonLd = buildJsonLdProduct({
+    ...product,
+    reviewAverage: reviewSummary.average,
+    reviewCount: reviewSummary.count,
+  });
   const breadcrumbJsonLd = buildJsonLdBreadcrumb([
     { name: "Home", href: "/" },
     { name: "Shop", href: "/shop" },
@@ -125,6 +145,21 @@ export default async function ProductPage({ params }: Props) {
         }}
       />
       <main className="storefront-page-shell storefront-pdp-shell w-full">
+        <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1 text-xs text-on-surface-variant">
+          <Link href="/" className="hover:text-primary">Home</Link>
+          <span aria-hidden="true" className="select-none">/</span>
+          <Link href="/shop" className="hover:text-primary">Shop</Link>
+          {product.category && (
+            <>
+              <span aria-hidden="true" className="select-none">/</span>
+              <Link href={`/shop?category=${encodeURIComponent(product.category)}`} className="hover:text-primary">
+                {product.category}
+              </Link>
+            </>
+          )}
+          <span aria-hidden="true" className="select-none">/</span>
+          <span className="text-primary font-medium" aria-current="page">{product.name}</span>
+        </nav>
         <ProductViewTracker slug={slug} id={product.id} />
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:gap-14 xl:grid-cols-2 xl:gap-16 2xl:gap-20">
           <div className="min-w-0 space-y-8 xl:max-w-none">
@@ -135,7 +170,7 @@ export default async function ProductPage({ params }: Props) {
             <div className="hidden border-t border-outline-variant/20 pt-8 xl:block">
               <ProductDetailsAccordions
                 product={product}
-                sizeRun={sizeRun}
+                typeRun={typeRun}
               />
             </div>
           </div>
@@ -161,18 +196,49 @@ export default async function ProductPage({ params }: Props) {
             />
             <p className="text-xl font-body text-on-surface-variant">
               PHP {minPrice.toLocaleString("en-PH")}
+              <span className="ml-2 text-xs text-on-surface-variant/60 font-normal uppercase tracking-wider">VAT incl.</span>
             </p>
+            <div className="flex flex-wrap gap-3 pt-1 text-xs">
+              <Link
+                href={compareHref}
+                className="rounded-full border border-outline-variant/30 px-3 py-1.5 font-medium text-primary hover:bg-primary hover:text-on-primary"
+              >
+                Compare similar
+              </Link>
+              <Link
+                href="#reviews"
+                className="rounded-full border border-outline-variant/30 px-3 py-1.5 font-medium text-on-surface-variant hover:text-primary"
+              >
+                Read reviews
+              </Link>
+            </div>
           </div>
 
           <div className="space-y-10">
             <AddToCartSection product={product} />
+            <div className="flex items-center gap-3">
+              <Link
+                href="/variant-guide"
+                className="text-xs font-medium text-on-surface-variant underline underline-offset-2 hover:text-primary"
+              >
+                Variant guide
+              </Link>
+              <span className="text-outline-variant" aria-hidden="true">·</span>
+              <ShareProductButton
+                title={product.name}
+                description={product.description ?? undefined}
+                url={canonicalUrl(`/shop/${product.slug}`)}
+              />
+            </div>
             <ShippingDeliveryEstimate />
             <TrustBadgesStrip />
-
+            <div className="border-t border-outline-variant/20 pt-8">
+              <ProductSpecifications product={product} />
+            </div>
             <div className="border-t border-outline-variant/20 pt-8 xl:hidden">
               <ProductDetailsAccordions
                 product={product}
-                sizeRun={sizeRun}
+                typeRun={typeRun}
               />
             </div>
           </div>
@@ -197,6 +263,7 @@ export default async function ProductPage({ params }: Props) {
               fill
               className="object-cover"
               sizes="(max-width: 1024px) 100vw, 896px"
+              unoptimized={shouldUnoptimizeImage(product.lifestyleImageUrl)}
             />
             {product.hotspots.map((h, i) => (
               <Link

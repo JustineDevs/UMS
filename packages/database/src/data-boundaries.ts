@@ -122,6 +122,12 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     kind: "bridge",
     notes: "Webhook inbox for idempotent provider event audit and replay; Medusa remains payment SoR.",
   },
+  staff_catalog_inventory_audit: {
+    surfaces: ["admin"],
+    kind: "derived",
+    notes:
+      "Append-only staff catalog stock adjustment audit; named to avoid public.inventory_movements (Medusa). Medusa inventory_item / levels remain SoR.",
+  },
 };
 
 /** Exact table names that must never be created in Supabase (Medusa-exclusive). */

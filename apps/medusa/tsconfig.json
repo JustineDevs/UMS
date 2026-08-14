@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2021",
+    "baseUrl": ".",
     "esModuleInterop": true,
     "module": "Node16",
     "moduleResolution": "Node16",
@@ -31,6 +32,10 @@
     ".medusa/server",
     ".medusa/admin",
     ".cache",
+    "**/*.spec.ts",
+    "**/*.spec.mts",
+    "**/*.test.ts",
+    "**/*.test.mts",
     "**/*.stress.test.mts"
   ]
 }

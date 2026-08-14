@@ -1,19 +1,21 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import type { CmsBlock } from "@apparel-commerce/platform-data";
+import { staffSessionAllows } from "@universal-music-store/database";
+import type { CmsBlock } from "@universal-music-store/platform-data";
 import {
   insertCmsPageBlockPreset,
   listCmsPageBlockPresets,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { cmsPresetSchema } from "@/lib/cms-route-contracts";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -22,39 +24,37 @@ export async function GET(req: NextRequest) {
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await listCmsPageBlockPresets(sup.client);
+  const organization = await resolveStaffOrganization(sup.client, session.user.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
+  const data = await listCmsPageBlockPresets(sup.client, organization.id);
   return correlatedJson(cid, { data });
 }
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
   if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-  const o = body as { name?: string; blocks?: unknown };
-  const name = typeof o.name === "string" ? o.name.trim() : "";
-  if (!name) {
-    return correlatedJson(cid, { error: "name required" }, { status: 400 });
-  }
-  const blocks = (Array.isArray(o.blocks) ? o.blocks : []) as CmsBlock[];
+  const parsed = cmsPresetSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return correlatedJson(cid, { error: "Invalid preset payload" }, { status: 400 });
+  const { name, blocks } = parsed.data as { name: string; blocks: CmsBlock[] };
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, session.user.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
   const row = await insertCmsPageBlockPreset(sup.client, {
     name,
     blocks,
+    organizationId: organization.id,
   });
   if (!row) {
     return correlatedJson(cid, { error: "Unable to save preset" }, { status: 500 });
   }
   return correlatedJson(cid, { data: row });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/cms/block-presets:POST", post);

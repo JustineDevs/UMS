@@ -51,7 +51,7 @@ Over 60% of ecommerce traffic is mobile. Mobile-first design is essential for co
 - Icons + labels for clarity
 
 **When to use:**
-- Mobile-first brands (fashion, beauty)
+- Mobile-first brands (instruments, accessories)
 - Younger demographic (18-34)
 - App-like experience desired
 

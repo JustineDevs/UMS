@@ -1,45 +1,38 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { listCmsBlogPosts, upsertCmsBlogPost } from "@apparel-commerce/platform-data";
+import { listCmsBlogPosts, upsertCmsBlogPost, type UpsertCmsBlogInput } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { cmsBlogSchema } from "@/lib/cms-route-contracts";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:read")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("content:read");
+  if (!auth.ok) return auth.response;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await listCmsBlogPosts(sup.client);
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
+  const data = await listCmsBlogPosts(sup.client, organization.id);
   return correlatedJson(cid, { data });
 }
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
+  const auth = await requireStaffApiSession("content:write");
+  if (!auth.ok) return auth.response;
+  const parsed = cmsBlogSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return correlatedJson(cid, { error: "Invalid blog payload" }, { status: 400 });
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const data = await upsertCmsBlogPost(sup.client, body as Parameters<typeof upsertCmsBlogPost>[1]);
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
+  const data = await upsertCmsBlogPost(sup.client, { ...(parsed.data as UpsertCmsBlogInput), organization_id: organization.id });
   if (!data) return correlatedJson(cid, { error: "Unable to save" }, { status: 500 });
   return correlatedJson(cid, { data });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/cms/blog:POST", post);

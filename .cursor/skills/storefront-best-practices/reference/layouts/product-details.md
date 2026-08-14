@@ -45,7 +45,7 @@ Product detail pages must use dynamic routes that accept a parameter (handle, sl
 - Remix: `routes/products.$handle.tsx`
 
 **Wrong examples:**
-- ❌ `pages/products/blue-shirt.tsx` (static file per product)
+- ❌ `pages/products/blue-guitar.tsx` (static file per product)
 - ❌ `pages/products/red-shoes.tsx` (doesn't scale)
 
 Fetch product data in the dynamic route based on the handle/ID parameter from the URL.
@@ -159,7 +159,7 @@ const product = await fetch(`/products/${id}?fields=*variants`)
 - Color or pattern variations
 - Material with visual differences
 - Visual is key to decision
-- Fashion, home decor, customizable products
+- Instruments, audio gear, customizable products
 
 **Implementation:**
 - Circular/square swatches (40-48px)

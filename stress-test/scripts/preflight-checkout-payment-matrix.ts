@@ -18,8 +18,7 @@ const root = path.resolve(__dirname, "../..");
 
 const require = createRequire(import.meta.url);
 try {
-  const dotenv = require("dotenv") as { config: (o?: { path?: string; override?: boolean }) => void };
-  dotenv.config({ path: path.join(root, ".env") });
+  const dotenv = require("dotenv") as { config: (_o?: { path?: string; override?: boolean }) => void };
   dotenv.config({ path: path.join(root, ".env.local"), override: true });
 } catch {
   /* optional */
@@ -70,20 +69,11 @@ function regionIdEnv() {
   );
 }
 
-function salesChannelMerge(body: Record<string, unknown>) {
-  const sc =
-    process.env.MEDUSA_SALES_CHANNEL_ID?.trim() ||
-    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID?.trim();
-  if (sc) return { ...body, sales_channel_id: sc };
-  return body;
-}
-
 const MANDATORY_IDS = [
   "pp_cod_cod",
   "pp_stripe_stripe",
   "pp_paypal_paypal",
-  "pp_paymongo_paymongo",
-  "pp_maya_maya",
+  "pp_xendit_xendit",
 ] as const;
 
 /** Provider ids this codebase registers in `apps/medusa/medusa-config.ts` plus Medusa default. */
@@ -139,21 +129,41 @@ async function main() {
     paymentProviders.map((p) => p.id).filter((id): id is string => Boolean(id)),
   );
 
-  const { products } = await sdk.store.product.list(
-    salesChannelMerge({
-      limit: 5,
-      region_id: reg,
-      fields: "*variants",
-    }) as never,
+  const productsResponse = await fetch(
+    `${baseUrl}/store/products?limit=5&region_id=${encodeURIComponent(reg)}&fields=${encodeURIComponent("*variants,*sales_channels")}`,
+    { headers: { "x-publishable-api-key": pub } },
   );
+  if (!productsResponse.ok) {
+    console.error(JSON.stringify({ ok: false, error: "list_products_failed", status: productsResponse.status }));
+    process.exit(1);
+  }
+  const { products } = (await productsResponse.json()) as {
+    products?: Array<{
+      variants?: Array<{ id?: string }>;
+      sales_channels?: Array<{ id?: string; is_disabled?: boolean }>;
+    }>;
+  };
   const firstVariant = products?.[0]?.variants?.[0]?.id;
   const variantOk =
     typeof firstVariant === "string" && firstVariant.startsWith("variant_");
+  const configuredSalesChannel =
+    process.env.MEDUSA_SALES_CHANNEL_ID?.trim() ||
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID?.trim();
+  const discoveredSalesChannel = products
+    ?.flatMap((product) => {
+      const channels = (product as { sales_channels?: Array<{ id?: string; is_disabled?: boolean }> }).sales_channels;
+      return channels ?? [];
+    })
+    .find((channel) => channel.id && !channel.is_disabled)?.id;
+  const probeSalesChannel = configuredSalesChannel || discoveredSalesChannel;
 
   let shippingOk = false;
   if (variantOk) {
     const { cart: created } = await sdk.store.cart.create(
-      salesChannelMerge({ region_id: reg }) as never,
+      {
+        region_id: reg,
+        ...(probeSalesChannel ? { sales_channel_id: probeSalesChannel } : {}),
+      } as never,
     );
     const cartId = created?.id;
     if (cartId) {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { useEffect, useRef, useState } from "react";
 import {
   buildHostedReturnMissingCorrelationMessage,
@@ -99,7 +100,12 @@ export function HostedCheckoutReturn({
         typeof finalizeJson.redirectUrl === "string" &&
         finalizeJson.redirectUrl.length > 0
       ) {
-        window.location.href = finalizeJson.redirectUrl;
+        const safeRedirectUrl = sanitizeTrustedPublicUrl(finalizeJson.redirectUrl);
+        if (!safeRedirectUrl) {
+          setMessage("Payment was confirmed, but the provider returned an invalid redirect. Check your order history.");
+          return;
+        }
+        window.location.href = safeRedirectUrl;
         return;
       }
 

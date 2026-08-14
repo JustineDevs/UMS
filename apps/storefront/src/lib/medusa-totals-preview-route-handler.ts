@@ -12,6 +12,7 @@ type Body = {
   email?: string;
   loyaltyPointsToRedeem?: number;
   paymentMethod?: string;
+  shippingOptionId?: string;
 };
 
 type TotalsPreviewDependencies = {
@@ -32,6 +33,7 @@ type TotalsPreviewDependencies = {
     email?: string;
     loyaltyPointsToRedeem?: number;
     codCartPayload?: CodCartPayload;
+    shippingOptionId?: string;
   }) => Promise<MedusaCheckoutTotalsPreview>;
   logEvent: (_event: string, _payload: Record<string, unknown>) => void;
 };
@@ -88,6 +90,10 @@ export async function handleMedusaTotalsPreviewRequest(
   const paymentMethod = String(body.paymentMethod ?? "STRIPE");
   const loyaltyPointsToRedeem = normalizeLoyaltyPoints(body.loyaltyPointsToRedeem);
   const emailFromBody = normalizeOptionalEmail(body.email);
+  const shippingOptionId =
+    typeof body.shippingOptionId === "string" && body.shippingOptionId.trim()
+      ? body.shippingOptionId.trim()
+      : undefined;
 
   try {
     if (isCodPaymentMethod(paymentMethod)) {
@@ -113,6 +119,7 @@ export async function handleMedusaTotalsPreviewRequest(
         lines,
         loyaltyPointsToRedeem,
         codCartPayload,
+        shippingOptionId,
       });
       deps.logEvent("checkout_quote_generated", {
         quoteFingerprint: preview.quoteFingerprint,
@@ -127,6 +134,7 @@ export async function handleMedusaTotalsPreviewRequest(
       lines,
       email: emailFromBody || sessionEmail,
       loyaltyPointsToRedeem,
+      shippingOptionId,
     });
     deps.logEvent("checkout_quote_generated", {
       quoteFingerprint: preview.quoteFingerprint,

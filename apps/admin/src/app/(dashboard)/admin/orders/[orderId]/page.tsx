@@ -104,6 +104,31 @@ export default async function OrderDetailPage({
           )}
         </section>
 
+        <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6">
+          <h2 className="mb-4 font-headline text-sm font-bold uppercase tracking-widest text-primary">
+            Sale details
+          </h2>
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <div className="rounded bg-surface-container-low p-3">
+              <p className="text-xs text-on-surface-variant">Order tag</p>
+              <p className="mt-1 font-medium">{String(order.metadata.pos_order_tag ?? "Not set")}</p>
+            </div>
+            <div className="rounded bg-surface-container-low p-3">
+              <p className="text-xs text-on-surface-variant">E-invoice</p>
+              <p className="mt-1 font-medium">{order.metadata.e_invoice_requested === true ? "Requested" : "Not requested"}</p>
+            </div>
+            {order.metadata.e_invoice_requested === true ? (
+              <div className="rounded bg-surface-container-low p-3 sm:col-span-2">
+                <p className="text-xs text-on-surface-variant">Invoice contact</p>
+                <p className="mt-1 font-medium">
+                  {String(order.metadata.e_invoice_customer_email ?? "No email provided")}
+                  {order.metadata.e_invoice_customer_tin ? ` · Tax ID ${String(order.metadata.e_invoice_customer_tin)}` : ""}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+
         <div className="space-y-8">
           <OrderRefundPanel
             orderId={order.id}

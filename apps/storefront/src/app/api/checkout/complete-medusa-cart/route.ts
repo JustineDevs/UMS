@@ -2,22 +2,50 @@ import { NextResponse } from "next/server";
 import {
   getPaymentAttemptByCorrelationId,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import { capturePostHogEvent } from "@universal-music-store/sdk";
+
+function jsonNoStore(
+  body: unknown,
+  init?: { status?: number; headers?: Record<string, string> },
+): NextResponse<unknown> {
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      ...(init?.headers ?? {}),
+    },
+  });
+}
 
 /**
  * @deprecated Legacy cart completion (cookie-bound). Primary path: POST
  * `/api/payments/checkout-intents/:correlationId/finalize` (or COD `/api/checkout/cod-place-order`).
- * When `STOREFRONT_STRICT_PAYMENT_LEDGER=true`, requires `correlationId` in JSON body or returns 400.
+ * This legacy path is permanently disabled. Checkout completion must carry a
+ * verified payment-attempt correlation id so the cart cannot be completed by
+ * cookie possession alone.
  */
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const rl = await applyRateLimit(req, "complete-medusa-cart", 40, 60_000);
   if (!rl.ok) {
     return rl.response;
+  }
+
+  if (process.env.STOREFRONT_LEGACY_CART_COMPLETION_ALLOW !== "true") {
+    return jsonNoStore(
+      {
+        error:
+          "Legacy cart completion is disabled. Use POST /api/payments/checkout-intents/:correlationId/finalize.",
+        code: "LEGACY_ROUTE_DISABLED",
+      },
+      { status: 410 },
+    );
   }
 
   const cartId = await readCartIdFromCookie();
@@ -29,7 +57,10 @@ export async function POST(req: Request) {
       errorCode: "no_cart",
       message: "No active cart",
     });
-    return NextResponse.json({ error: "No active cart" }, { status: 400 });
+    return NextResponse.json(
+      { error: "No active cart", code: "NO_CART" },
+      { status: 400, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const cartSuffix = cartId.length > 8 ? cartId.slice(-8) : cartId;
@@ -46,22 +77,11 @@ export async function POST(req: Request) {
     correlationId = undefined;
   }
 
-  const strictLedger = process.env.STOREFRONT_STRICT_PAYMENT_LEDGER === "true";
-  if (strictLedger && !correlationId) {
-    return NextResponse.json(
-      {
-        error:
-          "Use POST /api/payments/checkout-intents/:correlationId/finalize with a registered payment attempt.",
-      },
-      { status: 400 },
-    );
-  }
-
   const sb = createStorefrontServiceSupabase();
 
   try {
     const result = await finalizeMedusaCartFromServer(cartId, {
-      maxCompleteAttempts: strictLedger ? 2 : 6,
+      maxCompleteAttempts: 6,
     });
 
     if (!result.ok) {
@@ -85,7 +105,21 @@ export async function POST(req: Request) {
           }).catch(() => {});
         }
       }
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      void capturePostHogEvent({
+        event: "checkout_completion_failed",
+        distinctId: correlationId ?? cartSuffix,
+        properties: {
+          stage: "complete_medusa_cart",
+          httpStatus: result.status,
+          attempts: result.attempts,
+          errorCode: result.status === 409 ? "order_not_ready" : "complete_failed",
+          message: result.error.slice(0, 500),
+        },
+      });
+      return jsonNoStore(
+        { error: result.error, code: "COMPLETE_CART_FAILED" },
+        { status: result.status },
+      );
     }
 
     if (sb && correlationId) {
@@ -110,22 +144,48 @@ export async function POST(req: Request) {
       orderId: result.orderId,
       attempts: result.attempts,
     });
+    void capturePostHogEvent({
+      event: "checkout_completion_succeeded",
+      distinctId: correlationId ?? cartSuffix,
+      properties: {
+        stage: "complete_medusa_cart",
+        httpStatus: 200,
+        orderId: result.orderId,
+        attempts: result.attempts,
+      },
+    });
 
-    return NextResponse.json({
+    return jsonNoStore({
       ok: true,
       orderId: result.orderId,
       redirectUrl: result.redirectUrl,
+      code: "OK",
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Complete failed";
     logCheckoutCompletionEvent({
       stage: "complete_medusa_cart",
       outcome: "failure",
-      httpStatus: 500,
+      httpStatus: 503,
       cartIdSuffix: cartSuffix,
       errorCode: "exception",
       message: msg.slice(0, 500),
     });
-    return NextResponse.json({ error: msg }, { status: 500 });
+    void capturePostHogEvent({
+      event: "checkout_completion_exception",
+      distinctId: correlationId ?? cartSuffix,
+      properties: {
+        stage: "complete_medusa_cart",
+        httpStatus: 503,
+        errorCode: "exception",
+        message: msg.slice(0, 500),
+      },
+    });
+    return jsonNoStore(
+      { error: msg, code: "COMPLETE_EXCEPTION" },
+      { status: 503 },
+    );
   }
 }
+
+export const POST = withBotIdProtection(handlePOST);

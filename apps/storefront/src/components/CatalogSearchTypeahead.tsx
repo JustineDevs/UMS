@@ -9,18 +9,28 @@ type Suggestion = { slug: string; name: string; minPrice: number };
 export function CatalogSearchTypeahead({
   initialQ,
   category,
-  size,
-  color,
+  type,
+  finish,
   brand,
+  pickupConfig,
+  bodyWood,
+  condition,
+  skillLevel,
+  shippingSpeed,
   minPrice,
   maxPrice,
   sort,
 }: {
   initialQ?: string;
   category?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   minPrice?: number;
   maxPrice?: number;
   sort: string;
@@ -77,9 +87,14 @@ export function CatalogSearchTypeahead({
   function buildShopUrl(search: string) {
     const p = new URLSearchParams();
     if (category) p.set("category", category);
-    if (size) p.set("size", size);
-    if (color) p.set("color", color);
+    if (type) p.set("type", type);
+    if (finish) p.set("finish", finish);
     if (brand) p.set("brand", brand);
+    if (pickupConfig) p.set("pickupConfig", pickupConfig);
+    if (bodyWood) p.set("bodyWood", bodyWood);
+    if (condition) p.set("condition", condition);
+    if (skillLevel) p.set("skillLevel", skillLevel);
+    if (shippingSpeed) p.set("shippingSpeed", shippingSpeed);
     if (minPrice != null) p.set("minPrice", String(minPrice));
     if (maxPrice != null) p.set("maxPrice", String(maxPrice));
     if (sort && sort !== "newest") p.set("sort", sort);
@@ -116,7 +131,7 @@ export function CatalogSearchTypeahead({
           role="listbox"
         >
           {items.map((it) => (
-            <li key={it.slug} role="option">
+            <li key={it.slug} role="option" aria-selected={false}>
               <Link
                 href={`/shop/${it.slug}`}
                 className="block px-3 py-2 text-sm text-on-surface hover:bg-surface-container-low"

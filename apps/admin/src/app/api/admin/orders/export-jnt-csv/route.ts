@@ -1,7 +1,11 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { z } from "zod";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
+import { parseAdminJson } from "@/lib/admin-api-security";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +21,22 @@ type JntCsvRow = {
   codAmount: string;
   remarks: string;
 };
+
+const exportRequestSchema = z
+  .object({
+    orderIds: z
+      .array(z.string().trim().min(1).max(128))
+      .min(1)
+      .max(200)
+      .superRefine((ids, ctx) => {
+        if (new Set(ids).size !== ids.length) {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Duplicate order IDs" });
+        }
+      }),
+  })
+  .strict();
+
+const MAX_CONCURRENCY = 4;
 
 function escapeCsv(val: string): string {
   if (val.includes(",") || val.includes('"') || val.includes("\n")) {
@@ -51,38 +71,37 @@ function buildCsvRow(row: JntCsvRow): string {
  * Order No. | Consignee | Phone | Address | City | Province | Postal Code |
  * Weight (kg) | COD Amount | Remarks
  */
-export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+async function post(req: NextRequest) {
+  const correlationId = getCorrelationId(req);
+  const staff = await requireStaffApiSession("analytics:export");
+  if (!staff.ok) {
+    staff.response.headers.set("x-request-id", correlationId);
+    return staff.response;
   }
 
-  let body: { orderIds?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const parsed = await parseAdminJson(req, exportRequestSchema);
+  if (!parsed.ok) {
+    return correlatedJson(
+      correlationId,
+      { error: parsed.error, code: "VALIDATION_ERROR", requestId: correlationId },
+      { status: parsed.status },
+    );
   }
 
-  const orderIds = Array.isArray(body.orderIds)
-    ? (body.orderIds as unknown[]).filter((id) => typeof id === "string").slice(0, 200)
-    : [];
-
-  if (orderIds.length === 0) {
-    return NextResponse.json({ error: "No order IDs provided" }, { status: 400 });
-  }
+  const { orderIds } = parsed.data;
 
   const rows: JntCsvRow[] = [];
   const errors: string[] = [];
 
-  await Promise.all(
-    (orderIds as string[]).map(async (orderId) => {
+  for (let index = 0; index < orderIds.length; index += MAX_CONCURRENCY) {
+    const chunk = orderIds.slice(index, index + MAX_CONCURRENCY);
+    await Promise.all(chunk.map(async (orderId) => {
       try {
         const res = await medusaAdminFetch(
           `/admin/orders/${encodeURIComponent(orderId)}?fields=id,display_id,email,total,payment_status,metadata,*shipping_address,*items`,
         );
         if (!res.ok) {
-          errors.push(`${orderId}: HTTP ${res.status}`);
+          errors.push(orderId);
           return;
         }
         const json = (await res.json()) as {
@@ -110,14 +129,15 @@ export async function POST(req: NextRequest) {
 
         const o = json.order;
         if (!o) {
-          errors.push(`${orderId}: no order in response`);
+          errors.push(orderId);
           return;
         }
 
         const addr = o.shipping_address;
         const firstName = addr?.first_name?.trim() ?? "";
         const lastName = addr?.last_name?.trim() ?? "";
-        const consigneeName = [firstName, lastName].filter(Boolean).join(" ") || "Unknown";
+        const consigneeName =
+          [firstName, lastName].filter(Boolean).join(" ") || "Unknown";
         const phone = addr?.phone?.trim() ?? "";
         const addressLine = [addr?.address_1, addr?.address_2]
           .map((a) => a?.trim())
@@ -133,7 +153,8 @@ export async function POST(req: NextRequest) {
         }, 0);
         const weightKg = (totalWeightG / 1000).toFixed(2);
 
-        const isCod = o.payment_status === "not_paid" || o.payment_status === "awaiting";
+        const isCod =
+          o.payment_status === "not_paid" || o.payment_status === "awaiting";
         const codAmount = isCod ? ((o.total ?? 0) / 100).toFixed(2) : "0.00";
 
         rows.push({
@@ -146,13 +167,13 @@ export async function POST(req: NextRequest) {
           postalCode,
           weightKg,
           codAmount,
-          remarks: `Maharlika Apparel Order ${o.display_id ?? orderId}`,
+          remarks: `Universal Music Store Order ${o.display_id ?? orderId}`,
         });
-      } catch (err) {
-        errors.push(`${orderId}: ${err instanceof Error ? err.message : "error"}`);
+      } catch {
+        errors.push(orderId);
       }
-    }),
-  );
+    }));
+  }
 
   const header =
     "Order No.,Consignee Name,Phone,Address,City,Province,Postal Code,Weight (kg),COD Amount,Remarks";
@@ -164,7 +185,12 @@ export async function POST(req: NextRequest) {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="jnt-export-${new Date().toISOString().slice(0, 10)}.csv"`,
       "X-Export-Rows": String(rows.length),
-      ...(errors.length > 0 ? { "X-Export-Errors": errors.slice(0, 5).join("; ") } : {}),
+      ...(errors.length > 0
+        ? { "X-Export-Failures": String(errors.length) }
+        : {}),
+      "x-request-id": correlationId,
     },
   });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/orders/export-jnt-csv:POST", post);

@@ -54,6 +54,16 @@
       "args": [
         "@hakxel/mantine-ui-server"
       ]
+    },
+    "xendit": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "xendit-mcp"
+      ],
+      "env": {
+        "XENDIT_API_KEY": "your-xendit-api-key"
+      }
     }
   }
 }

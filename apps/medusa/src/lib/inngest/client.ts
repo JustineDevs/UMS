@@ -8,6 +8,6 @@ import { Inngest } from "inngest";
  * or use the dev server default.
  */
 export const inngest = new Inngest({
-  id: "maharlika-apparel",
+  id: "universal-music-store",
   eventKey: process.env.INNGEST_EVENT_KEY,
 });

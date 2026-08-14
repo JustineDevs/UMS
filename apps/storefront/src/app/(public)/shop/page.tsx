@@ -1,11 +1,11 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { loadCmsCategoryContentPublic } from "@apparel-commerce/platform-data";
+import { loadCmsCategoryContentPublic } from "@universal-music-store/platform-data";
 import {
   sanitizeCmsHtml,
   SHOP_PRODUCT_PAGE_SIZE,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import {
@@ -25,16 +25,26 @@ import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
-import { canonicalUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import {
+  buildPageMetadata,
+  SEO_KEYWORDS,
+  SITE_DESCRIPTION,
+} from "@/lib/seo";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export const revalidate = 60;
 
 type ShopSearchParams = {
   category?: string;
   locale?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   minPrice?: string;
   maxPrice?: string;
   sort?: string;
@@ -49,40 +59,49 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const sp = await searchParams;
   const q = parseShopPageQuery(sp);
+  const category = q.category?.trim() || undefined;
+  const type = q.type?.trim() || undefined;
+  const finish = q.finish?.trim() || undefined;
+  const brand = q.brand?.trim() || undefined;
   const searchQ = q.q?.trim() || undefined;
-  const offset = q.offset ?? 0;
   const normalizedBase: ShopQuery = {
-    category: q.category,
-    size: q.size,
-    color: q.color,
-    brand: q.brand,
+    category,
+    type,
+    finish,
+    brand,
+    pickupConfig: q.pickupConfig,
+    bodyWood: q.bodyWood,
+    condition: q.condition,
+    skillLevel: q.skillLevel,
+    shippingSpeed: q.shippingSpeed,
     minPrice: q.minPrice,
     maxPrice: q.maxPrice,
     search: searchQ,
     sort: q.sort,
   };
-  const canonical = canonicalUrl(shopHref(normalizedBase));
-  const prevOffset = offset - SHOP_PRODUCT_PAGE_SIZE;
-  const nextOffset = offset + SHOP_PRODUCT_PAGE_SIZE;
-  const alternates: Record<string, unknown> = { canonical };
-  const toShopQuery = (patch: { offset: number }) => ({
-    ...normalizedBase,
-    offset: patch.offset,
+  const pageTitle = searchQ
+    ? `Shop results for ${searchQ}`
+    : category
+      ? `${category} at the shop`
+      : "Shop instruments and gear";
+  const pageDescription = searchQ
+    ? `Search the catalog for ${searchQ}. ${SITE_DESCRIPTION}`
+    : category
+      ? `Browse ${category.toLowerCase()} products in the live catalog. ${SITE_DESCRIPTION}`
+      : SITE_DESCRIPTION;
+  return buildPageMetadata({
+    title: pageTitle,
+    description: pageDescription,
+    path: shopHref(normalizedBase),
+    keywords: [
+      ...SEO_KEYWORDS.shop,
+      ...(category ? [category] : []),
+      ...(type ? [type] : []),
+      ...(finish ? [finish] : []),
+      ...(brand ? [brand] : []),
+      ...(searchQ ? [searchQ] : []),
+    ],
   });
-  if (prevOffset >= 0) {
-    alternates.prev = canonicalUrl(shopHref(toShopQuery({ offset: prevOffset })));
-  }
-  alternates.next = canonicalUrl(shopHref(toShopQuery({ offset: nextOffset })));
-  return {
-    title: "Shop — All Products",
-    description: SITE_DESCRIPTION,
-    alternates: alternates as Metadata["alternates"],
-    openGraph: {
-      title: `Shop | ${SITE_NAME}`,
-      description: SITE_DESCRIPTION,
-      url: canonical,
-    },
-  };
 }
 
 export default async function ShopPage({
@@ -95,9 +114,14 @@ export default async function ShopPage({
   const q = parseShopPageQuery(sp);
 
   const category = q.category?.trim() || undefined;
-  const size = q.size?.trim() || undefined;
-  const color = q.color?.trim() || undefined;
+  const type = q.type?.trim() || undefined;
+  const finish = q.finish?.trim() || undefined;
   const brand = q.brand?.trim() || undefined;
+  const pickupConfig = q.pickupConfig?.trim() || undefined;
+  const bodyWood = q.bodyWood?.trim() || undefined;
+  const condition = q.condition?.trim() || undefined;
+  const skillLevel = q.skillLevel?.trim() || undefined;
+  const shippingSpeed = q.shippingSpeed?.trim() || undefined;
   const minPrice = q.minPrice;
   const maxPrice = q.maxPrice;
   const searchQ = q.q?.trim() || undefined;
@@ -108,9 +132,14 @@ export default async function ShopPage({
   const [pageRes, catRes, facetRes, cmsCategory] = await Promise.all([
     fetchProductsPage(limit, {
       category,
-      size,
-      color,
+      type,
+      finish,
       brand,
+      pickupConfig,
+      bodyWood,
+      condition,
+      skillLevel,
+      shippingSpeed,
       minPrice,
       maxPrice,
       q: searchQ,
@@ -143,7 +172,16 @@ export default async function ShopPage({
   const facets =
     facetRes.kind === "ok"
       ? facetRes.facets
-      : { sizes: [] as string[], colors: [] as string[], brands: [] as string[] };
+      : {
+          types: [] as string[],
+          finishes: [] as string[],
+          brands: [] as string[],
+          pickupConfigs: [] as string[],
+          bodyWoods: [] as string[],
+          conditions: [] as string[],
+          skillLevels: [] as string[],
+          shippingSpeeds: [] as string[],
+        };
 
   const sidebarWarning = secondaryCommerceFailure(catRes, facetRes);
 
@@ -154,9 +192,14 @@ export default async function ShopPage({
 
   const base = (): ShopQuery => ({
     category,
-    size,
-    color,
+    type,
+    finish,
     brand,
+    pickupConfig,
+    bodyWood,
+    condition,
+    skillLevel,
+    shippingSpeed,
     minPrice,
     maxPrice,
     sort,
@@ -181,6 +224,7 @@ export default async function ShopPage({
             sizes="(max-width: 1600px) 100vw, 1600px"
             className="object-cover"
             priority
+            unoptimized={shouldUnoptimizeImage(cmsCategory.banner_url)}
           />
         </div>
       ) : null}
@@ -190,7 +234,7 @@ export default async function ShopPage({
             Shop
             <br />
             <span className="text-[clamp(1.2rem,4vw,2.75rem)] font-bold">
-              All products
+              All instruments
             </span>
           </h1>
           {searchQ ? (
@@ -208,8 +252,10 @@ export default async function ShopPage({
             />
           ) : (
             <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-              Browse the catalog with filters for category, size, color, and price.
-              Product details, stock, and checkout use the live store system.
+              Browse the catalog with filters for category, instrument type,
+              finish, pickup layout, body wood, condition, skill level,
+              shipping speed, and price. Product details, stock, and checkout
+              use the live store system.
             </p>
           )}
         </div>
@@ -217,9 +263,14 @@ export default async function ShopPage({
           <CatalogSearchTypeahead
             initialQ={searchQ}
             category={category}
-            size={size}
-            color={color}
+            type={type}
+            finish={finish}
             brand={brand}
+            pickupConfig={pickupConfig}
+            bodyWood={bodyWood}
+            condition={condition}
+            skillLevel={skillLevel}
+            shippingSpeed={shippingSpeed}
             minPrice={minPrice}
             maxPrice={maxPrice}
             sort={sort}
@@ -227,9 +278,14 @@ export default async function ShopPage({
           <ShopSortSelect
             value={sort}
             category={category}
-            size={size}
-            color={color}
+            type={type}
+            finish={finish}
             brand={brand}
+            pickupConfig={pickupConfig}
+            bodyWood={bodyWood}
+            condition={condition}
+            skillLevel={skillLevel}
+            shippingSpeed={shippingSpeed}
             minPrice={minPrice}
             maxPrice={maxPrice}
             search={searchQ}
@@ -252,7 +308,16 @@ export default async function ShopPage({
             <ul className="space-y-4">
               <li>
                 <Link
-                  href={h({ category: undefined, size, color })}
+                  href={h({
+                    category: undefined,
+                    type,
+                    finish,
+                    pickupConfig,
+                    bodyWood,
+                    condition,
+                    skillLevel,
+                    shippingSpeed,
+                  })}
                   className={`flex items-center justify-between text-sm transition-colors ${
                     !category
                       ? "font-medium text-primary"
@@ -270,8 +335,13 @@ export default async function ShopPage({
                   <Link
                     href={h({
                       category: c.category,
-                      size: undefined,
-                      color: undefined,
+                      type: undefined,
+                      finish: undefined,
+                      pickupConfig: undefined,
+                      bodyWood: undefined,
+                      condition: undefined,
+                      skillLevel: undefined,
+                      shippingSpeed: undefined,
                     })}
                     className={`flex items-center justify-between text-sm transition-colors ${
                       category === c.category
@@ -289,22 +359,27 @@ export default async function ShopPage({
 
           <section>
             <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Size
+              Type
             </h3>
-            {facets.sizes.length === 0 ? (
+            {facets.types.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
-                No sizes in this view.
+                No types in this view.
               </p>
             ) : (
               <div className="grid grid-cols-4 gap-2">
-                {facets.sizes.map((s) => {
-                  const active = size === s;
+                {facets.types.map((t) => {
+                  const active = type === t;
                   return (
                     <Link
-                      key={s}
+                      key={t}
                       href={h({
-                        size: active ? undefined : s,
-                        color,
+                        type: active ? undefined : t,
+                        finish,
+                        pickupConfig,
+                        bodyWood,
+                        condition,
+                        skillLevel,
+                        shippingSpeed,
                       })}
                       className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-all rounded ${
                         active
@@ -312,7 +387,7 @@ export default async function ShopPage({
                           : "bg-surface-container-low hover:bg-primary hover:text-on-primary"
                       }`}
                     >
-                      {s}
+                      {t}
                     </Link>
                   );
                 })}
@@ -322,22 +397,27 @@ export default async function ShopPage({
 
           <section>
             <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Color
+              Finish
             </h3>
-            {facets.colors.length === 0 ? (
+            {facets.finishes.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
-                No colors in this view.
+                No finishes in this view.
               </p>
             ) : (
               <div className="space-y-3">
-                {facets.colors.map((col) => {
-                  const active = color === col;
+                {facets.finishes.map((col) => {
+                  const active = finish === col;
                   return (
                     <Link
                       key={col}
                       href={h({
-                        size,
-                        color: active ? undefined : col,
+                        type,
+                        finish: active ? undefined : col,
+                        pickupConfig,
+                        bodyWood,
+                        condition,
+                        skillLevel,
+                        shippingSpeed,
                       })}
                       className={`flex items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
                         active ? "ring-1 ring-primary" : ""
@@ -374,6 +454,11 @@ export default async function ShopPage({
                       <Link
                         href={h({
                           brand: active ? undefined : b,
+                          pickupConfig,
+                          bodyWood,
+                          condition,
+                          skillLevel,
+                          shippingSpeed,
                         })}
                         className={`text-sm ${
                           active
@@ -396,9 +481,14 @@ export default async function ShopPage({
             </h3>
             <ShopPriceRangeForm
               category={category}
-              size={size}
-              color={color}
+              type={type}
+              finish={finish}
               brand={brand}
+              pickupConfig={pickupConfig}
+              bodyWood={bodyWood}
+              condition={condition}
+              skillLevel={skillLevel}
+              shippingSpeed={shippingSpeed}
               sort={sort}
               search={searchQ}
               minPrice={minPrice}
@@ -406,9 +496,179 @@ export default async function ShopPage({
             />
           </section>
 
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Pickup config
+            </h3>
+            {facets.pickupConfigs.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Add pickup config metadata to variants to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.pickupConfigs.map((value) => {
+                  const active = pickupConfig === value;
+                  return (
+                    <li key={value}>
+                      <Link
+                        href={h({
+                          pickupConfig: active ? undefined : value,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {value}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Body wood
+            </h3>
+            {facets.bodyWoods.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Add body wood metadata to variants to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.bodyWoods.map((value) => {
+                  const active = bodyWood === value;
+                  return (
+                    <li key={value}>
+                      <Link
+                        href={h({
+                          bodyWood: active ? undefined : value,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {value}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Condition
+            </h3>
+            {facets.conditions.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Add condition metadata to variants to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.conditions.map((value) => {
+                  const active = condition === value;
+                  return (
+                    <li key={value}>
+                      <Link
+                        href={h({
+                          condition: active ? undefined : value,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {value}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Skill level
+            </h3>
+            {facets.skillLevels.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Add skill level metadata to variants to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.skillLevels.map((value) => {
+                  const active = skillLevel === value;
+                  return (
+                    <li key={value}>
+                      <Link
+                        href={h({
+                          skillLevel: active ? undefined : value,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {value}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
+              Shipping speed
+            </h3>
+            {facets.shippingSpeeds.length === 0 ? (
+              <p className="text-xs text-on-surface-variant">
+                Add shipping speed metadata to variants to filter here.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {facets.shippingSpeeds.map((value) => {
+                  const active = shippingSpeed === value;
+                  return (
+                    <li key={value}>
+                      <Link
+                        href={h({
+                          shippingSpeed: active ? undefined : value,
+                        })}
+                        className={`text-sm ${
+                          active
+                            ? "font-medium text-primary"
+                            : "text-on-surface-variant hover:text-primary"
+                        }`}
+                      >
+                        {value}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
           {(category ||
-            size ||
-            color ||
+            type ||
+            finish ||
+            pickupConfig ||
+            bodyWood ||
+            condition ||
+            skillLevel ||
+            shippingSpeed ||
             searchQ ||
             brand ||
             minPrice != null ||

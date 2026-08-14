@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { assertStorefrontLinesStock } from "@/lib/storefront-inventory-guard";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,16 @@ type VerifyStockBody = {
  * Server-side stock verification. Called by browser checkout before cart creation
  * because medusaAdminFetch requires MEDUSA_SECRET_API_KEY (server-only env).
  */
-export async function POST(req: Request): Promise<Response> {
+async function handlePOST(req: Request): Promise<Response> {
+  const ip = getRequestIp(req);
+  const rl = await rateLimitFixedWindow(`verify-stock:${ip}`, 30, 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, message: "Too many requests", code: "INVENTORY_CHECK_FAILED", retryAfter: rl.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
   let body: VerifyStockBody;
   try {
     body = (await req.json()) as VerifyStockBody;
@@ -49,3 +60,5 @@ export async function POST(req: Request): Promise<Response> {
   const result = await assertStorefrontLinesStock(lines);
   return NextResponse.json(result);
 }
+
+export const POST = withBotIdProtection(handlePOST);

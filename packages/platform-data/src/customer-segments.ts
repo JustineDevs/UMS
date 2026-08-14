@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type SegmentRuleType =
   | "spend_above"
@@ -20,6 +20,7 @@ export type Segment = {
   member_count: number;
   last_refreshed_at: string | null;
   created_at: string;
+  organization_id: string | null;
 };
 
 function rowToSegment(row: Record<string, unknown>): Segment {
@@ -34,16 +35,20 @@ function rowToSegment(row: Record<string, unknown>): Segment {
     last_refreshed_at:
       row.last_refreshed_at != null ? String(row.last_refreshed_at) : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
+    organization_id: row.organization_id != null ? String(row.organization_id) : null,
   };
 }
 
 export async function listSegments(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<Segment[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("customer_segments")
     .select("*")
     .order("name");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;
@@ -59,6 +64,7 @@ export async function createSegment(
     rule_type: SegmentRuleType;
     rule_config?: Record<string, unknown>;
     auto_refresh?: boolean;
+    organization_id: string;
   },
 ): Promise<Segment> {
   const { data, error } = await supabase
@@ -69,6 +75,7 @@ export async function createSegment(
       rule_type: input.rule_type,
       rule_config: input.rule_config ?? {},
       auto_refresh: input.auto_refresh ?? true,
+      organization_id: input.organization_id,
     })
     .select("*")
     .single();
@@ -79,6 +86,7 @@ export async function createSegment(
 export async function addSegmentMembers(
   supabase: SupabaseClient,
   segmentId: string,
+  organizationId: string,
   members: Array<{ customer_email: string; medusa_customer_id?: string }>,
 ): Promise<number> {
   if (members.length === 0) return 0;
@@ -89,13 +97,16 @@ export async function addSegmentMembers(
   }));
   const { error } = await supabase
     .from("customer_segment_members")
-    .upsert(rows, { onConflict: "segment_id,customer_email" });
+    .upsert(rows.map((row) => ({ ...row, organization_id: organizationId })), {
+      onConflict: "segment_id,customer_email",
+    });
   if (error) throw error;
 
   const { count } = await supabase
     .from("customer_segment_members")
     .select("*", { count: "exact", head: true })
-    .eq("segment_id", segmentId);
+    .eq("segment_id", segmentId)
+    .eq("organization_id", organizationId);
 
   await supabase
     .from("customer_segments")
@@ -103,7 +114,8 @@ export async function addSegmentMembers(
       member_count: count ?? members.length,
       last_refreshed_at: new Date().toISOString(),
     })
-    .eq("id", segmentId);
+    .eq("id", segmentId)
+    .eq("organization_id", organizationId);
 
   return count ?? members.length;
 }
@@ -111,11 +123,14 @@ export async function addSegmentMembers(
 export async function getSegmentMembers(
   supabase: SupabaseClient,
   segmentId: string,
+  organizationId?: string,
 ): Promise<Array<{ customer_email: string; medusa_customer_id: string | null }>> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("customer_segment_members")
     .select("customer_email, medusa_customer_id")
     .eq("segment_id", segmentId);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((r) => ({
     customer_email: String(r.customer_email),

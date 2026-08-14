@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { readAdminPreferences } from "@apparel-commerce/user-preferences";
+import { readAdminPreferences } from "@universal-music-store/user-preferences";
 
-/**
- * Applies saved admin UI preferences to the document root (density, motion).
- */
+/** Applies the saved admin spacing preference to the document root. */
 export function AdminPreferenceSync() {
   useEffect(() => {
     const apply = () => {

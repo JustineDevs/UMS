@@ -1,12 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 import type {
   CmsFooterColumn,
   CmsNavFeatured,
   CmsNavLink,
   CmsNavigationPayload,
   CmsSocialLink,
-} from "./cms-types";
+} from "./cms-types.js";
 
 const DEFAULT_ID = "default";
 
@@ -148,12 +148,14 @@ function rowToPayload(
 /** Public storefront: schedule windows applied. */
 export async function getCmsNavigationPayload(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<CmsNavigationPayload> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_navigation")
     .select("header_links, header_links_mobile, footer_columns, footer_bottom_links, social_links")
-    .eq("id", DEFAULT_ID)
-    .maybeSingle();
+    .eq("id", DEFAULT_ID);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) {
       return emptyPayload();
@@ -168,12 +170,14 @@ export async function getCmsNavigationPayload(
 /** Admin + publish: raw links without schedule filtering. */
 export async function getCmsNavigationPayloadAdmin(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<CmsNavigationPayload> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_navigation")
     .select("header_links, header_links_mobile, footer_columns, footer_bottom_links, social_links")
-    .eq("id", DEFAULT_ID)
-    .maybeSingle();
+    .eq("id", DEFAULT_ID);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) {
       return emptyPayload();
@@ -195,12 +199,14 @@ export type CmsNavigationDraftPayload = Partial<CmsNavigationPayload> & {
 
 export async function getCmsNavigationDraftPayload(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<CmsNavigationDraftPayload | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_navigation_draft")
     .select("payload")
-    .eq("id", DEFAULT_ID)
-    .maybeSingle();
+    .eq("id", DEFAULT_ID);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-navigation] getCmsNavigationDraftPayload", error.message);
@@ -236,31 +242,33 @@ export function mergeNavigationDraftOverLive(
 export async function upsertCmsNavigationDraftPayload(
   supabase: SupabaseClient,
   payload: CmsNavigationDraftPayload,
+  organizationId?: string,
 ): Promise<void> {
   const { error } = await supabase.from("cms_navigation_draft").upsert(
     {
       id: DEFAULT_ID,
       payload: payload as unknown as Record<string, unknown>,
       updated_at: new Date().toISOString(),
+      organization_id: organizationId ?? null,
     },
-    { onConflict: "id" },
+    { onConflict: "organization_id,id" },
   );
   if (error) throw new Error(error.message);
 }
 
-export async function publishCmsNavigationDraft(supabase: SupabaseClient): Promise<CmsNavigationPayload> {
-  const draft = await getCmsNavigationDraftPayload(supabase);
+export async function publishCmsNavigationDraft(supabase: SupabaseClient, organizationId?: string): Promise<CmsNavigationPayload> {
+  const draft = await getCmsNavigationDraftPayload(supabase, organizationId);
   if (!draft || Object.keys(draft).length === 0) {
-    return getCmsNavigationPayloadAdmin(supabase);
+    return getCmsNavigationPayloadAdmin(supabase, organizationId);
   }
-  const live = await getCmsNavigationPayloadAdmin(supabase);
+  const live = await getCmsNavigationPayloadAdmin(supabase, organizationId);
   const merged = mergeNavigationDraftOverLive(live, draft);
-  await upsertCmsNavigationPayload(supabase, merged);
+  await upsertCmsNavigationPayload(supabase, merged, organizationId);
   await supabase
     .from("cms_navigation_draft")
     .upsert(
-      { id: DEFAULT_ID, payload: {}, updated_at: new Date().toISOString() },
-      { onConflict: "id" },
+      { id: DEFAULT_ID, payload: {}, updated_at: new Date().toISOString(), organization_id: organizationId ?? null },
+      { onConflict: "organization_id,id" },
     );
   return merged;
 }
@@ -282,6 +290,7 @@ function serializeNavLink(l: CmsNavLink): Record<string, unknown> {
 export async function upsertCmsNavigationPayload(
   supabase: SupabaseClient,
   payload: CmsNavigationPayload,
+  organizationId?: string,
 ): Promise<void> {
   const { error } = await supabase.from("cms_navigation").upsert(
     {
@@ -304,8 +313,9 @@ export async function upsertCmsNavigationPayload(
       >[],
       social_links: payload.socialLinks as unknown as Record<string, unknown>[],
       updated_at: new Date().toISOString(),
+      organization_id: organizationId ?? null,
     },
-    { onConflict: "id" },
+    { onConflict: "organization_id,id" },
   );
   if (error) throw new Error(error.message);
 }

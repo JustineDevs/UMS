@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 import {
   AuthSplitShell,
   Card,
@@ -10,7 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import { AdminGoogleSignInButton } from "@/components/AdminGoogleSignInButton";
 import { authOptions } from "@/lib/auth";
 

@@ -10,14 +10,18 @@ export {
   availableQuantityFromVariantRaw,
 } from "@/lib/inventory-quantity-utils";
 
-async function getFirstStockLocationId(): Promise<string | null> {
+async function getStockLocationId(requested?: string): Promise<string | null> {
   try {
     const res = await medusaAdminFetch("/admin/stock-locations?limit=5");
     if (!res.ok) return null;
     const json = (await res.json()) as {
       stock_locations?: Array<{ id?: string }>;
     };
-    const id = json.stock_locations?.[0]?.id;
+    const locations = json.stock_locations ?? [];
+    const match = requested
+      ? locations.find((location) => String(location.id ?? "") === requested)
+      : locations[0];
+    const id = match?.id;
     return id ? String(id) : null;
   } catch {
     return null;
@@ -304,10 +308,26 @@ export async function fetchVariantAvailableQuantity(
  */
 export async function fetchVariantStockedQuantity(
   variantId: string,
+  locationId?: string,
 ): Promise<number | null> {
   const v = await fetchProductVariantInventoryRaw(variantId);
   if (!v) return null;
-  return stockedQuantityFromVariantRaw(v);
+  if (!locationId) return stockedQuantityFromVariantRaw(v);
+  let stocked = 0;
+  const inventoryItems = v.inventory_items as unknown[] | undefined;
+  for (const item of inventoryItems ?? []) {
+    const inventory = (item as Record<string, unknown>).inventory as
+      | Record<string, unknown>
+      | undefined;
+    const levels = inventory?.location_levels as unknown[] | undefined;
+    for (const level of levels ?? []) {
+      const row = level as Record<string, unknown>;
+      if (String(row.location_id ?? row.stock_location_id ?? "") === locationId) {
+        stocked += Number(row.stocked_quantity ?? 0);
+      }
+    }
+  }
+  return stocked;
 }
 
 /**
@@ -317,8 +337,9 @@ export async function applyVariantStockedQuantity(params: {
   productId: string;
   variantId: string;
   stockedQuantity: number;
+  locationId?: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const locationId = await getFirstStockLocationId();
+  const locationId = await getStockLocationId(params.locationId);
   if (!locationId) {
     return {
       ok: false,

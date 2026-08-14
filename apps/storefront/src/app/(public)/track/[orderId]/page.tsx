@@ -1,25 +1,21 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { verifyTrackingToken } from "@apparel-commerce/sdk";
+import { sanitizeTrustedPublicUrl, verifyTrackingToken } from "@universal-music-store/sdk";
 import {
   fetchMedusaTrackByCartId,
   fetchMedusaTrackByOrderId,
+  type TrackPayload,
 } from "@/lib/medusa-track-fetch";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-
-type TrackPayload = {
-  order: Record<string, unknown> & {
-    id?: string;
-    order_number?: string;
-    status?: string;
-  };
-  shipments: Array<{
-    id: string;
-    tracking_number?: string;
-    status?: string;
-    carrier_slug?: string;
-  }>;
-};
+export const metadata: Metadata = buildPageMetadata({
+  title: "Track order",
+  description: "View the latest public shipment updates for a specific order.",
+  path: "/track",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 async function fetchPublicTrack(orderId: string): Promise<{
   ok: boolean;
@@ -209,13 +205,39 @@ export default async function TrackPage({
                 key={s.id}
                 className="border-b border-surface-container-high pb-6 last:border-0 last:pb-0"
               >
-                <p className="font-medium text-primary">
-                  {s.tracking_number ?? "Awaiting tracking"}
-                </p>
+                {s.tracking_number ? (
+                  sanitizeTrustedPublicUrl(s.tracking_url) ? (
+                    <a
+                      href={sanitizeTrustedPublicUrl(s.tracking_url) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary underline hover:opacity-80"
+                    >
+                      {s.tracking_number}
+                    </a>
+                  ) : (
+                    <p className="font-medium text-primary">{s.tracking_number}</p>
+                  )
+                ) : (
+                  <p className="font-medium text-on-surface-variant">Awaiting tracking</p>
+                )}
                 <p className="text-sm text-on-surface-variant mt-1">
-                  {s.carrier_slug ?? "Carrier"} ·{" "}
+                  {s.carrier_slug ? s.carrier_slug.replace(/-/g, " ").toUpperCase() : "Carrier"} ·{" "}
                   {s.status?.replace(/_/g, " ") ?? "Pending"}
                 </p>
+                {s.expected_delivery && (
+                  <p className="text-xs text-on-surface-variant mt-1">
+                    Estimated delivery:{" "}
+                    <time dateTime={s.expected_delivery} className="font-medium text-primary">
+                      {new Date(s.expected_delivery).toLocaleDateString("en-PH", {
+                        weekday: "short",
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </time>
+                  </p>
+                )}
               </div>
             ))}
           </div>

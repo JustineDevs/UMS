@@ -47,8 +47,7 @@ if (storagePath && existsSync(storagePath)) {
 const ALL_STRESS_PROVIDERS: PaymentProvider[] = [
   "stripe",
   "paypal",
-  "paymongo",
-  "maya",
+  "xendit",
   "cod",
 ];
 
@@ -99,8 +98,6 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
         attachFullBrowserRuntimeLog(page, testInfo);
 
         try {
-          let pickedSlug = "";
-
           await test.step("catalog: in-stock PDP and add to bag", async () => {
             const picked = await navigateToShopAndAddPreferredCatalogProduct(page, {
               maxCandidates: 10,
@@ -117,7 +114,6 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
               test.skip(true, "No catalog product could be added (auth or stock)");
               return;
             }
-            pickedSlug = picked.slug;
             expect(picked.slug.length).toBeGreaterThan(0);
           });
 
@@ -161,7 +157,7 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
               } else {
                 await expect(
                   page
-                    .getByText(/paymongo|maya|payment|processing|confirm/i)
+                    .getByText(/xendit|payment|processing|confirm/i)
                     .first()
                     .or(page.locator("[data-testid='order-confirmation']")),
                 ).toBeVisible({ timeout: 45_000 });

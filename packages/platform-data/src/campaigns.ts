@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type CampaignType =
   | "winback"
@@ -20,6 +20,7 @@ export type Campaign = {
   last_run_at: string | null;
   schedule_cron: string | null;
   created_at: string;
+  organization_id: string | null;
 };
 
 function rowToCampaign(row: Record<string, unknown>): Campaign {
@@ -36,12 +37,13 @@ function rowToCampaign(row: Record<string, unknown>): Campaign {
     schedule_cron:
       row.schedule_cron != null ? String(row.schedule_cron) : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
+    organization_id: row.organization_id != null ? String(row.organization_id) : null,
   };
 }
 
 export async function listCampaigns(
   supabase: SupabaseClient,
-  opts?: { type?: CampaignType },
+  opts?: { type?: CampaignType; organizationId?: string },
 ): Promise<Campaign[]> {
   let q = supabase
     .from("campaigns")
@@ -50,6 +52,7 @@ export async function listCampaigns(
   if (opts?.type) {
     q = q.eq("type", opts.type);
   }
+  if (opts?.organizationId) q = q.eq("organization_id", opts.organizationId);
   const { data, error } = await q;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
@@ -67,6 +70,7 @@ export async function createCampaign(
     subject?: string;
     body_template?: string;
     schedule_cron?: string;
+    organization_id: string;
   },
 ): Promise<Campaign> {
   const { data, error } = await supabase
@@ -79,6 +83,7 @@ export async function createCampaign(
       body_template: input.body_template ?? null,
       channel: "email",
       schedule_cron: input.schedule_cron ?? null,
+      organization_id: input.organization_id,
     })
     .select("*")
     .single();
@@ -89,19 +94,21 @@ export async function createCampaign(
 export async function updateCampaign(
   supabase: SupabaseClient,
   id: string,
+  organizationId: string,
   patch: Partial<{
     name: string;
-    subject: string;
-    body_template: string;
+    subject: string | null;
+    body_template: string | null;
     is_active: boolean;
-    schedule_cron: string;
-    segment_id: string;
+    schedule_cron: string | null;
+    segment_id: string | null;
   }>,
 ): Promise<Campaign> {
   const { data, error } = await supabase
     .from("campaigns")
     .update(patch)
     .eq("id", id)
+    .eq("organization_id", organizationId)
     .select("*")
     .single();
   if (error) throw error;
@@ -137,12 +144,14 @@ export async function recordCampaignMessage(
 export async function executeCampaign(
   supabase: SupabaseClient,
   campaignId: string,
+  organizationId: string,
   sendEmail: (to: string, subject: string, html: string) => Promise<void>,
 ): Promise<number> {
   const { data: campaign, error: campErr } = await supabase
     .from("campaigns")
     .select("*")
     .eq("id", campaignId)
+    .eq("organization_id", organizationId)
     .single();
   if (campErr) throw campErr;
   if (!campaign.segment_id) throw new Error("Campaign has no segment");
@@ -150,20 +159,44 @@ export async function executeCampaign(
   const { data: members, error: memErr } = await supabase
     .from("customer_segment_members")
     .select("customer_email")
-    .eq("segment_id", campaign.segment_id);
+    .eq("segment_id", campaign.segment_id)
+    .eq("organization_id", organizationId);
   if (memErr) throw memErr;
+
+  const { data: preferences, error: preferenceErr } = await supabase
+    .from("marketing_preferences")
+    .select("email, consent_status")
+    .eq("organization_id", organizationId)
+    .eq("channel", "email");
+  if (preferenceErr && !isMissingTableOrSchemaError(preferenceErr)) throw preferenceErr;
+  const subscribed = new Set(
+    (preferences ?? [])
+      .filter((row) => row.consent_status === "subscribed")
+      .map((row) => String(row.email).trim().toLowerCase()),
+  );
+  const { data: sentMessages, error: sentErr } = await supabase
+    .from("campaign_messages")
+    .select("recipient_email")
+    .eq("campaign_id", campaignId)
+    .eq("status", "sent");
+  if (sentErr && !isMissingTableOrSchemaError(sentErr)) throw sentErr;
+  const alreadySent = new Set(
+    (sentMessages ?? []).map((row) => String(row.recipient_email).trim().toLowerCase()),
+  );
 
   let sent = 0;
   for (const member of members ?? []) {
+    const recipient = String(member.customer_email).trim().toLowerCase();
+    if (!recipient || !subscribed.has(recipient) || alreadySent.has(recipient)) continue;
     try {
       await sendEmail(
-        String(member.customer_email),
+        recipient,
         String(campaign.subject ?? campaign.name),
         String(campaign.body_template ?? ""),
       );
       await recordCampaignMessage(supabase, {
         campaign_id: campaignId,
-        recipient_email: String(member.customer_email),
+        recipient_email: recipient,
         status: "sent",
       });
       sent++;
@@ -179,7 +212,8 @@ export async function executeCampaign(
   await supabase
     .from("campaigns")
     .update({ last_run_at: new Date().toISOString() })
-    .eq("id", campaignId);
+    .eq("id", campaignId)
+    .eq("organization_id", organizationId);
 
   return sent;
 }

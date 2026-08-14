@@ -3,8 +3,8 @@ import {
   createSupabaseClient,
   exportDataSubjectByEmail,
   anonymizeStaleOrderAddresses,
-} from "@apparel-commerce/database";
-import { complianceEmailParamSchema } from "@apparel-commerce/validation";
+} from "@universal-music-store/database";
+import { complianceEmailParamSchema } from "@universal-music-store/validation";
 
 import {
   deleteMedusaCustomerByEmail,

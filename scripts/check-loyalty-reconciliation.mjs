@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 try {
-  const envPath = join(__dirname, "..", ".env");
+  const envPath = join(__dirname, "..", ".env.local");
   const lines = readFileSync(envPath, "utf-8").split("\n");
   for (const line of lines) {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -31,13 +31,17 @@ try {
       process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
     }
   }
-} catch { /* .env not present */ }
+} catch {
+  /* .env.local not present */
+}
 
 const url = process.env.SUPABASE_URL?.trim();
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 if (!url || !key) {
-  console.log("[loyalty-recon] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Skipping check.");
+  console.log(
+    "[loyalty-recon] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Skipping check.",
+  );
   process.exit(0);
 }
 
@@ -54,7 +58,9 @@ if (acctErr) {
 }
 
 if (!accounts || accounts.length === 0) {
-  console.log("[loyalty-recon] No loyalty accounts found. Skipping reconciliation.");
+  console.log(
+    "[loyalty-recon] No loyalty accounts found. Skipping reconciliation.",
+  );
   process.exit(0);
 }
 
@@ -64,7 +70,10 @@ const { data: txns, error: txnErr } = await sb
   .limit(100000);
 
 if (txnErr) {
-  console.error("[loyalty-recon] Failed to fetch transactions:", txnErr.message);
+  console.error(
+    "[loyalty-recon] Failed to fetch transactions:",
+    txnErr.message,
+  );
   process.exit(1);
 }
 
@@ -81,16 +90,20 @@ for (const acct of accounts) {
   if (computed !== stored) {
     console.error(
       `[loyalty-recon] DRIFT account=${acct.id} email=${acct.customer_email} ` +
-      `stored=${stored} computed=${computed} diff=${stored - computed}`
+        `stored=${stored} computed=${computed} diff=${stored - computed}`,
     );
     driftCount++;
   }
 }
 
 if (driftCount === 0) {
-  console.log(`[loyalty-recon] OK: ${accounts.length} accounts, all balances match transaction ledger.`);
+  console.log(
+    `[loyalty-recon] OK: ${accounts.length} accounts, all balances match transaction ledger.`,
+  );
   process.exit(0);
 } else {
-  console.error(`[loyalty-recon] FAIL: ${driftCount} accounts have diverged balances.`);
+  console.error(
+    `[loyalty-recon] FAIL: ${driftCount} accounts have diverged balances.`,
+  );
   process.exit(1);
 }

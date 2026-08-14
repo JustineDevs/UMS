@@ -13,22 +13,26 @@ LLM context and indexed project/docs. Read everything under `.cursor/llm/`.
 - `README.md` – LLM context overview (if present)
 
 ### `.cursor/llm/*` (all files)
-- `AfterShip-Tracking-API-AfterShip-Docs-*.txt`
-- Any other `.txt` files in this directory
+- Any `.txt` files in this directory
 
 ---
 
-## 2. `internal/docs` (all files and directories)
+## 2. `docs/` (all files and directories)
 
-Internal spec, blueprint, and implementation docs. Read everything under `internal/docs/`.
+Canonical spec, blueprint, and runbook docs. Read everything under `docs/`.
 
-### `internal/docs/`
-- `spec.md` – Apparel Commerce Platform specification
-- `blueprint.md` – Sprint plan and technical blueprint
+### `docs/`
+- `spec.md` – Universal Music Store Platform specification
 - `privacy-terms.md` – PRD, service agreement, GDPR/PDPA compliance
+- `validation-truth-matrix.md` – Verification commands and audit surface
+
+### `docs/runbooks/`
+- `GUIDE.md` – Deployment and operational runbook
+- `VERCEL.md` – Vercel-specific deployment notes
+- `PAYMENT-INTEGRATION.md` – Payment provider setup
 
 ---
 
 ## Rule
 
-For any request that needs documentation or context: **strictly read from `.cursor/llm` and `internal/docs`** (all files and directories listed above). Do not treat other `docs/` or `docs/*` paths as authoritative unless they are linked from or duplicated under these two roots. When in doubt, prefer `internal/docs/spec.md` and `internal/docs/blueprint.md` as entry points.
+For any request that needs documentation or context: **strictly read from `.cursor/llm` and `docs/`** (all files and directories listed above). When in doubt, prefer `docs/spec.md` as the primary entry point.

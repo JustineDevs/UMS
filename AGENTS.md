@@ -1,3 +1,14 @@
+<!-- intent-skills:start -->
+## Skill Loading
+
+Before editing files for a substantial task:
+- Run `pnpm dlx @tanstack/intent@latest list` from the workspace root to see available local skills.
+- If a listed skill matches the task, run `pnpm dlx @tanstack/intent@latest load <package>#<skill>` before changing files.
+- Use the loaded `SKILL.md` guidance while making the change.
+- Monorepos: when working across packages, run the skill check from the workspace root and prefer the local skill for the package being changed.
+- Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
+<!-- intent-skills:end -->
+
 <!-- VERCEL BEST PRACTICES START -->
 ## Best practices for developing on Vercel
 
@@ -23,13 +34,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
 
-<!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan:
-`specs/001-fix-stubs-wiring/plan.md`
-<!-- SPECKIT END -->
-
 <!-- CONTINUAL LEARNING -->
 - Sprint and `/sprint` backlog: Treat the user's listed sprint items as mandatory commitments—they stay under Committed unless Blocked by a concrete, named external blocker; do not downgrade to optional/stretch, silently drop items, narrow acceptance criteria, or replace implementation work with docs or placeholders without explicit Product Owner approval.
 - Payments: The codebase standardizes on Stripe plus PayPal; Lemon Squeezy was removed across Medusa, storefront, admin, and BYOK—do not re-add MoR PSP integration unless product direction explicitly changes again.
-- TypeScript workspace resolution: `@apparel-commerce/api` needs a direct `@apparel-commerce/platform-data` workspace dependency whenever the SDK (or transitive imports) pull that package—pnpm + `tsc` will fail otherwise.
+- TypeScript workspace resolution: `@universal-music-store/api` needs a direct `@universal-music-store/platform-data` workspace dependency whenever the SDK (or transitive imports) pull that package—pnpm + `tsc` will fail otherwise.

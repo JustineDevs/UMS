@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type DeviceType = "terminal" | "printer" | "kds" | "scanner";
 
@@ -69,46 +69,52 @@ export async function updateDevice(
     config?: Record<string, unknown>;
     is_active?: boolean;
   },
+  organizationId?: string,
 ): Promise<PosDevice> {
   const updateRow: Record<string, unknown> = {};
   if (patch.ip_address !== undefined) updateRow.ip_address = patch.ip_address;
   if (patch.is_active !== undefined) updateRow.is_active = patch.is_active;
   if (patch.config !== undefined) {
-    const { data: row, error: fetchErr } = await supabase
+    let query = supabase
       .from("pos_devices")
       .select("config")
       .eq("id", id)
-      .single();
+    if (organizationId) query = query.eq("organization_id", organizationId);
+    const { data: row, error: fetchErr } = await query.single();
     if (fetchErr) throw fetchErr;
     const prev = (row?.config as Record<string, unknown>) ?? {};
     updateRow.config = mergeDeviceConfig(prev, patch.config);
   }
   if (Object.keys(updateRow).length === 0) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("pos_devices")
       .select("*")
       .eq("id", id)
-      .single();
+    if (organizationId) query = query.eq("organization_id", organizationId);
+    const { data, error } = await query.single();
     if (error) throw error;
     return rowToDevice(data as Record<string, unknown>);
   }
-  const { data, error } = await supabase
+  let query = supabase
     .from("pos_devices")
     .update(updateRow)
-    .eq("id", id)
-    .select("*")
-    .single();
+    .eq("id", id);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.select("*").single();
   if (error) throw error;
   return rowToDevice(data as Record<string, unknown>);
 }
 
 export async function listDevices(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<PosDevice[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("pos_devices")
     .select("*")
     .order("name");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;
@@ -123,21 +129,36 @@ export async function upsertDevice(
     type?: DeviceType;
     ip_address?: string;
     config?: Record<string, unknown>;
+    organization_id?: string;
   },
 ): Promise<PosDevice> {
+  if (input.organization_id) {
+    const { data: existing, error: lookupError } = await supabase
+      .from("pos_devices")
+      .select("id")
+      .eq("name", input.name)
+      .eq("organization_id", input.organization_id)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    if (existing?.id) {
+      return updateDevice(supabase, String(existing.id), {
+        ip_address: input.ip_address ?? null,
+        config: input.config,
+        is_active: true,
+      }, input.organization_id);
+    }
+  }
   const { data, error } = await supabase
     .from("pos_devices")
-    .upsert(
-      {
+    .insert({
         name: input.name,
         type: input.type ?? "terminal",
         ip_address: input.ip_address ?? null,
         config: input.config ?? {},
+        organization_id: input.organization_id ?? null,
         last_seen_at: new Date().toISOString(),
         is_active: true,
-      },
-      { onConflict: "name" },
-    )
+      })
     .select("*")
     .single();
   if (error) throw error;

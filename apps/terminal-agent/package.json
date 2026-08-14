@@ -1,5 +1,5 @@
 {
-  "name": "@apparel-commerce/terminal-agent",
+  "name": "@universal-music-store/terminal-agent",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -9,11 +9,12 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@apparel-commerce/printer-core": "workspace:*",
+    "@node-escpos/network-adapter": "0.0.1",
+    "@universal-music-store/printer-core": "workspace:*",
     "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
-    "@apparel-commerce/config-typescript": "workspace:*",
+    "@universal-music-store/config-typescript": "workspace:*",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"

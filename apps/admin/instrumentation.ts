@@ -7,7 +7,7 @@ export async function register() {
     process.env.NEXTAUTH_URL = adminNextAuthUrl;
   }
   const { assertAdminMedusaEnvProduction } = await import(
-    "@apparel-commerce/sdk"
+    "@universal-music-store/sdk"
   );
   assertAdminMedusaEnvProduction();
 

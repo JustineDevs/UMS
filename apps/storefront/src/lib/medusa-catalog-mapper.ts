@@ -4,8 +4,10 @@ import type {
   ProductImage,
   ProductImageHotspot,
   ProductVariant,
-} from "@apparel-commerce/types";
+} from "@universal-music-store/types";
 
+import { medusaMinorToMajor } from "./medusa-money";
+import { isKnownUnavailableExternalImage } from "./image-helpers";
 import { urlLooksLikeRasterImage } from "./product-media";
 
 type MedusaOptionRow = {
@@ -22,6 +24,7 @@ type MedusaVariantRaw = {
   inventory_quantity?: number | null;
   calculated_price?: {
     calculated_amount?: number | null;
+    original_amount?: number | null;
     currency_code?: string | null;
   } | null;
   options?: MedusaOptionRow[] | null;
@@ -131,6 +134,17 @@ function brandFromMetadata(meta: Record<string, unknown> | null | undefined): st
   return strMeta(meta, "brand") ?? strMeta(meta, "brand_name") ?? strMeta(meta, "legacy_brand");
 }
 
+function metaValueByKeys(
+  meta: Record<string, unknown> | null | undefined,
+  keys: string[],
+): string | null {
+  for (const key of keys) {
+    const value = strMeta(meta, key);
+    if (value) return value;
+  }
+  return null;
+}
+
 function parseGalleryVideoUrls(meta: Record<string, unknown> | null | undefined): string[] {
   const raw = meta?.gallery_video_urls;
   if (Array.isArray(raw)) {
@@ -180,40 +194,110 @@ function buildGallerySlides(
   return slides;
 }
 
-function optionRowsToSizeColor(rows: MedusaOptionRow[] | null | undefined): {
-  size: string;
-  color: string;
+function optionRowsToTypeFinish(rows: MedusaOptionRow[] | null | undefined): {
+  type: string;
+  finish: string;
 } {
-  let size = "";
-  let color = "";
+  let type = "";
+  let finish = "";
   for (const row of rows ?? []) {
     const title = (row.option?.title ?? "").toLowerCase();
     const val = String(row.value ?? "").trim();
     if (!val) continue;
-    if (title.includes("size") || title === "sizes") {
-      size = val;
-    } else if (title.includes("color") || title.includes("colour")) {
-      color = val;
+    if (title.includes("type") || title.includes("model")) {
+      type = val;
+    } else if (title.includes("finish") || title.includes("color") || title.includes("colour")) {
+      finish = val;
     }
   }
-  if (!size && !color && rows?.length === 1) {
-    size = String(rows[0]?.value ?? "").trim();
+  if (!type && !finish && rows?.length === 1) {
+    type = String(rows[0]?.value ?? "").trim();
   }
-  return { size, color };
+  return { type, finish };
 }
 
-function variantPricePhp(v: MedusaVariantRaw): number {
+type InstrumentVariantAttributes = {
+  pickupConfig: string;
+  bodyWood: string;
+  condition: string;
+  skillLevel: string;
+  shippingSpeed: string;
+};
+
+function optionRowsToInstrumentAttributes(
+  rows: MedusaOptionRow[] | null | undefined,
+  meta: Record<string, unknown> | null | undefined,
+): InstrumentVariantAttributes {
+  const out: InstrumentVariantAttributes = {
+    pickupConfig: "",
+    bodyWood: "",
+    condition: "",
+    skillLevel: "",
+    shippingSpeed: "",
+  };
+  for (const row of rows ?? []) {
+    const title = (row.option?.title ?? "").toLowerCase();
+    const val = String(row.value ?? "").trim();
+    if (!val) continue;
+    if (title.includes("pickup")) {
+      out.pickupConfig = val;
+    } else if (title.includes("body") && title.includes("wood")) {
+      out.bodyWood = val;
+    } else if (title.includes("condition")) {
+      out.condition = val;
+    } else if (title.includes("skill")) {
+      out.skillLevel = val;
+    } else if (title.includes("shipping") || title.includes("delivery")) {
+      out.shippingSpeed = val;
+    }
+  }
+  out.pickupConfig =
+    out.pickupConfig ||
+    metaValueByKeys(meta, ["pickup_config", "pickupConfig", "pickup"]) ||
+    "";
+  out.bodyWood =
+    out.bodyWood ||
+    metaValueByKeys(meta, ["body_wood", "bodyWood", "wood"]) ||
+    "";
+  out.condition =
+    out.condition ||
+    metaValueByKeys(meta, ["condition", "item_condition", "product_condition"]) ||
+    "";
+  out.skillLevel =
+    out.skillLevel ||
+    metaValueByKeys(meta, ["skill_level", "skillLevel", "playing_level"]) ||
+    "";
+  out.shippingSpeed =
+    out.shippingSpeed ||
+    metaValueByKeys(meta, ["shipping_speed", "shippingSpeed", "delivery_speed"]) ||
+    "";
+  return out;
+}
+
+function variantPriceMajor(v: MedusaVariantRaw): number {
   const amt = v.calculated_price?.calculated_amount;
   if (typeof amt !== "number" || !Number.isFinite(amt)) {
     return 0;
   }
-  return Math.round((amt / 100) * 100) / 100;
+  const currency = v.calculated_price?.currency_code ?? "PHP";
+  return medusaMinorToMajor(amt, currency);
+}
+
+function variantCompareAtPriceMajor(v: MedusaVariantRaw): number | null {
+  const orig = v.calculated_price?.original_amount;
+  const calc = v.calculated_price?.calculated_amount;
+  if (typeof orig !== "number" || !Number.isFinite(orig)) return null;
+  if (typeof calc === "number" && Number.isFinite(calc) && orig <= calc) return null;
+  const currency = v.calculated_price?.currency_code ?? "PHP";
+  return medusaMinorToMajor(orig, currency);
 }
 
 /** Store API: unlimited when `manage_inventory === false`; else need `inventory_quantity > 0`. */
 export function medusaVariantRawIsSellable(v: MedusaVariantRaw): boolean {
   if (v.manage_inventory === false) return true;
   const q = v.inventory_quantity;
+  if (q === undefined) return true;
+  if (q === null) return true;
   if (typeof q === "number" && Number.isFinite(q)) return q > 0;
   if (v.manage_inventory === true) return false;
   return true;
@@ -228,7 +312,7 @@ export function medusaProductRawHasSellableVariant(raw: {
   );
 }
 
-export function productWithSellableVariantsOnly(p: Product): Product | null {
+function productWithSellableVariantsOnly(p: Product): Product | null {
   const variants = p.variants.filter((x) => x.isActive);
   if (variants.length === 0) return null;
   if (variants.length === p.variants.length) return p;
@@ -241,7 +325,7 @@ export function catalogProductFromMedusaRaw(raw: MedusaProductRaw): Product | nu
   return productWithSellableVariantsOnly(p);
 }
 
-export function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
+function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
   const id = raw.id ?? "unknown";
   const images: ProductImage[] = (raw.images ?? [])
     .filter(Boolean)
@@ -250,21 +334,25 @@ export function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
       productId: id,
       imageUrl: img?.url ?? raw.thumbnail ?? "",
       sortOrder: i,
-    }));
+    }))
+    .filter((img) => !isKnownUnavailableExternalImage(img.imageUrl));
 
   if (images.length === 0 && raw.thumbnail) {
-    images.push({
-      id: `${id}-thumb`,
-      productId: id,
-      imageUrl: raw.thumbnail,
-      sortOrder: 0,
-    });
+    if (!isKnownUnavailableExternalImage(raw.thumbnail)) {
+      images.push({
+        id: `${id}-thumb`,
+        productId: id,
+        imageUrl: raw.thumbnail,
+        sortOrder: 0,
+      });
+    }
   }
 
   const variants: ProductVariant[] = (raw.variants ?? [])
     .filter((v): v is MedusaVariantRaw => Boolean(v?.id))
     .map((v) => {
-      const { size, color } = optionRowsToSizeColor(v.options ?? []);
+      const { type, finish } = optionRowsToTypeFinish(v.options ?? []);
+      const attrs = optionRowsToInstrumentAttributes(v.options ?? [], raw.metadata ?? null);
       const bc =
         typeof v.barcode === "string" && v.barcode.trim() ? v.barcode.trim() : null;
       const iq = v.inventory_quantity;
@@ -277,10 +365,15 @@ export function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
         productId: id,
         sku: v.sku ?? (v.id as string),
         barcode: bc,
-        size,
-        color,
-        price: variantPricePhp(v),
-        compareAtPrice: null,
+        type,
+        finish,
+        pickupConfig: attrs.pickupConfig,
+        bodyWood: attrs.bodyWood,
+        condition: attrs.condition,
+        skillLevel: attrs.skillLevel,
+        shippingSpeed: attrs.shippingSpeed,
+        price: variantPriceMajor(v),
+        compareAtPrice: variantCompareAtPriceMajor(v),
         cost: null,
         manageInventory,
         inventoryQuantity,
@@ -340,16 +433,57 @@ export function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
 
 export function productMatchesVariantFilters(
   p: Product,
-  size: string | undefined,
-  color: string | undefined,
+  filters: {
+    type?: string;
+    finish?: string;
+    pickupConfig?: string;
+    bodyWood?: string;
+    condition?: string;
+    skillLevel?: string;
+    shippingSpeed?: string;
+  },
 ): boolean {
-  if (size?.trim()) {
-    const want = size.trim();
-    if (!p.variants.some((v) => v.size === want)) return false;
+  if (filters.type?.trim()) {
+    const want = filters.type.trim();
+    if (!p.variants.some((v) => v.type === want)) return false;
   }
-  if (color?.trim()) {
-    const want = color.trim();
-    if (!p.variants.some((v) => v.color === want)) return false;
+  if (filters.finish?.trim()) {
+    const want = filters.finish.trim();
+    if (!p.variants.some((v) => v.finish === want)) return false;
+  }
+  if (filters.pickupConfig?.trim()) {
+    const want = filters.pickupConfig.trim().toLowerCase();
+    if (
+      !p.variants.some((v) => v.pickupConfig.trim().toLowerCase() === want)
+    ) {
+      return false;
+    }
+  }
+  if (filters.bodyWood?.trim()) {
+    const want = filters.bodyWood.trim().toLowerCase();
+    if (!p.variants.some((v) => v.bodyWood.trim().toLowerCase() === want)) {
+      return false;
+    }
+  }
+  if (filters.condition?.trim()) {
+    const want = filters.condition.trim().toLowerCase();
+    if (!p.variants.some((v) => v.condition.trim().toLowerCase() === want)) {
+      return false;
+    }
+  }
+  if (filters.skillLevel?.trim()) {
+    const want = filters.skillLevel.trim().toLowerCase();
+    if (!p.variants.some((v) => v.skillLevel.trim().toLowerCase() === want)) {
+      return false;
+    }
+  }
+  if (filters.shippingSpeed?.trim()) {
+    const want = filters.shippingSpeed.trim().toLowerCase();
+    if (
+      !p.variants.some((v) => v.shippingSpeed.trim().toLowerCase() === want)
+    ) {
+      return false;
+    }
   }
   return true;
 }

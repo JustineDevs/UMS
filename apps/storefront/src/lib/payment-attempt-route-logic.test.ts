@@ -6,6 +6,7 @@ import {
   finalizeCheckoutIntentRouteLogic,
   finalizePaymentAttemptsCronRouteLogic,
   internalReconcilePaymentAttemptRouteLogic,
+  reconcileCheckoutIntentQuote,
   registerCheckoutIntentRouteLogic,
   type FinalizeMedusaCartResult,
 } from "./payment-attempt-route-logic";
@@ -86,6 +87,37 @@ test("registerCheckoutIntentRouteLogic requires quote fingerprint", async () => 
 
   assert.equal(result.status, 400);
   assert.deepEqual(result.body, { error: "quoteFingerprint is required" });
+});
+
+test("reconcileCheckoutIntentQuote rejects stale browser quotes before payment registration", () => {
+  const result = reconcileCheckoutIntentQuote({
+    submittedQuoteFingerprint: "qf_old",
+    authoritativeQuoteFingerprint: "qf_medusa",
+  });
+
+  assert.equal(result?.status, 409);
+  assert.deepEqual(result?.body, {
+    error:
+      "Your order changed before payment could be started. Review the updated total before continuing.",
+    code: "QUOTE_CHANGED",
+    quoteFingerprint: "qf_medusa",
+  });
+});
+
+test("reconcileCheckoutIntentQuote accepts fresh and omitted browser quotes", () => {
+  assert.equal(
+    reconcileCheckoutIntentQuote({
+      submittedQuoteFingerprint: "qf_medusa",
+      authoritativeQuoteFingerprint: "qf_medusa",
+    }),
+    null,
+  );
+  assert.equal(
+    reconcileCheckoutIntentQuote({
+      authoritativeQuoteFingerprint: "qf_medusa",
+    }),
+    null,
+  );
 });
 
 test("finalizeCheckoutIntentRouteLogic marks awaiting completion when Medusa is not ready", async () => {
@@ -347,7 +379,7 @@ test("codPlaceOrderRouteLogic marks attempts for review when finalize throws", a
     nowIso: () => "2026-04-05T00:00:00.000Z",
   });
 
-  assert.equal(result.status, 500);
+  assert.equal(result.status, 503);
   assert.deepEqual(result.body, { error: "Complete failed" });
   assert.equal(patches[0]?.status, "needs_review");
   assert.equal(events[0]?.errorCode, "exception");

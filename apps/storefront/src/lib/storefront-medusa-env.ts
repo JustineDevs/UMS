@@ -1,4 +1,5 @@
 import {
+  getMedusaAdminBaseUrl as getMedusaAdminBaseUrlBase,
   getMedusaStoreBaseUrl as getMedusaStoreBaseUrlBase,
   getMedusaPublishableKey as getMedusaPublishableKeyBase,
   getMedusaRegionId as getMedusaRegionIdBase,
@@ -6,12 +7,16 @@ import {
   getMedusaSalesChannelId as getMedusaSalesChannelIdBase,
   getMedusaSecretApiKey as getMedusaSecretApiKeyBase,
   withSalesChannelId as withSalesChannelIdBase,
-} from "@apparel-commerce/sdk";
+} from "@universal-music-store/sdk";
 
-/** Env hydration from monorepo root `.env` files runs in `instrumentation.ts` (Node only). */
+/** Env hydration from monorepo root `.env.local` files runs in `instrumentation.ts` (Node only). */
 
 export function getMedusaStoreBaseUrl(): string {
   return getMedusaStoreBaseUrlBase();
+}
+
+export function getMedusaAdminBaseUrl(): string {
+  return getMedusaAdminBaseUrlBase();
 }
 
 export function getMedusaPublishableKey(): string | undefined {

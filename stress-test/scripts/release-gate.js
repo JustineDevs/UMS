@@ -15,8 +15,8 @@
  *  - Provider sandbox connectivity, screenshots, and advisory jobs are separate and must not be confused with paid-order truth.
  *
  * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
- * For admin E2E credentials (local dev): root .env ADMIN_ALLOWED_EMAILS (first email) + NEXTAUTH_SECRET; run `pnpm e2e:ensure-staff`.
- * Playwright sets NEXTAUTH_URL per app (storefront 3000, admin 3001) so admin sign-in works even when root .env only lists the storefront URL.
+ * For admin E2E credentials (local dev): root .env.local ADMIN_ALLOWED_EMAILS (first email) + NEXTAUTH_SECRET; run `pnpm e2e:ensure-staff`.
+ * Playwright sets NEXTAUTH_URL per app (storefront 3000, admin 3001) so admin sign-in works even when root .env.local only lists the storefront URL.
  *
  * Full run report (`pnpm release-gate:full`): raw logs are written under stress-test/release-gate-logs/
  *   - release-gate-full-latest.log (overwritten each run)
@@ -131,6 +131,10 @@ function main() {
     {
       name: "Admin API route staff / internal guards",
       cmd: ["node", "stress-test/scripts/check-admin-api-staff-guard.mjs"],
+    },
+    {
+      name: "Admin OpenAPI route consistency",
+      cmd: ["node", "stress-test/scripts/check-admin-openapi.mjs"],
     },
     {
       name: "Unit / integration / Medusa / database",

@@ -1,17 +1,29 @@
 import { fetchMedusaPaymentProvidersFromRegions } from "@/lib/payment-providers-bridge";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("settings:read");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
 
-  const providers = await fetchMedusaPaymentProvidersFromRegions();
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, staff.session.user?.email);
+  if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
+
+  let providers;
+  try {
+    providers = await fetchMedusaPaymentProvidersFromRegions();
+  } catch {
+    return correlatedJson(correlationId, { error: "Unable to load payment providers" }, { status: 502 });
+  }
 
   logAdminApiEvent({
     route: "GET /api/admin/medusa/payment-providers",

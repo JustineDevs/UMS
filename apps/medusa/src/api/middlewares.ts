@@ -5,9 +5,10 @@ import type {
   MedusaRequest,
   MedusaResponse,
 } from "@medusajs/framework/http";
+import { z } from "zod";
 
 /**
- * Same semantics as `@apparel-commerce/rate-limits` (Medusa backend compiles as CJS; that package is ESM-only).
+ * Same semantics as `@universal-music-store/rate-limits` (Medusa backend compiles as CJS; that package is ESM-only).
  */
 function readPositiveIntEnv(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
@@ -68,11 +69,19 @@ function storeRateLimit(
   next: MedusaNextFunction,
 ) {
   const ip = clientKey(req);
+  // Keep independent store endpoints from consuming one shared catalog bucket.
+  // The checkout POST limiter below remains separately scoped and stricter.
+  const route = String(
+    (req as MedusaRequest & { originalUrl?: string }).originalUrl ??
+      req.url ??
+      "*",
+  ).split("?", 1)[0] || "*";
+  const key = `${ip}:${route}`;
   const now = Date.now();
-  let b = buckets.get(ip);
+  let b = buckets.get(key);
   if (!b || now > b.reset) {
     b = { count: 0, reset: now + WINDOW_MS };
-    buckets.set(ip, b);
+    buckets.set(key, b);
   }
   b.count += 1;
   res.setHeader("X-RateLimit-Limit", String(MAX));
@@ -139,8 +148,51 @@ function storeCheckoutPostRateLimit(
   next();
 }
 
+const loyaltyRedemptionSchema = z.object({
+  points: z.number().int().min(1, "points must be at least 1"),
+});
+
+function validateLoyaltyRedemptionBody(
+  req: MedusaRequest,
+  res: MedusaResponse,
+  next: MedusaNextFunction,
+) {
+  const result = loyaltyRedemptionSchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({
+      message: result.error.issues[0]?.message ?? "Invalid request body",
+      code: "VALIDATION",
+    });
+    return;
+  }
+  (req as MedusaRequest & { validatedBody: unknown }).validatedBody = result.data;
+  next();
+}
+
+function rootServiceInfo(
+  req: MedusaRequest,
+  res: MedusaResponse,
+  next: MedusaNextFunction,
+) {
+  if (req.originalUrl !== "/" || (req.method !== "GET" && req.method !== "HEAD")) {
+    next();
+    return;
+  }
+
+  res.status(200).json({
+    service: "Medusa",
+    health: "/health",
+    store: "/store",
+    admin: "/admin",
+  });
+}
+
 export default defineMiddlewares({
   routes: [
+    {
+      matcher: "*",
+      middlewares: [rootServiceInfo],
+    },
     {
       matcher: "/store*",
       middlewares: [
@@ -148,6 +200,11 @@ export default defineMiddlewares({
         storeRateLimit,
         storeCheckoutPostRateLimit,
       ],
+    },
+    {
+      matcher: "/store/carts/:id/loyalty",
+      method: "POST",
+      middlewares: [validateLoyaltyRedemptionBody],
     },
   ],
 });

@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { assertAdminMedusaEnvProduction } from "./admin-medusa";
+import { getMedusaAdminBaseUrl } from "../medusa-env.js";
+import { assertAdminMedusaEnvProduction } from "./admin-medusa.js";
 
 const envBackup: Record<string, string | undefined> = {};
 
@@ -62,5 +63,11 @@ describe("admin-medusa env", () => {
     process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
     assert.doesNotThrow(() => assertAdminMedusaEnvProduction());
+  });
+
+  it("getMedusaAdminBaseUrl: resolves the same backend origin as storefront helpers", () => {
+    process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
+    process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    assert.strictEqual(getMedusaAdminBaseUrl(), "https://api.example.com");
   });
 });

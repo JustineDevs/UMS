@@ -1,4 +1,14 @@
+import type { Metadata } from "next";
 import { CheckoutClient } from "./checkout-client";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Checkout",
+  description: "Complete your order and review shipping, payment, and delivery details.",
+  path: "/checkout",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default async function CheckoutPage({
   searchParams,

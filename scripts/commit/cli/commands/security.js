@@ -13,7 +13,7 @@ async function run() {
 
 function help() {
   console.log(`
-  apparel-commerce-commit security
+  universal-music-store-commit security
 
   Scan staged files and working directory for sensitive files.
   Blocks: .env, secrets, credentials, keys, certs, .cursor/mcp.json

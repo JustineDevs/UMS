@@ -6,8 +6,8 @@ import {
   upsertOAuthUser,
   isStaffRole,
   resolveStaffPermissionsForUserId,
-} from "@apparel-commerce/database";
-import { loadGoogleCredentials, normalizeEmail } from "@apparel-commerce/sdk";
+} from "@universal-music-store/database";
+import { loadGoogleCredentials, normalizeEmail } from "@universal-music-store/sdk";
 import {
   isAdminE2eCredentialsConfigured,
   parseAdminAllowedEmailList,
@@ -68,7 +68,7 @@ const google = loadGoogleCredentials("admin");
  */
 export function buildAuthOptions(): NextAuthOptions {
   return {
-  debug: process.env.NODE_ENV === "development",
+  debug: process.env.NEXTAUTH_DEBUG === "true",
   pages: {
     signIn: "/sign-in",
   },
@@ -123,7 +123,18 @@ export function buildAuthOptions(): NextAuthOptions {
       : []),
   ],
   secret: process.env.NEXTAUTH_SECRET?.trim(),
-  session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
+  session: { strategy: "jwt", maxAge: 60 * 60 * 4 },
+  cookies: {
+    sessionToken: {
+      name: "ums.admin-session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production" || process.env.NEXTAUTH_URL?.startsWith("https://") === true,
+      },
+    },
+  },
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "e2e-credentials") {

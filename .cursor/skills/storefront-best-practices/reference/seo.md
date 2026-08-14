@@ -116,7 +116,7 @@ Add on homepage only: Organization name, URL, logo, contact information. Helps e
 **Variant handling:**
 - Choose one variant as canonical (usually default)
 - All other variants canonical to that one
-- Example: Blue, Red, Green shirts all canonical to Blue (default)
+- Example: Blue, Red, Green guitars all canonical to Blue (default)
 
 **Multiple category paths:**
 - Choose one category as canonical (usually primary category)
@@ -128,8 +128,8 @@ Add on homepage only: Organization name, URL, logo, contact information. Helps e
 
 **Implementation:**
 ```html
-<!-- On variant page (Red shirt) -->
-<link rel="canonical" href="https://yourstore.com/products/cotton-tshirt" />
+<!-- On variant page (Red guitar) -->
+<link rel="canonical" href="https://yourstore.com/products/electric-guitar" />
 
 <!-- On filtered page -->
 <link rel="canonical" href="https://yourstore.com/products" />

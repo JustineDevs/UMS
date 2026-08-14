@@ -6,12 +6,12 @@ import { createProductCategoriesWorkflow } from "@medusajs/medusa/core-flows";
  * Idempotent: creates default product categories used by the storefront shop filter
  * and admin catalog assignment when they are missing.
  *
- * Aligns with names in `seed.ts` (Shirts, Sweatshirts, Pants, Merch).
+ * Aligns with names in `seed.ts` (Guitars, Amplifiers, Effects, Merch).
  */
 const DEFAULT_CATEGORY_NAMES = [
-  "Shirts",
-  "Sweatshirts",
-  "Pants",
+  "Guitars",
+  "Amplifiers",
+  "Effects",
   "Merch",
 ] as const;
 

@@ -55,7 +55,7 @@ export async function runGuestCheckoutShellWorkflow(
  */
 export async function exercisePaymentMethodToggles(page: Page): Promise<string[]> {
   const tried: string[] = [];
-  for (const key of ["cod", "stripe", "paypal", "paymongo", "maya"] as const) {
+  for (const key of ["cod", "stripe", "paypal", "xendit"] as const) {
     const ok = await selectPaymentProvider(page, key);
     if (ok) tried.push(key);
   }

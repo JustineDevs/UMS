@@ -1,10 +1,24 @@
 import { NextRequest } from "next/server";
-import { incrementCmsAnnouncementMetric } from "@apparel-commerce/platform-data";
+import { incrementCmsAnnouncementMetric } from "@universal-music-store/platform-data";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 const ALLOWED = new Set(["impression", "click", "dismiss"]);
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
+  const ip = getRequestIp(req);
+  const rl = await rateLimitFixedWindow(`cms-announcement-track:${ip}`, 30, 60_000);
+  if (!rl.ok) {
+    return new Response(JSON.stringify({ error: "Too many requests", retryAfter: rl.retryAfterSec }), {
+      status: 429,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": String(rl.retryAfterSec),
+      },
+    });
+  }
+
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
     return new Response(JSON.stringify({ ok: false }), { status: 503 });
@@ -30,3 +44,5 @@ export async function POST(req: NextRequest) {
   await incrementCmsAnnouncementMetric(sb, id, locale, metric);
   return Response.json({ ok: true });
 }
+
+export const POST = withBotIdProtection(handlePOST);

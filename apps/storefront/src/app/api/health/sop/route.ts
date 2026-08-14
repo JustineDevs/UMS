@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { listMissingPostHogEnv } from "@universal-music-store/sdk";
 import { listMissingMedusaStorefrontEnv } from "@/lib/medusa-sop-env";
 import { getMedusaStoreBaseUrl } from "@/lib/storefront-medusa-env";
 
@@ -11,6 +12,7 @@ export async function GET() {
   const timestamp = new Date().toISOString();
 
   const missingEnv = listMissingMedusaStorefrontEnv();
+  const missingObservabilityEnv = listMissingPostHogEnv();
   const baseUrl = getMedusaStoreBaseUrl();
   let medusaReachable = false;
   try {
@@ -23,7 +25,8 @@ export async function GET() {
     medusaReachable = false;
   }
 
-  const degraded = missingEnv.length > 0 || !medusaReachable;
+  const degraded =
+    missingEnv.length > 0 || missingObservabilityEnv.length > 0 || !medusaReachable;
 
   /** Always 200; use `status` for SOP readiness (avoids 503 during Medusa cold start in E2E). */
   return NextResponse.json(
@@ -35,6 +38,7 @@ export async function GET() {
         healthReachable: medusaReachable,
       },
       missingEnv,
+      missingObservabilityEnv,
       timestamp,
     },
     { status: 200 },

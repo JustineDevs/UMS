@@ -10,14 +10,14 @@ const repoRoot = path.join(__dirname, "..", "..", "..");
  * Does not treat missing credentials as skip: missing region providers are FAIL rows inside the script.
  */
 test.describe("mandatory payment matrix (CLI)", () => {
-  test("stress-checkout-providers --mandatory-five completes with exit 0", () => {
+  test("stress-checkout-providers --mandatory-core completes with exit 0", () => {
     const r = spawnSync(
       "pnpm",
       [
         "exec",
         "tsx",
         path.join(repoRoot, "scripts", "stress-checkout-providers.ts"),
-        "--mandatory-five",
+        "--mandatory-core",
       ],
       {
         cwd: repoRoot,
@@ -26,9 +26,6 @@ test.describe("mandatory payment matrix (CLI)", () => {
         shell: true,
       },
     );
-    expect(
-      r.status,
-      `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`,
-    ).toBe(0);
+    expect(r.status, `stdout:\n${r.stdout}\nstderr:\n${r.stderr}`).toBe(0);
   });
 });

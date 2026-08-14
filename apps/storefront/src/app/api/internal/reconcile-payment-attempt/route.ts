@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getPaymentAttemptByCorrelationId,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { internalReconcilePaymentAttemptRouteLogic } from "@/lib/payment-attempt-route-logic";

@@ -1,5 +1,5 @@
-import { sendResendTransactionalEmail } from "@apparel-commerce/resend-mail";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 function cartRecoveryEnabled(): boolean {
   return process.env.STOREFRONT_CART_RECOVERY_EMAIL?.trim() === "1";
@@ -37,9 +37,9 @@ export async function sendCartRecoveryEmail(params: {
     html: `<p>Hi,</p>
 <p>You still have <strong>${params.lineCount}</strong> line item${
       params.lineCount === 1 ? "" : "s"
-    } in your bag at Maharlika Apparel Custom.</p>
+    } in your bag at Universal Music Store.</p>
 <p><a href="${resumeUrl}">Return to checkout</a> when you are ready. If you did not intend to leave items behind, you can ignore this message.</p>
-<p>Thank you,<br/>Maharlika Apparel Custom</p>`,
+<p>Thank you,<br/>Universal Music Store</p>`,
     tags: [{ name: "type", value: "cart_recovery" }],
   });
   return result.ok;

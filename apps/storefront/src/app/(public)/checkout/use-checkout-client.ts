@@ -2,7 +2,12 @@
 
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
+import {
+  PH_VAT_RATE,
+  computeDisplayVat,
+  sanitizeSameOriginUrl,
+  sanitizeTrustedPublicUrl,
+} from "@universal-music-store/sdk";
 import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
 import {
   readCart,
@@ -44,8 +49,10 @@ export type CheckoutPendingPayment = {
 };
 
 export type CheckoutEmbeddedData = {
-  provider: "PAYPAL";
-  paypalOrderId: string;
+  provider: "PAYPAL" | "XENDIT";
+  paypalOrderId?: string;
+  xenditComponentsSdkKey?: string;
+  providerSessionId: string;
   cartId: string;
   trackingPageUrl: string;
   confirmedTotal: number;
@@ -281,16 +288,23 @@ export function useCheckoutClient({
       const qs = initialResumeCartId?.trim()
         ? `?cartId=${encodeURIComponent(initialResumeCartId.trim())}`
         : "";
-      const res = await fetch(`/api/cart/resume${qs}`);
-      const data = (await res.json()) as { lines?: CartLine[] };
-      if (cancelled) return;
-      if (Array.isArray(data.lines) && data.lines.length > 0) {
-        writeCart(data.lines);
-        setLines(data.lines);
-      } else {
-        setLines(readCart());
+      try {
+        const res = await fetch(`/api/cart/resume${qs}`);
+        const data = (await res.json()) as { lines?: CartLine[] };
+        if (cancelled) return;
+        if (Array.isArray(data.lines) && data.lines.length > 0) {
+          writeCart(data.lines);
+          setLines(data.lines);
+        } else {
+          setLines(readCart());
+        }
+      } catch {
+        // Cart hydration is an enhancement; a transient aborted request must
+        // not strand the checkout screen before the local cart is available.
+        if (!cancelled) setLines(readCart());
+      } finally {
+        if (!cancelled) setHydrated(true);
       }
-      setHydrated(true);
     }
     void hydrate();
     return () => {
@@ -334,6 +348,7 @@ export function useCheckoutClient({
                 ? parsedLoyalty
                 : undefined,
             paymentMethod,
+            shippingOptionId: selectedShippingOptionId ?? undefined,
           });
           if (!cancelled && seq === medusaPreviewSeqRef.current) {
             setMedusaPricePreview(preview);
@@ -576,7 +591,12 @@ export function useCheckoutClient({
           paymentMethod: "COD",
         });
         clearCart();
-        window.location.href = trackingPageUrl;
+        const safeTrackingUrl = sanitizeSameOriginUrl(trackingPageUrl, window.location.origin);
+        if (!safeTrackingUrl) {
+          setError("The tracking link returned by checkout is invalid. Open your order from the confirmation email.");
+          return;
+        }
+        window.location.href = safeTrackingUrl;
         return;
       }
 
@@ -585,7 +605,17 @@ export function useCheckoutClient({
         typeof sessionData.paypalOrderId === "string"
           ? sessionData.paypalOrderId
           : undefined;
+      const xenditComponentsSdkKey =
+        typeof sessionData.xenditComponentsSdkKey === "string"
+          ? sessionData.xenditComponentsSdkKey
+          : undefined;
+      const providerSessionId =
+        typeof sessionData.paymentSessionId === "string"
+          ? sessionData.paymentSessionId
+          : paypalOrderId;
       const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
+      const useXenditComponents =
+        paymentMethod === "XENDIT" && Boolean(xenditComponentsSdkKey && providerSessionId);
       const providerKey = paymentMethod.toLowerCase();
       const amountMinor = Math.round(
         confirmedTotal * minorUnitDivisor(currencyCode),
@@ -603,7 +633,7 @@ export function useCheckoutClient({
             quoteFingerprint: result.quoteFingerprint,
             variantIds: result.variantIds,
             productIds: result.productIds,
-            providerSessionId: paypalOrderId,
+            providerSessionId,
           }),
         });
         const regJson = (await regRes.json().catch(() => ({}))) as {
@@ -616,15 +646,19 @@ export function useCheckoutClient({
         checkoutCorrelationId = undefined;
       }
 
-      if (usePayPalElement) {
+      if (usePayPalElement || useXenditComponents) {
         if (!checkoutCorrelationId) {
           throw new Error(
             "Could not register a durable payment attempt for this checkout. Try again before entering payment details.",
           );
         }
         setEmbeddedData({
-          provider: "PAYPAL",
-          paypalOrderId: paypalOrderId!,
+          provider: usePayPalElement ? "PAYPAL" : "XENDIT",
+          paypalOrderId: usePayPalElement ? paypalOrderId : undefined,
+          xenditComponentsSdkKey: useXenditComponents
+            ? xenditComponentsSdkKey
+            : undefined,
+          providerSessionId: providerSessionId!,
           cartId,
           trackingPageUrl,
           confirmedTotal,
@@ -678,17 +712,18 @@ export function useCheckoutClient({
         /* ignore */
       }
     }
-    const popup = window.open(
-      pendingPayment.checkoutUrl,
-      "_blank",
-      "noopener,noreferrer",
-    );
+    const safeCheckoutUrl = sanitizeTrustedPublicUrl(pendingPayment.checkoutUrl);
+    if (!safeCheckoutUrl) {
+      setError("The payment provider returned an invalid checkout link. Start checkout again.");
+      return;
+    }
+    const popup = window.open(safeCheckoutUrl, "_blank", "noopener,noreferrer");
     if (popup) {
       popup.focus();
       return;
     }
     clearCart();
-    window.location.href = pendingPayment.checkoutUrl;
+    window.location.href = safeCheckoutUrl;
   }
 
   async function finalizeCheckoutAttempt(
@@ -713,8 +748,13 @@ export function useCheckoutClient({
         typeof finalizeJson.redirectUrl === "string" &&
         finalizeJson.redirectUrl.length > 0
       ) {
+        const safeRedirectUrl = sanitizeTrustedPublicUrl(finalizeJson.redirectUrl);
+        if (!safeRedirectUrl) {
+          setError("The payment provider returned an invalid redirect. Start checkout again.");
+          return;
+        }
         clearCart();
-        window.location.href = finalizeJson.redirectUrl;
+        window.location.href = safeRedirectUrl;
         return;
       }
 
@@ -786,8 +826,13 @@ export function useCheckoutClient({
   async function copyTrackingLink() {
     if (!pendingPayment || typeof navigator.clipboard?.writeText !== "function")
       return;
+    const safeTrackingUrl = sanitizeSameOriginUrl(
+      pendingPayment.trackingPageUrl,
+      window.location.origin,
+    );
+    if (!safeTrackingUrl) return;
     try {
-      await navigator.clipboard.writeText(pendingPayment.trackingPageUrl);
+      await navigator.clipboard.writeText(safeTrackingUrl);
       setCopyDone(true);
     } catch {
       setCopyDone(false);

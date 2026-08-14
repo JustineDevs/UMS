@@ -1,5 +1,4 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
 import { cn } from "../../lib/utils";
 
 const Breadcrumb = React.forwardRef<
@@ -42,14 +41,26 @@ const BreadcrumbLink = React.forwardRef<
   React.ComponentPropsWithoutRef<"a"> & {
     asChild?: boolean;
   }
->(({ asChild, className, ...props }, ref) => {
-  const Comp = asChild ? Slot : "a";
+>(({ asChild, className, children, ...props }, ref) => {
+  const classes = cn(
+    "font-medium text-primary transition-colors hover:underline",
+    className,
+  );
+
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children, {
+      ...props,
+      className: cn(classes, (children.props as { className?: string }).className),
+      ref,
+    } as React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+      ref?: React.Ref<HTMLAnchorElement>;
+    });
+  }
+
   return (
-    <Comp
-      ref={ref}
-      className={cn("font-medium text-primary transition-colors hover:underline", className)}
-      {...props}
-    />
+    <a ref={ref} className={classes} {...props}>
+      {children}
+    </a>
   );
 });
 BreadcrumbLink.displayName = "BreadcrumbLink";

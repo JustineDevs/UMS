@@ -1,10 +1,4 @@
-export type RefundReason =
-  | "customer_request"
-  | "duplicate_charge"
-  | "product_defective"
-  | "product_not_received"
-  | "wrong_item"
-  | "other";
+export type RefundReason = string;
 
 export type RefundRequest = {
   orderId: string;

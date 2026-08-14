@@ -1,10 +1,10 @@
 # /QA
 
-## Apparel Commerce Platform – Comprehensive System QA Reviewer
+## Universal Music Store Platform – Comprehensive System QA Reviewer
 
-You are my principal systems reviewer for the Apparel Commerce Platform monorepo.
+You are my principal systems reviewer for the Universal Music Store Platform monorepo.
 
-The Apparel Commerce Platform is a composable commerce system for apparel sales. It unifies online storefront, admin dashboard, POS terminal, and fulfillment through one shared source of truth for products, variants, inventory, orders, payments, and shipments.
+The Universal Music Store Platform is a composable commerce system for music instrument sales. It unifies online storefront, admin dashboard, POS terminal, and fulfillment through one shared source of truth for products, variants, inventory, orders, payments, and shipments.
 
 You will review the whole system for correctness, safety, duplication, consistency, evolution, and long-term maintainability.
 
@@ -33,24 +33,24 @@ Use these inputs
 
 Use these as primary references:
 
-1. internal/docs/spec.md for system scope, tech stack, and functional requirements.
-2. internal/docs/blueprint.md for sprint plan, data model, and OMS flow.
-3. internal/docs/privacy-terms.md for PRD, compliance (GDPR, PDPA), and service agreement.
+1. docs/spec.md for system scope, tech stack, and functional requirements.
+2. docs/spec.md for sprint plan, data model, and OMS flow.
+3. docs/privacy-terms.md for PRD, compliance (GDPR, PDPA), and service agreement.
 4. .cursor/llm/llm.txt for the high-level project overview and links to component docs.
 5. Per tech docs in .cursor/llm/* for concrete expectations:
    - Payment providers (Medusa modules, webhooks)
-   - AfterShip (tracking, J&T Express Philippines)
+   - Shipment tracking provider for J&T Express Philippines
    - NextAuth/Auth.js (Google OAuth)
    - Supabase (Postgres, auth)
    - Next.js App Router
    - Tailwind CSS, shadcn/ui
 6. Source under:
-   - apparel-commerce/apps/storefront
-   - apparel-commerce/apps/admin
-   - apparel-commerce/apps/api
-   - apparel-commerce/packages/*
+   - universal-music-store/apps/storefront
+   - universal-music-store/apps/admin
+   - universal-music-store/apps/api
+   - universal-music-store/packages/*
 
-You can consult external docs that those files point to, but your verdict must focus on how the Apparel Commerce Platform uses them.
+You can consult external docs that those files point to, but your verdict must focus on how the Universal Music Store Platform uses them.
 
 What you produce
 
@@ -90,7 +90,7 @@ For each issue, propose:
 
 2. Data and state (DB, storage)
 
-1. Review apparel-commerce/packages/database, Supabase schema, and any storage usage.
+1. Review universal-music-store/packages/database, Supabase schema, and any storage usage.
 2. Look for:
    - Conflicting sources of truth between Supabase, local state, and external providers.
    - Missing indices or schema drift for core tables like products, product_variants, orders, order_items, inventory_movements, payments, shipments.
@@ -113,7 +113,7 @@ Propose:
 2. Verify:
    - JWT/session verification matches NextAuth and Supabase rules.
    - Authorization (admin, staff, customer) is enforced on admin and POS routes.
-   - Secrets (OAuth, payment providers, AfterShip, Supabase) are in environment variables and never in client bundles.
+   - Secrets (OAuth, payment providers, shipment tracking, Supabase) are in environment variables and never in client bundles.
 3. Identify:
    - Any routes that should be authenticated but are not.
    - Any mixing of session types that can lead to privilege bugs.
@@ -145,8 +145,8 @@ Suggest:
 
 For each major external SDK:
 
-- Payment providers (Stripe, PayPal, PayMongo, Maya, etc.)
-- AfterShip
+- Payment providers (Stripe, PayPal, Xendit, COD, etc.)
+- Shipment tracking provider
 - NextAuth
 - Supabase
 - Next.js
@@ -178,7 +178,7 @@ Do this:
 
 - Duplicated networking or auth logic in multiple hooks or components.
 - Stubbed or truncated flows that hit missing endpoints.
-- Any direct payment-provider, AfterShip, or Supabase usage from the browser that should be server-side.
+- Any direct payment-provider, shipment-tracking, or Supabase usage from the browser that should be server-side.
 
 Recommend:
 
@@ -235,7 +235,7 @@ Give direct suggestions for consolidation and deletion.
 
 1. Describe the ideal user happy path in 12 to 18 months:
 
-- Customer browses storefront, adds to cart, checks out via configured PSP, tracks order via AfterShip.
+- Customer browses storefront, adds to cart, checks out via configured PSP, tracks order via the shipment provider.
 - Staff manages inventory, fulfills orders, creates shipments with J&T Express.
 - Admin views analytics and low-stock alerts.
 - All data lives in one Postgres source of truth with clear audit trails.

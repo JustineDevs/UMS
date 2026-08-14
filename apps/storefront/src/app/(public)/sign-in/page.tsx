@@ -10,13 +10,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import { describeAuthSignInError } from "@/lib/auth-sign-in-errors";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Sign in",
-};
+  description: "Access your account and order history with Google.",
+  path: "/sign-in",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default async function SignInPage({
   searchParams,

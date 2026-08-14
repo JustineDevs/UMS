@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type VariantRow = { id: string; weight: string };
@@ -22,24 +22,34 @@ type ExpRow = {
 };
 
 function parseVariants(v: unknown): VariantRow[] {
-  if (!Array.isArray(v)) return [{ id: "a", weight: "0.5" }, { id: "b", weight: "0.5" }];
+  if (!Array.isArray(v))
+    return [
+      { id: "a", weight: "0.5" },
+      { id: "b", weight: "0.5" },
+    ];
   return v.map((x) => {
     const o = x as Record<string, unknown>;
     return {
       id: String(o.id ?? "variant"),
-      weight: String(typeof o.weight === "number" ? o.weight : o.weight ?? "0"),
+      weight: String(
+        typeof o.weight === "number" ? o.weight : (o.weight ?? "0"),
+      ),
     };
   });
 }
 
 export function CmsExperimentsManager() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<ExpRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [key, setKey] = useState("hero_copy");
-  const [name, setName] = useState("Hero copy test");
+  const [key, setKey] = useState("");
+  const [name, setName] = useState("");
   const [active, setActive] = useState(true);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -57,6 +67,8 @@ export function CmsExperimentsManager() {
   const weightOk = Math.abs(weightSum - 1) < 0.02;
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     fetch("/api/admin/cms/experiments")
       .then(async (r) => {
         const j = (await r.json()) as { data?: ExpRow[]; error?: string };
@@ -64,7 +76,10 @@ export function CmsExperimentsManager() {
         return j.data ?? [];
       })
       .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, []);
 
   useEffect(() => {
@@ -73,8 +88,8 @@ export function CmsExperimentsManager() {
 
   const resetNew = () => {
     setEditingId(null);
-    setKey("hero_copy");
-    setName("New experiment");
+    setKey("");
+    setName("");
     setActive(true);
     setStartsAt("");
     setEndsAt("");
@@ -102,6 +117,10 @@ export function CmsExperimentsManager() {
 
   const save = async () => {
     if (!canWrite) return;
+    if (!key.trim() || !name.trim()) {
+      setError("Experiment key and name are required.");
+      return;
+    }
     if (!weightOk) {
       setError("Variant weights must sum to 1 (within 0.02).");
       return;
@@ -109,8 +128,8 @@ export function CmsExperimentsManager() {
     setError(null);
     const payload = {
       id: editingId ?? undefined,
-      experiment_key: key,
-      name,
+      experiment_key: key.trim(),
+      name: name.trim(),
       active,
       starts_at: startsAt.trim() || null,
       ends_at: endsAt.trim() || null,
@@ -141,7 +160,8 @@ export function CmsExperimentsManager() {
     load();
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
     <div className="space-y-8 max-w-3xl">
@@ -151,16 +171,19 @@ export function CmsExperimentsManager() {
         <p className="font-semibold text-slate-900">Guardrails</p>
         <ul className="mt-2 list-inside list-disc space-y-1">
           <li>
-            Treat sample sizes below a few hundred impressions per variant as noisy. Compare conversion
-            rates only after enough traffic.
+            Treat sample sizes below a few hundred impressions per variant as
+            noisy. Compare conversion rates only after enough traffic.
           </li>
           <li>
-            Run at most one active experiment per surface (page or component) so assignments stay
-            interpretable.
+            Run at most one active experiment per surface (page or component) so
+            assignments stay interpretable.
           </li>
         </ul>
         <p className="mt-3">
-          Storefront integration: read <code className="rounded bg-white px-1">docs/cms-experiment-storefront-keys.md</code>{" "}
+          Storefront integration: read{" "}
+          <code className="rounded bg-white px-1">
+            docs/cms-experiment-storefront-keys.md
+          </code>{" "}
           in the repo root.
         </p>
       </div>
@@ -182,7 +205,11 @@ export function CmsExperimentsManager() {
           placeholder="Name"
         />
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+          />
           Active
         </label>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -231,7 +258,9 @@ export function CmsExperimentsManager() {
         </label>
 
         <div>
-          <p className="text-xs font-medium text-slate-700">Variants (weights must sum to 1)</p>
+          <p className="text-xs font-medium text-slate-700">
+            Variants (weights must sum to 1)
+          </p>
           <ul className="mt-2 space-y-2">
             {variants.map((v, i) => (
               <li key={i} className="flex flex-wrap items-center gap-2">
@@ -258,7 +287,9 @@ export function CmsExperimentsManager() {
                 <button
                   type="button"
                   className="text-xs text-red-700 underline"
-                  onClick={() => setVariants(variants.filter((_, j) => j !== i))}
+                  onClick={() =>
+                    setVariants(variants.filter((_, j) => j !== i))
+                  }
                 >
                   Remove
                 </button>
@@ -268,12 +299,20 @@ export function CmsExperimentsManager() {
           <button
             type="button"
             className="mt-2 text-xs text-primary underline"
-            onClick={() => setVariants([...variants, { id: `v${variants.length + 1}`, weight: "0" }])}
+            onClick={() =>
+              setVariants([
+                ...variants,
+                { id: `v${variants.length + 1}`, weight: "0" },
+              ])
+            }
           >
             Add variant
           </button>
-          <p className={`mt-2 text-xs ${weightOk ? "text-emerald-800" : "text-amber-800"}`}>
-            Sum of weights: {weightSum.toFixed(4)} {weightOk ? "(ok)" : "(adjust to 1.0)"}
+          <p
+            className={`mt-2 text-xs ${weightOk ? "text-emerald-800" : "text-amber-800"}`}
+          >
+            Sum of weights: {weightSum.toFixed(4)}{" "}
+            {weightOk ? "(ok)" : "(adjust to 1.0)"}
           </p>
         </div>
 
@@ -286,20 +325,38 @@ export function CmsExperimentsManager() {
           >
             Save
           </button>
-          <button type="button" className="rounded-lg border border-slate-200 px-4 py-2 text-sm" onClick={resetNew}>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
+            onClick={resetNew}
+          >
             New
           </button>
         </div>
       </div>
 
-      <ul className="space-y-2 text-sm">
+      {loadingRows ? (
+        <p className="text-sm text-slate-600">Loading experiments...</p>
+      ) : null}
+      {!loadingRows && rows.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+          No experiments have been created.
+        </p>
+      ) : null}
+      <ul className="space-y-2 text-sm" aria-label="CMS experiments">
         {rows.map((r) => (
           <li key={r.id} className="rounded border border-slate-200 px-3 py-2">
-            <button type="button" className="text-left font-medium text-primary underline" onClick={() => loadOne(r)}>
+            <button
+              type="button"
+              className="text-left font-medium text-primary underline"
+              onClick={() => loadOne(r)}
+            >
               {r.experiment_key}
             </button>{" "}
             — {r.name}{" "}
-            <span className="text-slate-500">{r.active ? "(active)" : "(inactive)"}</span>
+            <span className="text-slate-500">
+              {r.active ? "(active)" : "(inactive)"}
+            </span>
             <span className="ml-2 text-xs text-slate-500">
               imp {r.impressions} / conv {r.conversions}
             </span>

@@ -1,5 +1,5 @@
 {
-  "extends": "@apparel-commerce/config-typescript/base.json",
+  "extends": "@universal-music-store/config-typescript/base.json",
   "compilerOptions": {
     "module": "NodeNext",
     "moduleResolution": "NodeNext",

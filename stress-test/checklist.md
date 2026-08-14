@@ -19,8 +19,8 @@ Manual review items aligned with **design-with-taste**, **core-engineering**, an
 
 - [ ] **Injection**: Inputs sanitized; parameterized queries
 - [ ] **Auth**: Session handling; no credentials in logs/URLs
-- [ ] **Sensitive data**: No `.env` in git; secrets in env vars only
+- [ ] **Sensitive data**: No `.env.local` in git; secrets in env vars only
 
 ---
 
-*Automated: `pnpm stress-test` runs lint, security check, audit, unit tests, E2E, dogfood.*
+_Automated: `pnpm stress-test` runs lint, security check, audit, unit tests, E2E, dogfood._

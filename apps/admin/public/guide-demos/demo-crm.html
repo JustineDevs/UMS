@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,15 +10,22 @@
     <header class="demo-story">
       <h1>CRM</h1>
       <p><strong>Audience:</strong> Support and retention leads.</p>
-      <p><strong>Outcome:</strong> You scan customer context before calls or messages. Data is mock and consistent with other demos.</p>
+      <p>
+        <strong>Outcome:</strong> You scan customer context before calls or
+        messages. Data is mock and consistent with other demos.
+      </p>
     </header>
     <div class="controls demo-controls">
       <button type="button" id="btn-play">Play</button>
       <button type="button" id="btn-pause" disabled>Pause</button>
-      <button type="button" id="btn-step" disabled style="display: none">Next step</button>
+      <button type="button" id="btn-step" disabled style="display: none">
+        Next step
+      </button>
       <button type="button" id="btn-skip">Skip</button>
       <button type="button" id="btn-reset" disabled>Reset</button>
-      <label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+      <label class="demo-ctrl-label"
+        ><input type="checkbox" id="chk-mute" /> Mute</label
+      >
       <label class="demo-ctrl-label"
         >Speed
         <select id="sel-speed" aria-label="Demo speed">
@@ -36,7 +43,14 @@
           <option value="manual">Manual</option>
         </select></label
       >
-      <div class="demo-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="demo-progress-wrap">
+      <div
+        class="demo-progress"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        id="demo-progress-wrap"
+      >
         <div class="demo-progress-bar" id="demo-progress-bar"></div>
       </div>
       <a href="./index.html">← All demos</a>
@@ -47,12 +61,18 @@
       <li>Use tier and last order to prioritize outreach.</li>
       <li>Orders remain the commerce record for purchases.</li>
     </ul>
-    <audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+    <audio
+      id="ui-tick"
+      preload="auto"
+      src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+    ></audio>
     <audio id="narration" preload="none"></audio>
     <div class="wrap" id="wrap">
       <div class="browser">
         <div class="chrome-top">
-          <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
           <div class="url-bar" id="url-bar"></div>
         </div>
         <div class="stage" id="stage">
@@ -61,25 +81,48 @@
             <div class="scene on" id="scene-0">
               <h2 class="faux">Customers</h2>
               <div class="search-row">
-                <div class="fake-input" id="crm-search">Search email or name…</div>
+                <div class="fake-input" id="crm-search">
+                  Search email or name…
+                </div>
               </div>
               <div class="faux-table demo-generic-grid">
-                <div class="faux-head"><span>Customer</span><span>Tier</span><span>Last</span></div>
-                <div class="faux-row hl"><span>Ana Reyes</span><span>Gold</span><span>2d ago</span></div>
-                <div class="faux-row"><span>Jordan Cruz</span><span>Silver</span><span>Today</span></div>
-                <div class="faux-row"><span>Sam Park</span><span>Member</span><span>1w ago</span></div>
+                <div class="faux-head">
+                  <span>Customer</span><span>Tier</span><span>Last</span>
+                </div>
+                <div class="faux-row hl">
+                  <span>Ana Reyes</span><span>Gold</span><span>2d ago</span>
+                </div>
+                <div class="faux-row">
+                  <span>Jordan Cruz</span><span>Silver</span><span>Today</span>
+                </div>
+                <div class="faux-row">
+                  <span>Sam Park</span><span>Member</span><span>1w ago</span>
+                </div>
               </div>
             </div>
             <div class="scene" id="scene-1">
               <h2 class="faux">Loyalty</h2>
-              <p style="font-size: 12px; color: var(--muted)">Maharlika Circle · mock program stats</p>
-              <div class="kpi" style="margin-top: 8px"><b>1,840</b>Active members</div>
+              <p style="font-size: 12px; color: var(--muted)">
+                Universal Music Circle · mock program stats
+              </p>
+              <div class="kpi" style="margin-top: 8px">
+                <b>1,840</b>Active members
+              </div>
             </div>
             <div class="caption" id="caption">Press Play to start.</div>
           </div>
           <div class="cursor" id="cursor" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z" fill="white" stroke="#191c1e" stroke-width="1.2" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z"
+                fill="white"
+                stroke="#191c1e"
+                stroke-width="1.2"
+              />
             </svg>
           </div>
           <div class="ripple" id="ripple"></div>
@@ -94,14 +137,70 @@
         GD.renderSidebar("#sidebar", "crm");
         var searchEl = document.getElementById("crm-search");
         var TIMELINE = [
-          { t: 0, x: 0.5, y: 0.35, cap: "CRM lists customers with tier and recency.", speak: "CRM is where you scan customers before you reach out." },
-          { t: 2600, x: 0.48, y: 0.28, cap: "Search narrows the list before you open a profile.", speak: "You can search by email or name to find someone fast." },
-          { t: 4800, x: 0.48, y: 0.28, cap: "Focus the search field before typing.", speak: "Click search to focus it.", click: true, flashSearch: true },
-          { t: 7200, x: 0.14, y: 0.42, cap: "Loyalty pairs with CRM for member context.", speak: "Next we peek at Loyalty next to CRM in the workflow story." },
-          { t: 9800, x: 0.14, y: 0.46, cap: "", speak: "", click: true, navKey: "loyalty" },
-          { t: 10200, scene: 1, x: 0.5, y: 0.4, cap: "Programs and points explain repeat purchase value.", speak: "Loyalty shows how members earn value over time." },
-          { t: 13400, x: 0.14, y: 0.4, cap: "", speak: "", click: true, navKey: "crm" },
-          { t: 13800, scene: 0, x: 0.5, y: 0.35, cap: "Recap: CRM for people, loyalty for rewards.", speak: "End of CRM demo." },
+          {
+            t: 0,
+            x: 0.5,
+            y: 0.35,
+            cap: "CRM lists customers with tier and recency.",
+            speak: "CRM is where you scan customers before you reach out.",
+          },
+          {
+            t: 2600,
+            x: 0.48,
+            y: 0.28,
+            cap: "Search narrows the list before you open a profile.",
+            speak: "You can search by email or name to find someone fast.",
+          },
+          {
+            t: 4800,
+            x: 0.48,
+            y: 0.28,
+            cap: "Focus the search field before typing.",
+            speak: "Click search to focus it.",
+            click: true,
+            flashSearch: true,
+          },
+          {
+            t: 7200,
+            x: 0.14,
+            y: 0.42,
+            cap: "Loyalty pairs with CRM for member context.",
+            speak: "Next we peek at Loyalty next to CRM in the workflow story.",
+          },
+          {
+            t: 9800,
+            x: 0.14,
+            y: 0.46,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "loyalty",
+          },
+          {
+            t: 10200,
+            scene: 1,
+            x: 0.5,
+            y: 0.4,
+            cap: "Programs and points explain repeat purchase value.",
+            speak: "Loyalty shows how members earn value over time.",
+          },
+          {
+            t: 13400,
+            x: 0.14,
+            y: 0.4,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "crm",
+          },
+          {
+            t: 13800,
+            scene: 0,
+            x: 0.5,
+            y: 0.35,
+            cap: "Recap: CRM for people, loyalty for rewards.",
+            speak: "End of CRM demo.",
+          },
         ];
         GD.attachPlayer({
           wrap: "#wrap",
@@ -127,7 +226,9 @@
           timeline: TIMELINE,
           totalMs: 15600,
           urlForScene: function (idx) {
-            return idx === 0 ? GD.getUrlForKey("crm") : GD.getUrlForKey("loyalty");
+            return idx === 0
+              ? GD.getUrlForKey("crm")
+              : GD.getUrlForKey("loyalty");
           },
           onClick: function (ev) {
             if (ev.flashSearch && searchEl) {

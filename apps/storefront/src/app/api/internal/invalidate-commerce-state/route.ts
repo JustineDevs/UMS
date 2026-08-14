@@ -3,7 +3,7 @@ import {
   listOpenPaymentAttempts,
   paymentAttemptMatchesCatalogMutation,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import {

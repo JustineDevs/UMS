@@ -1,4 +1,4 @@
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 /** Public storefront origin for links from the admin (shop preview, customer view). */
 export function getStorefrontPublicOrigin(): string {

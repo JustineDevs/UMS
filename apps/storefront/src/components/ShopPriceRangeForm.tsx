@@ -7,9 +7,14 @@ import { shopHref } from "@/lib/shop-url";
 
 type Props = {
   category?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   sort: string;
   search?: string;
   minPrice?: number;
@@ -18,9 +23,14 @@ type Props = {
 
 export function ShopPriceRangeForm({
   category,
-  size,
-  color,
+  type,
+  finish,
   brand,
+  pickupConfig,
+  bodyWood,
+  condition,
+  skillLevel,
+  shippingSpeed,
   sort,
   search,
   minPrice,
@@ -39,9 +49,14 @@ export function ShopPriceRangeForm({
     e.preventDefault();
     const base: ShopQuery = {
       category,
-      size,
-      color,
+      type,
+      finish,
       brand,
+      pickupConfig,
+      bodyWood,
+      condition,
+      skillLevel,
+      shippingSpeed,
       sort,
       search,
     };

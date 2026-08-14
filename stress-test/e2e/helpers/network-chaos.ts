@@ -1,6 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 
-export type ChaosProfile = "slow-json" | "abort-once" | "offline-burst";
+type ChaosProfile = "slow-json" | "abort-once" | "offline-burst";
 
 /**
  * Slow down JSON API responses to stress loading states (non-fatal).

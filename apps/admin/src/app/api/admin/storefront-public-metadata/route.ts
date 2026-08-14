@@ -1,19 +1,19 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import {
   getStorefrontPublicMetadata,
   mergeStorefrontPublicMetadataPayload,
   upsertStorefrontPublicMetadata,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -26,9 +26,9 @@ export async function GET(req: NextRequest) {
   return correlatedJson(cid, { data });
 }
 
-export async function PUT(req: NextRequest) {
+async function put(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -47,3 +47,5 @@ export async function PUT(req: NextRequest) {
   await upsertStorefrontPublicMetadata(sup.client, merged);
   return correlatedJson(cid, { data: merged });
 }
+
+export const PUT = withAdminMutationIdempotency("/admin/storefront-public-metadata:PUT", put);

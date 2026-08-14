@@ -1,16 +1,27 @@
 import { randomUUID } from "node:crypto";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { claimAdminIdempotency, completeAdminIdempotency, getRequestHash, parseAdminJson, requireIdempotencyKey } from "@/lib/admin-api-security";
 import {
   fetchMedusaOrderJson,
   patchMedusaOrderMetadata,
 } from "@/lib/medusa-order-bridge";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { z } from "zod";
+
+const shipmentSchema = z.object({
+  orderId: z.string().trim().regex(/^order_/),
+  trackingNumber: z.string().trim().min(1).max(200),
+  carrierSlug: z.string().trim().min(1).max(80).default("jtexpress-ph"),
+  labelUrl: z.string().trim().url().max(2_000).optional(),
+}).strict();
 
 export async function POST(req: Request) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("orders:write");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
@@ -21,40 +32,15 @@ export async function POST(req: Request) {
     phase: "start",
   });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    orderId?: string;
-    trackingNumber?: string;
-    carrierSlug?: string;
-    labelUrl?: string;
-  };
-
-  const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
-  if (!orderId.startsWith("order_")) {
-    return correlatedJson(
-      correlationId,
-      { error: "Invalid order id" },
-      { status: 400 },
-    );
-  }
-
-  const trackingNumber =
-    typeof body.trackingNumber === "string" ? body.trackingNumber.trim() : "";
-  if (!trackingNumber) {
-    return correlatedJson(
-      correlationId,
-      { error: "Missing trackingNumber" },
-      { status: 400 },
-    );
-  }
-
-  const carrierSlug =
-    typeof body.carrierSlug === "string" && body.carrierSlug.trim()
-      ? body.carrierSlug.trim()
-      : "jtexpress-ph";
-  const labelUrl =
-    typeof body.labelUrl === "string" && body.labelUrl.trim()
-      ? body.labelUrl.trim()
-      : undefined;
+  const idempotencyKey = requireIdempotencyKey(req);
+  if (!idempotencyKey) return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
+  const parsed = await parseAdminJson(req, shipmentSchema);
+  if (!parsed.ok) return correlatedJson(correlationId, { error: parsed.error }, { status: parsed.status });
+  const { orderId, trackingNumber, carrierSlug, labelUrl } = parsed.data;
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, staff.session.user?.email);
+  if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
 
   const order = await fetchMedusaOrderJson(orderId);
   if (!order) {
@@ -62,6 +48,18 @@ export async function POST(req: Request) {
   }
 
   const prev = (order.metadata as Record<string, unknown> | undefined) ?? {};
+  if (prev.organization_id !== organization.id) {
+    return correlatedJson(correlationId, { error: "Order not found" }, { status: 404 });
+  }
+  const claim = await claimAdminIdempotency(sup.client, {
+    actorKey: `${organization.id}:${staff.session.user?.email?.trim().toLowerCase() ?? "unknown"}`,
+    actionKey: `medusa.shipment.create:${orderId}`,
+    idempotencyKey,
+    requestHash: getRequestHash(parsed.data),
+  });
+  if (claim.kind === "replay") return correlatedJson(correlationId, claim.body, { status: claim.status });
+  if (claim.kind === "conflict") return correlatedJson(correlationId, { error: "Request is already being processed or key was reused" }, { status: 409 });
+  if (claim.kind !== "claimed") return correlatedJson(correlationId, { error: "Idempotency service unavailable" }, { status: 503 });
   const list = Array.isArray(prev.fulfillment_shipments)
     ? [...(prev.fulfillment_shipments as unknown[])]
     : [];
@@ -88,11 +86,9 @@ export async function POST(req: Request) {
       phase: "error",
       detail: { orderId, error: result.error },
     });
-    return correlatedJson(
-      correlationId,
-      { error: result.error ?? "Unable to update order" },
-      { status: 502 },
-    );
+    const body = { error: "Unable to update order" };
+    await completeAdminIdempotency(sup.client, claim.id, 502, body);
+    return correlatedJson(correlationId, body, { status: 502 });
   }
 
   logAdminApiEvent({
@@ -102,5 +98,7 @@ export async function POST(req: Request) {
     detail: { orderId },
   });
 
-  return correlatedJson(correlationId, { ok: true });
+  const body = { ok: true };
+  await completeAdminIdempotency(sup.client, claim.id, 200, body);
+  return correlatedJson(correlationId, body);
 }

@@ -33,7 +33,7 @@ describe("Stripe webhook state transitions", () => {
   }
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
   });
 
   it("accepts a signed checkout.session.completed event and returns successful action", async () => {

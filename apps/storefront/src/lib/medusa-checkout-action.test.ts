@@ -8,13 +8,13 @@ import {
 test("pickPaymentSessionForProvider returns exact provider only", () => {
   const sessions = [
     { provider_id: "pp_stripe_stripe", id: "ps_1" },
-    { provider_id: "pp_paymongo_paymongo", id: "ps_2" },
+    { provider_id: "pp_xendit_xendit", id: "ps_2" },
   ];
   assert.equal(
-    pickPaymentSessionForProvider(sessions, "pp_paymongo_paymongo")?.id,
+    pickPaymentSessionForProvider(sessions, "pp_xendit_xendit")?.id,
     "ps_2",
   );
-  assert.equal(pickPaymentSessionForProvider(sessions, "pp_maya_maya"), null);
+  assert.equal(pickPaymentSessionForProvider(sessions, "pp_paypal_paypal"), null);
 });
 
 test("resolveCheckoutAction: COD manual", () => {
@@ -38,11 +38,11 @@ test("resolveCheckoutAction: data.cod manual", () => {
   assert.equal(a.kind, "manual");
 });
 
-test("resolveCheckoutAction: hosted https redirect (PayMongo-style)", () => {
-  const a = resolveCheckoutAction("pp_paymongo_paymongo", {
+test("resolveCheckoutAction: hosted https redirect (Xendit-style)", () => {
+  const a = resolveCheckoutAction("pp_xendit_xendit", {
     id: "ps_p",
-    provider_id: "pp_paymongo_paymongo",
-    data: { checkout_url: "https://checkout.paymongo.com/l/abc" },
+    provider_id: "pp_xendit_xendit",
+    data: { checkout_url: "https://checkout.xendit.co/l/abc" },
   });
   assert.equal(a.kind, "redirect");
   if (a.kind === "redirect") {
@@ -50,15 +50,27 @@ test("resolveCheckoutAction: hosted https redirect (PayMongo-style)", () => {
   }
 });
 
-test("resolveCheckoutAction: Stripe embedded client_secret", () => {
+test("resolveCheckoutAction: Stripe client_secret without hosted URL is unsupported", () => {
   const a = resolveCheckoutAction("pp_stripe_stripe", {
     id: "ps_s",
     provider_id: "pp_stripe_stripe",
     data: { client_secret: "sec_xxx" },
   });
-  assert.equal(a.kind, "embedded");
-  if (a.kind === "embedded") {
-    assert.equal(a.stripeClientSecret, "sec_xxx");
+  assert.equal(a.kind, "error");
+});
+
+test("resolveCheckoutAction: Stripe prefers hosted checkout_url over client_secret", () => {
+  const a = resolveCheckoutAction("pp_stripe_stripe", {
+    id: "ps_s",
+    provider_id: "pp_stripe_stripe",
+    data: {
+      client_secret: "sec_xxx",
+      checkout_url: "https://checkout.stripe.com/c/pay/cs_test",
+    },
+  });
+  assert.equal(a.kind, "redirect");
+  if (a.kind === "redirect") {
+    assert.ok(a.url.includes("checkout.stripe.com"));
   }
 });
 
@@ -81,9 +93,9 @@ test("resolveCheckoutAction: provider mismatch is error", () => {
 });
 
 test("resolveCheckoutAction: missing https and no embedded is error", () => {
-  const a = resolveCheckoutAction("pp_maya_maya", {
+  const a = resolveCheckoutAction("pp_xendit_xendit", {
     id: "m",
-    provider_id: "pp_maya_maya",
+    provider_id: "pp_xendit_xendit",
     data: { checkout_url: "http://insecure.example" },
   });
   assert.equal(a.kind, "error");

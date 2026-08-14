@@ -3,9 +3,9 @@
  * read/write functions no-op on the server.
  */
 
-const LEGACY_STOREFRONT_KEY = "maharlika_preferences_v1";
-export const STOREFRONT_PREF_KEY = "maharlika_storefront_prefs_v2";
-export const ADMIN_PREF_KEY = "maharlika_admin_prefs_v1";
+const LEGACY_STOREFRONT_KEY = "universal_music_store_preferences_v1";
+export const STOREFRONT_PREF_KEY = "universal_music_store_storefront_prefs_v2";
+export const ADMIN_PREF_KEY = "universal_music_store_admin_prefs_v1";
 
 export type StorefrontPreferences = {
   language: "en" | "fil";

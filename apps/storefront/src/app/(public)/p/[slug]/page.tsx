@@ -6,8 +6,8 @@ import {
   getCmsPageBreadcrumbTrail,
   loadCmsPagePreviewPublic,
   loadCmsPagePublic,
-} from "@apparel-commerce/platform-data";
-import { sanitizeCmsHtml } from "@apparel-commerce/validation";
+} from "@universal-music-store/platform-data";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import { canonicalUrl } from "@/lib/seo";
 import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";

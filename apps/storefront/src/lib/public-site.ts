@@ -11,18 +11,18 @@ export function normalizeInstagramHref(raw: string | undefined): string | undefi
 }
 
 /** @deprecated Prefer server-loaded metadata via getCachedPublicSiteMetadata + normalizeInstagramHref */
-export function getInstagramHref(): string | undefined {
+function getInstagramHref(): string | undefined {
   return normalizeInstagramHref(process.env.NEXT_PUBLIC_INSTAGRAM_URL);
 }
 
 /** @deprecated Prefer server-loaded metadata */
-export function getSupportEmail(): string | undefined {
+function getSupportEmail(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim();
   return raw && raw.includes("@") ? raw : undefined;
 }
 
 /** @deprecated Prefer server-loaded metadata */
-export function getSupportPhoneDisplay(): string | undefined {
+function getSupportPhoneDisplay(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim();
   return raw || undefined;
 }

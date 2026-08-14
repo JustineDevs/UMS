@@ -3,7 +3,7 @@ import { Modules } from "@medusajs/framework/utils";
 import { inngest } from "../lib/inngest/client";
 
 /**
- * Fires an Inngest event `maharlika/order.placed` when an order is placed.
+ * Fires an Inngest event `universal-music-store/order.placed` when an order is placed.
  * Inngest handles retry logic, backoff, and delivery guarantees.
  * Falls back to direct send if INNGEST_EVENT_KEY is not set.
  */
@@ -14,9 +14,12 @@ export default async function orderPlacedSmsNotification({
   const apiKey = process.env.SEMAPHORE_API_KEY?.trim();
   if (!apiKey) return;
 
+  const { DEFAULT_PUBLIC_SITE_ORIGIN } = await import(
+    "@universal-music-store/sdk"
+  );
   const storefrontUrl =
     process.env.STOREFRONT_PUBLIC_URL?.trim() ??
-    "https://maharlika-apparel-custom.vercel.app";
+    DEFAULT_PUBLIC_SITE_ORIGIN;
 
   try {
     const orderModule = container.resolve(Modules.ORDER);
@@ -41,7 +44,7 @@ export default async function orderPlacedSmsNotification({
 
     if (process.env.INNGEST_EVENT_KEY) {
       await inngest.send({
-        name: "maharlika/order.placed",
+        name: "universal-music-store/order.placed",
         data: { phone, displayId, total, currencyCode, trackingUrl },
       });
     } else {

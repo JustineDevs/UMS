@@ -14,23 +14,23 @@ test("orderTrackStatusFromMedusa returns pending_payment when payment is not cap
   );
 });
 
-test("orderTrackStatusFromMedusa prefers AfterShip delivered metadata", () => {
+test("orderTrackStatusFromMedusa prefers Pancake POS delivered metadata", () => {
   assert.equal(
     orderTrackStatusFromMedusa({
       payment_status: "captured",
       fulfillment_status: "fulfilled",
-      metadata: { aftership_status: "delivered" },
+      metadata: { pancake_pos_status: "delivered" },
     }),
     "delivered",
   );
 });
 
-test("orderTrackStatusFromMedusa maps in_transit AfterShip metadata to shipped", () => {
+test("orderTrackStatusFromMedusa maps in_transit Pancake POS metadata to shipped", () => {
   assert.equal(
     orderTrackStatusFromMedusa({
       payment_status: "captured",
       fulfillment_status: "not_fulfilled",
-      metadata: { aftership_status: "in_transit" },
+      metadata: { pancake_pos_status: "in_transit" },
     }),
     "shipped",
   );

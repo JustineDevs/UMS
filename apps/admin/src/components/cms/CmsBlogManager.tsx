@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 
 type Post = {
   id: string;
@@ -15,12 +16,18 @@ type Post = {
 
 export function CmsBlogManager() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<Post[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     fetch("/api/admin/cms/blog")
       .then(async (r) => {
         const j = (await r.json()) as { data?: Post[]; error?: string };
@@ -28,7 +35,10 @@ export function CmsBlogManager() {
         return j.data ?? [];
       })
       .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, []);
 
   useEffect(() => {
@@ -48,15 +58,17 @@ export function CmsBlogManager() {
     selected.size > 0
       ? `/api/admin/cms/blog/export?ids=${encodeURIComponent(Array.from(selected).join(","))}`
       : "/api/admin/cms/blog/export";
+  const storefrontOrigin = getStorefrontPublicOrigin();
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
     <div className="space-y-6">
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       <p className="text-sm text-slate-600">
-        Draft and publish posts. Use Edit for the in-admin editor, scheduling, SEO fields, and preview
-        links.
+        Draft and publish posts. Use Edit for the in-admin editor, scheduling,
+        SEO fields, and preview links.
       </p>
       <div className="flex flex-wrap gap-3">
         <a
@@ -86,7 +98,15 @@ export function CmsBlogManager() {
           Delete selected
         </button>
       </div>
-      <ul className="space-y-2">
+      {loadingRows ? (
+        <p className="text-sm text-slate-600">Loading posts...</p>
+      ) : null}
+      {!loadingRows && rows.length === 0 ? (
+        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+          No blog posts exist yet.
+        </p>
+      ) : null}
+      <ul className="space-y-2" aria-label="Blog posts">
         {rows.map((p) => (
           <li
             key={p.id}
@@ -104,12 +124,20 @@ export function CmsBlogManager() {
               </span>
             </label>
             <div className="flex flex-wrap gap-3 text-xs">
-              <Link href={`/admin/cms/blog/${p.id}`} className="text-primary underline">
+              <Link
+                href={`/admin/cms/blog/${p.id}`}
+                className="text-primary underline"
+              >
                 Edit
               </Link>
-              <Link href={`/blog/${p.slug}`} className="text-primary underline" target="_blank">
+              <a
+                href={`${storefrontOrigin}/blog/${encodeURIComponent(p.slug)}`}
+                className="text-primary underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 View storefront
-              </Link>
+              </a>
             </div>
           </li>
         ))}
@@ -130,7 +158,10 @@ export function CmsBlogManager() {
                 status: "draft",
               }),
             });
-            const j = (await r.json()) as { data?: { id: string }; error?: string };
+            const j = (await r.json()) as {
+              data?: { id: string };
+              error?: string;
+            };
             if (r.ok && j.data?.id) {
               window.location.href = `/admin/cms/blog/${j.data.id}`;
             } else setError(j.error ?? "Could not create");

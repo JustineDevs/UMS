@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,15 +10,22 @@
     <header class="demo-story">
       <h1>Loyalty</h1>
       <p><strong>Audience:</strong> Marketing and store leads.</p>
-      <p><strong>Outcome:</strong> You explain how members earn points and what rewards look like in admin.</p>
+      <p>
+        <strong>Outcome:</strong> You explain how members earn points and what
+        rewards look like in admin.
+      </p>
     </header>
     <div class="controls demo-controls">
       <button type="button" id="btn-play">Play</button>
       <button type="button" id="btn-pause" disabled>Pause</button>
-      <button type="button" id="btn-step" disabled style="display: none">Next step</button>
+      <button type="button" id="btn-step" disabled style="display: none">
+        Next step
+      </button>
       <button type="button" id="btn-skip">Skip</button>
       <button type="button" id="btn-reset" disabled>Reset</button>
-      <label class="demo-ctrl-label"><input type="checkbox" id="chk-mute" /> Mute</label>
+      <label class="demo-ctrl-label"
+        ><input type="checkbox" id="chk-mute" /> Mute</label
+      >
       <label class="demo-ctrl-label"
         >Speed
         <select id="sel-speed" aria-label="Demo speed">
@@ -36,45 +43,74 @@
           <option value="manual">Manual</option>
         </select></label
       >
-      <div class="demo-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="demo-progress-wrap">
+      <div
+        class="demo-progress"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+        id="demo-progress-wrap"
+      >
         <div class="demo-progress-bar" id="demo-progress-bar"></div>
       </div>
       <a href="./index.html">← All demos</a>
     </div>
     <ul class="demo-recap">
       <li>Loyalty sits in Marketing between Analytics and Campaigns.</li>
-      <li>Members still checkout through commerce; points are a platform layer story.</li>
+      <li>
+        Members still checkout through commerce; points are a platform layer
+        story.
+      </li>
       <li>Numbers shown are mock.</li>
     </ul>
-    <audio id="ui-tick" preload="auto" src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="></audio>
+    <audio
+      id="ui-tick"
+      preload="auto"
+      src="data:audio/wav;base64,UklGRi4AAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+    ></audio>
     <audio id="narration" preload="none"></audio>
     <div class="wrap" id="wrap">
       <div class="browser">
         <div class="chrome-top">
-          <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="dots" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
           <div class="url-bar" id="url-bar"></div>
         </div>
         <div class="stage" id="stage">
           <aside class="sidebar" id="sidebar"></aside>
           <div class="main">
             <div class="scene on" id="scene-0">
-              <h2 class="faux">Maharlika Circle</h2>
+              <h2 class="faux">Universal Music Circle</h2>
               <div class="kpis">
                 <div class="kpi"><b>1,840</b>Active members</div>
                 <div class="kpi"><b>128k</b>Points issued (30d)</div>
                 <div class="kpi"><b>Top</b>₱500 voucher</div>
               </div>
-              <p style="font-size: 12px; color: var(--muted); margin-top: 10px">Reward: 2,500 pts · mock</p>
+              <p style="font-size: 12px; color: var(--muted); margin-top: 10px">
+                Reward: 2,500 pts · mock
+              </p>
             </div>
             <div class="scene" id="scene-1">
               <h2 class="faux">Campaigns</h2>
-              <p style="font-size: 12px; color: var(--muted)">Activate sends after loyalty segments are ready.</p>
+              <p style="font-size: 12px; color: var(--muted)">
+                Activate sends after loyalty segments are ready.
+              </p>
             </div>
             <div class="caption" id="caption">Press Play to start.</div>
           </div>
           <div class="cursor" id="cursor" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z" fill="white" stroke="#191c1e" stroke-width="1.2" />
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 3L4 20L9 15L14 22L16 21L11 14L18 14L4 3Z"
+                fill="white"
+                stroke="#191c1e"
+                stroke-width="1.2"
+              />
             </svg>
           </div>
           <div class="ripple" id="ripple"></div>
@@ -88,12 +124,55 @@
         var GD = window.GuideDemo;
         GD.renderSidebar("#sidebar", "loyalty");
         var TIMELINE = [
-          { t: 0, x: 0.52, y: 0.38, cap: "Loyalty summarizes members, points, and headline rewards.", speak: "Loyalty is where you explain how members earn and burn value." },
-          { t: 3000, x: 0.14, y: 0.48, cap: "Marketing groups analytics, loyalty, campaigns, and site surfaces.", speak: "Loyalty sits with analytics and campaigns in Marketing." },
-          { t: 5600, x: 0.14, y: 0.54, cap: "", speak: "", click: true, navKey: "campaigns" },
-          { t: 6000, scene: 1, x: 0.5, y: 0.4, cap: "Campaigns turn segments into scheduled or live outreach.", speak: "Campaigns is where loyalty segments often activate." },
-          { t: 9200, x: 0.14, y: 0.48, cap: "", speak: "", click: true, navKey: "loyalty" },
-          { t: 9600, scene: 0, x: 0.52, y: 0.42, cap: "Recap: loyalty for value, campaigns for activation.", speak: "End of loyalty demo." },
+          {
+            t: 0,
+            x: 0.52,
+            y: 0.38,
+            cap: "Loyalty summarizes members, points, and headline rewards.",
+            speak:
+              "Loyalty is where you explain how members earn and burn value.",
+          },
+          {
+            t: 3000,
+            x: 0.14,
+            y: 0.48,
+            cap: "Marketing groups analytics, loyalty, campaigns, and site surfaces.",
+            speak: "Loyalty sits with analytics and campaigns in Marketing.",
+          },
+          {
+            t: 5600,
+            x: 0.14,
+            y: 0.54,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "campaigns",
+          },
+          {
+            t: 6000,
+            scene: 1,
+            x: 0.5,
+            y: 0.4,
+            cap: "Campaigns turn segments into scheduled or live outreach.",
+            speak: "Campaigns is where loyalty segments often activate.",
+          },
+          {
+            t: 9200,
+            x: 0.14,
+            y: 0.48,
+            cap: "",
+            speak: "",
+            click: true,
+            navKey: "loyalty",
+          },
+          {
+            t: 9600,
+            scene: 0,
+            x: 0.52,
+            y: 0.42,
+            cap: "Recap: loyalty for value, campaigns for activation.",
+            speak: "End of loyalty demo.",
+          },
         ];
         GD.attachPlayer({
           wrap: "#wrap",
@@ -119,7 +198,9 @@
           timeline: TIMELINE,
           totalMs: 11800,
           urlForScene: function (idx) {
-            return idx === 0 ? GD.getUrlForKey("loyalty") : GD.getUrlForKey("campaigns");
+            return idx === 0
+              ? GD.getUrlForKey("loyalty")
+              : GD.getUrlForKey("campaigns");
           },
         });
       })();

@@ -5,55 +5,54 @@ import {
 } from "@medusajs/framework/utils";
 import { processPaymentWorkflow } from "@medusajs/medusa/core-flows";
 
-const MAYA_SANDBOX_API = "https://pg-sandbox.paymaya.com";
-const MAYA_PROD_API = "https://pg.paymaya.com";
+const XENDIT_API = "https://api.xendit.co";
 
 function basicAuth(secretKey: string): string {
   return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
 }
 
-function getMayaApiBase(sandbox: boolean): string {
-  return sandbox ? MAYA_SANDBOX_API : MAYA_PROD_API;
-}
-
-type MayaInvoiceJson = {
+type XenditSessionJson = {
   status?: string;
-  totalAmount?: { value?: string };
+  amount?: number;
+  reference_id?: string;
+  payment_request_id?: string;
+  payment_id?: string;
+  data?: {
+    status?: string;
+    amount?: number;
+    reference_id?: string;
+    payment_request_id?: string;
+    payment_id?: string;
+  };
 };
 
-async function fetchMayaInvoiceCompleted(
-  invoiceId: string,
+async function fetchXenditSessionCompleted(
+  sessionId: string,
   secretKey: string,
-  sandbox: boolean,
 ): Promise<{ completed: boolean; amountMinor: number }> {
-  const apiBase = getMayaApiBase(sandbox);
-  const res = await fetch(
-    `${apiBase}/invoice/v2/invoices/${encodeURIComponent(invoiceId)}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: basicAuth(secretKey),
-        Accept: "application/json",
-      },
+  const res = await fetch(`${XENDIT_API}/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: basicAuth(secretKey),
+      Accept: "application/json",
     },
-  );
+  });
   const text = await res.text();
   if (!res.ok) {
     return { completed: false, amountMinor: 0 };
   }
-  let json: MayaInvoiceJson;
+  let json: XenditSessionJson;
   try {
-    json = JSON.parse(text) as MayaInvoiceJson;
+    json = JSON.parse(text) as XenditSessionJson;
   } catch {
     return { completed: false, amountMinor: 0 };
   }
-  const status = (json.status ?? "").toUpperCase();
-  if (status !== "COMPLETED") {
+  const data = json.data ?? {};
+  const status = (data.status ?? json.status ?? "").toUpperCase();
+  if (status !== "COMPLETED" && status !== "SUCCESS" && status !== "PAID") {
     return { completed: false, amountMinor: 0 };
   }
-  const amountStr = json.totalAmount?.value;
-  const amountMinor =
-    amountStr != null ? Math.round(parseFloat(String(amountStr)) * 100) : 0;
+  const amountMinor = Math.round(Number(data.amount ?? json.amount ?? 0));
   return {
     completed: true,
     amountMinor: Number.isFinite(amountMinor) ? Math.max(0, amountMinor) : 0,
@@ -69,9 +68,9 @@ type PaymentSessionRow = {
 };
 
 /**
- * Polls gateway state for Maya sessions stuck in `requires_more` / `pending`
+ * Polls gateway state for Xendit sessions stuck in `requires_more` / `pending`
  * after checkout (missed webhook). Completes payment via the same workflow as
- * {@link processPaymentWorkflow} when the invoice is paid.
+ * {@link processPaymentWorkflow} when the session is paid.
  */
 export default async function reconcilePendingPayments({
   container,
@@ -83,15 +82,13 @@ export default async function reconcilePendingPayments({
   const minutes = Math.max(1, Number(process.env.MEDUSA_RECONCILE_MINUTES ?? "30"));
   const cutoff = new Date(Date.now() - minutes * 60 * 1000).toISOString();
 
-  const secretKey = process.env.MAYA_SECRET_KEY?.trim();
+  const secretKey = process.env.XENDIT_SECRET_KEY?.trim();
   if (!secretKey) {
     logger.warn(
-      "[reconcile-pending-payments] MAYA_SECRET_KEY not set — skipping Maya reconciliation.",
+      "[reconcile-pending-payments] XENDIT_SECRET_KEY not set — skipping Xendit reconciliation.",
     );
     return;
   }
-
-  const sandbox = process.env.MAYA_SANDBOX === "true";
 
   const query = container.resolve(ContainerRegistrationKeys.QUERY);
   let sessions: PaymentSessionRow[] = [];
@@ -100,7 +97,7 @@ export default async function reconcilePendingPayments({
       entity: "payment_session",
       fields: ["id", "status", "provider_id", "data", "created_at"],
       filters: {
-        provider_id: { $ilike: "%maya%" },
+        provider_id: { $ilike: "%xendit%" },
         created_at: { $lt: cutoff },
       },
     });
@@ -122,15 +119,11 @@ export default async function reconcilePendingPayments({
     if (st === "authorized" || st === "captured") continue;
 
     const data = row.data ?? {};
-    const invoiceId =
-      typeof data.maya_invoice_id === "string" ? data.maya_invoice_id.trim() : "";
-    if (!invoiceId) continue;
+    const sessionId =
+      typeof data.xendit_session_id === "string" ? data.xendit_session_id.trim() : "";
+    if (!sessionId) continue;
 
-    const { completed, amountMinor } = await fetchMayaInvoiceCompleted(
-      invoiceId,
-      secretKey,
-      sandbox,
-    );
+    const { completed, amountMinor } = await fetchXenditSessionCompleted(sessionId, secretKey);
     if (!completed) continue;
 
     try {
@@ -145,7 +138,7 @@ export default async function reconcilePendingPayments({
       });
       processed += 1;
       logger.info(
-        `[reconcile-pending-payments] Completed stuck Maya session ${id} (invoice ${invoiceId}).`,
+        `[reconcile-pending-payments] Completed stuck Xendit session ${id} (session ${sessionId}).`,
       );
     } catch (e) {
       logger.warn(
@@ -157,6 +150,6 @@ export default async function reconcilePendingPayments({
   }
 
   logger.info(
-    `[reconcile-pending-payments] Scanned ${sessions.length} Maya session(s) older than ${minutes}m; reconciled ${processed}.`,
+    `[reconcile-pending-payments] Scanned ${sessions.length} Xendit session(s) older than ${minutes}m; reconciled ${processed}.`,
   );
 }

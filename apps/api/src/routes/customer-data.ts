@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import {
   internalCustomerDataErasureBodySchema,
   internalCustomerDataExportBodySchema,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 
 const router = Router();
 

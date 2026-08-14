@@ -1,6 +1,5 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   getCmsNavigationDraftPayload,
   getCmsNavigationPayloadAdmin,
@@ -8,25 +7,24 @@ import {
   normalizeNavigationPayloadInput,
   upsertCmsNavigationDraftPayload,
   upsertCmsNavigationPayload,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { cmsNavigationSchema } from "@/lib/cms-route-contracts";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:read")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("content:read");
+  if (!auth.ok) return auth.response;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const live = await getCmsNavigationPayloadAdmin(sup.client);
-  const draft = await getCmsNavigationDraftPayload(sup.client);
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
+  const live = await getCmsNavigationPayloadAdmin(sup.client, organization.id);
+  const draft = await getCmsNavigationDraftPayload(sup.client, organization.id);
   const merged = mergeNavigationDraftOverLive(live, draft);
   return correlatedJson(cid, {
     data: merged,
@@ -34,32 +32,25 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export async function PUT(req: NextRequest) {
+async function put(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
+  const auth = await requireStaffApiSession("content:write");
+  if (!auth.ok) return auth.response;
+  const parsed = cmsNavigationSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return correlatedJson(cid, { error: "Invalid navigation payload" }, { status: 400 });
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const rec = body as Record<string, unknown>;
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
+  const rec = parsed.data as Record<string, unknown>;
   try {
     if (rec.mode === "draft") {
       const payload = normalizeNavigationPayloadInput(rec.payload ?? rec);
-      await upsertCmsNavigationDraftPayload(sup.client, payload);
+      await upsertCmsNavigationDraftPayload(sup.client, payload, organization.id);
     } else {
-      const payload = normalizeNavigationPayloadInput(body);
-      await upsertCmsNavigationPayload(sup.client, payload);
-      await upsertCmsNavigationDraftPayload(sup.client, {});
+      const payload = normalizeNavigationPayloadInput(parsed.data);
+      await upsertCmsNavigationPayload(sup.client, payload, organization.id);
+      await upsertCmsNavigationDraftPayload(sup.client, {}, organization.id);
     }
   } catch (e) {
     return correlatedJson(
@@ -68,11 +59,13 @@ export async function PUT(req: NextRequest) {
       { status: 500 },
     );
   }
-  const live = await getCmsNavigationPayloadAdmin(sup.client);
-  const draft = await getCmsNavigationDraftPayload(sup.client);
+  const live = await getCmsNavigationPayloadAdmin(sup.client, organization.id);
+  const draft = await getCmsNavigationDraftPayload(sup.client, organization.id);
   const merged = mergeNavigationDraftOverLive(live, draft);
   return correlatedJson(cid, {
     data: merged,
     meta: { hasDraft: draft != null },
   });
 }
+
+export const PUT = withAdminMutationIdempotency("/admin/cms/navigation:PUT", put);

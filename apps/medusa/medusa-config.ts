@@ -1,20 +1,32 @@
 import { resolve } from "node:path";
-import { loadEnv, defineConfig } from "@medusajs/framework/utils";
+import { defineConfig } from "@medusajs/framework/utils";
+import { config as loadDotenv } from "dotenv";
 import { validateMedusaProcessEnv } from "./src/loaders/validate-process-env";
+import { nangoPaymentProviderConfigured } from "./src/lib/nango-payment-credentials";
 
-const env = process.env.NODE_ENV || "development";
-loadEnv(env, resolve(process.cwd(), "../.."));
-loadEnv(env, process.cwd());
+const repoRoot = resolve(process.cwd(), "../..");
+const preservedNodeEnv = process.env.NODE_ENV;
+const envFileName =
+  preservedNodeEnv === "production" ? ".env.production" : ".env.local";
+// Keep deployment/runtime environment variables authoritative over local dotenv files.
+loadDotenv({ path: resolve(repoRoot, envFileName) });
+loadDotenv({ path: resolve(process.cwd(), envFileName) });
+if (preservedNodeEnv === undefined) {
+  delete process.env.NODE_ENV;
+} else {
+  process.env.NODE_ENV = preservedNodeEnv;
+}
 validateMedusaProcessEnv();
 
 /** Hosted Stripe Checkout (checkout.sessions) — same provider id `pp_stripe_stripe` as the stock plugin. */
-const stripeProvider = process.env.STRIPE_API_KEY?.trim()
+const stripeManagedByNango = nangoPaymentProviderConfigured("stripe");
+const stripeProvider = stripeManagedByNango
   ? [
       {
         resolve: "./src/modules/stripe-checkout-payment",
         id: "stripe",
         options: {
-          apiKey: process.env.STRIPE_API_KEY,
+          apiKey: "",
           webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
           successUrl: process.env.STRIPE_CHECKOUT_SUCCESS_URL?.trim(),
           cancelUrl: process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim(),
@@ -31,59 +43,37 @@ const codProvider = [
   },
 ];
 
+const paypalManagedByNango = nangoPaymentProviderConfigured(["paypal", "paypal-sandbox"]);
 const paypalProvider =
-  process.env.PAYPAL_CLIENT_ID?.trim() &&
-  process.env.PAYPAL_CLIENT_SECRET?.trim()
+  paypalManagedByNango
     ? [
         {
           resolve: "./src/modules/paypal-payment",
           id: "paypal",
           options: {
-            clientId: process.env.PAYPAL_CLIENT_ID!,
-            clientSecret: process.env.PAYPAL_CLIENT_SECRET!,
+            clientId: "",
+            clientSecret: "",
             sandbox:
               process.env.PAYPAL_ENVIRONMENT === "sandbox" ||
+              nangoPaymentProviderConfigured("paypal-sandbox") ||
               process.env.NODE_ENV !== "production",
           },
         },
       ]
     : [];
 
-const paymongoProvider =
-  process.env.PAYMONGO_SECRET_KEY?.trim() &&
-  process.env.PAYMONGO_WEBHOOK_SECRET?.trim()
+const xenditProvider =
+  process.env.XENDIT_SECRET_KEY?.trim() &&
+  process.env.XENDIT_WEBHOOK_TOKEN?.trim()
     ? [
         {
-          resolve: "./src/modules/paymongo-payment",
-          id: "paymongo",
+          resolve: "./src/modules/xendit-payment",
+          id: "xendit",
           options: {
-            secretKey: process.env.PAYMONGO_SECRET_KEY!,
-            webhookSecret: process.env.PAYMONGO_WEBHOOK_SECRET!,
-          },
-        },
-      ]
-    : [];
-
-const mayaProvider =
-  process.env.MAYA_SECRET_KEY?.trim() && process.env.MAYA_WEBHOOK_SECRET?.trim()
-    ? [
-        {
-          resolve: "./src/modules/maya-payment",
-          id: "maya",
-          options: {
-            secretKey: process.env.MAYA_SECRET_KEY!,
-            webhookSecret: process.env.MAYA_WEBHOOK_SECRET!,
-            /**
-             * Sandbox vs production PayMaya hosts. Unset in dev often meant "production"
-             * API with sandbox keys (401). Prefer sandbox when NODE_ENV is not production
-             * unless MAYA_SANDBOX=false.
-             */
-            sandbox:
-              process.env.MAYA_SANDBOX === "true"
-                ? true
-                : process.env.MAYA_SANDBOX === "false"
-                  ? false
-                  : process.env.NODE_ENV !== "production",
+            secretKey: process.env.XENDIT_SECRET_KEY!,
+            webhookToken: process.env.XENDIT_WEBHOOK_TOKEN!,
+            successUrl: process.env.XENDIT_CHECKOUT_SUCCESS_URL?.trim(),
+            cancelUrl: process.env.XENDIT_CHECKOUT_CANCEL_URL?.trim(),
           },
         },
       ]
@@ -93,22 +83,38 @@ const paymentProviders = [
   ...stripeProvider,
   ...codProvider,
   ...paypalProvider,
-  ...paymongoProvider,
-  ...mayaProvider,
+  ...xenditProvider,
 ];
 
-if (stripeProvider.length === 0) {
+if (stripeProvider.length === 0 && process.env.NODE_ENV === "production") {
   console.warn(
-    "[medusa-config] Stripe provider is not registered (STRIPE_API_KEY missing). " +
+    "[medusa-config] Stripe provider is not registered (Nango integration is not configured). " +
       "Regions that list pp_stripe_stripe will fail when creating payment sessions. " +
-      "Set STRIPE_API_KEY (and STRIPE_WEBHOOK_SECRET in production) in the Medusa environment, " +
+    "Configure the Nango Stripe integration (and STRIPE_WEBHOOK_SECRET in production), " +
       "or remove Stripe from the region in Medusa Admin → Settings → Regions.",
   );
 }
 
+/** Medusa event bus / locking: requires a TCP `redis://` or `rediss://` URL. REST-only Upstash vars are not used here. */
+const configuredRedisUrl =
+  process.env.REDIS_URL?.trim() || process.env.MEDUSA_REDIS_URL?.trim() || "";
+const redisUrl = (() => {
+  if (!configuredRedisUrl) return "";
+  try {
+    const url = new URL(configuredRedisUrl);
+    if (url.hostname.endsWith(".upstash.io") && url.protocol === "redis:") {
+      url.protocol = "rediss:";
+    }
+    return url.toString();
+  } catch {
+    return configuredRedisUrl;
+  }
+})();
+
 export default defineConfig({
   projectConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    ...(redisUrl ? { redisUrl } : {}),
     http: {
       storeCors: process.env.STORE_CORS!,
       adminCors: process.env.ADMIN_CORS!,
@@ -119,7 +125,10 @@ export default defineConfig({
   },
   admin: {
     disable: false,
-    backendUrl: process.env.MEDUSA_BACKEND_URL || "http://localhost:9000",
+    backendUrl:
+      process.env.MEDUSA_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_MEDUSA_URL ||
+      "http://localhost:9000",
   },
   modules: [
     ...(paymentProviders.length

@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { PreferencesControls } from "@/components/PreferencesControls";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Region & language",
-};
+  description: "Currency and shipping region preferences for the storefront.",
+  path: "/preferences",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default function PreferencesPage() {
   return (

@@ -1,26 +1,26 @@
 import { createClient } from "@supabase/supabase-js";
-import { getCmsNavigationPayload } from "./cms-navigation";
-import { listCmsAnnouncementsForLocalePublic } from "./cms-announcement";
+import { getCmsNavigationPayload } from "./cms-navigation.js";
+import { listCmsAnnouncementsForLocalePublic } from "./cms-announcement.js";
 import {
   getCmsPageBySlugLocalePublic,
   getCmsPageBySlugPreview,
   listCmsPagesForSitemapPublic,
-} from "./cms-pages";
+} from "./cms-pages.js";
 import {
   getCmsBlogPostBySlugPublic,
   listCmsBlogPostsPublic,
   listCmsBlogPostsForSitemapPublic,
-} from "./cms-blog";
-import { getCmsCategoryContentPublic } from "./cms-category";
-import { listCmsAbExperiments } from "./cms-experiments";
+} from "./cms-blog.js";
+import { getCmsCategoryContentPublic } from "./cms-category.js";
+import { listCmsAbExperiments } from "./cms-experiments.js";
 import type {
   CmsPageRow,
   CmsBlogPostRow,
   CmsNavigationPayload,
-} from "./cms-types";
-import type { CmsAnnouncementRow } from "./cms-announcement";
-import type { CmsCategoryContentRow } from "./cms-category";
-import type { CmsAbExperimentRow } from "./cms-experiments";
+} from "./cms-types.js";
+import type { CmsAnnouncementRow } from "./cms-announcement.js";
+import type { CmsCategoryContentRow } from "./cms-category.js";
+import type { CmsAbExperimentRow } from "./cms-experiments.js";
 
 function anonClient() {
   const url = process.env.SUPABASE_URL?.trim();
@@ -29,10 +29,16 @@ function anonClient() {
   return createClient(url, anonKey);
 }
 
+function publicOrganizationId(): string | null {
+  const id = process.env.DEFAULT_ORGANIZATION_ID?.trim();
+  return id || null;
+}
+
 export async function loadCmsPagePublic(slug: string, locale = "en"): Promise<CmsPageRow | null> {
   const sb = anonClient();
-  if (!sb) return null;
-  return getCmsPageBySlugLocalePublic(sb, slug, locale);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return null;
+  return getCmsPageBySlugLocalePublic(sb, slug, locale, organizationId);
 }
 
 export async function loadCmsPagePreviewPublic(
@@ -41,15 +47,17 @@ export async function loadCmsPagePreviewPublic(
   locale = "en",
 ): Promise<CmsPageRow | null> {
   const sb = anonClient();
-  if (!sb) return null;
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return null;
   const token = previewToken.trim();
   if (!token) return null;
-  return getCmsPageBySlugPreview(sb, slug, locale, token);
+  return getCmsPageBySlugPreview(sb, slug, locale, token, organizationId);
 }
 
 export async function loadCmsNavigationPublic(): Promise<CmsNavigationPayload> {
   const sb = anonClient();
-  if (!sb)
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId)
     return {
       headerLinks: [],
       headerLinksMobile: [],
@@ -57,7 +65,7 @@ export async function loadCmsNavigationPublic(): Promise<CmsNavigationPayload> {
       footerBottomLinks: [],
       socialLinks: [],
     };
-  return getCmsNavigationPayload(sb);
+  return getCmsNavigationPayload(sb, organizationId);
 }
 
 const DEFAULT_CMS_LOCALE = (process.env.NEXT_PUBLIC_CMS_LOCALE ?? "en").trim() || "en";
@@ -65,8 +73,9 @@ const DEFAULT_CMS_LOCALE = (process.env.NEXT_PUBLIC_CMS_LOCALE ?? "en").trim() |
 /** Active announcement bars for a locale (stacking rules applied). */
 export async function loadCmsAnnouncementsPublic(locale = DEFAULT_CMS_LOCALE): Promise<CmsAnnouncementRow[]> {
   const sb = anonClient();
-  if (!sb) return [];
-  return listCmsAnnouncementsForLocalePublic(sb, locale);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return [];
+  return listCmsAnnouncementsForLocalePublic(sb, locale, undefined, organizationId);
 }
 
 /** @deprecated Prefer loadCmsAnnouncementsPublic (returns stacked list). */
@@ -80,26 +89,30 @@ export async function loadCmsCategoryContentPublic(
   locale = "en",
 ): Promise<CmsCategoryContentRow | null> {
   const sb = anonClient();
-  if (!sb) return null;
-  return getCmsCategoryContentPublic(sb, collectionHandle, locale);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return null;
+  return getCmsCategoryContentPublic(sb, collectionHandle, locale, organizationId);
 }
 
 export async function loadCmsBlogListPublic(locale = "en"): Promise<CmsBlogPostRow[]> {
   const sb = anonClient();
-  if (!sb) return [];
-  return listCmsBlogPostsPublic(sb, locale, 40);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return [];
+  return listCmsBlogPostsPublic(sb, locale, 40, organizationId);
 }
 
 export async function loadCmsBlogPostPublic(slug: string, locale = "en"): Promise<CmsBlogPostRow | null> {
   const sb = anonClient();
-  if (!sb) return null;
-  return getCmsBlogPostBySlugPublic(sb, slug, locale);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return null;
+  return getCmsBlogPostBySlugPublic(sb, slug, locale, organizationId);
 }
 
 export async function loadCmsAbExperimentsActivePublic(): Promise<CmsAbExperimentRow[]> {
   const sb = anonClient();
-  if (!sb) return [];
-  const rows = await listCmsAbExperiments(sb);
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return [];
+  const rows = await listCmsAbExperiments(sb, organizationId);
   const now = Date.now();
   return rows.filter((r) => {
     if (!r.active) return false;
@@ -114,10 +127,11 @@ export async function loadCmsSitemapEntries(): Promise<{
   posts: { slug: string; locale: string; updated_at: string }[];
 }> {
   const sb = anonClient();
-  if (!sb) return { pages: [], posts: [] };
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return { pages: [], posts: [] };
   const [pages, posts] = await Promise.all([
-    listCmsPagesForSitemapPublic(sb),
-    listCmsBlogPostsForSitemapPublic(sb),
+    listCmsPagesForSitemapPublic(sb, organizationId),
+    listCmsBlogPostsForSitemapPublic(sb, organizationId),
   ]);
   return { pages, posts };
 }

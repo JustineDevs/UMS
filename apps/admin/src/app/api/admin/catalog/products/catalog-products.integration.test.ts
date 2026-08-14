@@ -1,12 +1,5 @@
-/**
- * PH-01: Catalog save path integration tests.
- * Validates that the catalog create/update API routes return structured errors
- * on missing/invalid input and include correlation IDs on every response.
- * These are unit-level mocks for the route handlers; a real E2E against a
- * running Medusa instance should be added to stress-test/e2e/.
- */
-
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import assert from "node:assert/strict";
+import test from "node:test";
 
 const BASE_PRODUCT = {
   title: "Test Jacket",
@@ -17,8 +10,7 @@ const BASE_PRODUCT = {
   stockQuantity: 10,
 };
 
-describe("Catalog products API - create", () => {
-  it("rejects request with missing title (400 with error field)", async () => {
+test("Catalog products API - create rejects request with missing title", async () => {
     const { POST } = await import("./route");
     const req = new Request("http://localhost/api/admin/catalog/products", {
       method: "POST",
@@ -26,12 +18,12 @@ describe("Catalog products API - create", () => {
       body: JSON.stringify({ pricePhp: 1500, status: "draft" }),
     });
     const res = await POST(req);
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    assert.ok(res.status >= 400);
     const body = await res.json();
-    expect(typeof body).toBe("object");
+    assert.equal(typeof body, "object");
   });
 
-  it("response always includes x-correlation-id header", async () => {
+test("Catalog products API - create includes correlation id header", async () => {
     const { POST } = await import("./route");
     const req = new Request("http://localhost/api/admin/catalog/products", {
       method: "POST",
@@ -42,12 +34,12 @@ describe("Catalog products API - create", () => {
       body: JSON.stringify({ pricePhp: 0 }),
     });
     const res = await POST(req);
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    assert.ok(res.status >= 400);
     const body = await res.json();
-    expect(body).toHaveProperty("correlationId");
+    assert.ok("correlationId" in body);
   });
 
-  it("rejects stock quantity above maximum (400)", async () => {
+test("Catalog products API - create rejects stock quantity above maximum", async () => {
     const { POST } = await import("./route");
     const req = new Request("http://localhost/api/admin/catalog/products", {
       method: "POST",
@@ -55,14 +47,12 @@ describe("Catalog products API - create", () => {
       body: JSON.stringify({ ...BASE_PRODUCT, stockQuantity: 9_999_999 }),
     });
     const res = await POST(req);
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    assert.ok(res.status >= 400);
     const body = await res.json();
-    expect(body).toHaveProperty("error");
+    assert.ok("error" in body);
   });
-});
 
-describe("Catalog products API - structured error surface", () => {
-  it("returns JSON with error key on auth failure", async () => {
+test("Catalog products API - structured error surface on auth failure", async () => {
     const { POST } = await import("./route");
     const req = new Request("http://localhost/api/admin/catalog/products", {
       method: "POST",
@@ -70,9 +60,8 @@ describe("Catalog products API - structured error surface", () => {
       body: JSON.stringify(BASE_PRODUCT),
     });
     const res = await POST(req);
-    expect([400, 401, 403, 422, 500, 502]).toContain(res.status);
+    assert.ok([400, 401, 403, 422, 500, 502].includes(res.status));
     const body = await res.json();
-    expect(typeof body).toBe("object");
-    expect(body).not.toBeNull();
+    assert.equal(typeof body, "object");
+    assert.notEqual(body, null);
   });
-});

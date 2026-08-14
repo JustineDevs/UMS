@@ -5,14 +5,14 @@ import { parseShopPageQuery } from "./shop-page-query";
 
 test("parseShopPageQuery preserves valid filters when only price bounds are invalid", () => {
   const parsed = parseShopPageQuery({
-    category: "shirts",
+    category: "guitars",
     sort: "price_asc",
     offset: "20",
     minPrice: "-1",
     maxPrice: "not-a-number",
   });
 
-  assert.equal(parsed.category, "shirts");
+  assert.equal(parsed.category, "guitars");
   assert.equal(parsed.sort, "price_asc");
   assert.equal(parsed.offset, 20);
   assert.equal(parsed.minPrice, undefined);

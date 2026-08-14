@@ -1,4 +1,13 @@
-import { getMedusaSecretApiKey, getMedusaStoreBaseUrl } from "./storefront-medusa-env";
+import { MedusaAdminConfigurationError } from "./medusa-admin-configuration-error";
+import {
+  getMedusaAdminBaseUrl,
+  getMedusaSecretApiKey,
+} from "./storefront-medusa-env";
+
+export {
+  MedusaAdminConfigurationError,
+  
+} from "./medusa-admin-configuration-error";
 
 /**
  * Medusa Admin API (server-only). Same Basic auth as admin app.
@@ -13,16 +22,25 @@ function secretApiKeyBasicAuthorization(secret: string): string {
   return `Basic ${b64}`;
 }
 
+function logMedusaAdminConfigMissing(): void {
+  console.error(
+    JSON.stringify({
+      level: "error",
+      diagnostic_code: "STORE_MEDUSA_ADMIN_SECRET_MISSING",
+      msg: "medusaAdminFetch called without MEDUSA_SECRET_API_KEY / MEDUSA_ADMIN_API_SECRET",
+    }),
+  );
+}
+
 export async function medusaAdminFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const base = getMedusaStoreBaseUrl().replace(/\/$/, "");
+  const base = getMedusaAdminBaseUrl().replace(/\/$/, "");
   const secret = getMedusaSecretApiKey();
   if (!secret) {
-    throw new Error(
-      "MEDUSA_SECRET_API_KEY is not set (add it to the repo root .env or .env.local, from Medusa Admin → Settings → Secret API keys)",
-    );
+    logMedusaAdminConfigMissing();
+    throw new MedusaAdminConfigurationError();
   }
   const url = path.startsWith("http")
     ? path

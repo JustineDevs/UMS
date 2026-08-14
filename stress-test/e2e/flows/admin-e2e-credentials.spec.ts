@@ -20,7 +20,7 @@ test.describe("Admin E2E credentials", () => {
     if (result === "skip_no_env") {
       test.skip(
         true,
-        "Set ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET in root .env for Playwright (loaded by playwright.config).",
+        "Set ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET in root .env.local for Playwright (loaded by playwright.config).",
       );
     }
   });

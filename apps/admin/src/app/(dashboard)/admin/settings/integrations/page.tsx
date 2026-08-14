@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
+import PancakeIntegrationCard from "./PancakeIntegrationCard";
 import type { IntegrationHealthEntry } from "@/app/api/admin/integration-health/route";
 
 const STATUS_STYLES: Record<IntegrationHealthEntry["status"], { bg: string; text: string; label: string }> = {
@@ -23,27 +24,16 @@ function callbackStatusLabel(status: IntegrationHealthEntry["webhookStatus"]): s
 }
 
 export default function IntegrationHealthPage() {
-  const [entries, setEntries] = useState<IntegrationHealthEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch("/api/admin/integration-health");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { entries: IntegrationHealthEntry[] };
-        if (!cancelled) setEntries(data.entries);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void load();
-    return () => { cancelled = true; };
-  }, []);
+  const { data, error, isLoading, mutate } = useSWR<{ entries: IntegrationHealthEntry[] }>(
+    "/api/admin/integration-health",
+    async (url: string) => {
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return (await res.json()) as { entries: IntegrationHealthEntry[] };
+    },
+    { revalidateOnFocus: false },
+  );
+  const entries = data?.entries ?? [];
 
   const healthyCount = entries.filter((e) => e.status === "healthy").length;
   const degradedCount = entries.filter((e) => e.status === "degraded").length;
@@ -59,10 +49,25 @@ export default function IntegrationHealthPage() {
         </p>
       </div>
 
-      {loading ? (
+      <PancakeIntegrationCard />
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => void mutate()}
+          disabled={isLoading}
+          className="rounded border border-outline-variant/30 px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-50"
+        >
+          {isLoading ? "Checking…" : "Check again"}
+        </button>
+      </div>
+
+      {isLoading ? (
         <p className="text-sm text-neutral-400 py-12 text-center">Loading…</p>
       ) : error ? (
-        <p className="text-sm text-red-600 py-12 text-center">{error}</p>
+        <p className="py-12 text-center text-sm text-red-600" role="alert">
+          {error instanceof Error ? error.message : "Failed to load"}
+        </p>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-4">

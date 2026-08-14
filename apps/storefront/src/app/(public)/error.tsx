@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { capturePostHogClientException } from "@universal-music-store/sdk";
 import { HttpErrorPage } from "@/components/HttpErrorPage";
+import { hasAnalyticsConsent } from "@/lib/analytics-consent";
 
 export default function PublicRouteError({
   error,
@@ -11,6 +13,12 @@ export default function PublicRouteError({
   reset: () => void;
 }) {
   useEffect(() => {
+    if (hasAnalyticsConsent()) {
+      capturePostHogClientException(error, {
+        scope: "storefront-public-error",
+        digest: error.digest ?? null,
+      });
+    }
     console.error(error);
   }, [error]);
 

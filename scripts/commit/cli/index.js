@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * apparel-commerce-commit CLI (Apparel Commerce monorepo)
+ * universal-music-store-commit CLI (Universal Music Store monorepo)
  * Composable commands for git commit with security checks and optional Linear integration.
  * Uses cli-building (async-first, composable) and linear-cli skills.
  */
@@ -42,11 +42,11 @@ async function main() {
 
 function printUsage() {
   console.log(`
-${style('apparel-commerce-commit', 'bright')} - Git commit CLI with security checks
+${style('universal-music-store-commit', 'bright')} - Git commit CLI with security checks
 
-Usage: apparel-commerce-commit commit [options]   (default)
-       apparel-commerce-commit security
-       apparel-commerce-commit linear [--issue <id>]
+Usage: universal-music-store-commit commit [options]   (default)
+       universal-music-store-commit security
+       universal-music-store-commit linear [--issue <id>]
 
 Commands:
   commit    Parallel commit with security checks (default)

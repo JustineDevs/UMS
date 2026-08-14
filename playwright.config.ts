@@ -4,15 +4,14 @@ import { existsSync } from "fs";
 import { resolve } from "path";
 
 /**
- * http-flow scripts often set `PLAYWRIGHT_SKIP_WEBSERVER=1` in `.env`. That must not disable
+ * http-flow scripts often set `PLAYWRIGHT_SKIP_WEBSERVER=1` in `.env.local`. That must not disable
  * `webServer` when you run `pnpm exec playwright test` without exporting the var in the shell,
  * or every API test gets `ECONNREFUSED` on 3000/9000. Only a shell-exported skip wins.
  */
 const shellPlaywrightSkipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER;
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? "development";
-/** Match `scripts/load-monorepo-root-env.cjs`: `.env` then `.env.local` (override). */
-loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
+/** Match `scripts/load-monorepo-root-env.cjs`: `.env.local` only. */
 const rootEnvLocal = resolve(process.cwd(), ".env.local");
 if (existsSync(rootEnvLocal)) {
   loadEnv({ path: rootEnvLocal, override: true });
@@ -25,7 +24,7 @@ if (!process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim()) {
 }
 
 /**
- * Root `.env` often sets NODE_ENV=production for deploy docs. `next dev` must run as
+ * Root `.env.local` often sets NODE_ENV=production for deploy docs. `next dev` must run as
  * development or it looks for `.next/required-server-files.json` and fails with ENOENT.
  */
 function nextDevServerEnv(): NodeJS.ProcessEnv {
@@ -33,7 +32,7 @@ function nextDevServerEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Root `.env` usually sets NEXTAUTH_URL to the storefront (3000). Admin on 3001 must use
+ * Root `.env.local` usually sets NEXTAUTH_URL to the storefront (3000). Admin on 3001 must use
  * its own URL or NextAuth cookies/session never match and sign-in stays on /sign-in.
  */
 function storefrontInvalidationSecretForE2E(): string {
@@ -139,7 +138,7 @@ export default defineConfig({
           stderr: "pipe",
         },
         {
-          command: "pnpm --filter @apparel-commerce/api dev",
+          command: "pnpm --filter @universal-music-store/api dev",
           url: process.env.PLAYWRIGHT_API_URL ?? "http://localhost:4000/health",
           reuseExistingServer: reuseDevServer,
           timeout: 120_000,
@@ -151,12 +150,12 @@ export default defineConfig({
           },
         },
         {
-          command: "pnpm --filter @apparel-commerce/storefront dev",
+          command: "pnpm --filter @universal-music-store/storefront dev",
           url: storefrontWebServerUrl,
           /**
            * Do not reuse a manually started storefront: it often lacks
            * `STOREFRONT_INTERNAL_INVALIDATION_SECRET`, which breaks commerce invalidation HTTP tests.
-           * Free port 3000 before running Playwright, or set `PLAYWRIGHT_SKIP_WEBSERVER=1` and align `.env`.
+           * Free port 3000 before running Playwright, or set `PLAYWRIGHT_SKIP_WEBSERVER=1` and align `.env.local`.
            */
           reuseExistingServer: false,
           timeout: 240_000,
@@ -165,7 +164,7 @@ export default defineConfig({
           env: storefrontDevServerEnv(),
         },
         {
-          command: "pnpm --filter @apparel-commerce/admin dev",
+          command: "pnpm --filter @universal-music-store/admin dev",
           url: "http://localhost:3001",
           reuseExistingServer: reuseDevServer,
           timeout: 240_000,

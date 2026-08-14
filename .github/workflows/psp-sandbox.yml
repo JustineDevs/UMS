@@ -2,20 +2,17 @@ name: PSP Sandbox Connectivity
 
 on:
   schedule:
-    - cron: '0 6 * * 1-5'
+    - cron: "0 6 * * 1-5"
   workflow_dispatch:
   push:
     paths:
-      - 'apps/medusa/src/modules/**-payment/**'
-      - 'apps/medusa/src/lib/*-sdk-client.ts'
+      - "apps/medusa/src/modules/**-payment/**"
+      - "apps/medusa/src/lib/*-sdk-client.ts"
 
 jobs:
   sandbox-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      matrix:
-        provider: [stripe, paypal, paymongo, maya, aftership]
     env:
       NODE_ENV: test
     steps:
@@ -26,7 +23,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
-      - name: Run PSP sandbox for ${{ matrix.provider }}
+      - name: Run PSP sandbox connectivity checks
         run: |
           pnpm --filter medusa test:unit -- --testPathPattern="psp-sandbox" --silent --runInBand --forceExit
         env:
@@ -35,10 +32,7 @@ jobs:
           PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_SANDBOX_CLIENT_ID }}
           PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_SANDBOX_CLIENT_SECRET }}
           PAYPAL_WEBHOOK_ID: ${{ secrets.PAYPAL_SANDBOX_WEBHOOK_ID }}
-          PAYMONGO_SECRET_KEY: ${{ secrets.PAYMONGO_TEST_SECRET_KEY }}
-          MAYA_SECRET_KEY: ${{ secrets.MAYA_SANDBOX_SECRET_KEY }}
-          MAYA_PUBLIC_KEY: ${{ secrets.MAYA_SANDBOX_PUBLIC_KEY }}
-          AFTERSHIP_API_KEY: ${{ secrets.AFTERSHIP_TEST_API_KEY }}
+          XENDIT_SECRET_KEY: ${{ secrets.XENDIT_TEST_SECRET_KEY }}
 
   webhook-replay:
     runs-on: ubuntu-latest

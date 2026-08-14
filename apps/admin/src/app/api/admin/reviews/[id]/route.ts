@@ -1,84 +1,82 @@
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
+import { z } from "zod";
+import { parseAdminJson } from "@/lib/admin-api-security";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
+import { insertStaffAuditLog } from "@/lib/staff-audit";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
+const moderationSchema = z
+  .object({
+    status: z.enum(["approved", "rejected", "hidden", "pending"]),
+    moderation_note: z.string().trim().max(2000).optional().default(""),
+    expected_updated_at: z.string().datetime().optional(),
+  })
+  .strict();
 
-const WRITE_PERM = "content:write";
-
-type ModerationBody = {
-  status?: string;
-  moderation_note?: string;
-};
-
-/**
- * Moderate a single review (approve, reject, hide). Staff: `content:write`.
- */
-export async function PATCH(
+async function patch(
   req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffApiSession(WRITE_PERM);
-  if (!staff.ok) {
-    return staff.response;
-  }
-
-  const { id } = await ctx.params;
-  const reviewId = id?.trim();
-  if (!reviewId) {
-    return correlatedJson(correlationId, { error: "Missing id" }, { status: 400 });
-  }
-
-  let body: ModerationBody;
-  try {
-    body = (await req.json()) as ModerationBody;
-  } catch {
-    return correlatedJson(correlationId, { error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const nextStatus = typeof body.status === "string" ? body.status.trim().toLowerCase() : "";
-  if (!["approved", "rejected", "hidden", "pending"].includes(nextStatus)) {
+  const staff = await requireStaffApiSession("content:write");
+  if (!staff.ok) return staff.response;
+  const reviewId = (await ctx.params).id?.trim();
+  if (!reviewId)
     return correlatedJson(
       correlationId,
-      { error: "status must be pending, approved, rejected, or hidden" },
+      { error: "Missing id" },
       { status: 400 },
     );
-  }
-
-  const note =
-    typeof body.moderation_note === "string" ? body.moderation_note.trim().slice(0, 2000) : "";
-
-  const sup = adminSupabaseOr503(correlationId);
-  if ("response" in sup) {
-    return sup.response;
-  }
-
-  const staffEmail = staff.session.user?.email?.trim() ?? "unknown";
-
-  const { data, error } = await sup.client
-    .from("product_reviews")
-    .update({
-      status: nextStatus,
-      moderated_by_staff_email: staffEmail,
-      moderated_at: new Date().toISOString(),
-      moderation_note: note.length > 0 ? note : null,
-    })
-    .eq("id", reviewId)
-    .select("id,status")
-    .maybeSingle();
-
-  if (error) {
+  const parsed = await parseAdminJson(req, moderationSchema);
+  if (!parsed.ok)
     return correlatedJson(
       correlationId,
-      { error: error.message, code: "REVIEW_UPDATE_FAILED" },
+      { error: parsed.error },
+      { status: parsed.status },
+    );
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const staffEmail =
+    staff.session.user?.email?.trim().toLowerCase() ?? "unknown";
+  let update = sup.client
+    .from("product_reviews")
+    .update({
+      status: parsed.data.status,
+      moderated_by_staff_email: staffEmail,
+      moderated_at: new Date().toISOString(),
+      moderation_note: parsed.data.moderation_note || null,
+    })
+    .eq("id", reviewId);
+  if (parsed.data.expected_updated_at)
+    update = update.eq("updated_at", parsed.data.expected_updated_at);
+  const { data, error } = await update.select("id,status").maybeSingle();
+  if (error)
+    return correlatedJson(
+      correlationId,
+      { error: "Unable to update review", code: "REVIEW_UPDATE_FAILED" },
       { status: 502 },
     );
-  }
-  if (!data) {
-    return correlatedJson(correlationId, { error: "Review not found" }, { status: 404 });
-  }
-
+  if (!data)
+    return correlatedJson(
+      correlationId,
+      {
+        error: parsed.data.expected_updated_at
+          ? "Review changed; reload before moderating"
+          : "Review not found",
+      },
+      { status: parsed.data.expected_updated_at ? 409 : 404 },
+    );
+  await insertStaffAuditLog(sup.client, {
+    actorEmail: staffEmail,
+    action: "review.moderate",
+    resource: "product_reviews",
+    resourceId: reviewId,
+    details: { status: parsed.data.status },
+  });
   return correlatedJson(correlationId, { ok: true, review: data });
 }
+
+export const PATCH = withAdminMutationIdempotency("/admin/reviews/[id]:PATCH", patch);

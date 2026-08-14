@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { AdminEmptyState, AdminSection } from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+
 type ReceiptPayload = {
   id: string;
   order_id: string;
@@ -68,6 +73,7 @@ export function DigitalReceiptLookup({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <AdminSection title="Receipt lookup" description="Find a stored receipt by its order number.">
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-end"
         onSubmit={(e) => {
@@ -76,25 +82,22 @@ export function DigitalReceiptLookup({
         }}
       >
         <div className="flex-1">
-          <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+          <label className="block text-sm font-medium text-foreground">
             Order id
-          </label>
-          <input
-            className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-sm"
+            <Input
+            className="mt-2 font-mono"
             value={orderId}
             onChange={(e) => setOrderId(e.target.value)}
             placeholder="Order number"
             autoComplete="off"
-          />
+            />
+          </label>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-        >
+        <Button type="submit" disabled={loading} size="sm">
           {loading ? "Loading…" : "Load receipt"}
-        </button>
+        </Button>
       </form>
+      </AdminSection>
 
       {error ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
@@ -103,8 +106,9 @@ export function DigitalReceiptLookup({
       ) : null}
 
       {receipt ? (
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-4 text-xs text-on-surface-variant">
+        <AdminSection title="Receipt result" description={`Order ${receipt.order_id}`}>
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3 text-xs text-muted-foreground">
+            <div className="flex flex-wrap gap-4">
             {receipt.customer_email ? (
               <span>
                 <span className="font-semibold text-primary">Email:</span> {receipt.customer_email}
@@ -118,17 +122,25 @@ export function DigitalReceiptLookup({
               <span className="font-semibold text-primary">Stored:</span>{" "}
               {new Date(receipt.created_at).toLocaleString()}
             </span>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>Print</Button>
+              <Button asChild variant="outline" size="sm"><a href={`data:text/html;charset=utf-8,${encodeURIComponent(receipt.receipt_html)}`} download={`receipt-${receipt.order_id}.html`}>Download</a></Button>
+            </div>
           </div>
-          <div className="overflow-hidden rounded-lg border border-outline-variant/20 bg-white shadow-sm">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
             <iframe
               title="Receipt preview"
               className="h-[min(70vh,720px)] w-full border-0"
               sandbox="allow-same-origin"
               srcDoc={receipt.receipt_html}
             />
-          </div>
-        </div>
+            </CardContent>
+          </Card>
+        </AdminSection>
       ) : null}
+      {!loading && !error && !receipt ? <AdminEmptyState title="No receipt loaded" description="Enter an order number above to view its stored digital receipt." /> : null}
     </div>
   );
 }

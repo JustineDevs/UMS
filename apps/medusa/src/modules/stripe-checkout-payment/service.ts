@@ -33,6 +33,11 @@ import {
 } from "@medusajs/framework/utils";
 import Stripe from "stripe";
 import {
+  getNangoPaymentCredentials,
+  nangoContextFrom,
+  nangoPaymentProviderConfigured,
+} from "../../lib/nango-payment-credentials";
+import {
   buildStripeWebhookDedupId,
   claimStripeWebhookDedup,
 } from "../../lib/stripe-webhook-dedup";
@@ -64,7 +69,7 @@ const ZERO_DECIMAL = new Set([
   "xpf",
 ]);
 
-/** Checkout Session `amount_total` is always in the smallest currency unit (same convention as PayPal/Paymongo webhook `amount`). */
+/** Checkout Session `amount_total` is always in the smallest currency unit (same convention as PayPal and other webhook `amount` fields). */
 function sessionAmountMinor(amountTotal: number | null | undefined): number {
   if (amountTotal == null || !Number.isFinite(amountTotal)) {
     return 0;
@@ -89,7 +94,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
   constructor(cradle: Record<string, unknown>, options: StripeCheckoutPaymentOptions) {
     super(cradle, options);
     this.options_ = options;
-    this.stripe_ = new Stripe(options.apiKey, {
+    this.stripe_ = new Stripe(options.apiKey?.trim() || "sk_test_nango_managed", {
       typescript: true,
     });
   }
@@ -97,10 +102,10 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
   static validateOptions(options: Record<string, unknown>): void {
     const apiKey = String(options.apiKey ?? "").trim();
     const webhookSecret = String(options.webhookSecret ?? "").trim();
-    if (!apiKey || !webhookSecret) {
+    if ((!apiKey && !nangoPaymentProviderConfigured("stripe")) || !webhookSecret) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        'Stripe payment provider: "apiKey" and "webhookSecret" are required.',
+        'Stripe payment provider requires a direct apiKey or configured Nango Stripe integration, plus webhookSecret.',
       );
     }
   }
@@ -118,6 +123,17 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       this.options_.cancelUrl?.trim() ||
       process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim() ||
       `${defaultStorefrontBase()}/checkout/hosted-return?provider=stripe&status=cancel`
+    );
+  }
+
+  private async stripeClient(context: unknown): Promise<Stripe> {
+    const credentials = await getNangoPaymentCredentials(nangoContextFrom(context));
+    const accessToken = typeof credentials?.access_token === "string" ? credentials.access_token.trim() : "";
+    if (accessToken) return new Stripe(accessToken, { typescript: true });
+    if (this.options_.apiKey?.trim()) return this.stripe_;
+    throw new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      "Stripe payment provider requires a connected Nango merchant account.",
     );
   }
 
@@ -162,7 +178,8 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
         : undefined;
 
     try {
-      const session = await this.stripe_.checkout.sessions.create(
+      const stripe = await this.stripeClient(input.context);
+      const session = await stripe.checkout.sessions.create(
         {
           mode: "payment",
           success_url: this.successUrl(),
@@ -226,7 +243,8 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
     }
 
     try {
-      const checkoutSession = await this.stripe_.checkout.sessions.retrieve(csId);
+      const stripe = await this.stripeClient(input.data);
+      const checkoutSession = await stripe.checkout.sessions.retrieve(csId);
       if (checkoutSession.payment_status !== "paid") {
         console.error(
           "[payment-pipeline] authorize_failed provider=stripe reason=session_not_paid status=",
@@ -277,12 +295,13 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       return { data: input.data ?? {} };
     }
     try {
-      const intent = await this.stripe_.paymentIntents.retrieve(id);
+      const stripe = await this.stripeClient(input.data);
+      const intent = await stripe.paymentIntents.retrieve(id);
       if (intent.status === "succeeded") {
         return { data: { ...((input.data as Record<string, unknown>) ?? {}), id } };
       }
       if (intent.status === "requires_capture") {
-        const captured = await this.stripe_.paymentIntents.capture(id);
+        const captured = await stripe.paymentIntents.capture(id);
         return { data: { ...((input.data as Record<string, unknown>) ?? {}), id: captured.id } };
       }
     } catch {
@@ -292,10 +311,11 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
   }
 
   async cancelPayment(input: CancelPaymentInput): Promise<CancelPaymentOutput> {
+    const stripe = await this.stripeClient(input.data);
     const csId = input.data?.stripe_checkout_session_id as string | undefined;
     if (csId?.trim()) {
       try {
-        await this.stripe_.checkout.sessions.expire(csId);
+        await stripe.checkout.sessions.expire(csId);
       } catch {
         /* session may already be completed or expired */
       }
@@ -303,7 +323,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
     const piId = input.data?.id as string | undefined;
     if (piId?.trim()) {
       try {
-        await this.stripe_.paymentIntents.cancel(piId);
+        await stripe.paymentIntents.cancel(piId);
       } catch {
         /* ignore */
       }
@@ -323,7 +343,8 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
         "Stripe getPaymentStatus: missing payment intent id.",
       );
     }
-    const intent = await this.stripe_.paymentIntents.retrieve(id);
+    const stripe = await this.stripeClient(input.data);
+    const intent = await stripe.paymentIntents.retrieve(id);
     switch (intent.status) {
       case "succeeded":
         return { status: PaymentSessionStatus.CAPTURED, data: intent as unknown as Record<string, unknown> };
@@ -355,7 +376,8 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
           ? Math.round(major)
           : Math.round(major * 100)
         : undefined;
-    await this.stripe_.refunds.create({
+    const stripe = await this.stripeClient(input.data);
+    await stripe.refunds.create({
       payment_intent: id,
       ...(refundMinor != null ? { amount: refundMinor } : {}),
     });
@@ -367,12 +389,21 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
     if (!id?.trim()) {
       return { data: input.data ?? {} };
     }
-    const intent = await this.stripe_.paymentIntents.retrieve(id);
+    const stripe = await this.stripeClient(input.data);
+    const intent = await stripe.paymentIntents.retrieve(id);
     return { data: intent as unknown as Record<string, unknown> };
   }
 
   async updatePayment(input: UpdatePaymentInput): Promise<UpdatePaymentOutput> {
-    return { data: input.data ?? {} };
+    const id = String(input.data?.id ?? "").trim();
+    if (!id) throw new MedusaError(MedusaError.Types.INVALID_DATA, "Stripe updatePayment: missing payment intent id.");
+    const metadata = input.data?.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      throw new MedusaError(MedusaError.Types.INVALID_DATA, "Stripe updatePayment: metadata is required.");
+    }
+    const stripe = await this.stripeClient(input.data);
+    const intent = await stripe.paymentIntents.update(id, { metadata: metadata as Record<string, string> });
+    return { data: intent as unknown as Record<string, unknown> };
   }
 
   async createAccountHolder(

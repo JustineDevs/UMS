@@ -1,5 +1,5 @@
-import type { ProductLabelPayload } from "@apparel-commerce/printer-core";
-import { PH_VAT_RATE } from "@apparel-commerce/sdk";
+import type { ProductLabelPayload } from "@universal-music-store/printer-core";
+import { PH_VAT_RATE } from "@universal-music-store/sdk";
 
 export type PosReceiptPayload = {
   title: string;
@@ -37,7 +37,7 @@ export function buildPosReceiptPayloadFromCart(
   }
   lines.push({ kind: "separator" });
   return {
-    title: "Maharlika POS",
+    title: "Universal Music Store POS",
     orderRef,
     offline,
     lines,

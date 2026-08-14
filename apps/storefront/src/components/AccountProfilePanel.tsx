@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import {
   isPhilippinesMobilePhone,
   type StorefrontShippingAddress,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 
 type Initial = {
   displayName: string | null;
   phone: string | null;
+  avatarUrl: string | null;
   shippingAddresses: StorefrontShippingAddress[];
 };
 
@@ -19,6 +20,7 @@ function emptyAddress(): StorefrontShippingAddress {
     fullName: "",
     phone: "",
     line1: "",
+    barangay: "",
     city: "",
     province: "",
     country: "PH",
@@ -29,6 +31,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl ?? "");
   const [addresses, setAddresses] = useState<StorefrontShippingAddress[]>(() =>
     initial.shippingAddresses.length > 0
       ? initial.shippingAddresses
@@ -69,11 +72,12 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
       if (
         !a.fullName.trim() ||
         !a.line1.trim() ||
+        !(a.barangay?.trim() ?? "") ||
         !a.city.trim() ||
         !a.province.trim()
       ) {
         setErr(
-          `Address ${i + 1}: full name, line 1, city, and province are required.`,
+          `Address ${i + 1}: full name, line 1, barangay, city, and province are required.`,
         );
         return;
       }
@@ -92,6 +96,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         body: JSON.stringify({
           displayName: displayName.trim() || undefined,
           phone: ph || undefined,
+          avatarUrl: avatarUrl.trim() || undefined,
           shippingAddresses: addresses,
         }),
       });
@@ -142,6 +147,19 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={120}
             placeholder="How we greet you in emails"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+            Avatar URL (optional)
+          </label>
+          <input
+            className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+            maxLength={500}
+            placeholder="https://..."
+            inputMode="url"
           />
         </div>
         <div>
@@ -261,6 +279,20 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                         updateAddress(i, { line2: e.target.value })
                       }
                       maxLength={200}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                      Barangay
+                    </label>
+                    <input
+                      className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
+                      value={a.barangay ?? ""}
+                      onChange={(e) =>
+                        updateAddress(i, { barangay: e.target.value })
+                      }
+                      maxLength={120}
+                      placeholder="Required for PH couriers"
                     />
                   </div>
                   <div>

@@ -11,7 +11,7 @@ const SEMAPHORE_API = "https://api.semaphore.co/api/v4/messages";
 export type SmsMessage = {
   number: string;
   message: string;
-  /** Sender name — 11 chars max. Defaults to SEMAPHORE_SENDER_NAME or "MAHARLIKA". */
+  /** Sender name — 11 chars max. Defaults to SEMAPHORE_SENDER_NAME or "UNIMUSIC". */
   senderName?: string;
 };
 
@@ -38,7 +38,7 @@ export async function sendSms(msg: SmsMessage): Promise<SmsSendResult> {
   const senderName = (
     msg.senderName?.trim() ||
     process.env.SEMAPHORE_SENDER_NAME?.trim() ||
-    "MAHARLIKA"
+    "UNIMUSIC"
   ).slice(0, 11);
 
   const phone = sanitizePhone(msg.number);
@@ -86,7 +86,7 @@ export function formatOrderPlacedSms(params: {
   storeName?: string;
   trackingUrl?: string;
 }): string {
-  const store = params.storeName || process.env.STORE_NAME?.trim() || "Maharlika Apparel";
+  const store = params.storeName || process.env.STORE_NAME?.trim() || "Universal Music Store";
   const amount = (params.total / 100).toLocaleString("en-PH", {
     style: "currency",
     currency: params.currencyCode.toUpperCase() || "PHP",
@@ -109,7 +109,7 @@ export function formatOrderShippedSms(params: {
   trackingUrl?: string;
   storeName?: string;
 }): string {
-  const store = params.storeName || process.env.STORE_NAME?.trim() || "Maharlika Apparel";
+  const store = params.storeName || process.env.STORE_NAME?.trim() || "Universal Music Store";
   const parts = [`${store}: Order #${params.displayId} has shipped!`];
   if (params.courierName && params.trackingNumber) {
     parts.push(`${params.courierName} tracking: ${params.trackingNumber}.`);

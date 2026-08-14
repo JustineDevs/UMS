@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
+/* global describe, afterEach, beforeEach, it, expect */
+
 import { isProviderEnabled, getDisabledProviders } from "../provider-feature-flags";
 
 describe("provider-feature-flags", () => {
@@ -11,9 +12,7 @@ describe("provider-feature-flags", () => {
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_STRIPE;
     delete process.env.FEATURE_FLAG_PAYPAL;
-    delete process.env.FEATURE_FLAG_PAYMONGO;
-    delete process.env.FEATURE_FLAG_MAYA;
-    delete process.env.FEATURE_FLAG_AFTERSHIP;
+    delete process.env.FEATURE_FLAG_XENDIT;
   });
 
   it("returns true when flag is unset (default enabled)", () => {
@@ -38,10 +37,10 @@ describe("provider-feature-flags", () => {
 
   it("getDisabledProviders returns providers set to off", () => {
     process.env.FEATURE_FLAG_STRIPE = "0";
-    process.env.FEATURE_FLAG_MAYA = "false";
+    process.env.FEATURE_FLAG_XENDIT = "false";
     const disabled = getDisabledProviders();
     expect(disabled).toContain("stripe");
-    expect(disabled).toContain("maya");
+    expect(disabled).toContain("xendit");
     expect(disabled).not.toContain("paypal");
   });
 

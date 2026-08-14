@@ -70,6 +70,6 @@ export const PH_REGION: StoreRegion = {
   taxRate: 0.12,
   countries: ["PH"],
   defaultLocale: "en-PH",
-  paymentProviders: ["stripe", "paypal", "paymongo", "maya", "cod"],
+  paymentProviders: ["stripe", "paypal", "xendit", "cod"],
   fulfillmentProviders: ["manual", "jt-express"],
 };

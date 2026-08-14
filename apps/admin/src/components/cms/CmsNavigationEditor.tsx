@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import type { CmsNavigationPayload } from "@apparel-commerce/platform-data";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import type { CmsNavigationPayload } from "@universal-music-store/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import {
   DndContext,
   closestCenter,

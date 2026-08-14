@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { tryCreateSupabaseClient } from "./payment-supabase-bridge";
 
 type LoggerLike = {
   info?: (msg: string) => void;
@@ -22,12 +23,9 @@ export async function emitOrderPlacedFunnelEvent(params: {
   };
   params.logger.info?.(JSON.stringify(payload));
 
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (supabaseUrl && supabaseKey) {
+  const sb = tryCreateSupabaseClient();
+  if (sb) {
     try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const sb = createClient(supabaseUrl, supabaseKey);
       await sb.from("audit_logs").insert({
         action: "commerce_funnel_order_placed",
         resource: params.orderId,

@@ -1,27 +1,16 @@
-import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
+"use client";
+
+import { AdminPageHeader } from "@/components/admin-console";
 import { CatalogMediaManager } from "@/components/catalog/CatalogMediaManager";
-import { requirePagePermission } from "@/lib/require-page-permission";
 
-export const dynamic = "force-dynamic";
-
-export default async function CatalogMediaPage() {
-  await requirePagePermission("catalog:read");
-
+export default function CatalogMediaPage() {
   return (
-    <AdminPageShell
-      title="Catalog media"
-      subtitle="Single source of truth for catalog bucket uploads: same POST /api/admin/catalog/media pipeline and cms_media rows as Product editor → Upload files / Pick from catalog library. List, edit display name and alt, tag, soft-delete, and see where each URL is referenced."
-      breadcrumbs={
-        <AdminBreadcrumbs
-          items={[
-            { label: "Dashboard", href: "/admin" },
-            { label: "Products", href: "/admin/catalog" },
-            { label: "Catalog media" },
-          ]}
-        />
-      }
-    >
+    <div className="flex min-w-0 flex-col gap-6 p-4 sm:p-6 lg:p-8">
+      <AdminPageHeader
+        title="Catalog media"
+        subtitle="Upload, organize, and maintain the assets used by products and storefront content."
+      />
       <CatalogMediaManager />
-    </AdminPageShell>
+    </div>
   );
 }

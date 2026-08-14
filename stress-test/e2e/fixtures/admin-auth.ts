@@ -7,8 +7,8 @@
  */
 import type { Page } from "@playwright/test";
 
-export const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
-export const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 function getAdminEmail(): string | undefined {
   const raw = process.env.ADMIN_ALLOWED_EMAILS?.trim();
@@ -28,6 +28,14 @@ export type SignInResult = "ok" | "skip_no_env" | "skip_no_ui";
  * or "skip_no_ui" when the e2e route is not accessible.
  */
 export async function signInAsAdmin(page: Page): Promise<SignInResult> {
+  if (process.env.AUTH_DISABLED === "true") {
+    try {
+      await page.goto(`${adminBase}/admin`, { timeout: 45_000 });
+      return /\/admin(?:[/?#]|$)/i.test(page.url()) ? "ok" : "skip_no_ui";
+    } catch {
+      return "skip_no_ui";
+    }
+  }
   const email = getAdminEmail();
   const password = getAdminPassword();
 
@@ -41,18 +49,25 @@ export async function signInAsAdmin(page: Page): Promise<SignInResult> {
     return "skip_no_ui";
   }
 
-  const emailInput = page.locator('input[type="email"], input[name="email"]').first();
-  const passwordInput = page.locator('input[type="password"], input[name="password"]').first();
+  if (/\/admin(?:[/?#]|$)/i.test(page.url())) {
+    return "ok";
+  }
 
-  const uiAvailable = await emailInput.isVisible({ timeout: 5_000 }).catch(() => false);
+  const form = page.getByTestId("e2e-credentials-form");
+  const emailInput = form.getByTestId("e2e-admin-email");
+  const passwordInput = form.getByTestId("e2e-admin-password");
+  const submitBtn = form.getByTestId("e2e-admin-submit");
+
+  const uiAvailable = await form.isVisible({ timeout: 5_000 }).catch(() => false);
   if (!uiAvailable) {
+    if (/\/admin(?:[/?#]|$)/i.test(page.url())) {
+      return "ok";
+    }
     return "skip_no_ui";
   }
 
   await emailInput.fill(email);
   await passwordInput.fill(password);
-
-  const submitBtn = page.locator('button[type="submit"]').first();
   await submitBtn.click();
 
   try {
@@ -67,7 +82,7 @@ export async function signInAsAdmin(page: Page): Promise<SignInResult> {
 /**
  * Signs into the admin app and returns the session cookies for use in API requests.
  */
-export async function signInAsAdminAndGetCookies(
+async function signInAsAdminAndGetCookies(
   page: Page,
 ): Promise<{ result: SignInResult; cookieHeader: string }> {
   const result = await signInAsAdmin(page);

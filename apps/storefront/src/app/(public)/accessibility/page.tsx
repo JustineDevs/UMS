@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Accessibility",
-};
+  description: "Accessibility statement, known limitations, and support contact for barriers.",
+  path: "/accessibility",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function AccessibilityPage() {
   return (
@@ -13,7 +17,7 @@ export default function AccessibilityPage() {
       </h1>
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
-          We aim to make <strong>maharlika.app</strong> (and related storefront
+          We aim to make <strong>Universal Music Store</strong> (and related storefront
           domains) perceivable, operable, and understandable for people with
           disabilities. We use <strong>WCAG 2.1 Level AA</strong> as the
           reference standard and test with keyboard navigation, screen readers,

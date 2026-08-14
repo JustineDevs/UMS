@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { generateTrackingToken, verifyTrackingToken } from "./tracking-token";
+import { generateTrackingToken, verifyTrackingToken } from "./tracking-token.js";
 
 const secret = "test-secret-32chars-long-enough";
 

@@ -24,6 +24,7 @@ export type ReceiptPayload = {
 
 export type PrinterAdapterId =
   | "escpos-tcp"
+  | "node-escpos-network"
   | "mock"
   | "http-relay"
   | "qz-tray"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth/next";
 import { AccountProfilePanel } from "@/components/AccountProfilePanel";
 import { authOptions } from "@/lib/auth";
@@ -9,9 +10,19 @@ import {
   computeAccountOrderStats,
   fetchCustomerOrders,
 } from "@/lib/medusa-account-orders";
+import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = buildPageMetadata({
+  title: "Account",
+  description: "Manage your profile, saved addresses, and orders.",
+  path: "/account",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default async function AccountPage() {
   const session = await getServerSession(authOptions);
@@ -22,6 +33,7 @@ export default async function AccountPage() {
     : { orders: [] };
   const profile = userEmail ? await loadCustomerProfile(userEmail) : null;
   const stats = computeAccountOrderStats(orders);
+  const profileAvatar = profile?.avatarUrl ?? user?.image ?? null;
 
   return (
     <main className="storefront-page-shell max-w-4xl">
@@ -103,16 +115,17 @@ export default async function AccountPage() {
           </h2>
           {user ? (
             <div className="space-y-3">
-              {user.image && (
+              {profileAvatar ? (
                 <Image
-                  src={user.image}
+                  src={profileAvatar}
                   alt=""
                   width={56}
                   height={56}
                   className="rounded-full"
                   referrerPolicy="no-referrer"
+                  unoptimized={shouldUnoptimizeImage(profileAvatar)}
                 />
-              )}
+              ) : null}
               <p className="text-sm font-medium text-on-surface">{user.name}</p>
               <p className="text-sm text-on-surface-variant">{user.email}</p>
               <SignOutButton />
@@ -137,6 +150,7 @@ export default async function AccountPage() {
             initial={{
               displayName: profile?.displayName ?? null,
               phone: profile?.phone ?? null,
+              avatarUrl: profile?.avatarUrl ?? null,
               shippingAddresses: profile?.shippingAddresses ?? [],
             }}
           />
@@ -175,6 +189,12 @@ export default async function AccountPage() {
                     </p>
                     <div className="flex flex-col items-end gap-1">
                       <Link
+                        href={`/account/orders/${order.id}`}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View details
+                      </Link>
+                      <Link
                         href={`/track/${order.id}`}
                         className="text-xs text-primary hover:underline"
                       >
@@ -186,6 +206,12 @@ export default async function AccountPage() {
                       >
                         Return
                       </Link>
+                      {(order.status === "pending" || order.status === "pending_payment" || order.status === "requires_action") && (
+                        <OrderCancelButton
+                          orderId={order.id}
+                          orderDisplayId={order.displayId}
+                        />
+                      )}
                     </div>
                   </div>
                 </li>

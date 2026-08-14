@@ -5,7 +5,7 @@ import { test, expect } from "@playwright/test";
  * HTTP-level integration against the running Next storefront (Playwright webServer).
  * Exercises real `next/cache` revalidateTag/revalidatePath inside the route handler.
  */
-/** playwright.config.ts sets a default after loading .env so this matches spawned webServer. */
+/** playwright.config.ts sets a default after loading .env.local so this matches spawned webServer. */
 const invalidationSecret =
   process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim() ||
   "playwright-e2e-invalidation-secret";

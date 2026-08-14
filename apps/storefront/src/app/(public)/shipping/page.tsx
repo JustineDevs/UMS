@@ -1,4 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Shipping",
+  description: "Shipping timelines, carriers, and delivery notes for Philippines orders.",
+  path: "/shipping",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function ShippingPage() {
   return (
@@ -7,7 +16,7 @@ export default function ShippingPage() {
         Shipping
       </h1>
       <p className="mb-6">
-        We ship apparel across the Philippines using third-party couriers
+        We ship music orders across the Philippines using third-party couriers
         (including <strong>J&amp;T</strong>
         where available) and coordinate <strong>pickup from Cavite</strong> for
         wholesale or arranged collections when that option is confirmed on your

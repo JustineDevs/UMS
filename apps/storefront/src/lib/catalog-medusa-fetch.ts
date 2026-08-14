@@ -2,8 +2,9 @@
  * Medusa Store API catalog queries (listing, PDP, facets, categories, sitemap).
  * Imported by `catalog-fetch.ts`, which re-exports the public surface.
  */
+import { createHash } from "node:crypto";
 import { unstable_cache } from "next/cache";
-import type { Product } from "@apparel-commerce/types";
+import type { Product } from "@universal-music-store/types";
 import {
   catalogProductFromMedusaRaw,
   medusaProductRawHasSellableVariant,
@@ -17,10 +18,11 @@ import {
   countSellableProductsInStoreList,
   MEDUSA_PRODUCT_STOCK_FIELDS,
 } from "./medusa-store-sellable-count";
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaStoreBaseUrl } from "@universal-music-store/sdk";
 import {
   getMedusaPublishableKey,
   getMedusaRegionId,
+  getMedusaSalesChannelId,
   withSalesChannelId,
 } from "./storefront-medusa-env";
 
@@ -28,9 +30,14 @@ export type CatalogQuery = {
   limit?: number;
   offset?: number;
   category?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   minPrice?: number;
   maxPrice?: number;
   q?: string;
@@ -58,7 +65,16 @@ export type CategorySummariesResult =
 export type VariantFacetsResult =
   | {
       kind: "ok";
-      facets: { sizes: string[]; colors: string[]; brands: string[] };
+      facets: {
+        types: string[];
+        finishes: string[];
+        brands: string[];
+        pickupConfigs: string[];
+        bodyWoods: string[];
+        conditions: string[];
+        skillLevels: string[];
+        shippingSpeeds: string[];
+      };
     }
   | CommerceFetchFailure;
 
@@ -83,6 +99,17 @@ function misconfigured(detail: string): CommerceFetchFailure {
   return { kind: "misconfigured", detail };
 }
 
+function catalogEnvCacheFingerprint(): string {
+  const raw = [
+    "v2",
+    getMedusaStoreBaseUrl(),
+    getMedusaPublishableKey() ?? "",
+    getMedusaRegionId() ?? "",
+    getMedusaSalesChannelId() ?? "",
+  ].join("|");
+  return createHash("sha256").update(raw).digest("hex").slice(0, 12);
+}
+
 function isLikelyUnreachableMedusaError(message: string): boolean {
   const m = message.toLowerCase();
   return (
@@ -97,7 +124,7 @@ function isLikelyUnreachableMedusaError(message: string): boolean {
   );
 }
 
-export function catalogServiceError(err: unknown): CommerceFetchFailure {
+function catalogServiceError(err: unknown): CommerceFetchFailure {
   const message = err instanceof Error ? err.message : String(err);
   if (
     message.includes("Invalid URL") ||
@@ -124,7 +151,7 @@ export function catalogServiceError(err: unknown): CommerceFetchFailure {
 }
 
 const MEDUSA_LIST_FIELDS =
-  "*variants,*variants.calculated_price,+variants.inventory_quantity,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
+  "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
 
 function requireMedusaClientConfig():
   | { ok: true }
@@ -171,6 +198,7 @@ async function resolveMedusaCategoryId(
 async function fetchMedusaProductsPage(
   limit: number,
   options: CatalogQuery,
+  useSalesChannelId = true,
 ): Promise<ProductsPageResult> {
   const gate = requireMedusaClientConfig();
   if (!gate.ok) {
@@ -185,51 +213,72 @@ async function fetchMedusaProductsPage(
     const priceSort =
       options.sort === "price_asc" || options.sort === "price_desc";
 
-    const collected: Product[] = [];
-    let apiOffset = 0;
-    const pageSize = 80;
-    const targetEnd = offset + limit;
-    const maxScan = 4000;
+    async function scanProducts(allowSalesChannel: boolean): Promise<Product[]> {
+      const collected: Product[] = [];
+      let apiOffset = 0;
+      const pageSize = 80;
+      const targetEnd = offset + limit;
+      const maxScan = 4000;
+      const salesChannelId =
+        allowSalesChannel && useSalesChannelId ? getMedusaSalesChannelId() : undefined;
 
-    while (collected.length < targetEnd && apiOffset < maxScan) {
-      const listParams: Record<string, unknown> = {
-        region_id: regionId,
-        limit: pageSize,
-        offset: apiOffset,
-        fields: MEDUSA_LIST_FIELDS,
-        order:
-          options.sort === "name_asc"
-            ? "title"
-            : options.sort === "newest"
-              ? "-created_at"
-              : "-created_at",
-      };
-      if (categoryId) listParams.category_id = categoryId;
-      if (options.q?.trim()) listParams.q = options.q.trim();
+      while (collected.length < targetEnd && apiOffset < maxScan) {
+        const listParams: Record<string, unknown> = {
+          region_id: regionId,
+          limit: pageSize,
+          offset: apiOffset,
+          fields: MEDUSA_LIST_FIELDS,
+          order:
+            options.sort === "name_asc"
+              ? "title"
+              : options.sort === "newest"
+                ? "-created_at"
+                : "-created_at",
+        };
+        if (categoryId) listParams.category_id = categoryId;
+        if (options.q?.trim()) listParams.q = options.q.trim();
 
-      const { products: rawList } = await sdk.store.product.list(
-        withSalesChannelId(listParams) as Parameters<
-          typeof sdk.store.product.list
-        >[0],
-      );
+        const { products: rawList } = await sdk.store.product.list(
+          (salesChannelId ? withSalesChannelId(listParams) : listParams) as Parameters<
+            typeof sdk.store.product.list
+          >[0],
+        );
 
-      for (const raw of rawList ?? []) {
-        const p = catalogProductFromMedusaRaw(raw as never);
-        if (!p) continue;
-        if (!productMatchesVariantFilters(p, options.size, options.color)) {
-          continue;
+        for (const raw of rawList ?? []) {
+          const p = catalogProductFromMedusaRaw(raw as never);
+          if (!p) continue;
+          if (
+            !productMatchesVariantFilters(p, {
+              type: options.type,
+              finish: options.finish,
+              pickupConfig: options.pickupConfig,
+              bodyWood: options.bodyWood,
+              condition: options.condition,
+              skillLevel: options.skillLevel,
+              shippingSpeed: options.shippingSpeed,
+            })
+          ) {
+            continue;
+          }
+          if (!productMatchesBrand(p, options.brand)) continue;
+          if (!productMatchesPriceRange(p, options.minPrice, options.maxPrice)) {
+            continue;
+          }
+          collected.push(p);
         }
-        if (!productMatchesBrand(p, options.brand)) continue;
-        if (!productMatchesPriceRange(p, options.minPrice, options.maxPrice)) {
-          continue;
+
+        apiOffset += pageSize;
+        if (!rawList?.length || rawList.length < pageSize) {
+          break;
         }
-        collected.push(p);
       }
 
-      apiOffset += pageSize;
-      if (!rawList?.length || rawList.length < pageSize) {
-        break;
-      }
+      return collected;
+    }
+
+    let collected = await scanProducts(true);
+    if (!collected.length && useSalesChannelId && getMedusaSalesChannelId()) {
+      collected = await scanProducts(false);
     }
 
     if (priceSort) {
@@ -266,19 +315,30 @@ async function fetchMedusaProductBySlug(slug: string): Promise<ProductBySlugResu
   try {
     const sdk = createStorefrontMedusaSdk();
     const regionId = getMedusaRegionId()!;
-    const { products } = await sdk.store.product.list(
-      withSalesChannelId({
-        region_id: regionId,
-        handle: slug,
-        limit: 1,
-        fields: MEDUSA_LIST_FIELDS,
-      }) as Parameters<typeof sdk.store.product.list>[0],
-    );
-    const raw = products?.[0];
-    if (!raw) {
-      return { kind: "not_found" };
+    const baseParams = {
+      region_id: regionId,
+      handle: slug,
+      limit: 1,
+      fields: MEDUSA_LIST_FIELDS,
+    };
+    const salesChannelId = getMedusaSalesChannelId();
+    const query = async (useSalesChannelId: boolean) =>
+      sdk.store.product.list(
+        (useSalesChannelId && salesChannelId
+          ? withSalesChannelId({ ...baseParams })
+          : baseParams) as Parameters<typeof sdk.store.product.list>[0],
+      );
+
+    let { products } = await query(true);
+    let raw = products?.[0];
+    let product = raw ? catalogProductFromMedusaRaw(raw as never) : null;
+
+    if (!product && salesChannelId) {
+      ({ products } = await query(false));
+      raw = products?.[0];
+      product = raw ? catalogProductFromMedusaRaw(raw as never) : null;
     }
-    const product = catalogProductFromMedusaRaw(raw as never);
+
     if (!product) {
       return { kind: "not_found" };
     }
@@ -332,42 +392,87 @@ async function fetchMedusaVariantFacets(
     const sdk = createStorefrontMedusaSdk();
     const regionId = getMedusaRegionId()!;
     const categoryId = await resolveMedusaCategoryId(sdk, category);
-    const sizes = new Set<string>();
-    const colors = new Set<string>();
-    const brands = new Set<string>();
-    let facetOffset = 0;
-    const facetPageSize = 100;
-    const facetMaxScan = 4000;
-    while (facetOffset < facetMaxScan) {
-      const { products } = await sdk.store.product.list(
-        withSalesChannelId({
-          region_id: regionId,
-          ...(categoryId ? { category_id: categoryId } : {}),
-          limit: facetPageSize,
-          offset: facetOffset,
-          fields: MEDUSA_LIST_FIELDS,
-        }) as Parameters<typeof sdk.store.product.list>[0],
-      );
-      for (const pr of products ?? []) {
-        const p = catalogProductFromMedusaRaw(pr as never);
-        if (!p) continue;
-        if (p.brand?.trim()) brands.add(p.brand.trim());
-        for (const v of p.variants) {
-          if (v.size) sizes.add(v.size);
-          if (v.color) colors.add(v.color);
+    async function scanFacets(allowSalesChannel: boolean) {
+      const types = new Set<string>();
+      const finishes = new Set<string>();
+      const brands = new Set<string>();
+      const pickupConfigs = new Set<string>();
+      const bodyWoods = new Set<string>();
+      const conditions = new Set<string>();
+      const skillLevels = new Set<string>();
+      const shippingSpeeds = new Set<string>();
+      let facetOffset = 0;
+      const facetPageSize = 100;
+      const facetMaxScan = 4000;
+      const salesChannelId =
+        allowSalesChannel && getMedusaSalesChannelId() ? getMedusaSalesChannelId() : undefined;
+      let sawRawRows = false;
+      while (facetOffset < facetMaxScan) {
+        const { products } = await sdk.store.product.list(
+          (salesChannelId
+            ? withSalesChannelId({
+                region_id: regionId,
+                ...(categoryId ? { category_id: categoryId } : {}),
+                limit: facetPageSize,
+                offset: facetOffset,
+                fields: MEDUSA_LIST_FIELDS,
+              })
+            : {
+                region_id: regionId,
+                ...(categoryId ? { category_id: categoryId } : {}),
+                limit: facetPageSize,
+                offset: facetOffset,
+                fields: MEDUSA_LIST_FIELDS,
+              }) as Parameters<typeof sdk.store.product.list>[0],
+        );
+        if ((products?.length ?? 0) > 0) sawRawRows = true;
+        for (const pr of products ?? []) {
+          const p = catalogProductFromMedusaRaw(pr as never);
+          if (!p) continue;
+          if (p.brand?.trim()) brands.add(p.brand.trim());
+          for (const v of p.variants) {
+            if (v.type) types.add(v.type);
+            if (v.finish) finishes.add(v.finish);
+            if (v.pickupConfig) pickupConfigs.add(v.pickupConfig);
+            if (v.bodyWood) bodyWoods.add(v.bodyWood);
+            if (v.condition) conditions.add(v.condition);
+            if (v.skillLevel) skillLevels.add(v.skillLevel);
+            if (v.shippingSpeed) shippingSpeeds.add(v.shippingSpeed);
+          }
+        }
+        facetOffset += facetPageSize;
+        if (!products?.length || products.length < facetPageSize) {
+          break;
         }
       }
-      facetOffset += facetPageSize;
-      if (!products?.length || products.length < facetPageSize) {
-        break;
-      }
+      return {
+        types,
+        finishes,
+        brands,
+        pickupConfigs,
+        bodyWoods,
+        conditions,
+        skillLevels,
+        shippingSpeeds,
+        sawRawRows,
+      };
+    }
+
+    let primary = await scanFacets(true);
+    if (!primary.sawRawRows && getMedusaSalesChannelId()) {
+      primary = await scanFacets(false);
     }
     return {
       kind: "ok",
       facets: {
-        sizes: [...sizes].sort(),
-        colors: [...colors].sort((a, b) => a.localeCompare(b)),
-        brands: [...brands].sort((a, b) => a.localeCompare(b)),
+        types: [...primary.types].sort(),
+        finishes: [...primary.finishes].sort((a, b) => a.localeCompare(b)),
+        brands: [...primary.brands].sort((a, b) => a.localeCompare(b)),
+        pickupConfigs: [...primary.pickupConfigs].sort((a, b) => a.localeCompare(b)),
+        bodyWoods: [...primary.bodyWoods].sort((a, b) => a.localeCompare(b)),
+        conditions: [...primary.conditions].sort((a, b) => a.localeCompare(b)),
+        skillLevels: [...primary.skillLevels].sort((a, b) => a.localeCompare(b)),
+        shippingSpeeds: [...primary.shippingSpeeds].sort((a, b) => a.localeCompare(b)),
       },
     };
   } catch (e) {
@@ -382,15 +487,21 @@ export async function fetchProductsPage(
   const normalizedOptions = {
     ...options,
     category: options.category?.trim() || undefined,
-    size: options.size?.trim() || undefined,
-    color: options.color?.trim() || undefined,
+    type: options.type?.trim() || undefined,
+    finish: options.finish?.trim() || undefined,
     brand: options.brand?.trim() || undefined,
+    pickupConfig: options.pickupConfig?.trim() || undefined,
+    bodyWood: options.bodyWood?.trim() || undefined,
+    condition: options.condition?.trim() || undefined,
+    skillLevel: options.skillLevel?.trim() || undefined,
+    shippingSpeed: options.shippingSpeed?.trim() || undefined,
     q: options.q?.trim() || undefined,
   };
   const cached = unstable_cache(
     async () => fetchMedusaProductsPage(limit, normalizedOptions),
     [
       "storefront-products-page",
+      catalogEnvCacheFingerprint(),
       String(limit),
       JSON.stringify(normalizedOptions),
     ],
@@ -406,8 +517,21 @@ export async function fetchFeaturedProducts(
   limit = 4,
 ): Promise<FeaturedProductsResult> {
   const cached = unstable_cache(
-    async () => fetchMedusaProductsPage(limit, { sort: "newest" }),
-    ["storefront-featured-products", String(limit)],
+    async () => {
+      const primary = await fetchMedusaProductsPage(limit, { sort: "newest" }, true);
+      if (primary.kind !== "ok") {
+        return primary;
+      }
+      if (primary.products.length > 0 || !getMedusaSalesChannelId()) {
+        return primary;
+      }
+      return fetchMedusaProductsPage(limit, { sort: "newest" }, false);
+    },
+    [
+      "storefront-featured-products",
+      catalogEnvCacheFingerprint(),
+      String(limit),
+    ],
     {
       revalidate: 60,
       tags: ["catalog:list", "storefront:home"],
@@ -467,12 +591,12 @@ export async function fetchProductBySlug(
   return fetchMedusaProductBySlug(slug);
 }
 
-export type CategorySummary = { category: string; count: number };
+type CategorySummary = { category: string; count: number };
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
   const cached = unstable_cache(
     async () => fetchMedusaCategorySummaries(),
-    ["storefront-category-summaries"],
+    ["storefront-category-summaries", catalogEnvCacheFingerprint()],
     {
       revalidate: 60,
       tags: ["catalog:list", "collections:index"],
@@ -481,9 +605,9 @@ export async function fetchCategorySummaries(): Promise<CategorySummariesResult>
   return cached();
 }
 
-export type VariantFacets = {
-  sizes: string[];
-  colors: string[];
+type VariantFacets = {
+  types: string[];
+  finishes: string[];
   brands: string[];
 };
 
@@ -493,7 +617,11 @@ export async function fetchVariantFacets(
   const normalizedCategory = category?.trim() || undefined;
   const cached = unstable_cache(
     async () => fetchMedusaVariantFacets(normalizedCategory),
-    ["storefront-variant-facets", normalizedCategory ?? "__all__"],
+    [
+      "storefront-variant-facets",
+      catalogEnvCacheFingerprint(),
+      normalizedCategory ?? "__all__",
+    ],
     {
       revalidate: 60,
       tags: catalogCacheTags({ category: normalizedCategory }),

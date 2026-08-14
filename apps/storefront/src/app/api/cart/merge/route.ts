@@ -3,19 +3,22 @@ import { getServerSession } from "next-auth/next";
 
 import { authOptions } from "@/lib/auth";
 import type { CartLine } from "@/lib/cart";
-import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
-import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
-import { getMedusaRegionId } from "@/lib/storefront-medusa-env";
-import { extractSessionEmail } from "@apparel-commerce/sdk";
+import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
+import {
+  getMedusaRegionId,
+  withSalesChannelId,
+} from "@/lib/storefront-medusa-env";
+import { extractSessionEmail } from "@universal-music-store/sdk";
 import {
   applyRateLimit,
   parseJsonBody,
   isValidCartId,
+  readCartIdFromCookie,
   writeCartCookie,
   retrieveCartLines,
   retrieveCartRaw,
 } from "@/lib/cart-api-helpers";
-import { cartMergePostBodySchema } from "@apparel-commerce/validation";
+import { cartMergePostBodySchema } from "@universal-music-store/validation";
 
 /**
  * Merges guest session lines into the customer's Medusa cart (combine quantities per variant).
@@ -51,60 +54,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Store region not configured" }, { status: 503 });
   }
 
-  const customerId = await findOrCreateMedusaCustomerIdByEmail(email);
-  if (!customerId) {
-    return NextResponse.json({ error: "Customer unavailable" }, { status: 502 });
-  }
+  const sdk = createStorefrontMedusaSdk();
+  let targetCartId = await readCartIdFromCookie();
 
-  let listRes = await medusaAdminFetch(
-    `/admin/carts?customer_id=${encodeURIComponent(customerId)}&limit=20&order=-created_at`,
-  );
-  if (!listRes.ok) {
-    listRes = await medusaAdminFetch(`/admin/carts?limit=50&order=-created_at`);
-  }
-
-  let targetCartId: string | null = null;
-  if (listRes.ok) {
-    const listJson = (await listRes.json()) as {
-      carts?: Array<{ id: string; completed_at?: string | null; customer_id?: string | null }>;
-    };
-    const carts = listJson.carts ?? [];
-    const open = carts.find(
-      (c) =>
-        c.customer_id === customerId &&
-        (c.completed_at == null || c.completed_at === ""),
+  const createCart = async () => {
+    const { cart: created } = await sdk.store.cart.create(
+      withSalesChannelId({ region_id: regionId }) as Parameters<
+        typeof sdk.store.cart.create
+      >[0],
     );
-    targetCartId = open?.id ?? null;
-  }
+    return created?.id ?? null;
+  };
 
-  if (!targetCartId) {
-    const createRes = await medusaAdminFetch("/admin/carts", {
-      method: "POST",
-      body: JSON.stringify({
-        region_id: regionId,
-        customer_id: customerId,
-      }),
-    });
-    if (!createRes.ok) {
-      const t = await createRes.text().catch(() => "");
-      console.error("[cart/merge] create cart failed:", t.slice(0, 300));
-      return NextResponse.json(
-        { error: "Could not create cart" },
-        { status: 502 },
-      );
-    }
-    const created = (await createRes.json()) as { cart?: { id: string } };
-    targetCartId = created.cart?.id ?? null;
-  }
+  if (!targetCartId) targetCartId = await createCart();
 
   if (!isValidCartId(targetCartId)) {
-    return NextResponse.json({ error: "No target cart" }, { status: 500 });
+    return NextResponse.json({ error: "No target cart" }, { status: 503 });
   }
 
-  const existing = await retrieveCartRaw(
+  let existing = await retrieveCartRaw(
     targetCartId,
     "*items,*items.id,*items.variant_id,*items.quantity",
   );
+  if (!existing) {
+    // A stale cookie is normal after a Medusa reset or cart expiry. Replace it
+    // instead of turning login/cart merge into a 500.
+    targetCartId = await createCart();
+    if (!isValidCartId(targetCartId)) {
+      return NextResponse.json({ error: "No target cart" }, { status: 503 });
+    }
+    existing = {};
+  }
   const existingItems = (
     (existing as { items?: Array<{ id?: string; variant_id?: string; quantity?: number }> })
       ?.items ?? []
@@ -131,37 +111,17 @@ export async function POST(req: Request) {
   for (const it of existingItems) {
     const lineId = typeof it.id === "string" ? it.id : "";
     if (!lineId) continue;
-    const delRes = await medusaAdminFetch(
-      `/admin/carts/${encodeURIComponent(targetCartId)}/line-items/${encodeURIComponent(lineId)}`,
-      { method: "DELETE" },
-    );
-    if (!delRes.ok && delRes.status !== 404) {
-      const t = await delRes.text().catch(() => "");
-      console.error("[cart/merge] clear cart lines failed:", t.slice(0, 300));
-      return NextResponse.json(
-        { error: "Could not clear cart lines" },
-        { status: 502 },
-      );
-    }
+    await sdk.store.cart.deleteLineItem(targetCartId, lineId);
   }
 
   for (const [variantId, quantity] of byVariant) {
-    const addRes = await medusaAdminFetch(
-      `/admin/carts/${encodeURIComponent(targetCartId)}/line-items`,
-      {
-        method: "POST",
-        body: JSON.stringify({ variant_id: variantId, quantity }),
-      },
-    );
-    if (!addRes.ok) {
-      const t = await addRes.text().catch(() => "");
-      console.error("[cart/merge] add line failed:", variantId, t.slice(0, 300));
-      return NextResponse.json(
-        { error: "Could not add line to cart" },
-        { status: 502 },
-      );
-    }
+    await sdk.store.cart.createLineItem(targetCartId, {
+      variant_id: variantId,
+      quantity,
+    });
   }
+
+  await sdk.store.cart.update(targetCartId, { email });
 
   const lines = await retrieveCartLines(targetCartId);
   await writeCartCookie(targetCartId);

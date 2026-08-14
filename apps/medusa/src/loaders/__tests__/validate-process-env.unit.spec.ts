@@ -1,15 +1,18 @@
+/* global describe, beforeEach, afterAll, it, expect, jest */
+
 import { validateMedusaProcessEnv } from "../validate-process-env";
 
 const PSP_KEYS = [
   "STRIPE_API_KEY",
   "STRIPE_WEBHOOK_SECRET",
-  "PAYMONGO_SECRET_KEY",
-  "PAYMONGO_WEBHOOK_SECRET",
   "PAYPAL_CLIENT_ID",
   "PAYPAL_CLIENT_SECRET",
   "PAYPAL_WEBHOOK_ID",
-  "MAYA_SECRET_KEY",
-  "MAYA_WEBHOOK_SECRET",
+  "PAYPAL_ENVIRONMENT",
+  "XENDIT_SECRET_KEY",
+  "XENDIT_WEBHOOK_TOKEN",
+  "NANGO_API_KEY",
+  "NANGO_PAYMENT_INTEGRATIONS",
 ] as const;
 
 function clearPspKeys(): void {
@@ -80,6 +83,24 @@ describe("validateMedusaProcessEnv", () => {
     process.env.RESEND_FROM_EMAIL = "orders@test.com";
     delete process.env.TRACKING_HMAC_SECRET;
     expect(() => validateMedusaProcessEnv()).toThrow("TRACKING_HMAC_SECRET");
+  });
+
+  it("throws when PayPal client ID set but PAYPAL_ENVIRONMENT is not production", () => {
+    process.env.NODE_ENV = "production";
+    setProductionBase();
+    process.env.PAYPAL_CLIENT_ID = "cid";
+    process.env.PAYPAL_CLIENT_SECRET = "sec";
+    process.env.PAYPAL_WEBHOOK_ID = "wh";
+    process.env.PAYPAL_ENVIRONMENT = "sandbox";
+    expect(() => validateMedusaProcessEnv()).toThrow("PAYPAL_ENVIRONMENT");
+  });
+
+  it("throws when Xendit secret set and webhook token missing in production", () => {
+    process.env.NODE_ENV = "production";
+    setProductionBase();
+    process.env.XENDIT_SECRET_KEY = "xendit_sk";
+    delete process.env.XENDIT_WEBHOOK_TOKEN;
+    expect(() => validateMedusaProcessEnv()).toThrow("XENDIT_WEBHOOK_TOKEN");
   });
 
   it("passes production with baseline env and no PSP keys set", () => {

@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { listVoids, getShiftById } from "@apparel-commerce/platform-data";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { listVoids, getShiftById } from "@universal-music-store/platform-data";
+import { staffSessionAllows } from "@universal-music-store/database";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,7 +16,7 @@ type Ctx = { params: Promise<{ id: string }> };
  */
 export async function GET(req: NextRequest, ctx: Ctx) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
@@ -31,13 +31,15 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const sup = adminSupabaseOr503(correlationId);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, session.user.email);
+  if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
 
-  const shift = await getShiftById(sup.client, shiftId.trim());
+  const shift = await getShiftById(sup.client, shiftId.trim(), organization.id);
   if (!shift) {
     return correlatedJson(correlationId, { error: "Shift not found" }, { status: 404 });
   }
 
-  const voids = await listVoids(sup.client, { shiftId: shiftId.trim(), limit: 200 });
+  const voids = await listVoids(sup.client, { shiftId: shiftId.trim(), limit: 200, organizationId: organization.id });
   const voidAmountMinor = voids.reduce((s, v) => s + (v.amount != null ? Math.round(v.amount) : 0), 0);
 
   let ordersMatched = 0;

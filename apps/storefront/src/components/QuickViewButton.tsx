@@ -19,9 +19,7 @@ export function QuickViewButton({ slug }: { slug: string }) {
       >
         Quick view
       </button>
-      {open ? (
-        <ProductQuickViewModal slug={slug} onClose={() => setOpen(false)} />
-      ) : null}
+      <ProductQuickViewModal slug={slug} open={open} onOpenChange={setOpen} />
     </>
   );
 }

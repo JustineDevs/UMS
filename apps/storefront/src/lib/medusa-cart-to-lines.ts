@@ -1,4 +1,5 @@
 import type { CartLine } from "@/lib/cart";
+import { medusaMinorToMajor } from "@/lib/medusa-money";
 
 type OptRow = { option?: { title?: string } | null; value?: string };
 
@@ -20,6 +21,7 @@ function optionValue(
 export function medusaCartToCartLines(cart: unknown): CartLine[] {
   if (!cart || typeof cart !== "object") return [];
   const c = cart as Record<string, unknown>;
+  const currencyCode = typeof c.currency_code === "string" ? c.currency_code : "PHP";
   const items = Array.isArray(c.items) ? c.items : [];
   const out: CartLine[] = [];
 
@@ -44,8 +46,8 @@ export function medusaCartToCartLines(cart: unknown): CartLine[] {
         : 1;
 
     const options = (variant?.options ?? null) as OptRow[] | null;
-    const size = optionValue(options, /size/);
-    const color = optionValue(options, /color|colour/);
+    const type = optionValue(options, /type|kind|style|size/);
+    const finish = optionValue(options, /finish|color|colour/);
 
     const unitMinor =
       typeof it.unit_price === "number" && Number.isFinite(it.unit_price)
@@ -57,8 +59,10 @@ export function medusaCartToCartLines(cart: unknown): CartLine[] {
                 .calculated_amount,
             )
           : 0;
-    const pricePhp =
-      Number.isFinite(unitMinor) && unitMinor > 0 ? unitMinor / 100 : 0;
+    const priceMajor =
+      Number.isFinite(unitMinor) && unitMinor > 0
+        ? medusaMinorToMajor(unitMinor, currencyCode)
+        : 0;
 
     const name =
       typeof product?.title === "string"
@@ -71,15 +75,23 @@ export function medusaCartToCartLines(cart: unknown): CartLine[] {
     const sku =
       typeof variant?.sku === "string" ? variant.sku : variantId.slice(-8);
 
+    const thumb =
+      typeof it.thumbnail === "string" && it.thumbnail.trim()
+        ? it.thumbnail.trim()
+        : typeof product?.thumbnail === "string" && product.thumbnail.trim()
+          ? product.thumbnail.trim()
+          : undefined;
+
     out.push({
       variantId,
       quantity: qty,
       slug,
       name,
       sku,
-      size: size || "—",
-      color: color || "—",
-      price: pricePhp,
+      type: type || "",
+      finish: finish || "",
+      price: priceMajor,
+      ...(thumb ? { thumbnail: thumb } : {}),
     });
   }
 

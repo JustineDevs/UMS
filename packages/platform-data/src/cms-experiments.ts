@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type CmsAbExperimentRow = {
   id: string;
+  organization_id: string | null;
   experiment_key: string;
   name: string;
   variants: unknown;
@@ -17,11 +18,13 @@ export type CmsAbExperimentRow = {
   conversions: number;
 };
 
-export async function listCmsAbExperiments(supabase: SupabaseClient): Promise<CmsAbExperimentRow[]> {
-  const { data, error } = await supabase
-    .from("cms_ab_experiments")
-    .select("*")
-    .order("experiment_key");
+export async function listCmsAbExperiments(
+  supabase: SupabaseClient,
+  organizationId?: string,
+): Promise<CmsAbExperimentRow[]> {
+  let query = supabase.from("cms_ab_experiments").select("*").order("experiment_key");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-experiments] list", error.message);
@@ -31,6 +34,7 @@ export async function listCmsAbExperiments(supabase: SupabaseClient): Promise<Cm
     const x = r as Record<string, unknown>;
     return {
       id: String(x.id),
+      organization_id: x.organization_id != null ? String(x.organization_id) : null,
       experiment_key: String(x.experiment_key ?? ""),
       name: String(x.name ?? ""),
       variants: x.variants ?? [],
@@ -54,6 +58,7 @@ export async function upsertCmsAbExperiment(
   supabase: SupabaseClient,
   input: {
     id?: string;
+    organization_id?: string;
     experiment_key: string;
     name?: string;
     variants: unknown;
@@ -68,10 +73,11 @@ export async function upsertCmsAbExperiment(
   },
 ): Promise<CmsAbExperimentRow | null> {
   const existing = input.id
-    ? (await supabase.from("cms_ab_experiments").select("*").eq("id", input.id).maybeSingle()).data
+    ? (await supabase.from("cms_ab_experiments").select("*").eq("id", input.id).eq("organization_id", input.organization_id ?? "").maybeSingle()).data
     : null;
   const ex = existing as Record<string, unknown> | null;
   const row = {
+    ...(input.organization_id ? { organization_id: input.organization_id } : {}),
     experiment_key: input.experiment_key,
     name: input.name ?? (ex ? String(ex.name ?? "") : ""),
     variants: input.variants ?? (ex?.variants ?? []),
@@ -116,6 +122,7 @@ export async function upsertCmsAbExperiment(
       .from("cms_ab_experiments")
       .update(row)
       .eq("id", input.id)
+      .eq("organization_id", input.organization_id ?? "")
       .select("*")
       .single();
     if (error) {
@@ -125,6 +132,7 @@ export async function upsertCmsAbExperiment(
     const x = data as Record<string, unknown>;
     return {
       id: String(x.id),
+      organization_id: x.organization_id != null ? String(x.organization_id) : null,
       experiment_key: String(x.experiment_key ?? ""),
       name: String(x.name ?? ""),
       variants: x.variants ?? [],
@@ -142,7 +150,7 @@ export async function upsertCmsAbExperiment(
   }
   const { data, error } = await supabase
     .from("cms_ab_experiments")
-    .upsert(row, { onConflict: "experiment_key" })
+    .upsert(row, { onConflict: "organization_id,experiment_key" })
     .select("*")
     .single();
   if (error) {
@@ -152,6 +160,7 @@ export async function upsertCmsAbExperiment(
   const x = data as Record<string, unknown>;
   return {
     id: String(x.id),
+    organization_id: x.organization_id != null ? String(x.organization_id) : null,
     experiment_key: String(x.experiment_key ?? ""),
     name: String(x.name ?? ""),
     variants: x.variants ?? [],

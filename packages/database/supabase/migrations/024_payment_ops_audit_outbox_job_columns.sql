@@ -69,6 +69,6 @@ AS $$
   SELECT count(*)::bigint
   FROM public.payment_attempts
   WHERE provider = 'cod'
-    AND (provider_payload->>'aftership_delivered_at') IS NOT NULL
+    AND (provider_payload->>'delivered_at') IS NOT NULL
     AND (provider_payload->>'cod_capture_complete') IS DISTINCT FROM 'true';
 $$;

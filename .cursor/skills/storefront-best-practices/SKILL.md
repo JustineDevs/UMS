@@ -165,7 +165,7 @@ Task 3: Implement Checkout Flow
 
 ### Routing Patterns
 - **ALWAYS use dynamic routes** for products and categories - NEVER create static pages for individual items
-- Product pages: Use dynamic routes like `/products/[handle]` or `/products/$handle`, NOT `/products/shirt.tsx`
+- Product pages: Use dynamic routes like `/products/[handle]` or `/products/$handle`, NOT `/products/guitar.tsx`
 - Category pages: Use dynamic routes like `/categories/[handle]` or `/categories/$handle`, NOT `/categories/women.tsx`
 - Framework-specific patterns:
   - **Next.js App Router**: `app/products/[handle]/page.tsx` or `app/products/[id]/page.tsx`
@@ -288,7 +288,7 @@ Before implementing, consider:
 1. **User preferences** - Read `design.md` to discover design style preferences
 2. **Brand identity** - Colors, typography, tone that match the brand
 3. **Target audience** - B2C vs B2B, demographics, device usage
-4. **Product type** - Fashion vs electronics vs groceries affect layout choices
+4. **Product type** - Instruments vs electronics vs groceries affect layout choices
 5. **Business requirements** - Multi-currency, multi-language, region-specific
 6. **Backend system** - API structure affects component implementation
 
@@ -360,7 +360,7 @@ Before implementing, watch out for these common ecommerce-specific pitfalls:
 - ❌ No clear indication of current page in category navigation
 
 **2. Product Browsing Mistakes**
-- ❌ Creating static routes for products/categories (use dynamic routes like `/products/[handle]` instead of `/products/shirt.tsx`)
+- ❌ Creating static routes for products/categories (use dynamic routes like `/products/[handle]` instead of `/products/guitar.tsx`)
 - ❌ Missing "no products found" empty state with helpful suggestions
 - ❌ No loading indicators while fetching products
 - ❌ Pagination without SEO-friendly URLs (for search engines)

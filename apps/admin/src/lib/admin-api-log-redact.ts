@@ -1,5 +1,5 @@
 const SENSITIVE_KEY =
-  /password|passwd|secret|token|ciphertext|apikey|api_key|privatekey|private_key|clientsecret|client_secret|webhooksecret|webhook_secret|secretkey|secret_key|authorization|bearer|refreshtoken|access_token|refresh_token|credential|kek|dek|encrypted/i;
+  /password|passwd|secret|token|ciphertext|apikey|api_key|privatekey|private_key|clientsecret|client_secret|webhooksecret|webhook_secret|secretkey|secret_key|authorization|bearer|refreshtoken|access_token|refresh_token|credential|kek|dek|encrypted|pin|cardnumber|card_number|cvv|cvc|iban|bankaccount|bank_account/i;
 
 function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEY.test(key);

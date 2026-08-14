@@ -1,5 +1,5 @@
 /**
- * Load repo-root `.env` / `.env.local` into `process.env` before Next reads config.
+ * Load the repo-root env file into `process.env` before Next reads config.
  * Used by apps/storefront and apps/admin `next.config.*` only.
  *
  * Kept under `scripts/` (not `stress-test/`) so production and CI builds never depend on test-only paths.
@@ -10,8 +10,9 @@ const dotenv = require("dotenv");
 
 /**
  * Apply vars from a root env file without letting `NODE_ENV` leak into the Next.js process.
- * Repo `.env` often documents `NODE_ENV=production` for deploys; `dotenv.config({ override: true })`
- * would overwrite the value Next sets for `next dev` / `next build` and breaks CSS compilation.
+ * Local repo `.env.local` stays on development defaults, while `.env.production` mirrors the
+ * production host config. Letting dotenv overwrite the process value would still break
+ * `next dev` / `next build` because Next manages its own mode.
  */
 function envValueUnset(key) {
   const v = process.env[key];
@@ -42,12 +43,18 @@ function applyRootEnvFile(filePath, overrideExisting) {
 
 function loadMonorepoRootEnv(fromConfigDir) {
   const root = path.resolve(fromConfigDir, "../..");
-  const env = path.join(root, ".env");
-  const envLocal = path.join(root, ".env.local");
+  const envFileName =
+    process.env.NODE_ENV === "production" ? ".env.production" : ".env.local";
+  const envFilePath = path.join(root, envFileName);
   const invalidationKey = "STOREFRONT_INTERNAL_INVALIDATION_SECRET";
   const invalidationBefore = process.env[invalidationKey];
-  applyRootEnvFile(env, false);
-  applyRootEnvFile(envLocal, true);
+  // The app launcher owns NEXTAUTH_URL in local development so admin and storefront
+  // never generate callbacks or cookies for each other's origin.
+  const runtimeNextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  applyRootEnvFile(envFilePath, true);
+  if (runtimeNextAuthUrl) {
+    process.env.NEXTAUTH_URL = runtimeNextAuthUrl;
+  }
   if (invalidationBefore?.trim() && !process.env[invalidationKey]?.trim()) {
     process.env[invalidationKey] = invalidationBefore;
   }

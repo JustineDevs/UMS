@@ -1,26 +1,40 @@
 {
-  "name": "@apparel-commerce/sdk",
+  "name": "@universal-music-store/sdk",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./cms-experiment-pick": "./src/cms-experiment-pick.ts",
-    "./*": "./src/*"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./cms-experiment-pick": {
+      "types": "./dist/cms-experiment-pick.d.ts",
+      "import": "./dist/cms-experiment-pick.js",
+      "default": "./dist/cms-experiment-pick.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts src/cms-helpers.test.ts"
+    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts src/cms-helpers.test.ts src/env/posthog.test.ts src/posthog.test.ts src/safe-url.test.ts"
   },
   "dependencies": {
-    "@apparel-commerce/platform-data": "workspace:*"
+    "@universal-music-store/platform-data": "workspace:*",
+    "posthog-js": "^1.261.0"
   },
   "devDependencies": {
-    "@apparel-commerce/config-eslint": "workspace:*",
-    "@apparel-commerce/config-typescript": "workspace:*",
+    "@universal-music-store/config-eslint": "workspace:*",
+    "@universal-music-store/config-typescript": "workspace:*",
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"

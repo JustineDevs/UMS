@@ -3,20 +3,22 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+const envFileName =
+  process.env.NODE_ENV === "production" ? ".env.production" : ".env.local";
+config({ path: resolve(__dirname, "../../../", envFileName) });
 
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { requestIdMiddleware } from "./lib/requestId.js";
-import { healthRouter } from "./routes/health.js";
+import { getReadinessPayload, healthRouter } from "./routes/health.js";
 import { complianceRouter } from "./routes/compliance.js";
 import { errorHandler } from "./lib/errorHandler.js";
 import { requireInternalApiKey } from "./lib/requireInternalApiKey.js";
 import { logStartup } from "./lib/logger.js";
 import rateLimit from "express-rate-limit";
-import { expressComplianceApiRateLimitOptions } from "@apparel-commerce/rate-limits";
+import { expressComplianceApiRateLimitOptions } from "@universal-music-store/rate-limits";
 import { shouldFailBootForMissingInternalKey } from "./lib/checkProductionInternalApiKey.js";
 
 const app = express();
@@ -81,6 +83,29 @@ app.use(
 app.use(express.json({ limit: "1mb" }));
 
 const complianceRateLimiter = rateLimit(expressComplianceApiRateLimitOptions());
+
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    service: "universal-music-store-api",
+    status: "ok",
+    health: "/health",
+    readiness: "/readyz",
+    compliance: "/compliance",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/readyz", async (_req, res) => {
+  const body = await getReadinessPayload();
+  res.status(body.ready ? 200 : 503).json(body);
+});
 
 app.use("/health", healthRouter);
 app.use(

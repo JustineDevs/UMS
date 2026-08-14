@@ -4,7 +4,8 @@ import {
   EMPTY_STOREFRONT_PUBLIC_METADATA,
   mergeStorefrontPublicMetadataPayload,
   resolveStorefrontPublicMetadataWithEnv,
-} from "./storefront-public-metadata";
+  storefrontSocialLinks,
+} from "./storefront-public-metadata.js";
 
 describe("mergeStorefrontPublicMetadataPayload", () => {
   it("returns empty strings for null input", () => {
@@ -19,10 +20,34 @@ describe("mergeStorefrontPublicMetadataPayload", () => {
     assert.equal(m.supportEmail, "a@b.co");
     assert.equal(m.instagramUrl, "");
   });
+
+  it("normalizes configured social handles and omits empty links", () => {
+    const links = storefrontSocialLinks({
+      ...EMPTY_STOREFRONT_PUBLIC_METADATA,
+      instagramUrl: "@universal.music.store",
+      facebookUrl: "https://facebook.com/universal-music-store",
+      tiktokUrl: "umsph",
+      whatsappUrl: "https://wa.me/639171234567",
+    });
+
+    assert.deepEqual(links, [
+      { label: "Instagram", href: "https://instagram.com/universal.music.store" },
+      { label: "Facebook", href: "https://facebook.com/universal-music-store" },
+      { label: "TikTok", href: "https://tiktok.com/@umsph" },
+      { label: "WhatsApp", href: "https://wa.me/639171234567" },
+    ]);
+  });
 });
 
 const ENV_KEYS = [
   "NEXT_PUBLIC_INSTAGRAM_URL",
+  "NEXT_PUBLIC_FACEBOOK_URL",
+  "NEXT_PUBLIC_TIKTOK_URL",
+  "NEXT_PUBLIC_YOUTUBE_URL",
+  "NEXT_PUBLIC_X_URL",
+  "NEXT_PUBLIC_LINKEDIN_URL",
+  "NEXT_PUBLIC_WHATSAPP_URL",
+  "NEXT_PUBLIC_MESSENGER_URL",
   "NEXT_PUBLIC_SUPPORT_EMAIL",
   "NEXT_PUBLIC_SUPPORT_PHONE",
 ] as const;

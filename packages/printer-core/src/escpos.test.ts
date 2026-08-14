@@ -25,10 +25,10 @@ describe("encodeEscPosReceipt", () => {
 describe("encodeEscPosProductLabel", () => {
   it("produces ESC/POS bytes with init and cut", () => {
     const buf = encodeEscPosProductLabel({
-      productName: "Test Tee",
+      productName: "Test Guitar",
       sku: "SKU-001",
       barcode: "4800123456789",
-      size: "M",
+      size: "Standard",
       color: "Black",
       priceDisplay: "PHP 599.00",
     });

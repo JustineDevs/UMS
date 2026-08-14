@@ -14,14 +14,12 @@ NC='\033[0m'
 
 # Sensitive file patterns
 SENSITIVE_PATTERNS=(
-    "^\.env$"
     "^\.env\.local$"
     "^\.env\.[^.]*\.local$"
     "^\.env\.production$"
     "^\.env\.development$"
     "^\.env\.test$"
     "^\.env\.staging$"
-    "\.env$"
     "\.secrets?$"
     "secrets/"
     "\.secret$"
@@ -114,7 +112,7 @@ check_gitignore() {
         return
     fi
     
-    if grep -qE "^\.env$|^\.env[[:space:]]" .gitignore 2>/dev/null; then
+    if grep -qE "^\.env\.local$|^\.env\.local[[:space:]]" .gitignore 2>/dev/null; then
         echo "ok"
     else
         echo "missing_env"
@@ -140,11 +138,11 @@ case "$gitignore_status" in
         print_color $YELLOW "⚠️  .gitignore file not found!"
         ;;
     "missing_env")
-        print_color $YELLOW "⚠️  .gitignore may not properly exclude .env files"
-        print_color $YELLOW "   Ensure .gitignore contains: .env"
+        print_color $YELLOW "⚠️  .gitignore may not properly exclude .env.local files"
+        print_color $YELLOW "   Ensure .gitignore contains: .env.local"
         ;;
     "ok")
-        print_color $GREEN "✅ .gitignore properly configured for .env files"
+        print_color $GREEN "✅ .gitignore properly configured for .env.local files"
         ;;
 esac
 
@@ -194,4 +192,3 @@ else
     print_color $RED "❌ Security check failed!"
     exit 1
 fi
-

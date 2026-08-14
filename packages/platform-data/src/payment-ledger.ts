@@ -2,10 +2,11 @@ import { randomUUID } from "crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type PaymentAttemptRow = {
   id: string;
+  organization_id: string | null;
   correlation_id: string;
   cart_id: string;
   order_id: string | null;
@@ -75,6 +76,7 @@ export async function findOpenPaymentAttemptForCart(
 }
 
 export type RegisterPaymentAttemptInput = {
+  organizationId?: string;
   cartId: string;
   provider: string;
   amountMinor: number;
@@ -219,6 +221,7 @@ export async function registerPaymentAttempt(
           ...nextQuotePayload,
         },
       };
+      if (input.organizationId?.trim()) patch.organization_id = input.organizationId.trim();
       if (input.medusaPaymentSessionId) {
         patch.medusa_payment_session_id = input.medusaPaymentSessionId;
       }
@@ -245,6 +248,7 @@ export async function registerPaymentAttempt(
       invalidated_by: "quote_fingerprint",
       last_error: "Your checkout total changed. Review the updated order before paying.",
     };
+    if (input.organizationId?.trim()) patch.organization_id = input.organizationId.trim();
     const { error } = await supabase
       .from("payment_attempts")
       .update(patch)
@@ -255,6 +259,7 @@ export async function registerPaymentAttempt(
   const correlationId = randomUUID();
   const quotePayload = buildQuoteProviderPayload(input);
   const { error } = await supabase.from("payment_attempts").insert({
+    ...(input.organizationId?.trim() ? { organization_id: input.organizationId.trim() } : {}),
     correlation_id: correlationId,
     cart_id: input.cartId,
     provider: input.provider,
@@ -431,17 +436,25 @@ export async function listStuckPaymentAttempts(
 }
 
 /** Alias for reconciliation jobs and operator docs (stale = paid but no order id). */
-export const listStalePaymentAttempts = listStuckPaymentAttempts;
+export async function listStalePaymentAttempts(
+  supabase: SupabaseClient,
+  limit: number,
+): Promise<PaymentAttemptRow[]> {
+  return listStuckPaymentAttempts(supabase, limit);
+}
 
 export async function listRecentPaymentAttempts(
   supabase: SupabaseClient,
   limit: number,
+  organizationId?: string,
 ): Promise<PaymentAttemptRow[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("payment_attempts")
     .select("*")
     .order("updated_at", { ascending: false })
     .limit(Math.min(500, Math.max(1, limit)));
+  if (organizationId?.trim()) query = query.eq("organization_id", organizationId.trim());
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;

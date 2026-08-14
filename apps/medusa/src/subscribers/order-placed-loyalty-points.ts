@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { tryCreateSupabaseClient } from "../lib/payment-supabase-bridge";
 
 const POINTS_PER_100_CENTS = 1;
 
@@ -26,12 +27,8 @@ export default async function orderPlacedLoyaltyPoints({
   event: { data },
   container,
 }: SubscriberArgs<{ id: string }>) {
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_ANON_KEY?.trim();
-
-  if (!supabaseUrl || !supabaseKey) return;
+  const sb = tryCreateSupabaseClient();
+  if (!sb) return;
 
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER) as {
     info?: (m: string) => void;
@@ -65,9 +62,6 @@ export default async function orderPlacedLoyaltyPoints({
   }
 
   try {
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(supabaseUrl, supabaseKey);
-
     const { data: existing } = await sb
       .from("loyalty_accounts")
       .select("id,points_balance")

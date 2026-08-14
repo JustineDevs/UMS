@@ -1,5 +1,5 @@
 import Medusa from "@medusajs/js-sdk";
-import { evaluateWebCheckoutPolicy } from "@apparel-commerce/omnichannel-policy";
+import { evaluateWebCheckoutPolicy } from "@universal-music-store/omnichannel-policy";
 import {
   getMedusaPublishableKey,
   getMedusaRegionId,
@@ -9,7 +9,7 @@ import {
 import { createStorefrontMedusaSdk } from "./medusa-sdk";
 import { medusaMinorToMajor } from "./medusa-money";
 import { tryDeleteStoreCart } from "./medusa-checkout-errors";
-import { assertStorefrontLinesStock } from "./storefront-inventory-guard";
+import type { StorefrontStockResult } from "./storefront-inventory-guard";
 import { buildCheckoutQuoteFingerprint } from "./checkout-quote-fingerprint";
 import type { MedusaCartAddressPayload } from "@/lib/medusa-profile-address";
 
@@ -21,7 +21,15 @@ export type CodCartPayload = {
   billing_address: MedusaCartAddressPayload;
 };
 
+type MedusaShippingOptionPreview = {
+  id: string;
+  name: string;
+  priceMajor: number;
+  currencyCode: string;
+};
+
 export type MedusaCheckoutTotalsPreview = {
+  cartId?: string;
   subtotal: number;
   taxTotal: number;
   shippingTotal: number;
@@ -34,6 +42,8 @@ export type MedusaCheckoutTotalsPreview = {
   productIds: string[];
   shippingMethodIds: string[];
   regionId: string | null;
+  shippingOptions: MedusaShippingOptionPreview[];
+  appliedShippingOptionId: string | null;
 };
 
 type PrepareMedusaCartInput = {
@@ -41,6 +51,8 @@ type PrepareMedusaCartInput = {
   email?: string;
   loyaltyPointsToRedeem?: number;
   codCartPayload?: CodCartPayload;
+  /** When set, must match a `listCartOptions` id for this cart. */
+  shippingOptionId?: string;
 };
 
 export type PrepareMedusaCartContext = {
@@ -48,7 +60,38 @@ export type PrepareMedusaCartContext = {
   cartId: string;
   baseUrl: string;
   publishableKey: string;
+  shippingOptions: MedusaShippingOptionPreview[];
+  appliedShippingOptionId: string;
 };
+
+function buildShippingOptionPreviews(
+  options: unknown[],
+  currencyCode: string,
+): MedusaShippingOptionPreview[] {
+  const cur = currencyCode.trim();
+  return options
+    .map((raw) => {
+      if (!raw || typeof raw !== "object") return null;
+      const o = raw as Record<string, unknown>;
+      const id = typeof o.id === "string" ? o.id.trim() : "";
+      if (!id) return null;
+      const name = typeof o.name === "string" ? o.name : "Shipping";
+      const rawAmt = o.amount ?? o.price ?? 0;
+      const minor =
+        typeof rawAmt === "bigint"
+          ? Number(rawAmt)
+          : typeof rawAmt === "number" && Number.isFinite(rawAmt)
+            ? rawAmt
+            : 0;
+      return {
+        id,
+        name,
+        priceMajor: medusaMinorToMajor(minor, cur),
+        currencyCode: cur.toUpperCase(),
+      };
+    })
+    .filter((x): x is MedusaShippingOptionPreview => x != null);
+}
 
 /**
  * Builds a store cart with lines, optional COD addresses, default shipping, and optional loyalty.
@@ -58,7 +101,7 @@ export async function prepareMedusaStoreCart(
   input: PrepareMedusaCartInput,
   codFlow: boolean,
 ): Promise<PrepareMedusaCartContext> {
-  const stock = await assertStorefrontLinesStock(input.lines);
+  const stock = await verifyStockServerSide(input.lines);
   if (!stock.ok) {
     throw new Error(stock.message);
   }
@@ -114,20 +157,31 @@ export async function prepareMedusaStoreCart(
     await sdk.store.cart.update(cartId, {
       shipping_address: input.codCartPayload.shipping_address,
       billing_address: input.codCartPayload.billing_address,
+      metadata: {
+        payment_provider: "cod",
+        cod_payment_status: "pending_collection",
+      },
     });
   }
 
   const { shipping_options } = await sdk.store.fulfillment.listCartOptions({
     cart_id: cartId,
   });
-  const firstOption = shipping_options?.[0];
-  if (!firstOption?.id) {
+  const currencyCode = String(created.currency_code ?? "PHP");
+  const rawOpts = shipping_options ?? [];
+  const shippingOptionPreviews = buildShippingOptionPreviews(rawOpts, currencyCode);
+  const requested = input.shippingOptionId?.trim();
+  const pickId =
+    requested && rawOpts.some((o) => (o as { id?: string }).id === requested)
+      ? requested
+      : (rawOpts[0] as { id?: string } | undefined)?.id;
+  if (!pickId?.trim()) {
     throw new Error(
       "No shipping options available for this cart. Check your region and shipping setup.",
     );
   }
 
-  await sdk.store.cart.addShippingMethod(cartId, { option_id: firstOption.id });
+  await sdk.store.cart.addShippingMethod(cartId, { option_id: pickId.trim() });
 
   const loyaltyPts = Math.floor(Number(input.loyaltyPointsToRedeem ?? 0));
   if (loyaltyPts > 0) {
@@ -153,7 +207,39 @@ export async function prepareMedusaStoreCart(
     }
   }
 
-  return { sdk, cartId, baseUrl, publishableKey };
+  return {
+    sdk,
+    cartId,
+    baseUrl,
+    publishableKey,
+    shippingOptions: shippingOptionPreviews,
+    appliedShippingOptionId: pickId.trim(),
+  };
+}
+
+/**
+ * Stock verification via server API route. The Admin API requires MEDUSA_SECRET_API_KEY
+ * which is only available server-side. Browser checkout calls this instead of
+ * importing medusaAdminFetch directly.
+ */
+async function verifyStockServerSide(
+  lines: MedusaCheckoutLine[],
+): Promise<StorefrontStockResult> {
+  if (typeof window === "undefined") {
+    const { assertStorefrontLinesStock } = await import("./storefront-inventory-guard");
+    return assertStorefrontLinesStock(lines);
+  }
+  try {
+    const res = await fetch("/api/checkout/verify-stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lines }),
+    });
+    const data = (await res.json()) as StorefrontStockResult;
+    return data;
+  } catch {
+    return { ok: false, message: "Stock verification failed", code: "INVENTORY_CHECK_FAILED" };
+  }
 }
 
 function readMinorField(record: Record<string, unknown>, key: string): number {
@@ -171,32 +257,20 @@ export function readMedusaCartMinorField(
   return readMinorField(cart, key);
 }
 
-const TOTAL_RECONCILE_TOLERANCE_MAJOR = 0.02;
-
 /**
- * When GET /store/carts/:id returns a `total` that is below subtotal + shipping + tax − discount
- * (seen after shipping methods apply), use the component sum so UI and confirmed amount match Medusa payment math.
+ * Returns Medusa's authoritative `total` field converted to major units.
+ * Medusa computes the grand total server-side accounting for tax-inclusive
+ * pricing, discounts, and shipping. Attempting to re-derive it from component
+ * fields (subtotal + shipping + tax) double-counts tax in tax-inclusive
+ * regions (e.g. Philippines) where subtotal already includes VAT.
  */
 export function reconcileMedusaCartGrandTotalMajor(
   cart: Record<string, unknown>,
   currencyCode: string,
 ): { totalMajor: number; reconciled: boolean } {
   const cur = currencyCode.trim().toUpperCase();
-  const sub = medusaMinorToMajor(readMinorField(cart, "subtotal"), cur);
-  const ship = medusaMinorToMajor(readMinorField(cart, "shipping_total"), cur);
-  const tax = medusaMinorToMajor(readMinorField(cart, "tax_total"), cur);
-  const disc = medusaMinorToMajor(readMinorField(cart, "discount_total"), cur);
   const api = medusaMinorToMajor(readMinorField(cart, "total"), cur);
-  const componentsSum = sub + ship + tax - disc;
-  const roundedSum = Math.round(componentsSum * 1e6) / 1e6;
-  const roundedApi = Math.round(api * 1e6) / 1e6;
-  if (
-    roundedSum > TOTAL_RECONCILE_TOLERANCE_MAJOR &&
-    roundedApi + TOTAL_RECONCILE_TOLERANCE_MAJOR < roundedSum - TOTAL_RECONCILE_TOLERANCE_MAJOR
-  ) {
-    return { totalMajor: roundedSum, reconciled: true };
-  }
-  return { totalMajor: roundedApi, reconciled: false };
+  return { totalMajor: Math.round(api * 1e6) / 1e6, reconciled: false };
 }
 
 export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview {
@@ -292,7 +366,10 @@ export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview 
     regionId,
   });
 
+  const cartId = typeof c.id === "string" && c.id.trim() ? c.id.trim() : undefined;
+
   return {
+    cartId,
     subtotal,
     taxTotal,
     shippingTotal,
@@ -305,6 +382,8 @@ export function cartToTotalsPreview(cart: unknown): MedusaCheckoutTotalsPreview 
     productIds: [...productIds].sort(),
     shippingMethodIds: [...shippingMethodIds].sort(),
     regionId,
+    shippingOptions: [],
+    appliedShippingOptionId: null,
   };
 }
 
@@ -314,6 +393,7 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
   email?: string;
   loyaltyPointsToRedeem?: number;
   codCartPayload?: CodCartPayload;
+  shippingOptionId?: string;
 }): Promise<MedusaCheckoutTotalsPreview> {
   const codFlow = Boolean(input.codCartPayload?.email?.trim());
   const ctx = await prepareMedusaStoreCart(
@@ -322,6 +402,7 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
       email: codFlow ? undefined : input.email,
       codCartPayload: input.codCartPayload,
       loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
+      shippingOptionId: input.shippingOptionId,
     },
     codFlow,
   );
@@ -331,7 +412,12 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
       fields:
         "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
     } as never);
-    return cartToTotalsPreview(cart);
+    const preview = cartToTotalsPreview(cart);
+    return {
+      ...preview,
+      shippingOptions: ctx.shippingOptions,
+      appliedShippingOptionId: ctx.appliedShippingOptionId,
+    };
   } finally {
     await tryDeleteStoreCart(ctx.cartId, ctx.baseUrl, ctx.publishableKey);
   }
@@ -346,4 +432,49 @@ export async function readMedusaCartTotalsPreview(
       "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
   } as never);
   return cartToTotalsPreview(cart);
+}
+
+export async function readVerifiedMedusaCartTotalsPreview(
+  cartId: string,
+): Promise<MedusaCheckoutTotalsPreview> {
+  const sdk = createStorefrontMedusaSdk();
+  const { cart } = await sdk.store.cart.retrieve(cartId, {
+    fields:
+      "id,region_id,total,currency_code,subtotal,tax_total,shipping_total,discount_total,*items,*shipping_methods",
+  } as never);
+  const preview = cartToTotalsPreview(cart);
+  const lines = medusaCartToCheckoutLines(cart);
+  if (lines.length === 0) {
+    throw new Error("Add at least one line item before checkout.");
+  }
+  const stock = await verifyStockServerSide(lines);
+  if (!stock.ok) {
+    throw new Error(stock.message);
+  }
+  return preview;
+}
+
+export function medusaCartToCheckoutLines(cart: unknown): MedusaCheckoutLine[] {
+  if (!cart || typeof cart !== "object") return [];
+  const items = Array.isArray((cart as { items?: unknown }).items)
+    ? (cart as { items: unknown[] }).items
+    : [];
+  return items
+    .map((raw) => {
+      if (!raw || typeof raw !== "object") return null;
+      const item = raw as Record<string, unknown>;
+      const variant = item.variant as Record<string, unknown> | undefined;
+      const variantId =
+        typeof item.variant_id === "string"
+          ? item.variant_id.trim()
+          : typeof variant?.id === "string"
+            ? variant.id.trim()
+            : "";
+      const quantity =
+        typeof item.quantity === "number" && Number.isFinite(item.quantity)
+          ? Math.floor(item.quantity)
+          : 0;
+      return variantId && quantity > 0 ? { variantId, quantity } : null;
+    })
+    .filter((line): line is MedusaCheckoutLine => line != null);
 }

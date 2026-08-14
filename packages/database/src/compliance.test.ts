@@ -8,13 +8,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   exportDataSubjectByEmail,
   anonymizeStaleOrderAddresses,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 function createMockSupabase(opts: {
   userByEmail?: Record<string, unknown> | null;
   insertError?: Error;
 }): SupabaseClient {
   const { userByEmail = null, insertError } = opts;
+
+  const makeSelectChain = (data: unknown[] = []) => ({
+    select: (_cols?: string) => makeSelectChain(data),
+    eq: (_col: string, _val: unknown) => makeSelectChain(data),
+    lt: (_col: string, _val: unknown) => makeSelectChain(data),
+    neq: (_col: string, _val: unknown) => makeSelectChain(data),
+    in: (_col: string, _vals: unknown[]) => Promise.resolve({ data, error: null }),
+    update: (_vals: unknown) => makeUpdateChain(),
+    maybeSingle: async () => ({ data: data[0] ?? null, error: null }),
+    then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
+      Promise.resolve({ data, error: null }).then(resolve),
+  });
+
+  const makeUpdateChain = () => ({
+    in: (_col: string, _vals: unknown[]) => Promise.resolve({ data: null, error: null }),
+  });
+
   const from = (table: string) => {
     if (table === "users") {
       return {
@@ -36,7 +53,7 @@ function createMockSupabase(opts: {
         },
       };
     }
-    return {};
+    return makeSelectChain([]);
   };
   return { from } as unknown as SupabaseClient;
 }

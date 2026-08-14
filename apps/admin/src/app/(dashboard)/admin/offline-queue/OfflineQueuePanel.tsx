@@ -5,7 +5,12 @@ import {
   AdminEmptyState,
   AdminErrorState,
   AdminLoadingState,
+  AdminSection,
 } from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type QueueItem = {
   id: string;
@@ -62,13 +67,9 @@ export function OfflineQueuePanel() {
         title="No pending offline sales"
         description="POS devices enqueue sales here when the network drops. Items clear after a successful sync."
         action={
-          <button
-            type="button"
-            onClick={() => load()}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white"
-          >
+          <Button type="button" onClick={() => load()}>
             Refresh
-          </button>
+          </Button>
         }
       />
     );
@@ -76,58 +77,64 @@ export function OfflineQueuePanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4">
+      <AdminSection title="Queue filters" description="Filter pending sales by the device that created them.">
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-4">
         <label className="block min-w-[200px] flex-1 text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            Device filter
-          </span>
-          <input
+          <span className="text-sm font-medium">Device filter</span>
+          <Input
             value={device}
             onChange={(e) => setDevice(e.target.value)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
+            className="mt-2"
             placeholder="Optional device name"
           />
         </label>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => load()}
-          className="rounded-lg border border-outline-variant/30 bg-white px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-container-low"
         >
           Apply
-        </button>
-      </div>
+        </Button>
+        </CardContent>
+      </Card>
+      </AdminSection>
 
-      <div className="overflow-x-auto rounded-lg border border-outline-variant/20">
-        <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-          <thead className="bg-surface-container-low text-xs uppercase tracking-wide text-on-surface-variant">
-            <tr>
-              <th className="px-4 py-3 font-medium">Device</th>
-              <th className="px-4 py-3 font-medium">Created</th>
-              <th className="px-4 py-3 font-medium">Payload</th>
-            </tr>
-          </thead>
-          <tbody>
+      <AdminSection title="Pending sales" description={`${items.length} sales waiting for synchronization.`}>
+      <Card>
+        <CardContent className="overflow-x-auto px-0">
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Device</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Payload</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {items.map((row) => (
-              <tr
+              <TableRow
                 key={row.id}
-                className="border-t border-outline-variant/15 hover:bg-surface-container-low/60"
               >
-                <td className="px-4 py-3 align-top font-medium text-on-surface">
+                <TableCell className="align-top font-medium">
                   {row.device_name}
-                </td>
-                <td className="px-4 py-3 align-top text-xs text-on-surface-variant">
+                </TableCell>
+                <TableCell className="align-top text-xs text-muted-foreground">
                   {new Date(row.created_at).toLocaleString()}
-                </td>
-                <td className="px-4 py-3 align-top">
-                  <pre className="max-h-40 max-w-xl overflow-auto rounded bg-surface-container-high p-2 font-mono text-[11px] text-on-surface">
+                </TableCell>
+                <TableCell className="align-top">
+                  <pre className="max-h-40 max-w-xl overflow-auto rounded-lg bg-muted p-2 font-mono text-[11px] text-foreground">
                     {JSON.stringify(row.payload, null, 2)}
                   </pre>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      </AdminSection>
     </div>
   );
 }

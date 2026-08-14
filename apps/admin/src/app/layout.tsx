@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
+import { AdminMutationRequestGuard } from "@/components/AdminMutationRequestGuard";
 import { LenisProvider } from "@/components/LenisProvider";
 import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import "./globals.css";
@@ -17,9 +19,16 @@ const inter = Inter({
   display: "swap",
 });
 
+const materialSymbols = localFont({
+  src: "./fonts/material-symbols-outlined.ttf",
+  variable: "--font-material-symbols",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Staff admin",
-  description: "Internal console for orders, inventory, POS, and settings",
+  title: "Universal Music Store Admin",
+  description: "Universal Music Store back office for orders, inventory, POS, CRM, and content.",
+  robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
   icons: {
     icon: [
       { url: "/icons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
@@ -42,15 +51,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${plusJakarta.variable} ${inter.variable} ${materialSymbols.variable}`}
+    >
       <body className="bg-surface font-body text-on-surface antialiased">
         <NextAuthSessionProvider>
+          <AdminMutationRequestGuard />
           <LenisProvider>{children}</LenisProvider>
         </NextAuthSessionProvider>
         <VercelWebAnalytics />

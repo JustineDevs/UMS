@@ -19,12 +19,15 @@ export function AuthSplitShell({
   offsetHeader,
 }: AuthSplitShellProps) {
   const isAdmin = variant === "admin";
+  const logoSrc = isAdmin
+    ? "/brand/uvs-logo-landscape.png"
+    : "/UVS/UVS_logo_landscape.png";
   const useHeaderOffset =
     offsetHeader ?? (variant === "storefront" ? true : false);
 
   const asideMarketing = isAdmin
-    ? "Staff workspace for Maharlika Apparel Custom. Sign in to run orders, inventory, POS, and campaigns in one place."
-    : "Custom apparel for teams, schools, and everyday wear. Sign in to track orders, save details, and check out faster.";
+    ? "Staff workspace for Universal Music Store. Sign in to run orders, inventory, POS, and campaigns in one place."
+    : "Music retail for instruments and gear. Sign in to track orders, save details, and check out faster.";
 
   const mainMinH = useHeaderOffset
     ? "min-h-[calc(100vh-5.5rem)] lg:min-h-[calc(100vh-6rem)]"
@@ -57,8 +60,8 @@ export function AuthSplitShell({
           <div className="relative z-[2] flex min-h-0 flex-1 flex-col items-center justify-start gap-6 px-8 pb-12 pt-10 lg:gap-7 lg:px-12 lg:pb-16 lg:pt-14">
             <div className="flex w-full max-w-[min(100%,420px)] shrink-0 justify-center sm:max-w-[min(100%,520px)] lg:max-w-[min(100%,640px)] xl:max-w-[min(100%,720px)]">
               <Image
-                src="/brand/maharlika-logo-design.svg"
-                alt="Maharlika Apparel Custom"
+                src={logoSrc}
+                alt="Universal Music Store"
                 width={1536}
                 height={1024}
                 className="pointer-events-none h-auto w-full select-none object-contain object-center"

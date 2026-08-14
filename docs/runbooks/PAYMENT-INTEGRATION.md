@@ -1,12 +1,12 @@
 # Payment Integration Guide
 
-This document describes the payment providers integrated into the Maharlika Apparel e-commerce platform (Medusa v2).
+This document describes the payment providers integrated into the Universal Music Store e-commerce platform (Medusa v2).
 
 ## Storefront checkout lifecycle (runtime truth)
 
 1. **Cart preparation** happens on the storefront server (Medusa store APIs) before a payment session is created.
 2. **Payment attempt** rows in Supabase (`payment_attempts`) record `correlation_id`, cart, provider, and status. Register via `POST /api/payments/checkout-intents` before hosted PSP redirect or COD completion.
-3. **Provider session** is created through Medusa `initiatePaymentSession` (Stripe Elements, PayPal, Paymongo, Maya, or COD session data).
+3. **Provider session** is created through Medusa `initiatePaymentSession` (Stripe Elements, PayPal, Xendit, or COD session data).
 4. **Completion** is server-owned: hosted flows call `POST /api/payments/checkout-intents/:correlationId/finalize`. **COD** calls `POST /api/checkout/cod-place-order` with the same `correlationId`. The browser does not call `cart.complete` for COD.
 5. **Recovery**: `GET /api/cron/finalize-payment-attempts` (secret header) processes stuck rows. Operators use **Admin → Payment attempts** (`/admin/payments`) for retry and escalation when `STOREFRONT_ORIGIN` and `STOREFRONT_INTERNAL_RECONCILE_SECRET` are set.
 
@@ -18,8 +18,7 @@ Legacy `POST /api/checkout/complete-medusa-cart` remains for backward compatibil
 |----------|---------|----------|
 | **Stripe** | Cards, wallets, regional methods (per Stripe Dashboard) | International and configurable per region |
 | **PayPal** | PayPal balance, cards | International |
-| **Paymongo** | GCash, cards, BillEase, e-wallets | Philippines |
-| **PayMaya (Maya)** | GCash, Maya wallet, cards, QRPH | Philippines |
+| **Xendit** | GCash, bank transfer, cards, e-wallets | Philippines |
 | **Cash on delivery** | COD | In-person or configured regions |
 
 Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa process to enable providers per deployment. Restart Medusa after changing keys.
@@ -34,7 +33,7 @@ Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa p
 
 ### Environment (Medusa)
 
-Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa server environment (see root `.env.example` section 12).
+Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa server environment (see root `.env.local` / `.env.example` section 12).
 
 ---
 
@@ -46,80 +45,47 @@ Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa se
 
 ### Environment (Medusa)
 
-`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see root `.env.example`).
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see root `.env.local` / `.env.example`).
 
 ---
 
-## 3. Paymongo (GCash)
+## 3. Xendit (GCash, cards, bank transfer)
 
-Paymongo supports Philippine payment methods:
+Xendit supports Philippine payment methods:
 
 - GCash
-- Maya
 - GrabPay
 - Cards (Visa, Mastercard)
-- BillEase (buy now, pay later)
+- Bank transfer
 - Online banking
 
 ### Setup
 
-1. Create a [PayMongo](https://paymongo.com) account.
-2. Complete business verification (KYC).
+1. Create a [Xendit](https://xendit.co) account.
+2. Complete business verification if required.
 3. Get API keys from **Developers → API Keys**.
-4. Create a webhook in **Developers → Webhooks** for `link.payment.paid`.
+4. Create a webhook in **Developers → Webhooks** for payment updates.
 
 ### Environment (Medusa)
 
 ```env
-PAYMONGO_SECRET_KEY=sk_live_...   # or sk_test_ for sandbox
-PAYMONGO_WEBHOOK_SECRET=whsk_...
+XENDIT_SECRET_KEY=xnd_...
+XENDIT_WEBHOOK_TOKEN=...
 ```
 
 ### Storefront
 
-Customers select **"GCash / PayMongo"** on checkout when that provider is enabled. They are redirected to Paymongo’s hosted payment page.
+Customers select **"GCash / Xendit"** on checkout when that provider is enabled. They are redirected to Xendit’s hosted payment page.
 
 ### Webhooks
 
-Register: `https://your-medusa-backend.onrender.com/hooks/payment/paymongo`
+Register: `https://your-medusa-backend.fly.dev/hooks/payment/xendit`
 
 ---
 
-## 4. PayMaya (Maya)
+## 4. Cash on delivery
 
-Maya provides:
-
-- Maya Checkout (hosted page)
-- Invoice API (payment links)
-- GCash, Maya wallet, cards, QRPH
-
-### Setup
-
-1. Create a [Maya Business Manager](https://pbm.paymaya.com) account.
-2. Activate Checkout and Invoicing.
-3. Get Secret Key from **Settings → API**.
-4. Register webhooks in **Settings → Webhooks** for `PAYMENT_SUCCESS`.
-
-### Environment (Medusa)
-
-```env
-MAYA_SECRET_KEY=sk-...
-MAYA_WEBHOOK_SECRET=   # Configure in Maya Business Manager if available
-MAYA_SANDBOX=true      # Set to false for production
-```
-
-### Storefront
-
-Customers select **"Maya (GCash, cards, e-wallets)"** on checkout when enabled. They are redirected to Maya’s hosted invoice page.
-
-### Webhooks
-
-Register: `https://your-medusa-backend.onrender.com/hooks/payment/maya`
-
-Maya recommends **IP whitelisting** for webhook security:
-
-- Sandbox: `13.229.160.234`, `3.1.199.75`
-- Production: `18.138.50.235`, `3.1.207.200`
+Cash on delivery remains available for eligible regions and is completed through the server-owned COD flow.
 
 ---
 
@@ -141,8 +107,7 @@ Maya recommends **IP whitelisting** for webhook security:
 |----------|------------|
 | Stripe | `pp_stripe_stripe` (and region-specific Stripe method IDs as registered) |
 | PayPal | `pp_paypal_paypal` |
-| Paymongo | `pp_paymongo_paymongo` |
-| Maya | `pp_maya_maya` |
+| Xendit | `pp_xendit_xendit` |
 | COD | `pp_cod_cod` |
 
 These IDs are used when configuring `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` for a default provider, or when selecting a provider on the checkout page.
@@ -163,8 +128,8 @@ When working on payment features in Cursor:
    - **paypal-integration** – PayPal setup and webhooks.
 
 3. **Configuration**:
-   - Root: `.env.example` → `NEXT_PUBLIC_MEDUSA_*`, `MEDUSA_*` (client config).
-   - Medusa: `apps/medusa/.env.template` → provider keys, webhook secrets.
+   - Root: `.env.example` → `NEXT_PUBLIC_MEDUSA_*`, `MEDUSA_*` (client config), then copy into `.env.local`.
+   - Medusa: `apps/medusa/.env.template` → provider keys, webhook secrets, then copy into `apps/medusa/.env.local`.
 
 ---
 
@@ -172,5 +137,4 @@ When working on payment features in Cursor:
 
 - [Stripe Docs](https://stripe.com/docs)
 - [PayPal REST APIs](https://developer.paypal.com/docs/api/overview/)
-- [PayMongo Docs](https://developers.paymongo.com)
-- [Maya Developer Hub](https://developers.maya.ph)
+- [Xendit Docs](https://docs.xendit.co)

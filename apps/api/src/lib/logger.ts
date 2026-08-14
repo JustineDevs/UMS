@@ -59,7 +59,7 @@ export function sanitizeLogPayload(
   return out;
 }
 
-export function logJson(
+function logJson(
   stream: "stdout" | "stderr",
   payload: Record<string, unknown>,
 ): void {

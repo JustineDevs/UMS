@@ -1,10 +1,9 @@
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { authOptions } from "@/lib/auth";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { listEntityWorkflows } from "@/lib/admin-workflow";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +13,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "dashboard:read")) {
-    return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("dashboard:read");
+  if (!auth.ok) return auth.response;
 
   const url = new URL(req.url);
   const limit = Math.min(
@@ -32,9 +26,21 @@ export async function GET(req: Request) {
 
   const sup = adminSupabaseOr503(correlationId);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(
+    sup.client,
+    auth.session.user?.email,
+  );
+  if (!organization) {
+    return correlatedJson(
+      correlationId,
+      { error: "Organization membership is not configured" },
+      { status: 403 },
+    );
+  }
 
   try {
     const rows = await listEntityWorkflows(sup.client, {
+      organizationId: organization.id,
       limit,
       offset,
       entityType,

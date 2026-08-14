@@ -6,57 +6,50 @@ import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
-export type PaymentProvider = "stripe" | "paypal" | "paymongo" | "maya" | "cod";
+export type PaymentProvider = "stripe" | "paypal" | "xendit" | "cod";
 
-export type PspCredentials = {
+type PspCredentials = {
   stripe?: { testCardNumber: string; expiry: string; cvc: string };
   paypal?: { email: string; password: string };
-  paymongo?: { testCardNumber: string; expiry: string; cvc: string };
-  maya?: { testCardNumber: string; expiry: string; cvc: string };
+  xendit?: { checkoutUrl?: string };
 };
 
 /**
  * Environment-based PSP configuration. Each test reads these env vars
  * to decide whether to run or skip the PSP-specific checkout.
  */
-export function getPspTestConfig(): {
+function getPspTestConfig(): {
   provider: PaymentProvider;
   configured: boolean;
   envVars: Record<string, string | undefined>;
 }[] {
+  const stripeKey = process.env.E2E_STRIPE_API_KEY?.trim() || process.env.STRIPE_API_KEY?.trim();
+  const paypalClientId = process.env.E2E_PAYPAL_CLIENT_ID?.trim() || process.env.PAYPAL_CLIENT_ID?.trim();
+  const paypalClientSecret = process.env.E2E_PAYPAL_CLIENT_SECRET?.trim() || process.env.PAYPAL_CLIENT_SECRET?.trim();
+  const xenditSecretKey = process.env.E2E_XENDIT_SECRET_KEY?.trim() || process.env.XENDIT_SECRET_KEY?.trim();
   return [
     {
       provider: "stripe",
-      configured: Boolean(process.env.E2E_STRIPE_API_KEY?.trim()),
+      configured: Boolean(stripeKey),
       envVars: {
-        apiKey: process.env.E2E_STRIPE_API_KEY,
-        webhookSecret: process.env.E2E_STRIPE_WEBHOOK_SECRET,
+        apiKey: stripeKey,
+        webhookSecret: process.env.E2E_STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
       },
     },
     {
       provider: "paypal",
-      configured: Boolean(
-        process.env.E2E_PAYPAL_CLIENT_ID?.trim() &&
-          process.env.E2E_PAYPAL_CLIENT_SECRET?.trim(),
-      ),
+      configured: Boolean(paypalClientId && paypalClientSecret),
       envVars: {
-        clientId: process.env.E2E_PAYPAL_CLIENT_ID,
-        clientSecret: process.env.E2E_PAYPAL_CLIENT_SECRET,
+        clientId: paypalClientId,
+        clientSecret: paypalClientSecret,
       },
     },
     {
-      provider: "paymongo",
-      configured: Boolean(process.env.E2E_PAYMONGO_SECRET_KEY?.trim()),
+      provider: "xendit",
+      configured: Boolean(xenditSecretKey),
       envVars: {
-        secretKey: process.env.E2E_PAYMONGO_SECRET_KEY,
-        webhookSecret: process.env.E2E_PAYMONGO_WEBHOOK_SECRET,
-      },
-    },
-    {
-      provider: "maya",
-      configured: Boolean(process.env.E2E_MAYA_SECRET_KEY?.trim()),
-      envVars: {
-        secretKey: process.env.E2E_MAYA_SECRET_KEY,
+        secretKey: xenditSecretKey,
+        webhookToken: process.env.E2E_XENDIT_WEBHOOK_TOKEN || process.env.XENDIT_WEBHOOK_TOKEN,
       },
     },
     {
@@ -72,12 +65,12 @@ export function skipUnlessPspConfigured(provider: PaymentProvider): void {
   if (!config?.configured) {
     if (isE2eStrictPayments()) {
       throw new Error(
-        `${provider}: E2E credentials not configured. Strict mode is on (E2E_STRICT_PAYMENTS=1 or E2E_STRICT_E2E=1).`,
+        `${provider}: sandbox credentials not configured. Strict mode is on (E2E_STRICT_PAYMENTS=1 or E2E_STRICT_E2E=1).`,
       );
     }
     test.skip(
       true,
-      `${provider} E2E credentials not configured (set E2E_${provider.toUpperCase()}_* env vars)`,
+      `${provider} sandbox credentials not configured (set E2E_* or provider sandbox env vars)`,
     );
   }
 }
@@ -122,7 +115,7 @@ export type AddCatalogProductResult = { slug: string; productTitle?: string };
  */
 export async function navigateToShopAndAddPreferredCatalogProduct(
   page: Page,
-  options?: { maxCandidates?: number; log?: (message: string) => void },
+  options?: { maxCandidates?: number; log?: (_message: string) => void },
 ): Promise<AddCatalogProductResult | null> {
   const max = options?.maxCandidates ?? 8;
   const log = options?.log ?? (() => {});
@@ -130,8 +123,12 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
 
   const cards = page.locator("[data-product-slug]");
-  const n = await cards.count();
-  if (n === 0) {
+  const slugs = await cards.evaluateAll((els) =>
+    els
+      .map((el) => el.getAttribute("data-product-slug")?.trim() ?? "")
+      .filter(Boolean),
+  );
+  if (slugs.length === 0) {
     log("stress catalog: no [data-product-slug] on /shop");
     return null;
   }
@@ -141,7 +138,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       waitUntil: "domcontentloaded",
     });
     if (!res || res.status() >= 400) return null;
-    const btn = page.getByTestId("pdp-add-to-bag");
+    const btn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
     await expect(btn).toBeVisible({ timeout: 20_000 });
     const label = ((await btn.innerText().catch(() => "")) as string).trim();
     log(`stress catalog: /shop/${slug} CTA "${label.slice(0, 72)}"`);
@@ -172,10 +169,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     return { slug, productTitle: title.trim() || undefined };
   };
 
-  for (let i = 0; i < Math.min(n, max); i++) {
-    const slugRaw = await cards.nth(i).getAttribute("data-product-slug");
-    const slug = slugRaw?.trim();
-    if (!slug) continue;
+  for (const slug of slugs.slice(0, max)) {
     const got = await trySlug(slug);
     if (got) {
       log(`stress catalog: selected ${slug}${got.productTitle ? ` (${got.productTitle})` : ""}`);
@@ -208,7 +202,7 @@ export async function getStressRunProviders(
 }
 
 /** Optional: confirm Medusa Admin API sees the order (needs MEDUSA_SECRET_API_KEY or E2E_MEDUSA_ADMIN_SECRET). */
-export async function verifyMedusaOrderExists(
+async function verifyMedusaOrderExists(
   request: APIRequestContext,
   orderId: string,
 ): Promise<boolean> {
@@ -266,13 +260,13 @@ export async function verifyPostPaymentSuccess(
     return;
   }
 
-  if (provider === "paymongo" || provider === "maya") {
+  if (provider === "xendit") {
     if (strict) {
       await expectOrderConfirmation(page);
     } else {
       await expect(
         page
-          .getByText(/paymongo|maya|payment|processing|confirm/i)
+          .getByText(/xendit|payment|processing|confirm/i)
           .first()
           .or(page.getByTestId("order-confirmation"))
           .or(page.locator("[data-order-id]")),
@@ -284,7 +278,7 @@ export async function verifyPostPaymentSuccess(
 /**
  * Verifies Medusa has the payment provider registered via the admin health endpoint.
  */
-export async function skipUnlessPspRegisteredInMedusa(
+async function skipUnlessPspRegisteredInMedusa(
   request: APIRequestContext,
   provider: PaymentProvider,
 ): Promise<void> {
@@ -330,10 +324,16 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
 }
 
 export async function navigateToCheckout(page: Page): Promise<void> {
-  await page.goto(`${baseURL}/checkout`);
-  await expect(
-    page.getByRole("heading", { name: /checkout/i }),
-  ).toBeVisible({ timeout: 30_000 });
+  // Card providers are intentionally available to guests; enter that explicit
+  // mode so provider smoke tests do not mistake the auth gate for a PSP gap.
+  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "load" });
+  await expect(page).toHaveURL(/guest=1/);
+  await expect(page.getByRole("heading", { name: /checkout/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByText("Preparing checkout…")).toHaveCount(0, {
+    timeout: 45_000,
+  });
 }
 
 export async function fillCheckoutShippingInfo(
@@ -404,9 +404,24 @@ export async function selectPaymentProvider(
   page: Page,
   provider: PaymentProvider,
 ): Promise<boolean> {
-  const byTestId = page.getByTestId(`payment-${provider}`);
-  if (await byTestId.isVisible({ timeout: 5_000 }).catch(() => false)) {
+  const labelByProvider: Record<PaymentProvider, RegExp> = {
+    stripe: /stripe/i,
+    paypal: /paypal/i,
+    xendit: /xendit/i,
+    cod: /cash on delivery/i,
+  };
+
+  const byTestId = page.locator(`[data-testid="payment-${provider}"]:visible`).first();
+  if (await byTestId.isVisible({ timeout: 60_000 }).catch(() => false)) {
     await byTestId.click();
+    return true;
+  }
+
+  const byRadioLabel = page.getByRole("radio", {
+    name: labelByProvider[provider],
+  });
+  if (await byRadioLabel.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await byRadioLabel.click();
     return true;
   }
 
@@ -429,9 +444,27 @@ export async function selectPaymentProvider(
  * Clicks the final pay/submit button on checkout.
  */
 export async function clickPayButton(page: Page): Promise<void> {
+  const review = page.getByRole("button", {
+    name: /reviewed the updated total/i,
+  });
+  const terms = page.getByTestId("checkout-terms-checkbox");
+  if (await terms.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await terms.check();
+  }
   const payBtn = page.getByTestId("checkout-submit-pay");
   await expect(payBtn).toBeVisible({ timeout: 10_000 });
-  await payBtn.click();
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    if (await review.isVisible().catch(() => false)) {
+      await review.click();
+    }
+    if (await payBtn.isEnabled().catch(() => false)) {
+      await payBtn.click();
+      return;
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error(`Checkout submit did not become enabled: ${await payBtn.innerText()}`);
 }
 
 /** Medusa Stripe module uses Checkout Sessions → redirect to `checkout.stripe.com` (not Elements on our domain). */
@@ -503,7 +536,7 @@ export async function fillStripeHostedCheckoutTestCard(
 /**
  * Submits payment on Stripe Hosted Checkout and waits for redirect back to the storefront.
  */
-export async function submitStripeHostedCheckoutAndWaitForReturn(page: Page): Promise<void> {
+async function submitStripeHostedCheckoutAndWaitForReturn(page: Page): Promise<void> {
   const pay = page
     .getByTestId("hosted-payment-submit-button")
     .or(page.getByRole("button", { name: /^pay\b/i }))
@@ -562,6 +595,7 @@ export async function expectOrderConfirmation(page: Page): Promise<void> {
   await expect(
     page
       .getByRole("heading", { name: /order.*confirm|thank you|success/i })
+      .or(page.getByRole("heading", { name: /^order\s+\d+/i }))
       .or(page.getByTestId("order-confirmation"))
       .or(page.locator("[data-order-id]")),
   ).toBeVisible({ timeout: 60_000 });

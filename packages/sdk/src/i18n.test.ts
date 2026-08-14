@@ -12,7 +12,7 @@ import {
   formatNumber,
   detectLocale,
   registerTranslations,
-} from "./i18n";
+} from "./i18n.js";
 
 const CORE_KEYS = [
   "cart.empty",

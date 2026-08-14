@@ -7,7 +7,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 
 export type Crumb = { label: string; href?: string };
 

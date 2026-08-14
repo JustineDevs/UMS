@@ -1,20 +1,34 @@
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { staffSessionAllows } from "@universal-music-store/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
 import {
   completePaymentRefundAudit,
   enqueueOutboxEvent,
   insertPaymentRefundAudit,
   PAYMENT_OUTBOX_EVENT_TYPES,
   tryCreateSupabaseClient,
-} from "@apparel-commerce/platform-data";
-import { getServerSession } from "next-auth/next";
+} from "@universal-music-store/platform-data";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
-import { authOptions } from "@/lib/auth";
 import {
   fetchMedusaOrderPaymentsForAdmin,
   refundMedusaPayment,
 } from "@/lib/medusa-order-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import {
+  claimAdminIdempotency,
+  completeAdminIdempotency,
+  getRequestHash,
+  parseAdminJson,
+  requireIdempotencyKey,
+  stepUpRequired,
+} from "@/lib/admin-api-security";
+import { z } from "zod";
+
+const refundSchema = z.object({
+  payment_id: z.string().trim().min(1).max(128).optional(),
+  amount_minor: z.number().int().positive().max(100_000_000).optional(),
+  note: z.string().trim().max(500).optional(),
+}).strict();
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +37,19 @@ export async function POST(
   ctx: { params: Promise<{ orderId: string }> },
 ) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
   if (!staffSessionAllows(session, "orders:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
+  }
+  const idempotencyKey = requireIdempotencyKey(req);
+  if (!idempotencyKey) {
+    return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
+  }
+  if (!stepUpRequired("orders.refund", req)) {
+    return correlatedJson(correlationId, { error: "Step-up authentication required" }, { status: 403 });
   }
 
   const { orderId } = await ctx.params;
@@ -36,11 +57,9 @@ export async function POST(
     return correlatedJson(correlationId, { error: "Invalid order id" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
-    payment_id?: string;
-    amount_minor?: number;
-    note?: string;
-  };
+  const parsed = await parseAdminJson(req, refundSchema);
+  if (!parsed.ok) return correlatedJson(correlationId, { error: parsed.error }, { status: parsed.status });
+  const body = parsed.data;
 
   const payments = await fetchMedusaOrderPaymentsForAdmin(orderId);
   if (payments.length === 0) {
@@ -95,6 +114,23 @@ export async function POST(
     );
   }
 
+  const sb = tryCreateSupabaseClient();
+  const claim = await claimAdminIdempotency(sb, {
+    actorKey: typeof session.user.email === "string" ? session.user.email : "unknown",
+    actionKey: `orders.refund:${orderId}:${paymentId}`,
+    idempotencyKey,
+    requestHash: getRequestHash({ orderId, paymentId, amountMinor, note: body.note ?? null }),
+  });
+  if (claim.kind === "unavailable") {
+    return correlatedJson(correlationId, { error: "Idempotency service unavailable" }, { status: 503 });
+  }
+  if (claim.kind === "conflict") {
+    return correlatedJson(correlationId, { error: "Request is already being processed or key was reused" }, { status: 409 });
+  }
+  if (claim.kind === "replay") {
+    return correlatedJson(correlationId, claim.body, { status: claim.status });
+  }
+
   logAdminApiEvent({
     route: "POST /api/admin/orders/[orderId]/refund",
     correlationId,
@@ -102,7 +138,6 @@ export async function POST(
     detail: { orderId, paymentId, amountMinor },
   });
 
-  const sb = tryCreateSupabaseClient();
   let refundAuditId: string | null = null;
   if (sb) {
     refundAuditId = await insertPaymentRefundAudit(sb, {
@@ -137,11 +172,14 @@ export async function POST(
   );
 
   if (!result.ok) {
+    const status = result.status >= 400 ? result.status : 502;
+    const responseBody = { error: result.error ?? "Refund did not complete" };
     if (sb && refundAuditId) {
       await completePaymentRefundAudit(sb, refundAuditId, false, result.error ?? "refund_failed").catch(
         () => {},
       );
     }
+    await completeAdminIdempotency(sb, claim.id, status, responseBody);
     logAdminApiEvent({
       route: "POST /api/admin/orders/[orderId]/refund",
       correlationId,
@@ -150,14 +188,20 @@ export async function POST(
     });
     return correlatedJson(
       correlationId,
-      { error: result.error ?? "Refund did not complete" },
-      { status: result.status >= 400 ? result.status : 502 },
+      responseBody,
+      { status },
     );
   }
 
   if (sb && refundAuditId) {
     await completePaymentRefundAudit(sb, refundAuditId, true, null).catch(() => {});
   }
+
+  await completeAdminIdempotency(sb, claim.id, 200, {
+    ok: true,
+    payment_id: paymentId,
+    amount_minor: amountMinor,
+  });
 
   logAdminApiEvent({
     route: "POST /api/admin/orders/[orderId]/refund",

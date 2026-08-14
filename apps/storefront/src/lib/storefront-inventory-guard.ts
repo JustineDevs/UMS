@@ -1,4 +1,4 @@
-import { availableQuantityFromVariantRaw } from "@apparel-commerce/validation";
+import { availableQuantityFromVariantRaw } from "@universal-music-store/validation";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import type { MedusaCheckoutLine } from "@/lib/medusa-checkout-cart-prep";
 import { tryDeleteStoreCart } from "@/lib/medusa-checkout-errors";

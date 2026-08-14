@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import {
   insertCmsFormSubmission,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
 import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import {
+  isRecaptchaConfigured,
+  verifyRecaptchaAction,
+} from "@/lib/recaptcha-enterprise";
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`newsletter:${ip}`, 5, 60_000);
   if (!rl.ok) {
@@ -31,6 +36,13 @@ export async function POST(req: NextRequest) {
   }
 
   const raw = body as Record<string, unknown>;
+
+  if (!isRecaptchaConfigured()) {
+    return NextResponse.json({ error: "Security verification unavailable" }, { status: 503 });
+  }
+  if (!(await verifyRecaptchaAction(req, raw.recaptchaToken, "signup"))) {
+    return NextResponse.json({ error: "Verification failed" }, { status: 400 });
+  }
 
   const trap = raw._hp ?? raw._honeypot;
   if (trap != null && String(trap).trim() !== "") {
@@ -54,9 +66,25 @@ export async function POST(req: NextRequest) {
     ip_hash: ipHash,
   });
 
+  await sb.from("marketing_preferences").upsert(
+    {
+      organization_id: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
+      email,
+      channel: "email",
+      consent_status: "subscribed",
+      source: typeof raw.source === "string" ? raw.source.slice(0, 80) : "homepage",
+      consented_at: new Date().toISOString(),
+      unsubscribed_at: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "organization_id,email,channel" },
+  );
+
   if (!submissionId) {
-    return NextResponse.json({ error: "Subscription failed" }, { status: 500 });
+    return NextResponse.json({ error: "Subscription failed" }, { status: 503 });
   }
 
   return NextResponse.json({ ok: true, id: submissionId });
 }
+
+export const POST = withBotIdProtection(handlePOST);

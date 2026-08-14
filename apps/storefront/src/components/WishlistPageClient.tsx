@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   getWishlist,
@@ -11,12 +11,18 @@ import {
   exportWishlistJSON,
   importWishlistJSON,
   onWishlistChange,
+  persistWishlistMutation,
 } from "@/lib/wishlist";
+import { readCart, writeCart } from "@/lib/cart";
+
+type AddToBagState = "idle" | "loading" | "done" | "error";
 
 export function WishlistPageClient() {
   const { status } = useSession();
   const [items, setItems] = useState<WishlistEntry[]>([]);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const addingRef = useRef<Record<string, AddToBagState>>({});
+  const [addingStates, setAddingStates] = useState<Record<string, AddToBagState>>({});
 
   const refresh = useCallback(() => {
     setItems(getWishlist());
@@ -28,15 +34,21 @@ export function WishlistPageClient() {
     return unsub;
   }, [refresh]);
 
-  function remove(slug: string, name: string, medusaProductId?: string) {
-    toggleWishlist({
+  async function remove(slug: string, name: string, medusaProductId?: string) {
+    const entry = {
       slug,
       name,
       ...(medusaProductId?.trim()
         ? { medusaProductId: medusaProductId.trim() }
         : {}),
-    });
-    refresh();
+    };
+    try {
+      await persistWishlistMutation(entry, "remove");
+      toggleWishlist(entry);
+      refresh();
+    } catch {
+      setStatusMsg("Saved items could not be synchronized. Nothing was removed.");
+    }
   }
 
   function handleExport() {
@@ -78,9 +90,96 @@ export function WishlistPageClient() {
     input.click();
   }
 
-  function handleClear() {
-    clearWishlist();
-    refresh();
+  async function handleClear() {
+    const current = getWishlist();
+    try {
+      await Promise.all(current.map((item) => persistWishlistMutation(item, "remove")));
+      clearWishlist();
+      refresh();
+    } catch {
+      setStatusMsg("Saved items could not be synchronized. Nothing was cleared.");
+    }
+  }
+
+  async function handleAddToBag(item: WishlistEntry) {
+    const key = item.medusaProductId ?? item.slug;
+    if (addingRef.current[key] === "loading") return;
+    addingRef.current[key] = "loading";
+    setAddingStates((p) => ({ ...p, [key]: "loading" }));
+    try {
+      let variantId: string | undefined;
+      let variantPrice: number | null = null;
+      let variantSku = "";
+      if (item.medusaProductId) {
+        const res = await fetch(
+          `/api/catalog/product-default-variant?productId=${encodeURIComponent(item.medusaProductId)}`,
+        );
+        if (res.ok) {
+          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null };
+          variantId = json.variantId?.trim() || undefined;
+          variantPrice = json.price ?? null;
+          variantSku = json.sku ?? "";
+        }
+      }
+      if (!variantId) {
+        const res = await fetch(
+          `/api/catalog/product-default-variant?slug=${encodeURIComponent(item.slug)}`,
+        );
+        if (res.ok) {
+          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null };
+          variantId = json.variantId?.trim() || undefined;
+          variantPrice = json.price ?? null;
+          variantSku = json.sku ?? "";
+        }
+      }
+      if (!variantId) {
+        throw new Error("Could not resolve a variant for this product. View the product page to select options.");
+      }
+      if (variantPrice == null) {
+        throw new Error("The current price is unavailable. View the product page before adding it to your bag.");
+      }
+      const current = readCart();
+      const existing = current.find((l) => l.variantId === variantId);
+      if (existing) {
+        const updated = current.map((l) =>
+          l.variantId === variantId
+            ? { ...l, quantity: l.quantity + 1, price: variantPrice ?? l.price, sku: variantSku || l.sku }
+            : l,
+        );
+        writeCart(updated);
+      } else {
+        writeCart([
+          ...current,
+          {
+            variantId,
+            quantity: 1,
+            price: variantPrice,
+            name: item.name,
+            slug: item.slug ?? "",
+            sku: variantSku,
+            type: "",
+            finish: "",
+          },
+        ]);
+      }
+      addingRef.current[key] = "done";
+      setAddingStates((p) => ({ ...p, [key]: "done" }));
+      setStatusMsg(`"${item.name}" added to bag.`);
+      setTimeout(() => setStatusMsg(null), 3000);
+      setTimeout(() => {
+        addingRef.current[key] = "idle";
+        setAddingStates((p) => ({ ...p, [key]: "idle" }));
+      }, 2000);
+    } catch (e) {
+      addingRef.current[key] = "error";
+      setAddingStates((p) => ({ ...p, [key]: "error" }));
+      setStatusMsg(e instanceof Error ? e.message : "Could not add to bag.");
+      setTimeout(() => setStatusMsg(null), 5000);
+      setTimeout(() => {
+        addingRef.current[key] = "idle";
+        setAddingStates((p) => ({ ...p, [key]: "idle" }));
+      }, 3000);
+    }
   }
 
   if (status === "loading") {
@@ -149,7 +248,19 @@ export function WishlistPageClient() {
                     /{item.slug}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleAddToBag(item)}
+                    disabled={addingStates[item.medusaProductId ?? item.slug] === "loading"}
+                    className="rounded bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-primary hover:opacity-90 disabled:opacity-50"
+                  >
+                    {addingStates[item.medusaProductId ?? item.slug] === "loading"
+                      ? "Adding…"
+                      : addingStates[item.medusaProductId ?? item.slug] === "done"
+                        ? "Added"
+                        : "Add to bag"}
+                  </button>
                   <Link
                     href={`/shop/${item.slug}`}
                     className="rounded border border-primary px-4 py-2 text-center text-xs font-bold uppercase tracking-wider text-primary hover:bg-primary hover:text-on-primary"
@@ -159,7 +270,7 @@ export function WishlistPageClient() {
                   <button
                     type="button"
                     onClick={() =>
-                      remove(item.slug, item.name, item.medusaProductId)
+                      void remove(item.slug, item.name, item.medusaProductId)
                     }
                     className="rounded border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:border-error hover:text-error"
                   >

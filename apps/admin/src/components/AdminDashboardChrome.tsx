@@ -8,8 +8,12 @@ import { AdminSidebar } from "@/components/AdminSidebar";
 
 export function AdminDashboardChrome({
   children,
+  commandPaletteEnabled = true,
+  localAuthBypass = false,
 }: {
   children: React.ReactNode;
+  commandPaletteEnabled?: boolean;
+  localAuthBypass?: boolean;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -18,14 +22,14 @@ export function AdminDashboardChrome({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+      if (commandPaletteEnabled && e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setCommandOpen((open) => !open);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [commandPaletteEnabled]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -48,9 +52,13 @@ export function AdminDashboardChrome({
   }, [mobileNavOpen]);
 
   return (
-    <div className="flex min-h-screen">
+    <div data-admin-shell className="admin-shell flex min-h-screen">
       <AdminPreferenceSync />
-      <AdminCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+      {commandPaletteEnabled ? (
+        <div data-command-menu="admin" data-command-menu-hotkey="mod-k">
+          <AdminCommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
+        </div>
+      ) : null}
 
       <header className="fixed left-0 right-0 top-0 z-40 flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 lg:hidden">
         <div className="flex min-w-0 flex-1 items-center">
@@ -69,6 +77,7 @@ export function AdminDashboardChrome({
         <button
           type="button"
           onClick={() => setCommandOpen(true)}
+          disabled={!commandPaletteEnabled}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-200"
           aria-label="Open search"
         >
@@ -89,9 +98,10 @@ export function AdminDashboardChrome({
         mobileOpen={mobileNavOpen}
         onNavigate={closeNav}
         onOpenSearch={() => setCommandOpen(true)}
+        localAuthBypass={localAuthBypass}
       />
 
-      <div className="flex min-h-screen flex-1 flex-col pt-14 lg:ml-72 lg:pt-0">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden pt-14 lg:ml-72 lg:pt-0">
         <AdminToastProvider>{children}</AdminToastProvider>
       </div>
     </div>

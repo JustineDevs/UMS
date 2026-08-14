@@ -231,11 +231,19 @@ If you have the external tool [`llmbundle`](https://github.com/vlasky/llmbundle)
 - Treat the outer bash structure as a container and only modify file contents between the heredoc EOF markers, as described in the `llmbundle` header comments.
 
 This skill does not require `llmbundle` and never executes it. It only describes how to use the tool if the user has chosen to install and verify it independently.
-```
 
 ---
 
 ## 7. How To Apply This In Your Setup
 
-1. **For new features:** Send a SoT skeleton of relevant files instead of full bodies.\n2. **For edits:** Ask for SEARCH/REPLACE style diffs, not entire files.\n3. **For multi-file work:** Wrap rules, files, and tasks in XML tags.\n4. **For repeated rules:** Define symbolic variables like [RULE_*] once at the top and reference them later.\n5. **For cost control:** Always end prompts with negative constraints (no preamble, no explanations) when you only need code or diffs.\n6. **With LLMBundle:** Use it to automatically package your repo into XML-tagged, token-efficient context before sending it to an AI agent.
+1. **For new features:** Send a SoT skeleton of relevant files instead of full bodies.
+2. **For edits:** Ask for SEARCH/REPLACE style diffs, not entire files.
+3. **For multi-file work:** Wrap rules, files, and tasks in XML tags.
+4. **For repeated rules:** Define symbolic variables like [RULE_*] once at the top and reference them later.
+5. **For cost control:** Always end prompts with negative constraints (no preamble, no explanations) when you only need code or diffs.
+6. **With LLMBundle:** Use it to automatically package your repo into XML-tagged, token-efficient context before sending it to an AI agent.
+
+### Project-specific assets (Universal Music Store Platform)
+
+This monorepo ships curated bundles, `[RULE_*]` blocks, and copy-paste templates under **`.cursor/context/`** (index: `.cursor/context/README.md`). Use them when scoping work across `apps/*`, `packages/*`, and Medusa or Supabase boundaries.
 

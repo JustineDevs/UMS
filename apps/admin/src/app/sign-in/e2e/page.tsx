@@ -10,7 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import { AdminE2eCredentialsForm } from "@/components/AdminE2eCredentialsForm";
 import { buildAuthOptions } from "@/lib/auth";
 import {

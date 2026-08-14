@@ -6,6 +6,7 @@ create table if not exists public.storefront_customer_profiles (
     check (char_length(email) >= 3 and char_length(email) <= 320 and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
   display_name text,
   phone text,
+  avatar_url text,
   shipping_addresses jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );

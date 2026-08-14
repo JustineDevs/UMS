@@ -14,6 +14,13 @@ export type OfflineSalePayload = {
   }>;
   total: number;
   created_at: string;
+  shiftId?: string;
+  posFeatures?: {
+    orderTag?: string;
+    eInvoiceRequested?: boolean;
+    eInvoiceCustomerEmail?: string;
+    eInvoiceCustomerTin?: string;
+  };
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -80,10 +87,14 @@ export async function syncPendingSales(): Promise<{
         },
         body: JSON.stringify({
           offlineSaleId: sale.id,
+          shiftId: sale.shiftId,
+          paymentMethod: "cash",
+          receiptReference: `offline:${sale.id}`,
           items: sale.items.map((i) => ({
             variantId: i.variantId,
             quantity: i.quantity,
           })),
+          posFeatures: sale.posFeatures,
         }),
       });
 
@@ -98,18 +109,20 @@ export async function syncPendingSales(): Promise<{
             employee_id: sale.employee_id,
             payload: sale,
           }),
-        }).then(async (qRes) => {
-          if (qRes.ok) {
-            const { data } = await qRes.json();
-            if (data?.id) {
-              await fetch("/api/admin/offline-queue", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: data.id, action: "synced" }),
-              });
+        })
+          .then(async (qRes) => {
+            if (qRes.ok) {
+              const { data } = await qRes.json();
+              if (data?.id) {
+                await fetch("/api/admin/offline-queue", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ id: data.id, action: "synced" }),
+                });
+              }
             }
-          }
-        }).catch(() => {});
+          })
+          .catch(() => {});
 
         synced++;
       } else {

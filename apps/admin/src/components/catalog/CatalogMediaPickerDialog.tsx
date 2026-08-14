@@ -1,6 +1,6 @@
 "use client";
 
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -23,6 +23,7 @@ type Props = {
   addPlacement: CatalogAddPlacement;
   onAddPlacementChange: (_placement: CatalogAddPlacement) => void;
   onPickMany: (_urls: string[]) => void;
+  mediaScope?: "catalog" | "cms";
 };
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -38,11 +39,15 @@ export function CatalogMediaPickerDialog({
   addPlacement,
   onAddPlacementChange,
   onPickMany,
+  mediaScope = "catalog",
 }: Props) {
   const { data: session, status: sessionStatus } = useSession();
+  const writePermission = mediaScope === "cms" ? "content:write" : "catalog:write";
+  const mediaApiPath = mediaScope === "cms" ? "/api/admin/cms/media" : "/api/admin/catalog/media";
+  const mediaPagePath = mediaScope === "cms" ? "/admin/cms/media" : "/admin/catalog/media";
   const canWrite = staffHasPermission(
     session?.user?.permissions ?? [],
-    "catalog:write",
+    writePermission,
   );
 
   const [rows, setRows] = useState<MediaRow[]>([]);
@@ -51,6 +56,7 @@ export function CatalogMediaPickerDialog({
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [serverCanWrite, setServerCanWrite] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editAlt, setEditAlt] = useState("");
@@ -64,10 +70,11 @@ export function CatalogMediaPickerDialog({
     sp.set("limit", "120");
     sp.set("sort", "created_desc");
     if (q.trim()) sp.set("q", q.trim());
-    fetch(`/api/admin/catalog/media?${sp.toString()}`)
+    fetch(`${mediaApiPath}?${sp.toString()}`)
       .then(async (r) => {
-        const j = (await r.json()) as { data?: MediaRow[]; error?: string };
+        const j = (await r.json()) as { data?: MediaRow[]; error?: string; canWrite?: boolean };
         if (!r.ok) throw new Error(j.error ?? r.statusText);
+        setServerCanWrite(Boolean(j.canWrite));
         return j.data ?? [];
       })
       .then(setRows)
@@ -122,9 +129,12 @@ export function CatalogMediaPickerDialog({
     setSavingMeta(true);
     setError(null);
     try {
-      const r = await fetch(`/api/admin/cms/media/${id}`, {
+      const r = await fetch(`${mediaApiPath}/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
         body: JSON.stringify({
           display_name: editDisplayName.trim() || null,
           alt_text: editAlt.trim() || null,
@@ -151,7 +161,10 @@ export function CatalogMediaPickerDialog({
     }
     setError(null);
     try {
-      const r = await fetch(`/api/admin/cms/media/${id}`, { method: "DELETE" });
+      const r = await fetch(`${mediaApiPath}/${id}`, {
+        method: "DELETE",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+      });
       const j = (await r.json()) as { error?: string };
       if (!r.ok) throw new Error(j.error ?? "Delete failed");
       setSelectedIds((prev) => {
@@ -188,8 +201,9 @@ export function CatalogMediaPickerDialog({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("alt", file.name);
-      const r = await fetch("/api/admin/catalog/media", {
+      const r = await fetch(mediaApiPath, {
         method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
         body: fd,
       });
       const j = (await r.json()) as { error?: string };
@@ -211,6 +225,7 @@ export function CatalogMediaPickerDialog({
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
       role="dialog"
+      tabIndex={-1}
       aria-modal="true"
       aria-labelledby="catalog-media-picker-title"
       aria-describedby="catalog-media-picker-desc"
@@ -221,6 +236,7 @@ export function CatalogMediaPickerDialog({
     >
       <div
         className="flex max-h-[min(90vh,720px)] w-full max-w-3xl flex-col rounded-2xl border border-outline-variant/30 bg-surface-container-lowest shadow-xl"
+        role="presentation"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-outline-variant/20 px-5 py-4">
@@ -229,22 +245,24 @@ export function CatalogMediaPickerDialog({
               id="catalog-media-picker-title"
               className="text-base font-semibold text-on-surface"
             >
-              Catalog media library
+              {mediaScope === "cms" ? "Content media library" : "Catalog media library"}
             </h2>
             <p
               id="catalog-media-picker-desc"
               className="mt-1 text-xs leading-relaxed text-on-surface-variant"
             >
               Preview images and videos, upload new files, or edit names. Select items to add them
-              to this product.
+              {mediaScope === "cms"
+                ? "Preview, upload, and select reusable content media."
+                : "Preview images and videos, upload new files, or edit names. Select items to add them to this product."}
             </p>
             <p className="mt-2 text-xs">
               <Link
-                href="/admin/catalog/media"
+                href={mediaPagePath}
                 className="font-medium text-primary underline"
                 onClick={onClose}
               >
-                Open full catalog media page
+              Open full media library
               </Link>{" "}
               for advanced filters and bulk work.
             </p>
@@ -258,7 +276,7 @@ export function CatalogMediaPickerDialog({
           </button>
         </div>
 
-        {canWrite && sessionStatus === "authenticated" ? (
+        {(canWrite || serverCanWrite) && (sessionStatus === "authenticated" || serverCanWrite) ? (
           <div className="border-b border-outline-variant/20 px-5 py-3">
             <input
               ref={fileInputRef}
@@ -379,7 +397,7 @@ export function CatalogMediaPickerDialog({
                         {(m.byte_size / 1024).toFixed(1)} KB
                       </p>
                     ) : null}
-                    {canWrite ? (
+                    {canWrite || serverCanWrite ? (
                       <div className="flex flex-wrap gap-2 pt-1">
                         {isEditing ? (
                           <>

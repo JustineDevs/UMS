@@ -9,6 +9,15 @@ export type DigitalReceipt = {
   created_at: string;
 };
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function rowToReceipt(row: Record<string, unknown>): DigitalReceipt {
   return {
     id: String(row.id ?? ""),
@@ -38,7 +47,7 @@ export function buildReceiptHtml(order: {
     .map(
       (i) =>
         `<tr>
-          <td style="padding:8px;border-bottom:1px solid #eee">${i.title}</td>
+          <td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(i.title)}</td>
           <td style="padding:8px;border-bottom:1px solid #eee;text-align:center">${i.quantity}</td>
           <td style="padding:8px;border-bottom:1px solid #eee;text-align:right">${(i.unit_price / 100).toFixed(2)}</td>
         </tr>`,
@@ -50,9 +59,9 @@ export function buildReceiptHtml(order: {
 <head><meta charset="utf-8"><title>Receipt</title></head>
 <body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
   <div style="text-align:center;margin-bottom:24px">
-    <h2 style="margin:0">${order.storeName ?? "Apparel Commerce"}</h2>
-    <p style="color:#666;margin:4px 0">Order #${order.display_id ?? order.id}</p>
-    <p style="color:#666;margin:4px 0">${order.created_at ? new Date(order.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
+    <h2 style="margin:0">${escapeHtml(order.storeName ?? "Universal Music Store")}</h2>
+    <p style="color:#666;margin:4px 0">Order #${escapeHtml(order.display_id ?? order.id)}</p>
+    <p style="color:#666;margin:4px 0">${escapeHtml(order.created_at ? new Date(order.created_at).toLocaleDateString("en-PH") : new Date().toLocaleDateString("en-PH"))}</p>
   </div>
   <table style="width:100%;border-collapse:collapse">
     <thead>
@@ -65,7 +74,7 @@ export function buildReceiptHtml(order: {
     <tbody>${itemRows}</tbody>
   </table>
   <div style="text-align:right;margin-top:16px;font-size:18px;font-weight:bold">
-    Total: ${order.currency_code.toUpperCase()} ${(order.total / 100).toFixed(2)}
+    Total: ${escapeHtml(order.currency_code.toUpperCase())} ${(order.total / 100).toFixed(2)}
   </div>
   <div style="text-align:center;margin-top:32px;color:#999;font-size:12px">
     Thank you for your purchase.
@@ -78,6 +87,7 @@ export async function saveReceipt(
   supabase: SupabaseClient,
   input: {
     order_id: string;
+    organization_id?: string;
     customer_email?: string;
     receipt_html: string;
   },
@@ -87,6 +97,7 @@ export async function saveReceipt(
     .insert({
       order_id: input.order_id,
       medusa_order_id: input.order_id,
+      organization_id: input.organization_id ?? null,
       customer_email: input.customer_email ?? null,
       receipt_html: input.receipt_html,
     })
@@ -110,12 +121,14 @@ export async function markReceiptSent(
 export async function getReceiptByOrder(
   supabase: SupabaseClient,
   orderId: string,
+  organizationId?: string,
 ): Promise<DigitalReceipt | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("digital_receipts")
     .select("*")
-    .eq("order_id", orderId)
-    .maybeSingle();
+    .eq("order_id", orderId);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return rowToReceipt(data as Record<string, unknown>);

@@ -6,8 +6,10 @@ export type ProductReviewRow = {
   author_name: string;
   body: string;
   created_at: string;
+  imageUrl?: string | null;
   /** True when staff-approved row was backed by Medusa order evidence at submit time. */
   is_verified_buyer?: boolean;
+  helpful_votes?: number;
 };
 
 export function summarizeProductReviews(reviews: ProductReviewRow[]): {
@@ -36,7 +38,7 @@ export async function fetchProductReviews(
   const sb = createClient(url, key);
   let q = sb
     .from("product_reviews")
-    .select("id,rating,author_name,body,created_at,is_verified_buyer")
+    .select("id,rating,author_name,body,created_at,image_url,is_verified_buyer,helpful_votes")
     .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -50,9 +52,10 @@ export async function fetchProductReviews(
   const { data, error } = await q;
   if (error || !data) return [];
   const seen = new Set<string>();
-  return (data as ProductReviewRow[]).filter((r) => {
+  return (data as Array<ProductReviewRow & { image_url?: string | null }>).filter((r) => {
     if (seen.has(r.id)) return false;
     seen.add(r.id);
+    r.imageUrl = r.image_url ?? null;
     return true;
   });
 }

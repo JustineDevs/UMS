@@ -5,7 +5,7 @@ export type JsonRouteResult<T extends Record<string, unknown> = Record<string, u
   body: T;
 };
 
-export type PaymentAttemptRouteRow = {
+type PaymentAttemptRouteRow = {
   cart_id: string;
   correlation_id: string;
   provider: string;
@@ -30,6 +30,7 @@ export type FinalizeMedusaCartResult =
     };
 
 type RegisterCheckoutIntentInput = {
+  organizationId?: string;
   cartId: string | null;
   provider: string;
   amountMinor: number;
@@ -42,6 +43,7 @@ type RegisterCheckoutIntentInput = {
   idempotencyKey?: string;
   supabaseAvailable: boolean;
   registerPaymentAttempt: (_input: {
+    organizationId?: string;
     cartId: string;
     provider: string;
       amountMinor: number;
@@ -93,6 +95,27 @@ const MISSING_CHECKOUT_ATTEMPT_ERROR =
   "This checkout session could not be found. Start checkout again before completing payment.";
 const WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR =
   "This payment session belongs to cash on delivery. Use the COD completion flow instead.";
+const START_QUOTE_CHANGED_ERROR =
+  "Your order changed before payment could be started. Review the updated total before continuing.";
+
+export function reconcileCheckoutIntentQuote(input: {
+  submittedQuoteFingerprint?: string;
+  authoritativeQuoteFingerprint: string;
+}): JsonRouteResult<{ error: string; code: string; quoteFingerprint: string }> | null {
+  const submitted = input.submittedQuoteFingerprint?.trim();
+  if (!submitted || submitted === input.authoritativeQuoteFingerprint) {
+    return null;
+  }
+
+  return {
+    status: 409,
+    body: {
+      error: START_QUOTE_CHANGED_ERROR,
+      code: "QUOTE_CHANGED",
+      quoteFingerprint: input.authoritativeQuoteFingerprint,
+    },
+  };
+}
 
 async function expireAttemptForQuoteMismatch(input: {
   correlationId: string;
@@ -194,6 +217,7 @@ export async function registerCheckoutIntentRouteLogic(
 
   try {
     const { correlationId, reused } = await input.registerPaymentAttempt({
+      organizationId: input.organizationId,
       cartId: input.cartId,
       provider: input.provider,
       amountMinor: input.amountMinor,
@@ -216,7 +240,7 @@ export async function registerCheckoutIntentRouteLogic(
     };
   } catch (error) {
     return {
-      status: 500,
+      status: 503,
       body: {
         error:
           error instanceof Error ? error.message : "Register failed",
@@ -344,11 +368,11 @@ export async function finalizeCheckoutIntentRouteLogic(
     input.logEvent({
       stage: "complete_medusa_cart",
       outcome: "failure",
-      httpStatus: 500,
+      httpStatus: 503,
       errorCode: "exception",
       message: message.slice(0, 500),
     });
-    return { status: 500, body: { error: message } };
+    return { status: 503, body: { error: message } };
   }
 }
 
@@ -455,11 +479,11 @@ export async function codPlaceOrderRouteLogic(
     input.logEvent({
       stage: "cod_place_order",
       outcome: "failure",
-      httpStatus: 500,
+      httpStatus: 503,
       errorCode: "exception",
       message: message.slice(0, 500),
     });
-    return { status: 500, body: { error: message } };
+    return { status: 503, body: { error: message } };
   }
 }
 

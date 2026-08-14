@@ -1,23 +1,12 @@
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { ChatIntakeForm } from "@/components/ChatIntakeForm";
+import { ChatOrdersWorkspace } from "@/components/ChatOrdersWorkspace";
 import { fetchRecentChatIntake } from "@/lib/chat-intake-bridge";
 import { getMedusaAdminDraftOrderEditUrl } from "@/lib/medusa-catalog-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
-
-function formatIntakeStatus(status: string): string {
-  const s = status.trim().toLowerCase().replace(/-/g, "_");
-  if (s === "pending") return "In queue";
-  if (s === "draft_created") return "Draft started in store";
-  return status.replace(/_/g, " ");
-}
-
-function truncate(s: string | null, max: number): string {
-  if (!s?.trim()) return "—";
-  const t = s.trim();
-  return t.length <= max ? t : `${t.slice(0, max - 1)}…`;
-}
 
 export default async function ChatOrdersPage() {
   await requirePagePermission("chat_orders:manage");
@@ -46,73 +35,25 @@ export default async function ChatOrdersPage() {
       <section className="mb-10 max-w-xl">
         <ChatIntakeForm />
       </section>
-      <div className="bg-surface-container-lowest rounded shadow overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
-          <thead>
-            <tr className="border-b border-outline-variant/20 text-left text-xs uppercase tracking-widest text-on-surface-variant">
-              <th className="py-3 px-4">Source</th>
-              <th className="py-3 px-4">Status</th>
-              <th className="py-3 px-4">Phone</th>
-              <th className="py-3 px-4">Notes</th>
-              <th className="py-3 px-4">Address</th>
-              <th className="py-3 px-4">Draft in store</th>
-              <th className="py-3 px-4">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-12 text-center text-on-surface-variant">
-                  No intake rows yet.
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => {
-                const draftHref = r.medusa_draft_order_id
-                  ? getMedusaAdminDraftOrderEditUrl(r.medusa_draft_order_id)
-                  : null;
-                return (
-                  <tr
-                    key={r.id}
-                    className="border-b border-outline-variant/10 hover:bg-surface-container-low/50"
-                  >
-                    <td className="py-3 px-4 font-medium">{r.source}</td>
-                    <td className="py-3 px-4 text-on-surface-variant">
-                      {formatIntakeStatus(r.status)}
-                    </td>
-                    <td className="py-3 px-4 text-on-surface-variant">
-                      {r.phone ?? "—"}
-                    </td>
-                    <td className="py-3 px-4 text-on-surface-variant max-w-[200px]">
-                      {truncate(r.raw_text, 120)}
-                    </td>
-                    <td className="py-3 px-4 text-on-surface-variant max-w-[180px]">
-                      {truncate(r.address, 80)}
-                    </td>
-                    <td className="py-3 px-4">
-                      {draftHref ? (
-                        <a
-                          href={draftHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-semibold text-primary hover:underline"
-                        >
-                          Open draft order
-                        </a>
-                      ) : (
-                        <span className="text-on-surface-variant">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-on-surface-variant whitespace-nowrap">
-                      {new Date(r.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          ["Total tickets", rows.length],
+          ["Pending", rows.filter((row) => row.status.toLowerCase().includes("pending")).length],
+          ["Settled", rows.filter((row) => row.payment_status === "settled").length],
+        ].map(([label, value]) => (
+          <Card key={String(label)} size="sm"><CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle></CardHeader><CardContent><p className="text-2xl tabular-nums">{value}</p></CardContent></Card>
+        ))}
+      </section>
+      <ChatOrdersWorkspace rows={rows.map((r) => ({
+        ...r,
+        draftHref: r.medusa_draft_order_id ? getMedusaAdminDraftOrderEditUrl(r.medusa_draft_order_id) : null,
+        medusaOrderId: r.medusa_order_id,
+        medusaOrderDisplayId: r.medusa_order_display_id,
+        medusaOrderPaymentStatus: r.medusa_order_payment_status,
+        paymentProvider: r.payment_provider,
+        paymentExternalId: r.payment_external_id,
+        paymentStatus: r.payment_status,
+      }))} />
     </AdminPageShell>
   );
 }

@@ -3,18 +3,18 @@
  * @see catalog-medusa-fetch.ts for implementation.
  */
 export type {
-  CatalogQuery,
+  
   CategorySummariesResult,
-  CategorySummary,
+  
   CommerceFetchFailure,
-  FeaturedProductsResult,
+  
   ProductBySlugResult,
   ProductsPageResult,
-  VariantFacets,
+  
   VariantFacetsResult,
 } from "./catalog-medusa-fetch";
 export {
-  catalogServiceError,
+  
   fetchCategorySummaries,
   fetchFeaturedProducts,
   fetchProductBySlug,

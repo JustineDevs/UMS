@@ -1,8 +1,18 @@
+import type { Metadata } from "next";
 import { HostedCheckoutReturn } from "@/components/HostedCheckoutReturn";
 import {
   normalizeHostedReturnProvider,
   normalizeHostedReturnStatus,
 } from "@/lib/hosted-payment-return";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Payment return",
+  description: "Return page after hosted checkout.",
+  path: "/checkout/hosted-return",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default async function HostedReturnPage({
   searchParams,

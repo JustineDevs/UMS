@@ -1,21 +1,20 @@
 export const PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY =
   "payment_checkout_correlation_id";
 
-export type HostedReturnProvider = "stripe" | "paypal" | "maya" | "paymongo";
+export type HostedReturnProvider = "stripe" | "paypal" | "xendit";
 export type HostedReturnStatus = "success" | "cancel" | "failure";
 
 const PROVIDER_LABELS: Record<HostedReturnProvider, string> = {
   stripe: "Stripe",
   paypal: "PayPal",
-  maya: "Maya",
-  paymongo: "PayMongo",
+  xendit: "Xendit",
 };
 
 export function normalizeHostedReturnProvider(
   raw: string | undefined,
 ): HostedReturnProvider {
   const value = raw?.trim().toLowerCase();
-  if (value === "paypal" || value === "maya" || value === "paymongo") {
+  if (value === "paypal" || value === "xendit") {
     return value;
   }
   return "stripe";

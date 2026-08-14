@@ -1,8 +1,8 @@
 /**
- * @deprecated Import from @apparel-commerce/validation (medusa-inventory-math) instead.
+ * @deprecated Import from @universal-music-store/validation (medusa-inventory-math) instead.
  * Re-export preserves existing admin import paths.
  */
 export {
   stockedQuantityFromVariantRaw,
   availableQuantityFromVariantRaw,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";

@@ -8,7 +8,7 @@ Run the full production hardening pre-action. Execute the mandatory pre-action c
 
 ## Production Hardening Pre-Action (Non-Negotiable)
 
-This command defines a **mandatory pre-action** to harden, polish, and elevate the **Apparel Commerce Platform** to production level. It is **non-negotiable** before treating the codebase as production-ready. The agent must execute the full procedure and **immediately fix all findings** without interruption until the prioritized action list is resolved.
+This command defines a **mandatory pre-action** to harden, polish, and elevate the **Universal Music Store Platform** to production level. It is **non-negotiable** before treating the codebase as production-ready. The agent must execute the full procedure and **immediately fix all findings** without interruption until the prioritized action list is resolved.
 
 ---
 

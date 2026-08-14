@@ -11,7 +11,7 @@ import {
   DialogTrigger,
   Input,
   Label,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
@@ -57,7 +57,16 @@ export function AdminProfilePreferencesDialog() {
           type="button"
           className="mb-2 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-slate-200"
         >
-          <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-container-high" />
+          <div
+            className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-container-high bg-no-repeat"
+            role="img"
+            aria-label={`${session?.user?.name || session?.user?.email || "Staff"} avatar`}
+            style={{
+              backgroundImage: `url('/api/admin/profile/avatar?seed=${encodeURIComponent(session?.user?.email ?? "staff")}')`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          />
           <div className="flex min-w-0 flex-col overflow-hidden">
             <span className="truncate text-xs font-bold text-primary">
               {session?.user?.email ?? "Staff"}

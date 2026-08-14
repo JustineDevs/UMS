@@ -21,6 +21,6 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-      - name: Release gate (full: boot + E2E)
+      - name: "Release gate (full: boot + E2E)"
         run: pnpm release-gate:full
         timeout-minutes: 30

@@ -3,8 +3,25 @@ import {
   getMedusaPublishableKey,
 } from "@/lib/storefront-medusa-env";
 import { applyRateLimit } from "@/lib/cart-api-helpers";
+import { withBotIdProtection } from "@/lib/botid-protection";
 
 export const dynamic = "force-dynamic";
+
+type PromoBody = {
+  cartId?: string;
+  code?: string;
+};
+
+function parsePromoBody(body: unknown): PromoBody {
+  if (!body || typeof body !== "object") {
+    return {};
+  }
+  const candidate = body as Record<string, unknown>;
+  return {
+    cartId: typeof candidate.cartId === "string" ? candidate.cartId.trim().slice(0, 120) : undefined,
+    code: typeof candidate.code === "string" ? candidate.code.trim().slice(0, 64) : undefined,
+  };
+}
 
 /**
  * POST /api/checkout/apply-promo
@@ -14,17 +31,13 @@ export const dynamic = "force-dynamic";
  * Body: { cartId: string; code: string }
  * Returns: { ok: true; discountAmount?: number } | { ok: false; error: string; code: string }
  */
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const rl = await applyRateLimit(req, "apply-promo", 20, 60_000);
   if (!rl.ok) return rl.response;
 
-  const body = await req.json().catch(() => ({})) as {
-    cartId?: string;
-    code?: string;
-  };
-
-  const cartId = body.cartId?.trim();
-  const code = body.code?.trim();
+  const body = parsePromoBody(await req.json().catch(() => ({})));
+  const cartId = body.cartId;
+  const code = body.code;
 
   if (!cartId || !code) {
     return Response.json(
@@ -86,17 +99,13 @@ export async function POST(req: Request) {
  * Removes a promotion code from an active Medusa cart.
  * Body: { cartId: string; code: string }
  */
-export async function DELETE(req: Request) {
+async function handleDELETE(req: Request) {
   const rl = await applyRateLimit(req, "remove-promo", 20, 60_000);
   if (!rl.ok) return rl.response;
 
-  const body = await req.json().catch(() => ({})) as {
-    cartId?: string;
-    code?: string;
-  };
-
-  const cartId = body.cartId?.trim();
-  const code = body.code?.trim();
+  const body = parsePromoBody(await req.json().catch(() => ({})));
+  const cartId = body.cartId;
+  const code = body.code;
 
   if (!cartId || !code) {
     return Response.json(
@@ -142,6 +151,9 @@ export async function DELETE(req: Request) {
     return Response.json({ ok: false, error: msg, code: "REQUEST_FAILED" }, { status: 502 });
   }
 }
+
+export const POST = withBotIdProtection(handlePOST);
+export const DELETE = withBotIdProtection(handleDELETE);
 
 function mapMedusaPromoError(json: Record<string, unknown>, code: string): string {
   const raw = typeof json.message === "string" ? json.message.trim() : "";

@@ -1,18 +1,32 @@
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffSession } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
+import {
+  claimAdminIdempotency,
+  completeAdminIdempotency,
+  getRequestHash,
+  parseAdminJson,
+  requireIdempotencyKey,
+} from "@/lib/admin-api-security";
 import {
   fetchMedusaOrderJson,
   patchMedusaOrderMetadata,
 } from "@/lib/medusa-order-bridge";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { z } from "zod";
+
+const orderStatusSchema = z.object({
+  status: z.string().trim().min(1).max(64),
+}).strict();
 
 export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ orderId: string }> },
 ) {
   const correlationId = getCorrelationId(req);
-  const staff = await requireStaffSession();
+  const staff = await requireStaffApiSession("orders:write");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
   }
@@ -32,19 +46,35 @@ export async function PATCH(
     );
   }
 
-  const body = (await req.json().catch(() => ({}))) as { status?: string };
-  const status = typeof body.status === "string" ? body.status.trim() : "";
-  if (!status) {
-    return correlatedJson(correlationId, { error: "Missing status" }, { status: 400 });
-  }
+  const idempotencyKey = requireIdempotencyKey(req);
+  if (!idempotencyKey) return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
+  const parsed = await parseAdminJson(req, orderStatusSchema);
+  if (!parsed.ok) return correlatedJson(correlationId, { error: parsed.error }, { status: parsed.status });
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, staff.session.user?.email);
+  if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
+  const status = parsed.data.status;
 
   const order = await fetchMedusaOrderJson(orderId);
   if (!order) {
     return correlatedJson(correlationId, { error: "Order not found" }, { status: 404 });
   }
+  const currentMetadata = (order.metadata as Record<string, unknown> | undefined) ?? {};
+  if (currentMetadata.organization_id !== organization.id) {
+    return correlatedJson(correlationId, { error: "Order not found" }, { status: 404 });
+  }
+  const claim = await claimAdminIdempotency(sup.client, {
+    actorKey: `${organization.id}:${staff.session.user?.email?.trim().toLowerCase() ?? "unknown"}`,
+    actionKey: `medusa.order.status:${orderId}`,
+    idempotencyKey,
+    requestHash: getRequestHash(parsed.data),
+  });
+  if (claim.kind === "replay") return correlatedJson(correlationId, claim.body, { status: claim.status });
+  if (claim.kind === "conflict") return correlatedJson(correlationId, { error: "Request is already being processed or key was reused" }, { status: 409 });
+  if (claim.kind !== "claimed") return correlatedJson(correlationId, { error: "Idempotency service unavailable" }, { status: 503 });
 
-  const prev = (order.metadata as Record<string, unknown> | undefined) ?? {};
-  const meta = { ...prev, oms_status: status };
+  const meta = { ...currentMetadata, oms_status: status };
   const result = await patchMedusaOrderMetadata(orderId, meta);
   if (!result.ok) {
     logAdminApiEvent({
@@ -53,11 +83,9 @@ export async function PATCH(
       phase: "error",
       detail: { orderId, error: result.error },
     });
-    return correlatedJson(
-      correlationId,
-      { error: result.error ?? "Unable to update order" },
-      { status: 502 },
-    );
+    const body = { error: "Unable to update order" };
+    await completeAdminIdempotency(sup.client, claim.id, 502, body);
+    return correlatedJson(correlationId, body, { status: 502 });
   }
 
   logAdminApiEvent({
@@ -67,5 +95,7 @@ export async function PATCH(
     detail: { orderId, status },
   });
 
-  return correlatedJson(correlationId, { status });
+  const body = { status };
+  await completeAdminIdempotency(sup.client, claim.id, 200, body);
+  return correlatedJson(correlationId, body);
 }

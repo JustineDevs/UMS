@@ -69,7 +69,10 @@ export async function POST(req: Request) {
       });
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json(
+        { error: error.message },
+        { status: /not found|missing|does not exist/i.test(error.message) ? 404 : 503 },
+      );
     }
   }
 

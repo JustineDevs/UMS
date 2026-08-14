@@ -1,4 +1,13 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  title: "Returns & exchanges",
+  description: "Return and exchange policy for defective, damaged, or misdescribed items.",
+  path: "/returns",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function ReturnsPage() {
   return (
@@ -9,7 +18,7 @@ export default function ReturnsPage() {
       <p className="mb-6">
         We accept returns or exchanges for defective, damaged, incorrectly
         delivered, or materially different items. For eligible non-defective
-        apparel, we may allow <strong>size exchange within 7 days</strong> of
+        items, we may allow <strong>exchange within 7 days</strong> of
         receipt, provided the item is unused, unwashed, unaltered, with original
         tags, packaging, and proof of purchase.
       </p>

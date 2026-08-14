@@ -71,8 +71,8 @@ You must inspect and improve all relevant layers:
 8. Supabase schema where still used, ownership model, migrations, and RLS
 9. health checks, readiness checks, startup validation (storefront `instrumentation`, Medusa `validate-process-env`, Express boot), operator safety
 10. observability, logging, request IDs, error surfaces, and debugging ergonomics
-11. unit tests, integration tests, and e2e tests (`apparel-commerce/e2e` and app-level tests)
-12. docs or config references that create false confidence or drift from reality (`internal/docs/spec.md`, `blueprint.md`, cutover and ADR docs)
+11. unit tests, integration tests, and e2e tests (`universal-music-store/e2e` and app-level tests)
+12. docs or config references that create false confidence or drift from reality (`docs/spec.md`, `blueprint.md`, cutover and ADR docs)
 
 ---
 
@@ -255,7 +255,7 @@ Focus on real regressions:
 - ownership checks
 - critical API boundaries (admin BFF, Medusa Store/Admin)
 - storefront checkout and cart (session storage vs Medusa cart)
-- Payment-provider and AfterShip webhook safety (HMAC, dedup, single owner per env)
+- Payment-provider and shipment webhook safety (HMAC, dedup, single owner per env)
 - POS draft order and convert-to-order
 - payments and order-paid transitions
 - catalog misconfiguration vs empty-grid vs error states
@@ -313,7 +313,7 @@ Add and/or update automated tests for every critical or high-risk fix that can r
 
 ### Deliverable C — hardening report
 Create a markdown report in the repo, for example:
-`internal/docs/reports/production-hardening-pass.md` (or `docs/reports/production-hardening-pass.md` if that tree exists)
+`docs/reports/production-hardening-pass.md` (or `docs/reports/production-hardening-pass.md` if that tree exists)
 
 This report must contain:
 1. Executive production audit
@@ -329,9 +329,9 @@ This report must contain:
 
 ### Deliverable D — operator notes
 Create or update a concise operator-facing file, for example:
-`internal/docs/reports/production-hardening-operator-notes.md`
+`docs/reports/production-hardening-operator-notes.md`
 
-Align env and runbook notes with `apparel-commerce/.env.example`, `apps/medusa/.env.template`, and `internal/docs/SOP-OPERATIONS-MEDUSA.md` where relevant.
+Align env and runbook notes with `universal-music-store/.env.example`, `apps/medusa/.env.template`, and `docs/runbooks/GUIDE.md` where relevant.
 
 Include:
 - env changes

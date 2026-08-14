@@ -55,7 +55,9 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
     ).toBe(true);
   });
 
-  test("checkout reaches PayPal redirect or inline approval", async ({ page }) => {
+  test("checkout reaches PayPal redirect or inline approval", async ({
+    page,
+  }) => {
     await navigateToShopAndAddFirstProduct(page);
     await navigateToCheckout(page);
     await fillCheckoutShippingInfo(page);
@@ -73,43 +75,65 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
       test.skip(
         true,
         "BLOCKED: PAYPAL_SANDBOX_BUYER_EMAIL not set — cannot complete PayPal sandbox login. " +
-          "Set PAYPAL_SANDBOX_BUYER_EMAIL and PAYPAL_SANDBOX_BUYER_PASSWORD in .env from " +
+          "Set PAYPAL_SANDBOX_BUYER_EMAIL and PAYPAL_SANDBOX_BUYER_PASSWORD in .env.local from " +
           "https://developer.paypal.com/dashboard/accounts",
       );
       return;
     }
 
-    const paypalRedirect = await page.waitForURL(/paypal\.com/, { timeout: 20_000 }).then(() => true).catch(() => false);
+    const paypalRedirect = await page
+      .waitForURL(/paypal\.com/, { timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
 
     if (paypalRedirect) {
       await expect(page).toHaveURL(/paypal\.com/, { timeout: 10_000 });
 
       const emailInput = page.locator('#email, input[type="email"]').first();
-      const emailVisible = await emailInput.isVisible({ timeout: 10_000 }).catch(() => false);
+      const emailVisible = await emailInput
+        .isVisible({ timeout: 10_000 })
+        .catch(() => false);
 
       if (emailVisible) {
         await emailInput.fill(buyer.email);
-        const nextBtn = page.getByRole("button", { name: /next|continue/i }).first();
+        const nextBtn = page
+          .getByRole("button", { name: /next|continue/i })
+          .first();
         if (await nextBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
           await nextBtn.click();
         }
 
-        const passwordInput = page.locator('#password, input[type="password"]').first();
+        const passwordInput = page
+          .locator('#password, input[type="password"]')
+          .first();
         await passwordInput.fill(buyer.password);
-        const loginBtn = page.getByRole("button", { name: /log in|sign in|login/i }).first();
+        const loginBtn = page
+          .getByRole("button", { name: /log in|sign in|login/i })
+          .first();
         await loginBtn.click();
 
-        const approveBtn = page.getByRole("button", { name: /approve|pay now|agree|continue/i }).first();
+        const approveBtn = page
+          .getByRole("button", { name: /approve|pay now|agree|continue/i })
+          .first();
         await approveBtn.click({ timeout: 30_000 }).catch(() => {});
 
-        await page.waitForURL(/\/track\/order_/i, { timeout: 60_000 }).catch(() => {});
+        await page
+          .waitForURL(/\/track\/order_/i, { timeout: 60_000 })
+          .catch(() => {});
         expect(page.url()).toMatch(/\/track\/order_/i);
       }
     } else {
       const paypalFrame = page.frameLocator("iframe[name*='paypal']").first();
-      const loginBtn = paypalFrame.locator("button, [data-funding-source='paypal']").first();
-      const visible = await loginBtn.isVisible({ timeout: 10_000 }).catch(() => false);
-      expect(paypalRedirect || visible, "PayPal must redirect or render embedded checkout").toBeTruthy();
+      const loginBtn = paypalFrame
+        .locator("button, [data-funding-source='paypal']")
+        .first();
+      const visible = await loginBtn
+        .isVisible({ timeout: 10_000 })
+        .catch(() => false);
+      expect(
+        paypalRedirect || visible,
+        "PayPal must redirect or render embedded checkout",
+      ).toBeTruthy();
     }
   });
 

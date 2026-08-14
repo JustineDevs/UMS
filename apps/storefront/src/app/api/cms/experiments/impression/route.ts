@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { incrementCmsAbExperimentImpressions } from "@apparel-commerce/platform-data";
+import { incrementCmsAbExperimentImpressions } from "@universal-music-store/platform-data";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import {
   getRequestIp,

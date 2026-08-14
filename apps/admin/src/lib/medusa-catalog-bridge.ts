@@ -1,4 +1,4 @@
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaStoreBaseUrl } from "@universal-music-store/sdk";
 import { optionRowsToSizeColor } from "@/lib/medusa-pos";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 
@@ -40,6 +40,8 @@ export async function fetchMedusaProductsListForAdmin(opts: {
   limit?: number;
   offset?: number;
   q?: string;
+  status?: string;
+  order?: "-created_at" | "title" | "-title";
 }): Promise<{
   products: MedusaProductListRow[];
   count: number;
@@ -56,6 +58,10 @@ export async function fetchMedusaProductsListForAdmin(opts: {
     "id,title,handle,status,thumbnail,created_at,*variants,*variants.options,*variants.options.option,*categories",
   );
   if (q) qs.set("q", q);
+  if (opts.status && ["draft", "published", "rejected"].includes(opts.status)) {
+    qs.set("status", opts.status);
+  }
+  if (opts.order) qs.set("order", opts.order);
 
   let res: Response;
   try {
@@ -89,8 +95,10 @@ export async function fetchMedusaProductsListForAdmin(opts: {
 
     const cats = (o.categories ?? []) as Array<{ name?: string }>;
     const categorySummary =
-      cats.map((c) => String(c.name ?? "").trim()).filter(Boolean).join(", ") ||
-      "—";
+      cats
+        .map((c) => String(c.name ?? "").trim())
+        .filter(Boolean)
+        .join(", ") || "—";
 
     const status = String(o.status ?? "");
     const shopNotes: string[] = [];

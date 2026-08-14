@@ -12,6 +12,6 @@
 
 ## Key flows to trace
 
-1. **Storefront**: Product list -> shop page; Product detail -> PDP; Add to cart -> reservation; Checkout -> Medusa payment session / hosted PSP; Order tracking -> AfterShip.
+1. **Storefront**: Product list -> shop page; Product detail -> PDP; Add to cart -> reservation; Checkout -> Medusa payment session / hosted PSP; Order tracking -> shipment tracking provider.
 2. **Admin**: Inventory table -> inventory_movements; Orders hub -> orders, order_items; POS -> barcode lookup, order creation, payment link.
-3. **Medusa / API**: Payment webhooks -> payment verification -> order paid -> inventory committed; AfterShip webhook -> shipment status update.
+3. **Medusa / API**: Payment webhooks -> payment verification -> order paid -> inventory committed; shipment-tracking webhook -> shipment status update.

@@ -2,7 +2,8 @@ import {
   loadCmsAbExperimentsActivePublic,
   loadCmsAnnouncementsPublic,
   loadCmsNavigationPublic,
-} from "@apparel-commerce/platform-data";
+  storefrontSocialLinks,
+} from "@universal-music-store/platform-data";
 import { CmsAnnouncementStack } from "./CmsAnnouncementBar";
 import { CmsExperimentAssigner } from "./CmsExperimentAssigner";
 import { GlobalRouteMotion } from "./GlobalRouteMotion";
@@ -38,6 +39,12 @@ export async function StorefrontPublicChrome({
 
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[500] focus:block focus:h-auto focus:w-auto focus:overflow-visible focus:rounded-lg focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-on-primary focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-white/70"
+      >
+        Skip to main content
+      </a>
       <StorefrontHeader
         announcement={
           announcementBars.length > 0 ? <CmsAnnouncementStack bars={announcementBars} /> : undefined
@@ -45,7 +52,11 @@ export async function StorefrontPublicChrome({
         navigation={nav}
       />
       <CmsExperimentAssigner experiments={experiments} />
-      <div className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.875rem] xs:pt-24 sm:pt-[6.125rem] md:pt-[6.25rem]">
+      <div
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.875rem] outline-none xs:pt-24 sm:pt-[6.125rem] md:pt-[6.25rem]"
+      >
         <GlobalRouteMotion>{children}</GlobalRouteMotion>
       </div>
       <StorefrontFooter
@@ -54,7 +65,7 @@ export async function StorefrontPublicChrome({
           nav.footerBottomLinks.length > 0 ? nav.footerBottomLinks : undefined
         }
         cmsSocialLinks={nav.socialLinks.length > 0 ? nav.socialLinks : undefined}
-        instagramUrlRaw={publicSite.instagramUrl}
+        publicSocialLinks={storefrontSocialLinks(publicSite)}
       />
     </>
   );

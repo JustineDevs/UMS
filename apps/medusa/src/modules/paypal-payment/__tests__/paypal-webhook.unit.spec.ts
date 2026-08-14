@@ -142,13 +142,13 @@ describe("PayPal webhook service", () => {
       {
         clientId: "client-id",
         clientSecret: "client-secret",
-        environment: "sandbox",
+        sandbox: true,
       },
     );
   }
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
     process.env = { ...originalEnv, NODE_ENV: "test", PAYPAL_WEBHOOK_ID: "wh_test" };
     (verifyPayPalWebhookSignature as jest.Mock).mockResolvedValue(true);
   });

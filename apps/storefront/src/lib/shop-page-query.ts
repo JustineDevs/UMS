@@ -2,14 +2,19 @@ import {
   productListQuerySchema,
   SHOP_PRODUCT_PAGE_SIZE,
   type ProductListQuery,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 
 export type ShopPageSearchParams = {
   category?: string;
   locale?: string;
-  size?: string;
-  color?: string;
+  type?: string;
+  finish?: string;
   brand?: string;
+  pickupConfig?: string;
+  bodyWood?: string;
+  condition?: string;
+  skillLevel?: string;
+  shippingSpeed?: string;
   minPrice?: string;
   maxPrice?: string;
   sort?: string;
@@ -22,9 +27,14 @@ function buildCandidate(searchParams: ShopPageSearchParams) {
     limit: SHOP_PRODUCT_PAGE_SIZE,
     offset: searchParams.offset,
     category: searchParams.category,
-    size: searchParams.size,
-    color: searchParams.color,
+    type: searchParams.type,
+    finish: searchParams.finish,
     brand: searchParams.brand,
+    pickupConfig: searchParams.pickupConfig,
+    bodyWood: searchParams.bodyWood,
+    condition: searchParams.condition,
+    skillLevel: searchParams.skillLevel,
+    shippingSpeed: searchParams.shippingSpeed,
     minPrice: searchParams.minPrice,
     maxPrice: searchParams.maxPrice,
     q: searchParams.q,

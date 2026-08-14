@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { PH_VAT_RATE, computeDisplayVat } from "@apparel-commerce/sdk";
+import Image from "next/image";
+import { PH_VAT_RATE, computeDisplayVat } from "@universal-music-store/sdk";
+import type { PosSaleFeatureMetadata } from "@universal-music-store/platform-data";
 import {
   buildPosReceiptPayloadFromCart,
   buildProductLabelPayloadFromLineItem,
@@ -16,6 +18,7 @@ import {
   AdminPageHelpFromPath,
   AdminPageShell,
 } from "@/components/admin-console";
+import { PosSaleDetailsPanel } from "@/components/pos/PosSaleDetailsPanel";
 
 type CartItem = {
   id: string;
@@ -75,9 +78,12 @@ function PosProductImage({
     return <div className={className} aria-hidden />;
   }
   return (
-    <img
+    <Image
+      fill
       src={url}
       alt={alt}
+      unoptimized
+      sizes="(min-width: 1024px) 240px, 50vw"
       className={className}
       onError={() => setBroken(true)}
     />
@@ -93,6 +99,7 @@ export default function POSPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hardwareMessage, setHardwareMessage] = useState<string | null>(null);
+  const [posFeatures, setPosFeatures] = useState<PosSaleFeatureMetadata>({});
 
   const { online, pendingCount, syncing, trySync } = useOfflineSync();
   const [activeShift, setActiveShift] = useState<ShiftData | null>(null);
@@ -103,6 +110,16 @@ export default function POSPage() {
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [voidForm, setVoidForm] = useState({ action: "void_item", reason: "", approver_id: "", pin: "" });
   const [voidTarget, setVoidTarget] = useState<string | null>(null);
+  const barcodeInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const [saleSession, setSaleSession] = useState({ id: "LOCAL", openedAt: new Date(0) });
+
+  useEffect(() => {
+    setSaleSession({
+      id: Date.now().toString(36).slice(-5).toUpperCase(),
+      openedAt: new Date(),
+    });
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/shifts?status=open")
@@ -111,6 +128,21 @@ export default function POSPage() {
         if (data?.length > 0) setActiveShift(data[0]);
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if (event.key === "F1") {
+        event.preventDefault();
+        barcodeInputRef.current?.focus();
+      }
+      if (event.key === "F2") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
   async function handleOpenShift(e: React.FormEvent) {
@@ -146,6 +178,11 @@ export default function POSPage() {
 
   async function handleVoid(e: React.FormEvent) {
     e.preventDefault();
+    if (!activeShift) {
+      setLookupError("Open a shift before recording a void.");
+      setShowVoidModal(false);
+      return;
+    }
     let pinVerified = false;
     if (voidForm.approver_id && voidForm.pin) {
       const pinRes = await fetch("/api/admin/pin-approval", {
@@ -163,12 +200,12 @@ export default function POSPage() {
         return;
       }
     }
-    await fetch("/api/admin/voids", {
+    const res = await fetch("/api/admin/voids", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        shift_id: activeShift?.id,
-        employee_id: activeShift?.employee_id ?? "",
+        shift_id: activeShift.id,
+        employee_id: activeShift.employee_id,
         approved_by: voidForm.approver_id || undefined,
         action: voidForm.action,
         reason: voidForm.reason,
@@ -176,6 +213,16 @@ export default function POSPage() {
         line_item_id: voidTarget,
       }),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      setLookupError(
+        typeof err.error === "string"
+          ? err.error
+          : "Void was not recorded.",
+      );
+      setShowVoidModal(false);
+      return;
+    }
     if (voidTarget) {
       setCart(cart.filter((c) => c.id !== voidTarget));
     }
@@ -252,7 +299,7 @@ export default function POSPage() {
     const res = await fetch(`${medusaPosBase}/draft-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({ items, posFeatures }),
     });
     setLinkLoading(false);
     if (!res.ok) {
@@ -304,9 +351,12 @@ export default function POSPage() {
         })),
         total,
         created_at: new Date().toISOString(),
+        shiftId: activeShift?.id,
+        posFeatures,
       });
       setCommitLoading(false);
       setCart([]);
+      setPosFeatures({});
       setSuccessMessage("Sale saved offline. Will sync when connection restores.");
       fireAndForgetPrint(
         buildPosReceiptPayloadFromCart(
@@ -335,12 +385,16 @@ export default function POSPage() {
           quantity: c.qty,
         })),
         shiftId: activeShift?.id,
+        paymentMethod: "cash",
+        receiptReference: `pos:${idempotencyKey}`,
+        posFeatures,
       }),
     });
     setCommitLoading(false);
     if (res.ok) {
       const { orderNumber } = (await res.json()) as { orderNumber?: string };
       setCart([]);
+      setPosFeatures({});
       setLookupError(null);
       setSuccessMessage(
         orderNumber
@@ -373,8 +427,11 @@ export default function POSPage() {
         })),
         total,
         created_at: new Date().toISOString(),
+        shiftId: activeShift?.id,
+        posFeatures,
       });
       setCart([]);
+      setPosFeatures({});
       setSuccessMessage("Sale queued offline. Automatic retry is enabled.");
       setLookupError(errMsg);
       fireAndForgetPrint(
@@ -559,7 +616,7 @@ export default function POSPage() {
         </header>
 
         {successMessage && (
-          <div className="bg-emerald-500/10 text-emerald-700 px-4 py-2 rounded text-sm font-medium flex items-center justify-between">
+          <div role="status" aria-live="polite" className="bg-emerald-500/10 text-emerald-700 px-4 py-2 rounded text-sm font-medium flex items-center justify-between">
             <span>{successMessage}</span>
             <button
               onClick={() => setSuccessMessage(null)}
@@ -580,6 +637,7 @@ export default function POSPage() {
               barcode_scanner
             </span>
             <input
+              ref={barcodeInputRef}
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
               onKeyDown={(e) => {
@@ -600,6 +658,7 @@ export default function POSPage() {
               search
             </span>
             <input
+              ref={searchInputRef}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
@@ -658,6 +717,8 @@ export default function POSPage() {
             )}
           </div>
         ) : null}
+
+        <PosSaleDetailsPanel value={posFeatures} onChange={setPosFeatures} />
 
         <section className="mt-12">
           <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-6">
@@ -778,11 +839,13 @@ export default function POSPage() {
               Active Sale
             </h2>
             <p className="text-[10px] uppercase tracking-widest text-on-primary/60">
-              Session: #{Date.now().toString(36).slice(-5).toUpperCase()} ·{" "}
-              {new Date().toLocaleTimeString("en-PH", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              Session: #{saleSession.id} ·{" "}
+              {saleSession.openedAt.getTime() === 0
+                ? "--:--"
+                : saleSession.openedAt.toLocaleTimeString("en-PH", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
             </p>
           </div>
           <div className="flex-grow overflow-y-auto p-6 space-y-6">
@@ -793,7 +856,7 @@ export default function POSPage() {
             ) : (
               cart.map((item) => (
                 <div key={item.id} className="flex gap-4">
-                  <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded bg-surface-container-low">
+                  <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded bg-surface-container-low">
                     <PosProductImage
                       url={item.imageUrl}
                       alt={item.name}
@@ -815,13 +878,15 @@ export default function POSPage() {
                           <span className="material-symbols-outlined text-sm">label</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => { setVoidTarget(item.id); setShowVoidModal(true); }}
                           className="text-on-surface-variant hover:text-amber-600 transition-colors"
-                          title="Void item (requires manager PIN)"
+                          title="Record void item"
                         >
                           <span className="material-symbols-outlined text-sm">block</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => removeFromCart(item.id)}
                           className="text-on-surface-variant hover:text-error transition-colors"
                         >
@@ -840,6 +905,7 @@ export default function POSPage() {
                     <div className="mt-3 flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <button
+                          type="button"
                           onClick={() => updateQty(item.id, -1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
                         >
@@ -849,6 +915,7 @@ export default function POSPage() {
                         </button>
                         <span className="text-xs font-bold">{item.qty}</span>
                         <button
+                          type="button"
                           onClick={() => updateQty(item.id, 1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
                         >
@@ -914,7 +981,7 @@ export default function POSPage() {
               catalog data when available.
             </p>
             {hardwareMessage ? (
-              <p className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
+              <p role="alert" className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
             ) : null}
           </div>
         </div>
@@ -975,12 +1042,12 @@ export default function POSPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleVoid} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Void / Override</h2>
-            <select value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+            <select disabled value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 disabled:bg-surface-container-low disabled:text-on-surface-variant">
               <option value="void_item">Void Item</option>
-              <option value="void_order">Void Order</option>
-              <option value="discount_override">Discount Override</option>
-              <option value="refund">Refund</option>
             </select>
+            <p className="text-xs text-on-surface-variant">
+              This records a cart-line void. Use the Orders workflow for order-level refunds, voids, or discount overrides.
+            </p>
             <input required placeholder="Reason" value={voidForm.reason} onChange={(e) => setVoidForm({ ...voidForm, reason: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="border-t border-outline-variant/20 pt-4">
               <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">Manager Approval</p>

@@ -25,36 +25,38 @@
     "test:integration:http": "node scripts/run-jest.cjs integration:http -- --silent=false --runInBand --forceExit",
     "test:integration:modules": "node scripts/run-jest.cjs integration:modules -- --silent=false --runInBand --forceExit",
     "test:unit": "node scripts/run-jest.cjs unit -- --silent --runInBand --forceExit",
-    "test:stress": "node --import tsx/esm --test src/lib/aftership-webhook-dedup.stress.test.mts src/lib/paymongo-webhook-dedup.stress.test.mts src/loaders/validate-process-env.stress.test.mts",
-    "test:aftership-map": "node --import tsx/esm --test src/lib/aftership-status-map.test.mts"
+    "test:stress": "node --import tsx/esm --test src/loaders/validate-process-env.stress.test.mts",
+    "test:jnt-map": "tsx src/lib/jnt-status-map.test.mts"
   },
   "dependencies": {
-    "@aftership/tracking-sdk": "^15.0.1",
-    "@apparel-commerce/resend-mail": "workspace:*",
-    "@apparel-commerce/types": "workspace:*",
+    "@universal-music-store/resend-mail": "workspace:*",
+    "@universal-music-store/sdk": "workspace:*",
+    "@universal-music-store/types": "workspace:*",
+    "@medusajs/admin-sdk": "2.17.2",
+    "@medusajs/admin-shared": "2.17.2",
+    "@medusajs/cli": "2.17.2",
+    "@medusajs/dashboard": "2.17.2",
+    "@medusajs/draft-order": "2.17.2",
+    "@medusajs/framework": "2.17.2",
+    "@medusajs/medusa": "2.17.2",
     "@paypal/paypal-server-sdk": "^2.0.0",
     "@supabase/supabase-js": "^2.45.0",
-    "tsx": "^4.19.0",
-    "zod": "^3.23.8",
-    "stripe": "^15.5.0",
+    "inngest": "^4.2.4",
     "pg": "^8.13.1",
-    "@medusajs/admin-sdk": "2.13.1",
-    "@medusajs/admin-shared": "2.13.1",
-    "@medusajs/cli": "2.13.1",
-    "@medusajs/dashboard": "2.13.1",
-    "@medusajs/draft-order": "2.13.1",
-    "@medusajs/framework": "2.13.1",
-    "@medusajs/medusa": "2.13.1"
+    "stripe": "^15.5.0",
+    "tsx": "^4.19.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@medusajs/utils": "2.13.1",
+    "@medusajs/test-utils": "2.17.2",
+    "@medusajs/utils": "2.17.2",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
     "@opentelemetry/exporter-zipkin": "^2.0.0",
-    "@types/pg": "^8.11.10",
-    "@medusajs/test-utils": "2.13.1",
     "@swc/core": "1.15.18",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.13",
     "@types/node": "^20.12.11",
+    "@types/pg": "^8.11.10",
     "@types/react": "^18.3.2",
     "@types/react-dom": "^18.2.25",
     "jest": "^29.7.0",
@@ -71,6 +73,5 @@
   },
   "optionalDependencies": {
     "@swc/core-win32-x64-msvc": "1.15.18"
-  },
-  "packageManager": "pnpm@9.14.2"
+  }
 }

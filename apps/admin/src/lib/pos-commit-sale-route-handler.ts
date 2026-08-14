@@ -1,11 +1,16 @@
 import type { NextResponse } from "next/server";
-import { correlatedError, correlatedJson, tagResponse } from "./staff-api-response";
-import type { PosCommitSaleInput, PosCommitSaleRouteResult } from "./pos-commit-sale-route-logic";
+import {
+  correlatedError,
+  correlatedJson,
+  tagResponse,
+} from "./staff-api-response";
+import type {
+  PosCommitSaleInput,
+  PosCommitSaleRouteResult,
+} from "./pos-commit-sale-route-logic";
 import type { AdminApiLogPhase } from "./admin-api-log";
 
-type StaffResult =
-  | { ok: true }
-  | { ok: false; response: NextResponse };
+type StaffResult = { ok: true } | { ok: false; response: NextResponse };
 
 export type PosCommitSaleRouteDeps = {
   getCorrelationId: (_req: Request) => string;
@@ -25,7 +30,9 @@ export type PosCommitSaleRouteDeps = {
     body: PosCommitSaleInput;
     correlationId: string;
     idempotencyKey?: string;
+    organizationId?: string;
   }) => Promise<PosCommitSaleRouteResult>;
+  resolveOrganizationId?: (_correlationId: string) => Promise<string | null>;
 };
 
 export async function handlePosCommitSaleRequest(
@@ -36,6 +43,17 @@ export async function handlePosCommitSaleRequest(
   const staff = await deps.requireStaffApiSession("pos:use");
   if (!staff.ok) {
     return tagResponse(staff.response, correlationId);
+  }
+  const organizationId = deps.resolveOrganizationId
+    ? await deps.resolveOrganizationId(correlationId)
+    : undefined;
+  if (deps.resolveOrganizationId && !organizationId) {
+    return correlatedError(
+      correlationId,
+      403,
+      "Organization scope required",
+      "FORBIDDEN",
+    );
   }
 
   deps.logAdminApiEvent({
@@ -78,6 +96,7 @@ export async function handlePosCommitSaleRequest(
       body,
       correlationId,
       idempotencyKey,
+      organizationId: organizationId ?? undefined,
     });
 
     deps.logAdminApiEvent({

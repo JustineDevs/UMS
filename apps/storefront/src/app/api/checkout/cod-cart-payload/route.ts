@@ -1,19 +1,29 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
 import {
   isStorefrontProfileComplete,
   listMissingProfileParts,
 } from "@/lib/storefront-profile-complete";
 import { profileToCodCartAddresses } from "@/lib/medusa-profile-address";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Server-validated delivery identity for COD. Client must not invent addresses.
  */
-export async function POST() {
-  const session = await getServerSession(authOptions);
+async function handlePOST(req: Request) {
+  const ip = getRequestIp(req);
+  const rl = await rateLimitFixedWindow(`cod-cart-payload:${ip}`, 20, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "Too many requests", retryAfter: rl.retryAfterSec },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
+
+  const session = await getStorefrontSession();
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) {
     return Response.json({ error: "Sign in to use cash on delivery." }, { status: 401 });
@@ -43,3 +53,5 @@ export async function POST() {
 
   return Response.json(payload);
 }
+
+export const POST = withBotIdProtection(handlePOST);

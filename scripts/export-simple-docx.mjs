@@ -260,7 +260,7 @@ const coreXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
  xmlns:dcterms="http://purl.org/dc/terms/"
  xmlns:dcmitype="http://purl.org/dc/dcmitype/"
  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Maharlika Apparel Custom 12-Month Development and Support Agreement</dc:title>
+  <dc:title>Universal Music Store 12-Month Development and Support Agreement</dc:title>
   <dc:creator>Codex</dc:creator>
   <cp:lastModifiedBy>Codex</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created>

@@ -5,15 +5,15 @@ import { buildCommerceInvalidationRevalidationPlan } from "./commerce-invalidati
 
 test("buildCommerceInvalidationRevalidationPlan includes product, collection, and catalog tags", () => {
   const plan = buildCommerceInvalidationRevalidationPlan({
-    productHandles: ["tee"],
+    productHandles: ["guitar"],
     collectionHandlesLowercase: ["summer-sale"],
     classification: "checkout_affecting",
   });
-  assert.ok(plan.tags.includes("product:tee"));
+  assert.ok(plan.tags.includes("product:guitar"));
   assert.ok(plan.tags.includes("collection:summer-sale"));
   assert.ok(plan.tags.includes("catalog:list"));
   assert.ok(plan.tags.includes("storefront:home"));
-  assert.ok(plan.paths.includes("/shop/tee"));
+  assert.ok(plan.paths.includes("/shop/guitar"));
   assert.ok(plan.paths.includes("/collections/summer-sale"));
   assert.ok(plan.paths.includes("/"));
 });

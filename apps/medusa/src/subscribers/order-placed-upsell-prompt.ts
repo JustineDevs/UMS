@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { sendResendTransactionalEmail } from "../lib/resend-email";
 
 export default async function orderPlacedUpsellPrompt({
   event: { data },
@@ -7,7 +8,7 @@ export default async function orderPlacedUpsellPrompt({
 }: SubscriberArgs<{ id: string }>) {
   const resendKey = process.env.RESEND_API_KEY?.trim();
   const fromAddr =
-    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@apparel-commerce.com";
+    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@universal-music-store.com";
   const storefrontUrl =
     process.env.STOREFRONT_PUBLIC_URL?.trim() ||
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
@@ -53,12 +54,9 @@ export default async function orderPlacedUpsellPrompt({
   <p>Hi ${firstName}, thanks for your recent purchase of ${purchasedTitles.join(", ")}.</p>
   <p>Check out items that pair well with your order:</p>
   <p><a href="${shopUrl}" style="display:inline-block;background:#1e293b;color:white;padding:12px 24px;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.05em;text-transform:uppercase">Shop Now</a></p>
-  <p style="font-size:12px;color:#94a3b8;margin-top:24px">Maharlika Apparel Custom</p>
+  <p style="font-size:12px;color:#94a3b8;margin-top:24px">${process.env.STORE_NAME?.trim() || "Universal Music Store"}</p>
 </body></html>`;
 
-  const { sendResendTransactionalEmail } = await import(
-    "@apparel-commerce/resend-mail"
-  );
   const sent = await sendResendTransactionalEmail({
     apiKey: resendKey,
     from: fromAddr,

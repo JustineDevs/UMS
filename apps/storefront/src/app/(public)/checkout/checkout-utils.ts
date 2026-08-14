@@ -1,4 +1,4 @@
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 export const CHECKOUT_SITE_ORIGIN = (
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN

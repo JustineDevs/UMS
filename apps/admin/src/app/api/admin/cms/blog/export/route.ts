@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { listCmsBlogPosts } from "@apparel-commerce/platform-data";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { insertStaffAuditLog } from "@/lib/staff-audit";
 
 function csvEscape(s: string): string {
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -13,7 +13,7 @@ function csvEscape(s: string): string {
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return new Response("Unauthorized", { status: 401 });
   }
@@ -22,9 +22,36 @@ export async function GET(req: NextRequest) {
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
-  const rows = await listCmsBlogPosts(sup.client);
-  const ids = req.nextUrl.searchParams.get("ids")?.split(",").map((x) => x.trim()).filter(Boolean);
-  const filtered = ids?.length ? rows.filter((r) => ids.includes(r.id)) : rows;
+  const organization = await resolveStaffOrganization(
+    sup.client,
+    session.user.email,
+  );
+  if (!organization)
+    return new Response("Tenant scope unavailable", { status: 403 });
+  const rawIds = req.nextUrl.searchParams.get("ids");
+  const ids = rawIds
+    ?.split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (
+    ids &&
+    (ids.length > 100 || ids.some((id) => !/^[0-9a-f-]{36}$/i.test(id)))
+  ) {
+    return new Response("Invalid ids", { status: 400 });
+  }
+  let query = sup.client
+    .from("cms_blog_posts")
+    .select(
+      "id,slug,locale,title,status,published_at,scheduled_publish_at,author_name,tags,rss_include,canonical_url,og_image_url,updated_at",
+    )
+    .order("updated_at", { ascending: false })
+    .limit(1000);
+  if (ids?.length) query = query.in("id", ids);
+  query = query.eq("organization_id", organization.id);
+  const { data, error } = await query;
+  if (error)
+    return new Response("Unable to export blog posts", { status: 502 });
+  const filtered = (data ?? []) as Array<Record<string, unknown>>;
 
   const header = [
     "id",
@@ -53,8 +80,8 @@ export async function GET(req: NextRequest) {
         r.published_at ?? "",
         r.scheduled_publish_at ?? "",
         r.author_name ?? "",
-        r.tags.join(";"),
-        r.rss_include ? "1" : "0",
+        Array.isArray(r.tags) ? r.tags.map(String).join(";") : "",
+        r.rss_include === true ? "1" : "0",
         r.canonical_url ?? "",
         r.og_image_url ?? "",
         r.updated_at,
@@ -64,6 +91,19 @@ export async function GET(req: NextRequest) {
     ),
   ];
   const body = lines.join("\r\n");
+  if (new TextEncoder().encode(body).byteLength > 5 * 1024 * 1024) {
+    return new Response("Export too large", { status: 413 });
+  }
+  await insertStaffAuditLog(sup.client, {
+    actorEmail: session.user.email ?? "unknown",
+    action: "cms.blog.export",
+    resource: "cms_blog_posts",
+    details: {
+      organization_id: organization.id,
+      count: filtered.length,
+      correlation_id: cid,
+    },
+  });
   return new Response(body, {
     status: 200,
     headers: {

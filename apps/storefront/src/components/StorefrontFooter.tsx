@@ -2,36 +2,46 @@ import type {
   CmsFooterColumn,
   CmsNavLink,
   CmsSocialLink,
-} from "@apparel-commerce/platform-data";
+  StorefrontSocialLink,
+} from "@universal-music-store/platform-data";
 import Image from "next/image";
 import Link from "next/link";
-import { normalizeInstagramHref } from "@/lib/public-site";
 
 export function StorefrontFooter({
   cmsFooterColumns,
   cmsFooterBottomLinks,
   cmsSocialLinks,
-  instagramUrlRaw,
+  publicSocialLinks,
 }: {
   cmsFooterColumns?: CmsFooterColumn[];
   cmsFooterBottomLinks?: CmsNavLink[];
   cmsSocialLinks?: CmsSocialLink[];
   /** From CMS / env (resolved on server). */
-  instagramUrlRaw?: string;
+  publicSocialLinks?: StorefrontSocialLink[];
 }) {
-  const instagram = normalizeInstagramHref(instagramUrlRaw);
+  const socialLinks = [...(cmsSocialLinks ?? []), ...(publicSocialLinks ?? [])].filter(
+    (link, index, links) => links.findIndex((candidate) => candidate.href === link.href) === index,
+  );
 
   return (
-    <footer className="w-full border-t border-slate-100 bg-slate-50 px-[clamp(0.75rem,4vw,2rem)] py-16 sm:py-20">
-      <div className="mx-auto grid max-w-7xl grid-cols-2 gap-12 gap-y-14 md:grid-cols-3 md:gap-x-14 lg:grid-cols-6">
-        <div className="col-span-2 flex flex-col gap-4 md:col-span-1 lg:col-span-2">
+    <footer
+      className="w-full border-t border-slate-100 bg-slate-50 px-[clamp(0.75rem,4vw,2rem)] py-16 sm:py-20"
+      data-cms-id="storefront-footer"
+      data-cms-label="Storefront footer"
+    >
+      <div
+        className="mx-auto grid max-w-7xl grid-cols-2 gap-12 gap-y-14 md:grid-cols-3 md:gap-x-14 lg:grid-cols-6"
+        data-cms-id="footer-columns"
+        data-cms-label="Footer columns"
+      >
+        <div data-cms-id="footer-brand" data-cms-label="Brand" className="col-span-2 flex flex-col gap-4 md:col-span-1 lg:col-span-2">
           <Link
             href="/"
             className="relative block aspect-[1536/1024] w-full max-w-xs shrink-0 overflow-visible opacity-90 transition-opacity hover:opacity-100 sm:max-w-sm md:max-w-md lg:max-w-lg"
           >
             <Image
-              src="/brand/maharlika-logo-design.svg"
-              alt="Maharlika Apparel Custom"
+              src="/UVS/UVS_logo_landscape.png"
+              alt="Universal Music Store"
               width={1536}
               height={1024}
               className="h-full w-full object-contain object-left"
@@ -40,7 +50,7 @@ export function StorefrontFooter({
             />
           </Link>
           <p className="font-body text-sm tracking-wide text-slate-500">
-            © {new Date().getFullYear()} Maharlika Apparel Custom.
+            © {new Date().getFullYear()} Universal Music Store.
           </p>
         </div>
         {cmsFooterColumns?.map((col) => (
@@ -66,6 +76,8 @@ export function StorefrontFooter({
             Shop
           </h4>
           <nav
+            data-cms-id="footer-shop-links"
+            data-cms-label="Shop links"
             className="flex flex-col gap-2.5 md:gap-3"
             aria-label="Shop links"
           >
@@ -100,6 +112,8 @@ export function StorefrontFooter({
             Support
           </h4>
           <nav
+            data-cms-id="footer-support-links"
+            data-cms-label="Support links"
             className="flex flex-col gap-2.5 md:gap-3"
             aria-label="Support links"
           >
@@ -219,8 +233,8 @@ export function StorefrontFooter({
           <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Connect
           </h4>
-          <nav className="flex flex-col gap-2.5 md:gap-3" aria-label="Social">
-            {cmsSocialLinks?.map((s) => (
+          <nav data-cms-id="footer-social-links" data-cms-label="Social links" className="flex flex-col gap-2.5 md:gap-3" aria-label="Social">
+            {socialLinks.map((s) => (
               <a
                 key={s.href}
                 href={s.href}
@@ -231,16 +245,6 @@ export function StorefrontFooter({
                 {s.label}
               </a>
             ))}
-            {instagram ? (
-              <a
-                href={instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"
-              >
-                Instagram
-              </a>
-            ) : null}
             <Link
               href="/#join-club"
               className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"

@@ -38,14 +38,32 @@ export async function GET(req: Request) {
   });
 
   const encoder = new TextEncoder();
+  let closeStream = () => {};
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
+      let interval: ReturnType<typeof setInterval> | undefined;
+
+      const close = () => {
+        if (closed) return;
+        closed = true;
+        if (interval) clearInterval(interval);
+        try {
+          controller.close();
+        } catch {
+          // The consumer may have closed the stream before the abort event.
+        }
+      };
+      closeStream = close;
+
       const send = async () => {
+        if (closed) return;
         try {
           const result = await fetchMedusaInventoryPage({
             limit: pageSize,
             offset,
           });
+          if (closed) return;
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -57,26 +75,30 @@ export async function GET(req: Request) {
             ),
           );
         } catch (e) {
+          if (closed) return;
           const msg = e instanceof Error ? e.message : String(e);
-          controller.enqueue(
-            encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`),
-          );
+          try {
+            controller.enqueue(
+              encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`),
+            );
+          } catch {
+            close();
+          }
         }
       };
 
       await send();
-      const id = setInterval(() => {
+      if (closed) return;
+      interval = setInterval(() => {
         void send();
       }, TICK_MS);
 
       req.signal.addEventListener("abort", () => {
-        clearInterval(id);
-        try {
-          controller.close();
-        } catch {
-          /* already closed */
-        }
+        close();
       });
+    },
+    cancel() {
+      closeStream();
     },
   });
 

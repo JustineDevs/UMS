@@ -2,7 +2,7 @@ import {
   getPaymentAttemptByCorrelationId,
   incrementFinalizeAttempts,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
@@ -10,6 +10,7 @@ import { handleFinalizeCheckoutIntentRequest } from "@/lib/finalize-checkout-int
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { capturePostHogEvent } from "@universal-music-store/sdk";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function POST(
 ) {
   const { correlationId } = await ctx.params;
   const sb = createStorefrontServiceSupabase();
-  return handleFinalizeCheckoutIntentRequest(req, correlationId ?? "", {
+  const response = await handleFinalizeCheckoutIntentRequest(req, correlationId ?? "", {
     applyRateLimit: async (request) =>
       applyRateLimit(request, "checkout-intents-finalize", 40, 60_000),
     readCartIdFromCookie,
@@ -55,4 +56,18 @@ export async function POST(
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
     nowIso: () => new Date().toISOString(),
   });
+
+  void capturePostHogEvent({
+    event:
+      response.status === 200
+        ? "checkout_finalize_succeeded"
+        : "checkout_finalize_failed",
+    distinctId: correlationId || "unknown",
+    properties: {
+      status: response.status,
+      correlationId: correlationId || null,
+    },
+  });
+
+  return response;
 }

@@ -83,7 +83,7 @@ export class CircuitBreaker {
 
 const breakers = new Map<string, CircuitBreaker>();
 
-export function getCircuitBreaker(
+function getCircuitBreaker(
   name: string,
   opts?: Omit<CircuitBreakerOptions, "name">,
 ): CircuitBreaker {

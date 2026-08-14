@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { readStorefrontPreferences } from "@apparel-commerce/user-preferences";
+import { readStorefrontPreferences } from "@universal-music-store/user-preferences";
 
 /**
  * Applies storefront preferences to the document root for CSS and a11y hooks.

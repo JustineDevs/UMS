@@ -8,7 +8,7 @@
 - [Contact Page](#contact-page)
 - [Shipping and Returns](#shipping-and-returns)
 - [Privacy Policy and Terms](#privacy-policy-and-terms)
-- [Size Guide](#size-guide)
+- [Product Fit Guide](#product-fit-guide)
 - [Mobile and SEO](#mobile-and-seo)
 - [Checklist](#checklist)
 
@@ -29,7 +29,7 @@ Static pages provide essential information about the store, policies, and custom
 - About Us
 
 **Optional:**
-- Size Guide (for apparel stores)
+- Product Fit Guide (for instrument stores)
 - Store Locator (if physical stores)
 
 ## FAQ Page
@@ -226,29 +226,28 @@ Table of contents (for long policies), clear section headings, numbered or bulle
 **Layout:**
 Numbered sections (1, 1.1, 1.2), table of contents for long documents, clear section titles, anchor links to sections.
 
-## Size Guide
+## Product Fit Guide
 
-**Purpose (for apparel/footwear stores)**:
-Help customers choose correct size, reduce returns due to sizing issues, increase purchase confidence.
+**Purpose (for instrument/accessory stores)**:
+Help customers choose the right instrument size or fit, reduce returns due to compatibility issues, and increase purchase confidence.
 
 **Content:**
-- Size charts (numeric measurements) - use proper table markup
+- Fit charts (dimensions and compatibility) - use proper table markup
 - How to measure instructions with illustrations
-- Fit descriptions (slim fit, relaxed, etc.)
-- Model measurements (for reference)
-- Size conversion chart (US, EU, UK)
+- Fit descriptions (compact, standard, full-size, etc.)
+- Player or setup measurements (for reference)
+- Compatibility chart for scale length, body size, and accessories
 
 **Size Chart Format:**
 ```
-Women's Tops Size Guide
+Electric Guitar Fit Guide
 
-Size  | Bust      | Waist     | Hips
-─────────────────────────────────────
-XS    | 32-33"    | 24-25"    | 35-36"
-S     | 34-35"    | 26-27"    | 37-38"
-M     | 36-37"    | 28-29"    | 39-40"
-L     | 38-40"    | 30-32"    | 41-43"
-XL    | 41-43"    | 33-35"    | 44-46"
+Model | Scale Length | Body Width | Notes
+──────────────────────────────────────────
+S     | 24.75"       | 12.5"      | Compact, easier reach
+M     | 25.5"        | 13.0"      | Standard fit
+L     | 25.5"        | 13.5"      | Full-size body
+XL    | 26.0"        | 14.0"      | Extended scale options
 ```
 
 **Accessibility:**
@@ -319,8 +318,8 @@ Rich snippets in search results, improved visibility, better click-through rates
 
 - [ ] About Us page with brand story
 - [ ] Mission and values section
-- [ ] Size Guide (if apparel)
-- [ ] Size charts with measurements
+- [ ] Product Fit Guide (if needed)
+- [ ] Fit charts with measurements
 - [ ] How to measure instructions
 - [ ] Store Locator (if physical stores)
 

@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import {
   staffHasPermission,
   staffPermissionListForSession,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import {
   CommandDialog,
   CommandEmpty,
@@ -15,8 +15,12 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
-} from "@apparel-commerce/ui";
-import { ADMIN_COMMAND_CMS_GROUPS, ADMIN_NAV_GROUPS } from "@/config/admin-nav";
+} from "@universal-music-store/ui";
+import {
+  ADMIN_COMMAND_CMS_GROUPS,
+  ADMIN_NAV_GROUPS,
+  flattenAdminNavItems,
+} from "@/config/admin-nav";
 
 const ALL_GROUPS = [...ADMIN_NAV_GROUPS, ...ADMIN_COMMAND_CMS_GROUPS];
 
@@ -42,7 +46,7 @@ export function AdminCommandPalette({
   const groupNodes: ReactNode[] = [];
   let firstVisible = true;
   for (const group of ALL_GROUPS) {
-    const items = group.items.filter((item) =>
+    const items = flattenAdminNavItems(group.items).filter((item) =>
       staffHasPermission(perms, item.permission),
     );
     if (items.length === 0) continue;

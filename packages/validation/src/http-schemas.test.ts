@@ -4,12 +4,14 @@ import { describe, it } from "node:test";
 import {
   cartMergePostBodySchema,
   cmsFormSubmissionPayloadSchema,
+  cmsBlockSchema,
   complianceEmailParamSchema,
   internalCustomerDataErasureBodySchema,
   internalCustomerDataExportBodySchema,
   medusaCartIdSchema,
   medusaResourceIdSchema,
   storefrontProductSlugSchema,
+  storefrontReturnRequestBodySchema,
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
 } from "./http-schemas";
@@ -50,7 +52,7 @@ describe("http-schemas", () => {
   it("validates review list query", () => {
     assert.ok(
       storefrontReviewsListQuerySchema.safeParse({
-        productSlug: "tee",
+        productSlug: "guitar",
       }).success,
     );
     assert.ok(
@@ -67,14 +69,56 @@ describe("http-schemas", () => {
       medusaProductId: "prod_01HZABC",
       body: "Great",
       rating: 5,
+      proofMediaUrl: "https://example.com/proof.jpg",
     });
     assert.ok(ok.success);
+    assert.ok(
+      storefrontReviewPostBodySchema.safeParse({
+        productSlug: "my-product",
+        medusaProductId: "prod_01HZABC",
+        body: "Great",
+        rating: 5,
+        proofMediaUrl: "",
+      }).success,
+    );
+    assert.ok(
+      storefrontReviewPostBodySchema.safeParse({
+        productSlug: "my-product",
+        medusaProductId: "prod_01HZABC",
+        body: "Great",
+        rating: 5,
+        imageUrl: "https://example.com/proof.mp4",
+      }).success,
+    );
     assert.ok(
       !storefrontReviewPostBodySchema.safeParse({
         productSlug: "",
         medusaProductId: "prod_01HZ",
         body: "x",
         rating: 5,
+      }).success,
+    );
+  });
+
+  it("validates storefront return request body", () => {
+    assert.ok(
+      storefrontReturnRequestBodySchema.safeParse({
+        orderId: "order_01HZABC",
+        note: "Pack carefully",
+        items: [
+          {
+            item_id: "item_01HZABC",
+            quantity: 1,
+            reason_id: "reason_01HZABC",
+            note: "Wrong size",
+          },
+        ],
+      }).success,
+    );
+    assert.ok(
+      !storefrontReturnRequestBodySchema.safeParse({
+        orderId: "",
+        items: [],
       }).success,
     );
   });
@@ -90,6 +134,16 @@ describe("http-schemas", () => {
       big[`k${i}`] = "v";
     }
     assert.ok(!cmsFormSubmissionPayloadSchema.safeParse(big).success);
+  });
+
+  it("accepts payment link cms blocks", () => {
+    assert.ok(
+      cmsBlockSchema.safeParse({
+        id: "blk_01",
+        type: "payment_link",
+        props: { paymentLinkId: "pl_01" },
+      }).success,
+    );
   });
 
   it("validates internal customer export body", () => {

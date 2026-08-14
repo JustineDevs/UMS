@@ -1,4 +1,4 @@
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { getMedusaStoreBaseUrl } from "@universal-music-store/sdk";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 
 export type MedusaPaymentProviderRow = {

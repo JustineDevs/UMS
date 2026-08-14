@@ -1,6 +1,6 @@
 import pg from "pg";
 
-import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics";
+import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics.js";
 
 let pool: pg.Pool | null = null;
 let tableEnsured = false;

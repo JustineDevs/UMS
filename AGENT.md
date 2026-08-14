@@ -1,10 +1,10 @@
-# Agent Instructions – Apparel Commerce Platform
+# Agent Instructions – Universal Music Store Platform
 
-You are working on the **Apparel Commerce Platform**, a composable commerce system for apparel sales across storefront, POS, and fulfillment. Use this file as your primary context when assisting with this codebase.
+You are working on the **Universal Music Store Platform**, a composable commerce system for music retail across storefront, POS, and fulfillment. Use this file as your primary context when assisting with this codebase.
 
 ## Project Overview
 
-- **Purpose**: Unified online and in-store sales for a shorts/apparel retail business in the Philippines.
+- **Purpose**: Unified online and in-store sales for a music retail business in the Philippines.
 - **Architecture**: Monorepo (Turborepo + pnpm) with one shared source of truth for products, variants, inventory, orders, payments, and shipments.
 - **Apps**: `apps/storefront`, `apps/admin`, `apps/api`, `apps/medusa`.
 - **Packages**: `types`, `validation`, `rate-limits`, `database`, `config`, `sdk`, `ui`, `platform-data`.
@@ -13,14 +13,14 @@ You are working on the **Apparel Commerce Platform**, a composable commerce syst
 
 Read these first when answering questions about scope, flow, or requirements:
 
-- **internal/docs/REMAINING-IMPLEMENTATION.md** – Shipped vs backlog for commerce hardening; validation commands; next-session checklist.
-- **internal/docs/spec.md** – System scope, tech stack, functional requirements, OMS flow.
-- **internal/docs/blueprint.md** – Sprint plan, data model, OMS flow, SOPs.
-- **internal/docs/privacy-terms.md** – PRD, service agreement, GDPR/PDPA compliance.
+- **docs/spec.md** – System scope, tech stack, functional requirements, OMS flow.
+- **docs/validation-truth-matrix.md** – Verification commands, audit surface, and validation expectations.
+- **docs/privacy-terms.md** – PRD, service agreement, GDPR/PDPA compliance.
+- **docs/runbooks/GUIDE.md** – Deployment and operational runbook.
 
 If some of the above files are absent in your branch, use git history or restore from main before relying on them.
 
-For doc context commands, use **internal/docs** and **.cursor/llm** as canonical roots (see `.cursor/commands/docs.md`).
+For doc context commands, use **docs/** and **.cursor/llm** as canonical roots (see `.cursor/commands/docs.md`).
 
 ## Tech Stack
 
@@ -31,7 +31,7 @@ For doc context commands, use **internal/docs** and **.cursor/llm** as canonical
 | Database | PostgreSQL via Supabase |
 | Auth | NextAuth/Auth.js with Google provider |
 | Payments | Stripe, PayPal, Paymongo (GCash), Maya, cash on delivery (Medusa) |
-| Shipping | AfterShip + J&T Express Philippines |
+| Shipping | Shipment tracking + J&T Express Philippines |
 
 ## Critical Rules
 
@@ -55,7 +55,7 @@ For doc context commands, use **internal/docs** and **.cursor/llm** as canonical
 - **/QA** – Comprehensive QA report (architecture, data, auth, order flow, SDKs).
 - **/trace** – Map data flow from UI → API → Supabase; flag MOCK/TODO/STUB.
 - **/hardening** – Production hardening with findings log and fix phase.
-- **/docs** – Load context from `internal/docs` and `.cursor/llm` only.
+- **/docs** – Load context from `docs/` and `.cursor/llm`.
 
 ## Project Structure Reference
 
@@ -67,7 +67,7 @@ apps/
 └── medusa       # Commerce backend (Medusa 2)
 packages/
 ├── types, validation, rate-limits, database, config, sdk
-└── ui             # Shared shadcn-style primitives (@apparel-commerce/ui)
+└── ui             # Shared shadcn-style primitives (@universal-music-store/ui)
 ```
 
 ## MCP (Model Context Protocol)
@@ -78,18 +78,18 @@ packages/
 
 Ensure Stripe and PayPal MCP servers are enabled in Cursor when working on payment integrations.
 
-### UI and layout (see `internal/docs/MCP-UI-STACK.md`)
+### UI and layout (see `.cursor/rules/mcp-ui-stack.mdc`)
 
 | MCP | Use |
 |-----|-----|
 | **shadcn** | Registry and `add` commands; extend `packages/ui`. |
-| **ui-layouts-mcp** | Layout and motion patterns; port into Tailwind + `@apparel-commerce/ui`. |
+| **ui-layouts-mcp** | Layout and motion patterns; port into Tailwind + `@universal-music-store/ui`. |
 | **gsap-master** | GSAP timelines and scroll patterns; align with storefront motion. |
 | **tailwindcss-server** | Tailwind utilities and token consistency. |
 | **socraticode** | Guided reasoning for refactors. |
 | **mui-mcp**, **mantine**, **chakra-ui**, **heroui-react**, **daisyui-blueprint**, **kibo-ui** | **Reference only** for patterns; do not add as runtime deps without an ADR. |
 
-Full rules, workflows, and anti-patterns: **`internal/docs/MCP-UI-STACK.md`**.
+Full rules, workflows, and anti-patterns: **`.cursor/rules/mcp-ui-stack.mdc`**.
 
 ## Skills (when relevant)
 

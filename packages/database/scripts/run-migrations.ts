@@ -8,14 +8,14 @@
  * - Existing database (first use of this runner): empty ledger, all files run once;
  *   SQL is idempotent (`IF NOT EXISTS`, `DROP IF EXISTS`, etc.) where possible.
  * - Subsequent runs: only pending files run.
- *
+ * ` pnpm --filter @universal-music-store/database migrate`
  * Append new `supabase/migrations/*.sql` names to MIGRATION_FILES in numeric order.
- * Uses LEGACY_DATABASE_URL from repo root `.env`.
+ * Uses LEGACY_DATABASE_URL from repo root `.env.local`.
  *
  * Flags:
  *   --status   List applied vs pending and exit (exit 1 if any pending).
  *
- * Supabase CLI alternative: `pnpm --filter @apparel-commerce/database migrate:cli`
+ * Supabase CLI alternative: `pnpm --filter @universal-music-store/database migrate:cli`
  */
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -24,7 +24,8 @@ import { config } from "dotenv";
 import pg from "pg";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: join(__dirname, "../../../.env") });
+const repoRoot = join(__dirname, "../../../");
+config({ path: join(repoRoot, ".env.local"), override: true });
 
 const MIGRATION_FILES = [
   "002_staff_permissions.sql",
@@ -51,6 +52,60 @@ const MIGRATION_FILES = [
   "025_catalog_storage_bucket.sql",
   "026_payment_attempt_quote_fingerprint_and_staleness.sql",
   "027_payment_attempt_quote_version.sql",
+  "028_inventory_movements_append_only.sql",
+  "029_back_in_stock_notifications.sql",
+  "030_require_medusa_order_id_receipts_voids.sql",
+  "031_cart_abandonment_dedup_constraint.sql",
+  "032_wishlists_server_sync.sql",
+  "033_product_reviews_helpful_votes.sql",
+  "034_staff_customer_notes.sql",
+  "035_payment_receipts.sql",
+  "036_cms_payment_links.sql",
+  "037_rebuild_cms_payment_links.sql",
+  "038_return_refund_reason_registry.sql",
+  "039_reviews_and_profiles_images.sql",
+  "040_catalog_provider_projections.sql",
+  "041_crm_nango_mappings.sql",
+  "042_crm_nango_connections_and_records.sql",
+  "043_delivery_logistics_ledger.sql",
+  "044_crm_delivery_operations.sql",
+  "045_payment_nango_connections.sql",
+  "046_admin_security_hardening.sql",
+  "047_pos_logistics_channel_enterprise.sql",
+  "048_admin_invoices.sql",
+  "049_payment_provider_lifecycle.sql",
+  "050_receipt_idempotency.sql",
+  "051_organizations_memberships.sql",
+  "052_tenant_scope_financial_records.sql",
+  "053_replay_guards.sql",
+  "054_inventory_audit_tenant.sql",
+  "055_crm_tenant_scope.sql",
+  "056_chat_order_tenant_scope.sql",
+  "057_campaign_segment_tenant_scope.sql",
+  "058_marketing_preferences.sql",
+  "059_pos_tenant_scope.sql",
+  "060_pos_shift_tenant_scope.sql",
+  "061_payment_invoice_artifact.sql",
+  "063_inventory_reservation_lifecycle.sql",
+  "063_payment_reconciliation_job_dedupe.sql",
+  "063_pos_terminal_provider_artifact_mapping.sql",
+  "064_pos_sale_ledger.sql",
+  "065_admin_workflow_tenant_scope.sql",
+  "066_cms_pages_tenant_scope.sql",
+  "067_invoice_reference_tenant_scope.sql",
+  "068_crm_nango_mapping_tenant_scope.sql",
+  "069_invoice_provider_lifecycle.sql",
+  "070_inventory_operations.sql",
+  "071_chat_order_settlement.sql",
+  "075_cms_component_lifecycle.sql",
+  "076_cms_experiment_media_tenant_scope.sql",
+  "077_device_payment_attempt_tenant_scope.sql",
+  "078_cms_core_tenant_scope.sql",
+  "079_cms_legacy_composite_tenant_keys.sql",
+  "080_cms_announcement_analytics_tenant.sql",
+  "081_cms_component_definition_transaction.sql",
+  "082_cms_block_presets_tenant_scope.sql",
+  "083_cms_payment_links_tenant_scope.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
@@ -63,7 +118,7 @@ if (!databaseUrl?.trim()) {
     "LEGACY_DATABASE_URL is required (Supabase Postgres pooler URI).",
   );
   console.error(
-    "Set it in the repo root .env (see .env.example). Not the same as Medusa DATABASE_URL.",
+    "Set it in the repo root .env.local (see .env.example). Not the same as Medusa DATABASE_URL.",
   );
   process.exit(1);
 }

@@ -1,4 +1,5 @@
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { AdminBreadcrumbs, AdminPageShell, AdminSection, AuditTimeline } from "@/components/admin-console";
+import { ChannelEventsTable } from "@/components/ChannelEventsTable";
 import { fetchRecentChannelEvents } from "@/lib/channel-events-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
@@ -29,39 +30,9 @@ export default async function ChannelsPage() {
             integration documentation for this project.
           </p>
         </details>
-      <div className="overflow-hidden rounded-lg bg-surface-container-lowest shadow">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-outline-variant/20 text-left text-xs uppercase tracking-widest text-on-surface-variant">
-              <th className="py-3 px-4">Channel</th>
-              <th className="py-3 px-4">Event</th>
-              <th className="py-3 px-4">Received</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="py-12 text-center text-on-surface-variant leading-relaxed px-4">
-                  No events yet. When your channel partner sends updates, they will appear here.
-                </td>
-              </tr>
-            ) : (
-              events.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-outline-variant/10 hover:bg-surface-container-low/50"
-                >
-                  <td className="py-3 px-4 font-medium">{e.channel}</td>
-                  <td className="py-3 px-4 text-on-surface-variant">{e.event_type}</td>
-                  <td className="py-3 px-4 text-on-surface-variant">
-                    {new Date(e.received_at).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <AdminSection title="Recent channel events" description="Signed updates received from connected sales channels.">
+        <ChannelEventsTable initialEvents={events} />
+      </AdminSection>
     </AdminPageShell>
   );
 }

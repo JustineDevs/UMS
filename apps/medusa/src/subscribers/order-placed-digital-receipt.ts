@@ -1,19 +1,19 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
+import { tryCreateSupabaseClient } from "../lib/payment-supabase-bridge";
+import { buildReceiptHtml, markReceiptSent, saveReceipt } from "../lib/digital-receipt";
+import { sendResendTransactionalEmail } from "../lib/resend-email";
 
 export default async function orderPlacedDigitalReceipt({
   event: { data },
   container,
 }: SubscriberArgs<{ id: string }>) {
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_ANON_KEY?.trim();
+  const sb = tryCreateSupabaseClient();
   const resendKey = process.env.RESEND_API_KEY?.trim();
   const fromAddr =
-    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@apparel-commerce.com";
+    process.env.RESEND_FROM_EMAIL?.trim() || "noreply@universal-music-store.com";
 
-  if (!supabaseUrl || !supabaseKey) return;
+  if (!sb) return;
 
   const logger = container.resolve(ContainerRegistrationKeys.LOGGER) as {
     info?: (m: string) => void;
@@ -45,12 +45,6 @@ export default async function orderPlacedDigitalReceipt({
   }));
 
   try {
-    const { buildReceiptHtml, saveReceipt, markReceiptSent } = await import(
-      "../lib/digital-receipt.js"
-    );
-    const { createClient } = await import("@supabase/supabase-js");
-    const sb = createClient(supabaseUrl, supabaseKey);
-
     const html = buildReceiptHtml({
       id: order.id ?? data.id,
       display_id: order.display_id,
@@ -58,7 +52,7 @@ export default async function orderPlacedDigitalReceipt({
       total: Number(order.total ?? 0),
       currency_code: order.currency_code ?? "php",
       created_at: order.created_at,
-      storeName: "Maharlika Apparel Custom",
+      storeName: process.env.STORE_NAME?.trim() || "Universal Music Store",
     });
 
     const receipt = await saveReceipt(sb, {
@@ -68,9 +62,6 @@ export default async function orderPlacedDigitalReceipt({
     });
 
     if (email && resendKey) {
-      const { sendResendTransactionalEmail } = await import(
-        "@apparel-commerce/resend-mail"
-      );
       const sent = await sendResendTransactionalEmail({
         apiKey: resendKey,
         from: fromAddr,

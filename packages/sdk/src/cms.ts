@@ -1,5 +1,5 @@
 /**
- * CMS facade: helpers in this package; data loaders live in @apparel-commerce/platform-data.
+ * CMS facade: helpers in this package; data loaders live in @universal-music-store/platform-data.
  */
 
 export {
@@ -17,7 +17,7 @@ export {
   loadCmsSitemapEntries,
   getCmsRedirectForPath,
   CMS_FORM_KEYS,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 export type {
   CmsPageType,
@@ -38,7 +38,7 @@ export type {
   CmsMediaRow,
   CmsFormSettingsRow,
   CmsFormKey,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 export {
   buildCmsPreviewUrl,
@@ -46,6 +46,6 @@ export {
   normalizeCmsLocale,
   type BuildCmsPreviewUrlInput,
   type CmsPreviewUrlKind,
-} from "./cms-helpers";
+} from "./cms-helpers.js";
 
-export { pickCmsAbVariantId } from "./cms-experiment-pick";
+export { pickCmsAbVariantId } from "./cms-experiment-pick.js";

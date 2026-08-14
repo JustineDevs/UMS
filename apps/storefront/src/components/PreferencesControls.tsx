@@ -6,7 +6,7 @@ import {
   readStorefrontPreferences,
   writeStorefrontPreferences,
   type StorefrontPreferences,
-} from "@apparel-commerce/user-preferences";
+} from "@universal-music-store/user-preferences";
 
 export function PreferencesControls() {
   const [prefs, setPrefs] = useState<StorefrontPreferences>(defaultStorefrontPreferences);

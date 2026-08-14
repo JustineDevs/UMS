@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { canonicalUrl } from "@/lib/seo";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Privacy policy",
   description:
-    "Maharlika Apparel Custom privacy policy. How we collect, use, and protect your data. PDPA and GDPR aligned.",
-  alternates: { canonical: canonicalUrl("/privacy") },
-};
+    "Universal Music Store privacy policy. How we collect, use, and protect your data. PDPA and GDPR aligned.",
+  path: "/privacy",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function PrivacyPage() {
   return (
@@ -22,7 +23,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-bold">Who we are</h2>
           <p>
-            This policy describes how <strong>Maharlika Apparel Custom</strong>{" "}
+            This policy describes how <strong>Universal Music Store</strong>{" "}
             (&quot;we&quot;) collects, uses, and protects personal information
             when you use our website and services. We align practices with the{" "}
             <strong>Philippines Data Privacy Act (PDPA)</strong> and respect

@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Cookies",
-};
+  description: "Cookie notice explaining essential, functional, and analytics storage.",
+  path: "/cookies",
+  keywords: [...SEO_KEYWORDS.policies],
+});
 
 export default function CookiesPage() {
   return (

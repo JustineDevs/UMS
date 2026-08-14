@@ -1,4 +1,7 @@
-import { enqueueJob, insertCustomerReturnRequestAudit } from "@apparel-commerce/platform-data";
+import {
+  enqueueJob,
+  insertCustomerReturnRequestAudit,
+} from "@universal-music-store/platform-data";
 
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
@@ -10,19 +13,26 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { storefrontReturnRequestBodySchema } from "@universal-music-store/validation";
 
-type ReturnItem = {
-  item_id?: string;
-  quantity?: number;
-  reason_id?: string;
-  note?: string;
-};
+function jsonNoStore(
+  body: unknown,
+  init?: Parameters<typeof NextResponse.json>[1],
+): NextResponse<unknown> {
+  return NextResponse.json(body, {
+    ...init,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      ...(init?.headers ?? {}),
+    },
+  });
+}
 
 export async function POST(req: Request) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`order-return:${ip}`, 10, 60_000);
   if (!rl.ok) {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
     );
@@ -31,57 +41,37 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { orderId?: string; items?: ReturnItem[]; note?: string };
+  let body: unknown;
   try {
-    body = (await req.json()) as typeof body;
+    body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return jsonNoStore({ error: "Invalid JSON" }, { status: 400 });
   }
-
-  const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
-  if (!orderId.startsWith("order_")) {
-    return NextResponse.json({ error: "Invalid order" }, { status: 400 });
-  }
-
-  const rawItems = Array.isArray(body.items) ? body.items : [];
-  const items = rawItems
-    .map((it) => ({
-      item_id: typeof it.item_id === "string" ? it.item_id.trim() : "",
-      quantity:
-        typeof it.quantity === "number" && Number.isFinite(it.quantity)
-          ? Math.max(1, Math.floor(it.quantity))
-          : 0,
-      reason_id:
-        typeof it.reason_id === "string" && it.reason_id.trim()
-          ? it.reason_id.trim()
-          : undefined,
-      note:
-        typeof it.note === "string" && it.note.trim() ? it.note.trim() : undefined,
-    }))
-    .filter((it) => it.item_id.length > 0 && it.quantity > 0);
-
-  if (items.length === 0) {
-    return NextResponse.json(
-      { error: "Select at least one line to return" },
+  const parsed = storefrontReturnRequestBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return jsonNoStore(
+      { error: "Invalid return payload", details: parsed.error.flatten() },
       { status: 400 },
     );
   }
+
+  const { orderId, items, note } = parsed.data;
 
   const orderRes = await medusaAdminFetch(
     `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email`,
   );
   if (!orderRes.ok) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    return jsonNoStore({ error: "Order not found" }, { status: 404 });
   }
   const orderJson = (await orderRes.json()) as {
     order?: { email?: string | null };
   };
   const orderEmail = orderJson.order?.email?.trim().toLowerCase();
   if (!orderEmail || orderEmail !== email) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return jsonNoStore({ error: "Forbidden" }, { status: 403 });
   }
 
   const payload: Record<string, unknown> = {
@@ -92,8 +82,8 @@ export async function POST(req: Request) {
       ...(it.note ? { note: it.note } : {}),
     })),
   };
-  if (typeof body.note === "string" && body.note.trim()) {
-    payload.note = body.note.trim();
+  if (note) {
+    payload.note = note;
   }
 
   const returnRes = await medusaAdminFetch(
@@ -106,7 +96,7 @@ export async function POST(req: Request) {
 
   if (!returnRes.ok) {
     const t = await returnRes.text().catch(() => "");
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Return request failed", detail: t.slice(0, 300) },
       { status: 502 },
     );
@@ -127,11 +117,11 @@ export async function POST(req: Request) {
       medusaOrderId: orderId,
       customerEmail: email,
       items: items.map((it) => ({ ...it })),
-      note: typeof body.note === "string" ? body.note.trim() || null : null,
+      note: note ?? null,
       medusaResponse: data,
       staffReviewJobId: staffJobId,
     }).catch(() => {});
   }
 
-  return NextResponse.json({ ok: true, data });
+  return jsonNoStore({ ok: true, data });
 }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   listStuckPaymentAttempts,
   updatePaymentAttemptByCorrelationId,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { finalizePaymentAttemptsCronRouteLogic } from "@/lib/payment-attempt-route-logic";
@@ -12,10 +12,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * Server-side recovery for payment attempts stuck after hosted pay (webhook lag, closed tab).
- * Schedule: Vercel cron or external worker GET this route with shared secret.
+ * Schedule: Vercel cron (`apps/storefront/vercel.json`) or external worker GET with secret.
+ * Auth: `Authorization: Bearer <secret>` or `x-cron-secret`. Secret is `CRON_SECRET` (Vercel)
+ * or `STOREFRONT_PAYMENT_CRON_SECRET` for local parity.
  */
 export async function GET(req: Request) {
-  const secret = process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim();
+  const secret =
+    process.env.CRON_SECRET?.trim() ||
+    process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim();
   const auth = req.headers.get("authorization");
   const token =
     auth?.startsWith("Bearer ") ? auth.slice(7).trim() : req.headers.get("x-cron-secret")?.trim();
@@ -41,6 +45,6 @@ export async function GET(req: Request) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }

@@ -1,10 +1,10 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { getMedusaStoreBaseUrl } from "../medusa-env";
+import { getMedusaStoreBaseUrl } from "../medusa-env.js";
 import {
   assertMedusaStorefrontEnvProduction,
   listMissingMedusaStorefrontEnv,
-} from "./medusa-storefront";
+} from "./medusa-storefront.js";
 
 const envBackup: Record<string, string | undefined> = {};
 
@@ -31,6 +31,8 @@ const ENV_KEYS = [
   "MEDUSA_SALES_CHANNEL_ID",
   "NEXT_PUBLIC_MEDUSA_URL",
   "MEDUSA_BACKEND_URL",
+  "MEDUSA_SECRET_API_KEY",
+  "MEDUSA_ADMIN_API_SECRET",
 ];
 
 describe("medusa-storefront env", () => {
@@ -50,6 +52,7 @@ describe("medusa-storefront env", () => {
     delete process.env.MEDUSA_PUBLISHABLE_API_KEY;
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.throws(
       () => assertMedusaStorefrontEnvProduction(),
       /required env missing/,
@@ -66,6 +69,7 @@ describe("medusa-storefront env", () => {
     delete process.env.NEXT_PUBLIC_MEDUSA_REGION_ID;
     delete process.env.MEDUSA_REGION_ID;
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.throws(
       () => assertMedusaStorefrontEnvProduction(),
       /NEXT_PUBLIC_MEDUSA_REGION_ID/,
@@ -79,9 +83,24 @@ describe("medusa-storefront env", () => {
     delete process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID;
     delete process.env.MEDUSA_SALES_CHANNEL_ID;
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.throws(
       () => assertMedusaStorefrontEnvProduction(),
       /NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID/,
+    );
+  });
+
+  it("assertMedusaStorefrontEnvProduction: throws when production and Medusa secret API key missing", () => {
+    process.env.NODE_ENV = "production";
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
+    process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID = "sc_123";
+    process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    delete process.env.MEDUSA_SECRET_API_KEY;
+    delete process.env.MEDUSA_ADMIN_API_SECRET;
+    assert.throws(
+      () => assertMedusaStorefrontEnvProduction(),
+      /MEDUSA_SECRET_API_KEY/,
     );
   });
 
@@ -90,6 +109,7 @@ describe("medusa-storefront env", () => {
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_123";
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
     process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.throws(
       () => assertMedusaStorefrontEnvProduction(),
       /must be a public HTTPS origin/,
@@ -106,6 +126,7 @@ describe("medusa-storefront env", () => {
     process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_123";
     process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID = "sc_123";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
   });
 
@@ -122,6 +143,7 @@ describe("medusa-storefront env", () => {
     process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID = "sc_123";
     process.env.MEDUSA_BACKEND_URL = "http://localhost:9000";
     process.env.NEXT_PUBLIC_MEDUSA_URL = "https://api.example.com";
+    process.env.MEDUSA_SECRET_API_KEY = "sk_123";
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
   });
 

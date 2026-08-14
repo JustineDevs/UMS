@@ -9,9 +9,8 @@ export type FeatureFlagDef = {
 const FLAG_REGISTRY: FeatureFlagDef[] = [
   { key: "stripe", envVar: "FEATURE_FLAG_STRIPE", defaultEnabled: true, description: "Stripe payment provider", killSwitch: true },
   { key: "paypal", envVar: "FEATURE_FLAG_PAYPAL", defaultEnabled: true, description: "PayPal payment provider", killSwitch: true },
-  { key: "paymongo", envVar: "FEATURE_FLAG_PAYMONGO", defaultEnabled: true, description: "PayMongo payment provider", killSwitch: true },
-  { key: "maya", envVar: "FEATURE_FLAG_MAYA", defaultEnabled: true, description: "Maya payment provider", killSwitch: true },
-  { key: "aftership", envVar: "FEATURE_FLAG_AFTERSHIP", defaultEnabled: true, description: "AfterShip tracking", killSwitch: true },
+  { key: "xendit", envVar: "FEATURE_FLAG_XENDIT", defaultEnabled: true, description: "Xendit payment provider", killSwitch: true },
+  { key: "pancake_pos", envVar: "FEATURE_FLAG_PANCAKE_POS", defaultEnabled: true, description: "Pancake POS logistics bridge", killSwitch: true },
   { key: "loyalty_points", envVar: "FEATURE_FLAG_LOYALTY", defaultEnabled: true, description: "Loyalty points system", killSwitch: true },
   { key: "subscriptions", envVar: "FEATURE_FLAG_SUBSCRIPTIONS", defaultEnabled: false, description: "Subscription/installment payments", killSwitch: false },
   { key: "experiments", envVar: "FEATURE_FLAG_EXPERIMENTS", defaultEnabled: true, description: "CMS A/B experiments", killSwitch: true },

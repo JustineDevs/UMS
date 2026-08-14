@@ -76,7 +76,7 @@ export default class RuntimeLogReporter implements Reporter {
     fs.writeFileSync(
       path.join(this.logDir, "README.txt"),
       [
-        "Maharlika E2E raw runtime logs for this Playwright run.",
+        "Universal Music Store E2E raw runtime logs for this Playwright run.",
         "",
         "- playwright-cli-raw.log: full stdout/stderr of the Playwright CLI (only when using stress-test/scripts/run-e2e.js).",
         "- playwright-worker-stdio.log: raw worker stdout/stderr (tests, expect failures, console.log from tests).",
@@ -188,7 +188,7 @@ export default class RuntimeLogReporter implements Reporter {
 
     if (result.status === "failed" || result.status === "timedOut") {
       const title = test.titlePath().join(" › ");
-      process.stderr.write(`[maharlika-e2e] ${result.status}: ${title}\n`);
+      process.stderr.write(`[universal-music-store-e2e] ${result.status}: ${title}\n`);
     }
   }
 

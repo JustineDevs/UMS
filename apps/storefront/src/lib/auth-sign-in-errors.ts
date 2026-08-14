@@ -4,7 +4,7 @@
  */
 const HINTS: Record<string, string> = {
   Configuration:
-    "The server is missing or misreading auth environment variables. On Vercel, set NEXTAUTH_URL (exact site URL, no trailing slash), NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET in Project Settings (the repo .env file is not deployed).",
+    "The server is missing or misreading auth environment variables. On Vercel, set NEXTAUTH_URL (exact site URL, no trailing slash), NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET in Project Settings (the repo .env.local file is not deployed).",
   AccessDenied:
     "Google denied access or you cancelled. If the OAuth consent screen is in Testing, add your Google account under Test users, or publish the app.",
   OAuthSignin:

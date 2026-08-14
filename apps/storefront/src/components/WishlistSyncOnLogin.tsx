@@ -8,7 +8,7 @@ import {
   type WishlistEntry,
 } from "@/lib/wishlist";
 
-const SYNC_DONE_KEY = "mah_wishlist_synced_v1";
+const SYNC_DONE_KEY = "ums_wishlist_synced_v1";
 
 /**
  * Invisible component mounted in the layout that merges localStorage wishlist
@@ -64,7 +64,7 @@ export function WishlistSyncOnLogin() {
           clearWishlist();
           if (typeof window !== "undefined") {
             window.localStorage.setItem(
-              "maharlika_wishlist_v1",
+              "universal_music_store_wishlist_v1",
               JSON.stringify(merged),
             );
           }

@@ -1,4 +1,4 @@
-import { loadStorefrontPublicMetadataResolvedForPublic } from "@apparel-commerce/platform-data";
+import { loadStorefrontPublicMetadataResolvedForPublic } from "@universal-music-store/platform-data";
 import { cache } from "react";
 
 /**

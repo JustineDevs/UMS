@@ -1,13 +1,15 @@
-import { getPaymentAttemptByCorrelationId, updatePaymentAttemptByCorrelationId } from "@apparel-commerce/platform-data";
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
+import { getPaymentAttemptByCorrelationId, updatePaymentAttemptByCorrelationId } from "@universal-music-store/platform-data";
 
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { randomUUID } from "crypto";
+import { insertStaffAuditLog } from "@/lib/staff-audit";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
+async function post(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) {
@@ -33,6 +35,15 @@ export async function POST(
     checkout_state: "needs_review",
     last_error: (row.last_error ? `${row.last_error}; ` : "") + "escalated_by_operator",
   });
+  await insertStaffAuditLog(sup.client, {
+    actorEmail: typeof staff.session.user?.email === "string" ? staff.session.user.email : "unknown",
+    action: "payment.mark_review",
+    resource: "payment_attempt",
+    resourceId: id.trim(),
+    details: { status: "needs_review" },
+  });
 
   return correlatedJson(correlationId, { ok: true });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/payments/[id]/mark-review:POST", post);

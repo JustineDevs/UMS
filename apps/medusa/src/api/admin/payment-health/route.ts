@@ -3,6 +3,7 @@ import {
   getPaymentPlatformMetrics,
   tryCreateSupabaseClient,
 } from "../../../lib/payment-supabase-bridge";
+import { nangoPaymentProviderConfigured } from "../../../lib/nango-payment-credentials";
 
 type ProviderStatus = {
   configured: boolean;
@@ -29,10 +30,15 @@ export async function GET(
   res: MedusaResponse,
 ): Promise<void> {
   const providers: Record<string, ProviderStatus> = {
-    stripe: checkProvider("STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET"),
-    paypal: checkProvider("PAYPAL_CLIENT_ID", "PAYPAL_WEBHOOK_ID"),
-    paymongo: checkProvider("PAYMONGO_SECRET_KEY", "PAYMONGO_WEBHOOK_SECRET"),
-    maya: checkProvider("MAYA_SECRET_KEY", "MAYA_WEBHOOK_SECRET"),
+    stripe: {
+      configured: nangoPaymentProviderConfigured("stripe"),
+      hasWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim()),
+    },
+    paypal: {
+      configured: nangoPaymentProviderConfigured(["paypal", "paypal-sandbox"]),
+      hasWebhookSecret: Boolean(process.env.PAYPAL_WEBHOOK_ID?.trim()),
+    },
+    xendit: checkProvider("XENDIT_SECRET_KEY", "XENDIT_WEBHOOK_TOKEN"),
     cod: { configured: true, hasWebhookSecret: true },
   };
 
@@ -51,10 +57,9 @@ export async function GET(
     platformMetrics = await getPaymentPlatformMetrics(sb);
   }
 
-  const storefrontCronConfigured = Boolean(
-    process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim() ||
-      process.env.STOREFRONT_ORIGIN?.trim(),
-  );
+  const cronSecretConfigured = Boolean(process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim());
+  const storefrontOriginConfigured = Boolean(process.env.STOREFRONT_ORIGIN?.trim());
+  const reconciliationConfigured = cronSecretConfigured && storefrontOriginConfigured;
 
   res.json({
     configuredCount,
@@ -66,9 +71,10 @@ export async function GET(
         "Durable payment state in Supabase payment_attempts. Stale rows recover via storefront GET /api/cron/finalize-payment-attempts and admin /admin/payments.",
       medusaRole:
         "Medusa remains PSP webhooks and order or capture source of truth; ledger bridges hosted pay and COD capture.",
-      cronSecretConfigured: storefrontCronConfigured,
+      cronSecretConfigured,
+      storefrontOriginConfigured,
+      reconciliationConfigured,
       ledgerMetrics: platformMetrics,
-      reconciliationWorkerAlive: null as boolean | null,
     },
   });
 }

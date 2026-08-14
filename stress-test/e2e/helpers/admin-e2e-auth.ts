@@ -4,7 +4,7 @@ import { expect, type Page } from "@playwright/test";
 export const adminBase =
   process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
 
-export function firstAdminAllowedEmail(): string | undefined {
+function firstAdminAllowedEmail(): string | undefined {
   const raw = process.env.ADMIN_ALLOWED_EMAILS?.trim();
   if (!raw) return undefined;
   const first = raw.split(",")[0]?.trim().toLowerCase();
@@ -18,6 +18,11 @@ export type E2eAdminLoginResult = "ok" | "skip_no_ui" | "skip_no_env";
  * Requires `pnpm e2e:ensure-staff` (user + `staff_permission_grants` `*` for full route coverage).
  */
 export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
+  if (process.env.AUTH_DISABLED === "true") {
+    await page.goto(`${adminBase}/admin`, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/admin/, { timeout: 45_000 });
+    return "ok";
+  }
   const email = firstAdminAllowedEmail();
   const password = process.env.NEXTAUTH_SECRET;
   await page.goto(`${adminBase}/sign-in/e2e`, { waitUntil: "domcontentloaded" });

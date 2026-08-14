@@ -5,6 +5,7 @@ import {
   AuditTimeline,
 } from "@/components/admin-console";
 import { ProductEditorForm } from "@/components/catalog/ProductEditorForm";
+import { Button } from "@/components/ui/button";
 import {
   fetchCatalogProductDetail,
 } from "@/lib/medusa-catalog-service";
@@ -60,22 +61,16 @@ export default async function CatalogEditPage({
         />
       }
       actions={
-        <>
-          <Link
-            href="/admin/catalog"
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            Back to products
-          </Link>
-          <a
-            href={medusaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-semibold text-primary hover:underline"
-          >
-            Open in store admin
-          </a>
-        </>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/admin/catalog">Back to products</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href={medusaUrl} target="_blank" rel="noopener noreferrer">
+              Open in store admin
+            </a>
+          </Button>
+        </div>
       }
       inspector={
         <AuditTimeline

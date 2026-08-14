@@ -9,7 +9,11 @@ import {
 } from "@/lib/cart-api-helpers";
 
 export async function GET(req: Request) {
-  const rl = await applyRateLimit(req, "cart-resume", 90, 60_000);
+  // This is a read-only hydration request and can run more than once during
+  // navigation; keep abuse protection without starving normal storefront flows.
+  // Version the bucket when the read budget changes so stale remote counters
+  // from an older, stricter deployment cannot lock out normal checkout loads.
+  const rl = await applyRateLimit(req, "cart-resume:v2", 300, 60_000);
   if (!rl.ok) return rl.response;
 
   const url = new URL(req.url);

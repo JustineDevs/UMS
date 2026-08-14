@@ -3,12 +3,12 @@
  * Stress-tests checkout against every payment provider registered for the region:
  * creates a cart, adds a line, sets addresses, adds shipping, initiates payment.
  *
- * - Hosted PSPs (PayMongo, Maya, PayPal, Stripe): records session data and
+ * - Hosted PSPs (Xendit, PayPal, Stripe): records session data and
  *   hosted URL when present (approval_url for PayPal, client_secret for Stripe).
  * - COD (pp_cod_cod): completes the cart (Medusa `complete-cart` workflow runs
  *   `authorizePaymentSession` internally; no separate Store `/authorize` call).
  *
- * Prerequisites: Medusa running, root .env with NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
+ * Prerequisites: Medusa running, root .env.local with NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY,
  * NEXT_PUBLIC_MEDUSA_REGION_ID (or MEDUSA_REGION_ID), MEDUSA_BACKEND_URL or
  * NEXT_PUBLIC_MEDUSA_URL, sandbox keys for each provider you expect to load.
  *
@@ -21,8 +21,8 @@
  *
  * Usage:
  *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts
- *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --providers=cod,paymongo
- *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --mandatory-five
+ *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --providers=cod,xendit
+ *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --mandatory-core
  *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --no-cod-complete
  *   node --import tsx/esm stress-test/scripts/stress-checkout-providers.ts --with-db
  */
@@ -44,8 +44,9 @@ const root = path.resolve(__dirname, "../..");
 
 const require = createRequire(import.meta.url);
 try {
-  const dotenv = require("dotenv") as { config: (o?: { path?: string; override?: boolean }) => void };
-  dotenv.config({ path: path.join(root, ".env") });
+  const dotenv = require("dotenv") as {
+    config: (_o?: { path?: string; override?: boolean }) => void;
+  };
   dotenv.config({ path: path.join(root, ".env.local"), override: true });
 } catch {
   /* optional */
@@ -75,8 +76,7 @@ const MANDATORY_PROVIDER_IDS = [
   "pp_cod_cod",
   "pp_stripe_stripe",
   "pp_paypal_paypal",
-  "pp_paymongo_paymongo",
-  "pp_maya_maya",
+  "pp_xendit_xendit",
 ] as const;
 
 function stripSlash(u) {
@@ -123,11 +123,11 @@ function secretApiKeyBasicAuthorization(secret) {
 
 function parseArgs(argv) {
   const out = {
-    providers: /** @type {string[] | null} */ (null),
+    providers: /** @type {string[] | null} */ null,
     codComplete: true,
     cleanup: true,
     withDb: false,
-    mandatoryFive: false,
+    mandatoryCore: false,
   };
   for (const a of argv) {
     if (a.startsWith("--providers=")) {
@@ -142,8 +142,8 @@ function parseArgs(argv) {
       out.cleanup = false;
     } else if (a === "--with-db") {
       out.withDb = true;
-    } else if (a === "--mandatory-five") {
-      out.mandatoryFive = true;
+    } else if (a === "--mandatory-core") {
+      out.mandatoryCore = true;
     }
   }
   return out;
@@ -152,16 +152,19 @@ function parseArgs(argv) {
 /** Surfaces Medusa client / fetch rejection details when the message is generic. */
 function formatStressError(e) {
   if (e instanceof Error) {
-    const any = /** @type {{ cause?: unknown; response?: { data?: unknown } }} */ (
-      e
-    );
+    const any =
+      /** @type {{ cause?: unknown; response?: { data?: unknown } }} */ e;
     const cause = any.cause;
-    if (cause instanceof Error && cause.message && cause.message !== e.message) {
+    if (
+      cause instanceof Error &&
+      cause.message &&
+      cause.message !== e.message
+    ) {
       return `${e.message} (${cause.message})`;
     }
     const data = any.response?.data;
     if (data && typeof data === "object" && data !== null) {
-      const msg = /** @type {{ message?: string }} */ (data).message;
+      const msg = /** @type {{ message?: string }} */ data.message;
       if (typeof msg === "string" && msg.trim()) {
         return `${e.message}: ${msg}`;
       }
@@ -173,8 +176,11 @@ function formatStressError(e) {
       }
     }
     const msg = e.message.trim();
-    if (msg === "An unknown error occurred." || msg === "An unknown error occurred") {
-      const extra = /** @type {Record<string, unknown>} */ (e);
+    if (
+      msg === "An unknown error occurred." ||
+      msg === "An unknown error occurred"
+    ) {
+      const extra = /** @type {Record<string, unknown>} */ e;
       const status =
         typeof extra.status === "number"
           ? extra.status
@@ -182,13 +188,12 @@ function formatStressError(e) {
             ? extra.statusCode
             : undefined;
       const body =
-        extra.body ??
-        extra.response ??
-        extra.toJSON?.() ??
-        undefined;
+        extra.body ?? extra.response ?? extra.toJSON?.() ?? undefined;
       const bits = [
         typeof status === "number" ? `status=${status}` : null,
-        body !== undefined ? `detail=${JSON.stringify(body).slice(0, 600)}` : null,
+        body !== undefined
+          ? `detail=${JSON.stringify(body).slice(0, 600)}`
+          : null,
       ].filter(Boolean);
       if (bits.length) return `${msg} ${bits.join(" ")}`;
     }
@@ -199,7 +204,7 @@ function formatStressError(e) {
 
 function hostedUrlFromSessionData(data) {
   if (!data || typeof data !== "object") return null;
-  const d = /** @type {Record<string, unknown>} */ (data);
+  const d = /** @type {Record<string, unknown>} */ data;
   if (typeof d.checkout_url === "string" && d.checkout_url.startsWith("http"))
     return d.checkout_url;
   if (typeof d.approval_url === "string" && d.approval_url.startsWith("http"))
@@ -209,7 +214,7 @@ function hostedUrlFromSessionData(data) {
 
 function summarizeSessionData(data) {
   if (!data || typeof data !== "object") return {};
-  const d = /** @type {Record<string, unknown>} */ (data);
+  const d = /** @type {Record<string, unknown>} */ data;
   const keys = Object.keys(d).filter((k) => {
     const v = d[k];
     if (typeof v === "string" && v.length > 80) return false;
@@ -222,7 +227,11 @@ function summarizeSessionData(data) {
       o.has_client_secret = true;
       continue;
     }
-    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+    if (
+      typeof v === "string" ||
+      typeof v === "number" ||
+      typeof v === "boolean"
+    ) {
       o[k] = v;
     }
   }
@@ -361,22 +370,17 @@ function salesChannelIdsFromProduct(product) {
  * Store carts only accept variants for products that are published and in the cart sales channel.
  * When autoPrepare is true (pinned prod_/variant_ stress ids), default is to fix draft + missing channel unless NO_PREPARE.
  */
-async function ensureProductSellableForStore(
-  baseUrl,
-  secret,
-  productId,
-  opts,
-) {
+async function ensureProductSellableForStore(baseUrl, secret, productId, opts) {
   const autoPrepare = Boolean(opts?.autoPrepare);
   const auto = autoPrepare && stressAutoPrepareCatalog();
-  const publishDraft =
-    envBool("STRESS_CHECKOUT_PUBLISH_DRAFT") || auto;
-  const linkChannel =
-    envBool("STRESS_CHECKOUT_LINK_SALES_CHANNEL") || auto;
+  const publishDraft = envBool("STRESS_CHECKOUT_PUBLISH_DRAFT") || auto;
+  const linkChannel = envBool("STRESS_CHECKOUT_LINK_SALES_CHANNEL") || auto;
 
   const product = await fetchAdminProductFull(baseUrl, secret, productId);
   if (!product) {
-    throw new Error(`Admin GET product ${productId} failed (check MEDUSA_SECRET_API_KEY).`);
+    throw new Error(
+      `Admin GET product ${productId} failed (check MEDUSA_SECRET_API_KEY).`,
+    );
   }
   const variantId = firstVariantIdFromProduct(product);
   if (!variantId) {
@@ -407,7 +411,12 @@ async function ensureProductSellableForStore(
   }
 
   if (Object.keys(payload).length > 0) {
-    const res = await adminPostProductUpdate(baseUrl, secret, productId, payload);
+    const res = await adminPostProductUpdate(
+      baseUrl,
+      secret,
+      productId,
+      payload,
+    );
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       throw new Error(
@@ -496,7 +505,11 @@ async function resolveStressVariantId(sdk, regionId, baseUrl) {
   if (variantEnv && variantEnv.startsWith("variant_")) {
     console.log(`Using STRESS_CHECKOUT_VARIANT_ID=${variantEnv}`);
     if (secret) {
-      const pid = await getProductIdForVariantAdmin(baseUrl, secret, variantEnv);
+      const pid = await getProductIdForVariantAdmin(
+        baseUrl,
+        secret,
+        variantEnv,
+      );
       if (pid) {
         await ensureProductSellableForStore(baseUrl, secret, pid, {
           autoPrepare: true,
@@ -569,7 +582,7 @@ async function buildPreparedCart(sdk, regionId, variantId, email) {
   });
 
   await sdk.store.cart.update(cartId, {
-    email: email || "stress-checkout@example.com",
+    email: email || process.env.CHECKOUT_TEST_EMAIL || "delivered@resend.dev",
     shipping_address: {
       first_name: "Stress",
       last_name: "Checkout",
@@ -664,8 +677,7 @@ function providerMatchesFilter(providerId, wanted) {
       (x === "stripe" && lower.includes("stripe")) ||
       (x === "paypal" && lower.includes("paypal")) ||
       (x === "cod" && lower.includes("cod")) ||
-      (x === "paymongo" && lower.includes("paymongo")) ||
-      (x === "maya" && lower.includes("maya"))
+      (x === "xendit" && lower.includes("xendit"))
     );
   });
 }
@@ -677,7 +689,7 @@ async function main() {
   const reg = regionId();
   if (!pub || !reg) {
     console.error(
-      "Set NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY and NEXT_PUBLIC_MEDUSA_REGION_ID (or MEDUSA_REGION_ID) in .env",
+      "Set NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY and NEXT_PUBLIC_MEDUSA_REGION_ID (or MEDUSA_REGION_ID) in .env.local",
     );
     process.exit(1);
   }
@@ -716,28 +728,22 @@ async function main() {
         };
         results.push(failRow);
         console.log(JSON.stringify(failRow));
-        await fs.appendFile(
-          reportPath,
-          JSON.stringify(failRow) + "\n",
-          "utf8",
-        );
+        await fs.appendFile(reportPath, JSON.stringify(failRow) + "\n", "utf8");
       }
     }
   }
 
   let providers = (payment_providers ?? []).filter((p) =>
-    args.providers?.length
-      ? providerMatchesFilter(p.id, args.providers)
-      : true,
+    args.providers?.length ? providerMatchesFilter(p.id, args.providers) : true,
   );
 
-  if (args.mandatoryFive) {
+  if (args.mandatoryCore) {
     providers = MANDATORY_PROVIDER_IDS.filter((id) => enabledIds.has(id)).map(
       (id) => ({ id }),
     );
   }
 
-  if (providers.length === 0 && !args.mandatoryFive) {
+  if (providers.length === 0 && !args.mandatoryCore) {
     console.error(
       "No payment providers match. Check region payment providers in Admin and --providers filter.",
     );
@@ -749,9 +755,9 @@ async function main() {
   console.log(
     `Providers to run (${providers.length}): ${providers.map((p) => p.id).join(", ")}`,
   );
-  if (args.mandatoryFive) {
+  if (args.mandatoryCore) {
     console.log(
-      "Mode: --mandatory-five (all five PSP ids must be region-enabled; missing providers are recorded as failures).",
+      "Mode: --mandatory-core (all configured PSP ids must be region-enabled; missing providers are recorded as failures).",
     );
   }
 
@@ -782,7 +788,7 @@ async function main() {
         sdk,
         reg,
         variantId,
-        "stress-checkout@example.com",
+        process.env.CHECKOUT_TEST_EMAIL || "delivered@resend.dev",
       );
       row.cart_id = cartId;
 
@@ -804,7 +810,8 @@ async function main() {
       row.session_summary = summarizeSessionData(data);
       row.ok = true;
 
-      const isCod = providerId.includes("pp_cod_") || providerId.includes("_cod_");
+      const isCod =
+        providerId.includes("pp_cod_") || providerId.includes("_cod_");
 
       if (isCod && args.codComplete) {
         if (!payment_collection_id || !session?.id) {
@@ -887,10 +894,7 @@ async function main() {
         "utf8",
       );
     } catch (e) {
-      console.warn(
-        "DB query skipped:",
-        e instanceof Error ? e.message : e,
-      );
+      console.warn("DB query skipped:", e instanceof Error ? e.message : e);
     }
   }
 

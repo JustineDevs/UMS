@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import type { AuditEntry } from "@/components/admin-console/AuditTimeline";
 import { formatAuditActorLabel } from "@/lib/audit-actor-format";
 import {

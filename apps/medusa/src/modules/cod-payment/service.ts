@@ -33,8 +33,8 @@ import {
 } from "@medusajs/framework/utils";
 
 /**
- * Cash on delivery: no external PSP. Authorize at checkout; capture runs when AfterShip reports
- * delivered (see `api/hooks/aftership`). Refunds are operational, not card-network refunds.
+ * Cash on delivery: no external PSP. Authorize at checkout; capture runs when J&T Express reports
+ * delivered (see `api/hooks/jnt`). Refunds are operational, not card-network refunds.
  */
 export default class CodPaymentProviderService extends AbstractPaymentProvider<Record<string, never>> {
   static identifier = "cod";
@@ -75,7 +75,7 @@ export default class CodPaymentProviderService extends AbstractPaymentProvider<R
         cod: true,
         amount_minor: Math.round(amount),
         currency_code: currency,
-        capture_expected_via: "aftership_delivered_webhook",
+        capture_expected_via: "jnt_delivered_webhook",
       },
     };
   }
@@ -102,7 +102,7 @@ export default class CodPaymentProviderService extends AbstractPaymentProvider<R
         capture_expected_via:
           typeof prior.capture_expected_via === "string"
             ? prior.capture_expected_via
-            : "aftership_delivered_webhook",
+            : "jnt_delivered_webhook",
       },
     };
   }

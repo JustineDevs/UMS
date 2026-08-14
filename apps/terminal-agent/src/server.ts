@@ -7,7 +7,7 @@ import {
   drawerOpenPulse,
   type ProductLabelPayload,
   type ReceiptPayload,
-} from "@apparel-commerce/printer-core";
+} from "@universal-music-store/printer-core";
 import {
   fetchDeviceByName,
   heartbeatDeviceByName,
@@ -15,6 +15,7 @@ import {
 } from "./supabase-device.js";
 import { listAdapterCapabilities } from "./adapters.js";
 import { sendTcpRaw } from "./tcp-send.js";
+import { sendNodeEscposNetwork } from "./node-escpos-network.js";
 import { postOctetStreamPrint } from "./relay-post.js";
 import {
   dequeueStarCloudPrnt,
@@ -77,7 +78,7 @@ async function sendEscPosToAdapter(
       process.env.ALLOW_MOCK_TERMINAL_ADAPTER !== "true"
     ) {
       throw new Error(
-        "Mock adapter is disabled in production. Configure a real printer adapter or set ALLOW_MOCK_TERMINAL_ADAPTER=true only for emergencies.",
+        "Development adapter is disabled in production. Configure a real printer adapter or set ALLOW_MOCK_TERMINAL_ADAPTER=true only for emergencies.",
       );
     }
     const outDir = process.env.TERMINAL_AGENT_MOCK_DIR?.trim();
@@ -87,13 +88,19 @@ async function sendEscPosToAdapter(
       await writeFile(f, Buffer.from(bytes));
       return;
     }
-    process.stdout.write(`[terminal-agent mock print ${bytes.length} bytes]\n`);
+    process.stdout.write(`[terminal-agent dev print ${bytes.length} bytes]\n`);
     return;
   }
 
   if (adapter === "escpos-tcp") {
     const { host, port } = override ?? resolvedPrinterTcp(device);
     await sendTcpRaw(host, port, bytes);
+    return;
+  }
+
+  if (adapter === "node-escpos-network") {
+    const { host, port } = override ?? resolvedPrinterTcp(device);
+    await sendNodeEscposNetwork(host, port, bytes);
     return;
   }
 
@@ -175,10 +182,10 @@ async function openDrawerWithAdapter(
       process.env.ALLOW_MOCK_TERMINAL_ADAPTER !== "true"
     ) {
       throw new Error(
-        "Mock adapter is disabled in production. Configure a real adapter or set ALLOW_MOCK_TERMINAL_ADAPTER=true only for emergencies.",
+        "Development adapter is disabled in production. Configure a real adapter or set ALLOW_MOCK_TERMINAL_ADAPTER=true only for emergencies.",
       );
     }
-    process.stdout.write("[terminal-agent mock open-drawer]\n");
+    process.stdout.write("[terminal-agent dev open-drawer]\n");
     return;
   }
 
@@ -224,8 +231,64 @@ async function openDrawerWithAdapter(
   await sendTcpRaw(host, port, pulse);
 }
 
-function json(res: http.ServerResponse, code: number, body: unknown) {
-  res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
+const CORS_METHODS = "GET,POST,OPTIONS";
+const CORS_HEADERS = "Content-Type, X-Terminal-Agent-Secret";
+
+function terminalAgentAllowedOrigins(): string[] {
+  const raw = process.env.TERMINAL_AGENT_CORS_ORIGINS?.trim();
+  if (raw) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return ["http://127.0.0.1:3001", "http://localhost:3001"];
+}
+
+/**
+ * Browser cross-origin calls must send Origin matching this allowlist.
+ * Requests without Origin (curl, server-side fetch) get wildcard ACAO for local tooling.
+ */
+function corsHeadersForRequest(
+  req: http.IncomingMessage,
+): { ok: true; headers: Record<string, string> } | { ok: false } {
+  const origin = (req.headers.origin as string | undefined)?.trim();
+  const base: Record<string, string> = {
+    "Access-Control-Allow-Methods": CORS_METHODS,
+    "Access-Control-Allow-Headers": CORS_HEADERS,
+  };
+  if (!origin) {
+    return {
+      ok: true,
+      headers: { ...base, "Access-Control-Allow-Origin": "*" },
+    };
+  }
+  const allowed = terminalAgentAllowedOrigins();
+  if (!allowed.includes(origin)) {
+    return { ok: false };
+  }
+  return {
+    ok: true,
+    headers: {
+      ...base,
+      "Access-Control-Allow-Origin": origin,
+      Vary: "Origin",
+    },
+  };
+}
+
+function json(
+  res: http.ServerResponse,
+  req: http.IncomingMessage,
+  code: number,
+  body: unknown,
+) {
+  const cors = corsHeadersForRequest(req);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json; charset=utf-8",
+  };
+  if (cors.ok) Object.assign(headers, cors.headers);
+  res.writeHead(code, headers);
   res.end(JSON.stringify(body));
 }
 
@@ -284,29 +347,41 @@ function readJsonBody(req: http.IncomingMessage): Promise<
   });
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, X-Terminal-Agent-Secret",
-};
-
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "127.0.0.1"}`);
 
   if (req.method === "OPTIONS") {
-    res.writeHead(204, corsHeaders);
+    const cors = corsHeadersForRequest(req);
+    if (!cors.ok) {
+      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Forbidden origin");
+      return;
+    }
+    res.writeHead(204, cors.headers);
     res.end();
     return;
   }
 
-  const corsJson = {
-    ...corsHeaders,
-    "Content-Type": "application/json; charset=utf-8",
-  };
+  const cors = corsHeadersForRequest(req);
+  if (req.headers.origin && !cors.ok) {
+    res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Forbidden origin");
+    return;
+  }
+
+  const corsJson = cors.ok
+    ? { ...cors.headers, "Content-Type": "application/json; charset=utf-8" }
+    : { "Content-Type": "application/json; charset=utf-8" };
 
   if (req.method === "GET" && url.pathname === "/health") {
     res.writeHead(200, corsJson);
-    res.end(JSON.stringify({ ok: true }));
+    res.end(
+      JSON.stringify({
+        ok: true,
+        lastError: state.lastError,
+        adapterName: resolvedDefaultAdapter(cachedDevice),
+      }),
+    );
     return;
   }
 
@@ -370,12 +445,12 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && url.pathname === "/print-receipt") {
     if (!mutatingPostAllowed(req)) {
-      json(res, 401, { error: "Unauthorized" });
+      json(res, req, 401, { error: "Unauthorized" });
       return;
     }
     void readJsonBody(req).then(async (parsed) => {
       if (!parsed.ok) {
-        json(res, parsed.status, { error: parsed.error });
+        json(res, req, parsed.status, { error: parsed.error });
         return;
       }
       try {
@@ -385,7 +460,7 @@ const server = http.createServer((req, res) => {
           printer?: { host: string; port: number };
         };
         if (!body?.receipt?.title) {
-          json(res, 400, { error: "receipt required" });
+          json(res, req, 400, { error: "receipt required" });
           return;
         }
         const adapter =
@@ -393,11 +468,11 @@ const server = http.createServer((req, res) => {
         await printWithAdapter(body.receipt, adapter, body.printer);
         state.lastError = null;
         state.lastPrintAt = new Date().toISOString();
-        json(res, 200, { ok: true });
+        json(res, req, 200, { ok: true });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         state.lastError = msg;
-        json(res, 502, { error: msg });
+        json(res, req, 502, { error: msg });
       }
     });
     return;
@@ -405,12 +480,12 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && url.pathname === "/print-label") {
     if (!mutatingPostAllowed(req)) {
-      json(res, 401, { error: "Unauthorized" });
+      json(res, req, 401, { error: "Unauthorized" });
       return;
     }
     void readJsonBody(req).then(async (parsed) => {
       if (!parsed.ok) {
-        json(res, parsed.status, { error: parsed.error });
+        json(res, req, parsed.status, { error: parsed.error });
         return;
       }
       try {
@@ -428,7 +503,7 @@ const server = http.createServer((req, res) => {
           typeof label?.priceDisplay === "string" &&
           label.priceDisplay.trim().length > 0;
         if (!label || !nameOk || !skuOk || !priceOk) {
-          json(res, 400, {
+          json(res, req, 400, {
             error:
               "label with productName, sku, and priceDisplay strings required",
           });
@@ -439,11 +514,11 @@ const server = http.createServer((req, res) => {
         await printLabelWithAdapter(label, adapter, body.printer);
         state.lastError = null;
         state.lastPrintAt = new Date().toISOString();
-        json(res, 200, { ok: true });
+        json(res, req, 200, { ok: true });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         state.lastError = msg;
-        json(res, 502, { error: msg });
+        json(res, req, 502, { error: msg });
       }
     });
     return;
@@ -451,12 +526,12 @@ const server = http.createServer((req, res) => {
 
   if (req.method === "POST" && url.pathname === "/open-drawer") {
     if (!mutatingPostAllowed(req)) {
-      json(res, 401, { error: "Unauthorized" });
+      json(res, req, 401, { error: "Unauthorized" });
       return;
     }
     void readJsonBody(req).then(async (parsed) => {
       if (!parsed.ok) {
-        json(res, parsed.status, { error: parsed.error });
+        json(res, req, parsed.status, { error: parsed.error });
         return;
       }
       try {
@@ -468,25 +543,25 @@ const server = http.createServer((req, res) => {
           body.adapter ?? resolvedDefaultAdapter(cachedDevice);
         await openDrawerWithAdapter(adapter, body.printer);
         state.lastError = null;
-        json(res, 200, { ok: true });
+        json(res, req, 200, { ok: true });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         state.lastError = msg;
-        json(res, 502, { error: msg });
+        json(res, req, 502, { error: msg });
       }
     });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/scan/attach") {
-    json(res, 501, {
+    json(res, req, 501, {
       error:
         "Scanner pairing is handled in the browser (WebHID) or HID keyboard wedge mode. This agent does not expose USB scanner control.",
     });
     return;
   }
 
-  json(res, 404, { error: "Not found" });
+  json(res, req, 404, { error: "Not found" });
 });
 
 const port = readEnvPort();

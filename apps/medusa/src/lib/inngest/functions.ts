@@ -30,7 +30,7 @@ export const orderPlacedSmsJob = inngest.createFunction(
     id: "order-placed-sms",
     name: "Send Order Placed SMS",
     retries: 3,
-    trigger: { event: "maharlika/order.placed" },
+    trigger: { event: "universal-music-store/order.placed" },
   } as Parameters<typeof inngest.createFunction>[0],
   async ({ event }: { event: { data: OrderPlacedData } }) => {
     const { phone, displayId, total, currencyCode, trackingUrl } = event.data;
@@ -50,7 +50,7 @@ export const fulfillmentCreatedSmsJob = inngest.createFunction(
     id: "fulfillment-created-sms",
     name: "Send Fulfillment Created SMS",
     retries: 3,
-    trigger: { event: "maharlika/fulfillment.created" },
+    trigger: { event: "universal-music-store/fulfillment.created" },
   } as Parameters<typeof inngest.createFunction>[0],
   async ({ event }: { event: { data: FulfillmentCreatedData } }) => {
     const { phone, displayId, trackingNumber, trackingUrl } = event.data;
@@ -78,7 +78,7 @@ export const campaignSendBatchJob = inngest.createFunction(
     name: "Send Campaign SMS Batch",
     retries: 2,
     concurrency: { limit: 5 },
-    trigger: { event: "maharlika/campaign.send.batch" },
+    trigger: { event: "universal-music-store/campaign.send.batch" },
   } as Parameters<typeof inngest.createFunction>[0],
   async ({
     event,

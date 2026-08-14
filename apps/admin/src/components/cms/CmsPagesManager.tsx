@@ -1,11 +1,16 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { useSearchParams } from "next/navigation";
+import {
+  staffHasPermission,
+  type CmsBlock,
+} from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
-import type { CmsBlock } from "@apparel-commerce/platform-data";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
-import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
+import { StorefrontPublicMetadataEditor } from "@/components/StorefrontPublicMetadataEditor";
+import { CmsPageBuilder } from "./CmsPageBuilder";
+import { StorefrontHomeVisualEditor } from "./StorefrontHomeVisualEditor";
 
 type CmsPageRow = {
   id: string;
@@ -28,12 +33,40 @@ type CmsPageRow = {
   breadcrumb_label: string | null;
 };
 
+function emptyPage(): CmsPageRow {
+  return {
+    id: "",
+    slug: "new-page",
+    locale: "en",
+    page_type: "static",
+    title: "New page",
+    body: "<p></p>",
+    blocks: [],
+    status: "draft",
+    published_at: null,
+    scheduled_publish_at: null,
+    preview_token: null,
+    meta_title: null,
+    meta_description: null,
+    canonical_url: null,
+    og_image_url: null,
+    json_ld: null,
+    parent_slug: null,
+    breadcrumb_label: null,
+  };
+}
+
 export function CmsPagesManager() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const searchParams = useSearchParams();
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<CmsPageRow[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [editing, setEditing] = useState<CmsPageRow | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [blocksJson, setBlocksJson] = useState("[]");
@@ -41,48 +74,76 @@ export function CmsPagesManager() {
   const [jsonLdText, setJsonLdText] = useState("");
   const [slugWhenOpened, setSlugWhenOpened] = useState<string | null>(null);
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
+  const [showStorefrontHome, setShowStorefrontHome] = useState(
+    () => searchParams.get("section") === "home",
+  );
 
   const load = useCallback(() => {
-    fetch("/api/admin/cms/pages")
-      .then(async (r) => {
-        const j = (await r.json()) as { data?: CmsPageRow[]; error?: string };
-        if (!r.ok) throw new Error(j.error ?? r.statusText);
-        return j.data ?? [];
+    setLoadingRows(true);
+    setLoadError(null);
+    void fetch("/api/admin/cms/pages")
+      .then(async (response) => {
+        const json = (await response.json()) as {
+          data?: CmsPageRow[];
+          error?: string;
+        };
+        if (!response.ok) throw new Error(json.error ?? response.statusText);
+        setRows(json.data ?? []);
       })
-      .then(setRows)
-      .catch((e: unknown) => {
-        setLoadError(e instanceof Error ? e.message : "Unable to load content");
-      });
+      .catch((error: unknown) =>
+        setLoadError(
+          error instanceof Error ? error.message : "Unable to load content",
+        ),
+      )
+      .finally(() => setLoadingRows(false));
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
-
+  useEffect(() => {
+    setShowStorefrontHome(searchParams.get("section") === "home");
+  }, [searchParams]);
   useEffect(() => {
     if (!editing) return;
     setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
     setShowBlocksAdvancedJson(false);
     setJsonLdText(
-      editing.json_ld != null ? JSON.stringify(editing.json_ld, null, 2) : "",
+      editing.json_ld == null ? "" : JSON.stringify(editing.json_ld, null, 2),
     );
   }, [editing]);
+
+  const openPage = (page: CmsPageRow) => {
+    setSlugWhenOpened(page.slug);
+    setRedirectMessage(null);
+    setSaveError(null);
+    setEditing({
+      ...page,
+      parent_slug: page.parent_slug ?? null,
+      breadcrumb_label: page.breadcrumb_label ?? null,
+    });
+  };
+  const openNewPage = () => {
+    setSlugWhenOpened(null);
+    setRedirectMessage(null);
+    setSaveError(null);
+    setEditing(emptyPage());
+  };
 
   const save = async () => {
     if (!editing || !canWrite) return;
     setSaving(true);
     setSaveError(null);
-    let blocks: unknown = [];
+    let blocks: unknown = editing.blocks ?? [];
     if (showBlocksAdvancedJson) {
       try {
         blocks = JSON.parse(blocksJson) as unknown;
+        if (!Array.isArray(blocks)) throw new Error();
       } catch {
-        setSaveError("Blocks must be valid JSON array");
+        setSaveError("Blocks must be a valid JSON array");
         setSaving(false);
         return;
       }
-    } else {
-      blocks = editing.blocks ?? [];
     }
     let json_ld: unknown | null = null;
     if (jsonLdText.trim()) {
@@ -113,35 +174,43 @@ export function CmsPagesManager() {
       parent_slug: editing.parent_slug,
       breadcrumb_label: editing.breadcrumb_label,
     };
-    if (editing.id.trim()) payload.id = editing.id;
-    const method = editing.id.trim() ? "PUT" : "POST";
-    const url = editing.id.trim() ? `/api/admin/cms/pages/${editing.id}` : "/api/admin/cms/pages";
+    if (editing.id) payload.id = editing.id;
     try {
-      const r = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const j = (await r.json()) as { data?: CmsPageRow; error?: string };
-      if (!r.ok) throw new Error(j.error ?? r.statusText);
-      if (j.data) {
-        setEditing(j.data as CmsPageRow);
-        setSlugWhenOpened(j.data.slug);
+      const response = await fetch(
+        editing.id
+          ? `/api/admin/cms/pages/${editing.id}`
+          : "/api/admin/cms/pages",
+        {
+          method: editing.id ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      const json = (await response.json()) as {
+        data?: CmsPageRow;
+        error?: string;
+      };
+      if (!response.ok) throw new Error(json.error ?? response.statusText);
+      if (json.data) {
+        setEditing(json.data);
+        setSlugWhenOpened(json.data.slug);
       }
       load();
-    } catch (e: unknown) {
-      setSaveError(e instanceof Error ? e.message : "Unable to save");
+    } catch (error: unknown) {
+      setSaveError(error instanceof Error ? error.message : "Unable to save");
     } finally {
       setSaving(false);
     }
   };
 
-  const remove = async (id: string) => {
-    if (!canWrite || !confirm("Delete this page?")) return;
-    const r = await fetch(`/api/admin/cms/pages/${id}`, { method: "DELETE" });
-    if (!r.ok) {
-      const j = (await r.json()) as { error?: string };
-      setSaveError(j.error ?? "Unable to delete");
+  const remove = async () => {
+    if (!editing?.id || !canWrite || !confirm("Delete this page?")) return;
+    const response = await fetch(`/api/admin/cms/pages/${editing.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const json = (await response.json()) as { error?: string };
+      setSaveError(json.error ?? "Unable to delete");
       return;
     }
     setEditing(null);
@@ -149,356 +218,430 @@ export function CmsPagesManager() {
   };
 
   const createSlugRedirect = async () => {
-    if (!editing?.id || !slugWhenOpened || slugWhenOpened === editing.slug || !canWrite) return;
-    setRedirectMessage(null);
+    if (
+      !editing?.id ||
+      !slugWhenOpened ||
+      slugWhenOpened === editing.slug ||
+      !canWrite
+    )
+      return;
     const from_path = `/p/${slugWhenOpened.replace(/^\/+/, "").replace(/^p\//, "")}`;
-    const toSlug = editing.slug.replace(/^\/+/, "").replace(/^p\//, "");
-    const to_path = `/p/${toSlug}`;
-    const r = await fetch("/api/admin/cms/redirects", {
+    const to_path = `/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const response = await fetch("/api/admin/cms/redirects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from_path, to_path, status_code: 301, active: true }),
+      body: JSON.stringify({
+        from_path,
+        to_path,
+        status_code: 301,
+        active: true,
+      }),
     });
-    const j = (await r.json()) as { error?: string };
-    if (!r.ok) {
-      setRedirectMessage(j.error ?? "Could not create redirect");
-      return;
-    }
-    setRedirectMessage(`Redirect saved: ${from_path} -> ${to_path}`);
+    const json = (await response.json()) as { error?: string };
+    setRedirectMessage(
+      response.ok
+        ? `Redirect saved: ${from_path} -> ${to_path}`
+        : (json.error ?? "Could not create redirect"),
+    );
   };
 
-  if (status === "loading") {
-    return <p className="text-sm text-slate-600">Loading session…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading session...</p>;
+
+  if (showStorefrontHome) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Homepage
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              The public homepage is managed here as the first page in the
+              same CMS workspace as every other page.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={() => setShowStorefrontHome(false)}
+          >
+            Back to page list
+          </button>
+        </div>
+        <StorefrontPublicMetadataEditor />
+        <StorefrontHomeVisualEditor
+          onClose={() => setShowStorefrontHome(false)}
+        />
+      </div>
+    );
+  }
+
+  if (editing) {
+    const pageUrl = `${getStorefrontPublicOrigin()}/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const settings = (
+      <div className="space-y-4 text-xs">
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Page identity
+          </p>
+          <label className="block text-slate-500">
+            Slug
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.slug}
+              onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Title
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.title}
+              onChange={(e) =>
+                setEditing({ ...editing, title: e.target.value })
+              }
+            />
+          </label>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <label className="block text-slate-500">
+              Locale
+              <select
+                className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                value={editing.locale}
+                onChange={(e) =>
+                  setEditing({ ...editing, locale: e.target.value })
+                }
+              >
+                <option value="en">en</option>
+                <option value="fil">fil</option>
+              </select>
+            </label>
+            <label className="block text-slate-500">
+              Type
+              <select
+                className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                value={editing.page_type}
+                onChange={(e) =>
+                  setEditing({ ...editing, page_type: e.target.value })
+                }
+              >
+                <option value="static">static</option>
+                <option value="landing">landing</option>
+                <option value="legal">legal</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <label className="block text-slate-500">
+          Body HTML
+          <textarea
+            className="mt-1 min-h-28 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
+            value={editing.body}
+            onChange={(e) => setEditing({ ...editing, body: e.target.value })}
+          />
+        </label>
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Navigation
+          </p>
+          <label className="block text-slate-500">
+            Parent slug
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.parent_slug ?? ""}
+              onChange={(e) =>
+                setEditing({ ...editing, parent_slug: e.target.value || null })
+              }
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Breadcrumb label
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.breadcrumb_label ?? ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  breadcrumb_label: e.target.value || null,
+                })
+              }
+            />
+          </label>
+        </div>
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Publishing
+          </p>
+          <label className="block text-slate-500">
+            Status
+            <select
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.status}
+              onChange={(e) =>
+                setEditing({ ...editing, status: e.target.value })
+              }
+            >
+              <option value="draft">draft</option>
+              <option value="published">published</option>
+              <option value="scheduled">scheduled</option>
+            </select>
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Preview token
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 font-mono text-[11px] text-slate-700"
+              value={editing.preview_token ?? ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  preview_token: e.target.value || null,
+                })
+              }
+            />
+          </label>
+          <a
+            className="mt-3 inline-flex text-xs text-primary underline"
+            href={`${pageUrl}${editing.preview_token ? `?preview=${encodeURIComponent(editing.preview_token)}` : ""}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open storefront preview
+          </a>
+        </div>
+        <div>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            SEO
+          </p>
+          <label className="block text-slate-500">
+            Meta title
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.meta_title ?? ""}
+              onChange={(e) =>
+                setEditing({ ...editing, meta_title: e.target.value || null })
+              }
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Meta description
+            <textarea
+              className="mt-1 min-h-20 w-full rounded border border-slate-200 bg-white p-2 text-xs text-slate-700"
+              value={editing.meta_description ?? ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  meta_description: e.target.value || null,
+                })
+              }
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Canonical URL
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.canonical_url ?? ""}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  canonical_url: e.target.value || null,
+                })
+              }
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            OG image URL
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.og_image_url ?? ""}
+              onChange={(e) =>
+                setEditing({ ...editing, og_image_url: e.target.value || null })
+              }
+            />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            JSON-LD
+            <textarea
+              className="mt-1 min-h-20 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
+              value={jsonLdText}
+              onChange={(e) => setJsonLdText(e.target.value)}
+            />
+          </label>
+        </div>
+        <div>
+          <button
+            type="button"
+            className="text-[11px] text-slate-500 underline"
+            onClick={() => setShowBlocksAdvancedJson((value) => !value)}
+          >
+            {showBlocksAdvancedJson ? "Hide" : "Show"} advanced blocks JSON
+          </button>
+          {showBlocksAdvancedJson ? (
+            <textarea
+              className="mt-2 min-h-40 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
+              value={blocksJson}
+              onChange={(e) => setBlocksJson(e.target.value)}
+            />
+          ) : null}
+        </div>
+        {slugWhenOpened && slugWhenOpened !== editing.slug ? (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-800">
+            <p>Slug changed from {slugWhenOpened}</p>
+            <button
+              type="button"
+              className="mt-2 underline"
+              onClick={() => void createSlugRedirect()}
+            >
+              Create 301 redirect
+            </button>
+            {redirectMessage ? (
+              <p className="mt-2 text-slate-600">{redirectMessage}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {saveError ? (
+          <p
+            className="rounded border border-red-200 bg-red-50 p-3 text-[11px] text-red-700"
+            role="alert"
+          >
+            {saveError}
+          </p>
+        ) : null}
+        <div className="flex flex-wrap gap-2 border-t border-slate-200 pt-4">
+          <button
+            type="button"
+            className="h-8 rounded bg-red-50 px-3 text-xs text-red-700 hover:bg-red-100"
+            disabled={!canWrite || !editing.id}
+            onClick={() => void remove()}
+          >
+            Delete page
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded border border-slate-200 px-3 text-xs text-slate-600 hover:bg-slate-50"
+            onClick={() => setEditing(null)}
+          >
+            Close editor
+          </button>
+        </div>
+      </div>
+    );
+    return (
+      <CmsPageBuilder
+        value={editing.blocks ?? []}
+        disabled={!canWrite}
+        immersive
+        pageTitle={editing.title}
+        pageBody={editing.body}
+        onPageBodyChange={(body) => setEditing({ ...editing, body })}
+        previewUrl={pageUrl}
+        pages={rows.map((page) => ({
+          id: page.id,
+          title: page.title,
+          slug: page.slug,
+          status: page.status,
+        }))}
+        currentPageId={editing.id}
+        onSelectPage={(id) => {
+          const page = rows.find((item) => item.id === id);
+          if (page) openPage(page);
+        }}
+        onNewPage={openNewPage}
+        settings={settings}
+        toolbarActions={
+          <button
+            type="button"
+            className="h-8 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            disabled={!canWrite || saving}
+            onClick={() => void save()}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        }
+        onClose={() => setEditing(null)}
+        onChange={(next: CmsBlock[]) =>
+          setEditing({ ...editing, blocks: next })
+        }
+      />
+    );
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap gap-3">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Pages</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Choose a page to open the visual editor.
+          </p>
+        </div>
         <button
           type="button"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
-          onClick={() => {
-            setSlugWhenOpened(null);
-            setEditing({
-              id: "",
-              slug: "new-page",
-              locale: "en",
-              page_type: "static",
-              title: "New page",
-              body: "<p></p>",
-              blocks: [],
-              status: "draft",
-              published_at: null,
-              scheduled_publish_at: null,
-              preview_token: null,
-              meta_title: null,
-              meta_description: null,
-              canonical_url: null,
-              og_image_url: null,
-              json_ld: null,
-              parent_slug: null,
-              breadcrumb_label: null,
-            });
-          }}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          onClick={openNewPage}
         >
           New page
         </button>
       </div>
-      {loadError ? <p className="text-sm text-red-700">{loadError}</p> : null}
-      {saveError ? <p className="text-sm text-red-700">{saveError}</p> : null}
-
-      <div className="grid gap-8 lg:grid-cols-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/15 bg-primary/[0.04] px-4 py-4">
         <div>
-          <h3 className="font-headline text-lg font-bold text-primary mb-3">All pages</h3>
-          <ul className="space-y-2">
-            {rows.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="text-left text-sm text-slate-800 underline"
-                  onClick={() => {
-                    setSlugWhenOpened(p.slug);
-                    setRedirectMessage(null);
-                    setEditing({
-                      ...p,
-                      parent_slug: p.parent_slug ?? null,
-                      breadcrumb_label: p.breadcrumb_label ?? null,
-                    });
-                  }}
-                >
-                  {p.slug} ({p.status})
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p className="text-sm font-semibold text-slate-900">
+            Homepage
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Homepage sections, navigation-aware preview, SEO metadata, and
+            publish settings live in this unified CMS workspace.
+          </p>
         </div>
-
-        {editing ? (
-          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-            <h3 className="font-headline text-lg font-bold text-primary">Edit</h3>
-            <label className="block text-xs font-medium text-slate-600">
-              Slug
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.slug}
-                onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Title
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.title}
-                onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Parent page slug (optional, for breadcrumbs)
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={editing.parent_slug ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    parent_slug: e.target.value.trim() || null,
-                  })
-                }
-                placeholder="e.g. about (not /p/about)"
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Breadcrumb label override
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.breadcrumb_label ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    breadcrumb_label: e.target.value.trim() || null,
-                  })
-                }
-                placeholder="Shorter label in the trail; defaults to title"
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Body (HTML)
-              <textarea
-                className="mt-1 w-full min-h-[120px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={editing.body}
-                onChange={(e) => setEditing({ ...editing, body: e.target.value })}
-              />
-            </label>
-            <div className="space-y-2">
-              <span className="block text-xs font-medium text-slate-600">
-                Page blocks (drag to reorder)
-              </span>
-              <CmsPageBlocksEditor
-                value={editing.blocks ?? []}
-                disabled={!canWrite}
-                onChange={(next: CmsBlock[]) =>
-                  setEditing({ ...editing, blocks: next })
-                }
-              />
-              <button
-                type="button"
-                className="text-xs font-medium text-slate-500 underline"
-                onClick={() => {
-                  setShowBlocksAdvancedJson((v) => {
-                    const next = !v;
-                    if (next && editing) {
-                      setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
-                    }
-                    return next;
-                  });
-                }}
-              >
-                {showBlocksAdvancedJson ? "Hide" : "Show"} advanced blocks JSON
-              </button>
-              {showBlocksAdvancedJson ? (
-                <textarea
-                  className="mt-1 w-full min-h-[160px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                  value={blocksJson}
-                  onChange={(e) => setBlocksJson(e.target.value)}
-                />
-              ) : null}
-            </div>
-            <label className="block text-xs font-medium text-slate-600">
-              Status
-              <select
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.status}
-                onChange={(e) => setEditing({ ...editing, status: e.target.value })}
-              >
-                <option value="draft">draft</option>
-                <option value="published">published</option>
-                <option value="scheduled">scheduled</option>
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Meta title
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.meta_title ?? ""}
-                onChange={(e) => setEditing({ ...editing, meta_title: e.target.value || null })}
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Meta description
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.meta_description ?? ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, meta_description: e.target.value || null })
-                }
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              Canonical URL
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.canonical_url ?? ""}
-                onChange={(e) => setEditing({ ...editing, canonical_url: e.target.value || null })}
-              />
-            </label>
-            <label className="block text-xs font-medium text-slate-600">
-              OG image URL
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
-                value={editing.og_image_url ?? ""}
-                onChange={(e) => setEditing({ ...editing, og_image_url: e.target.value || null })}
-              />
-            </label>
-            <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
-              <p className="text-xs font-semibold text-slate-700">SEO checklist</p>
-              <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
-                <li className={editing.meta_title?.trim() ? "text-green-800" : ""}>
-                  Meta title {editing.meta_title?.trim() ? "set" : "missing"}
-                </li>
-                <li
-                  className={
-                    (editing.meta_description?.trim().length ?? 0) >= 50 &&
-                    (editing.meta_description?.trim().length ?? 0) <= 170
-                      ? "text-green-800"
-                      : ""
-                  }
-                >
-                  Meta description length (aim 50–170 chars):{" "}
-                  {editing.meta_description?.trim().length ?? 0}
-                </li>
-                <li className={editing.canonical_url?.trim() ? "text-green-800" : ""}>
-                  Canonical URL {editing.canonical_url?.trim() ? "set" : "optional but recommended"}
-                </li>
-                <li className={editing.og_image_url?.trim() ? "text-green-800" : ""}>
-                  OG image {editing.og_image_url?.trim() ? "set" : "optional"}
-                </li>
-              </ul>
-            </div>
-            <label className="block text-xs font-medium text-slate-600">
-              Preview token (UUID)
-              <input
-                className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={editing.preview_token ?? ""}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    preview_token: e.target.value.trim() || null,
-                  })
-                }
-              />
-            </label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                disabled={!canWrite}
-                onClick={() =>
-                  setEditing({
-                    ...editing,
-                    preview_token:
-                      typeof crypto !== "undefined" && crypto.randomUUID
-                        ? crypto.randomUUID()
-                        : `pv_${Date.now()}`,
-                  })
-                }
-              >
-                Generate preview token
-              </button>
-              <a
-                className="inline-flex items-center rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
-                href={`${getStorefrontPublicOrigin()}/p/${encodeURIComponent(editing.slug)}${
-                  editing.preview_token?.trim()
-                    ? `?preview=${encodeURIComponent(editing.preview_token.trim())}`
-                    : ""
-                }`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Open storefront preview
-              </a>
-            </div>
-            {editing.id &&
-            slugWhenOpened &&
-            editing.slug !== slugWhenOpened &&
-            slugWhenOpened.length > 0 ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-950">
-                <p className="font-medium">Slug changed from {slugWhenOpened}</p>
-                <p className="mt-1 text-amber-900/90">
-                  Add a 301 redirect so old links keep working.
-                </p>
-                <button
-                  type="button"
-                  disabled={!canWrite}
-                  className="mt-2 rounded border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-950 hover:bg-amber-100 disabled:opacity-50"
-                  onClick={() => void createSlugRedirect()}
-                >
-                  Create redirect /p/{slugWhenOpened} to /p/{editing.slug}
-                </button>
-                {redirectMessage ? <p className="mt-2 text-slate-700">{redirectMessage}</p> : null}
-              </div>
-            ) : null}
-            <label className="block text-xs font-medium text-slate-600">
-              JSON-LD (optional)
-              <textarea
-                className="mt-1 w-full min-h-[100px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
-                value={jsonLdText}
-                onChange={(e) => setJsonLdText(e.target.value)}
-              />
-            </label>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <button
-                type="button"
-                disabled={!canWrite || saving}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                onClick={() => void save()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-              {editing.id ? (
-                <button
-                  type="button"
-                  disabled={!canWrite}
-                  className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-700"
-                  onClick={() => void remove(editing.id)}
-                >
-                  Delete
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm"
-                onClick={() => setEditing(null)}
-              >
-                Close
-              </button>
-            </div>
-            <p className="text-xs text-slate-500">
-              Public URL when published: <code>/p/{editing.slug || "slug"}</code>. Draft preview uses{" "}
-              <code>?preview=</code> with your preview token on that path (see Open storefront preview
-              above).
-            </p>
-          </div>
-        ) : null}
+        <button
+          type="button"
+          className="rounded-lg border border-primary/20 bg-white px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5"
+          onClick={() => setShowStorefrontHome(true)}
+        >
+          Edit homepage
+        </button>
       </div>
+      {loadError ? <p className="text-sm text-red-700">{loadError}</p> : null}
+      {loadingRows ? (
+        <p className="text-sm text-slate-600">Loading pages...</p>
+      ) : null}
+      {!loadingRows && !rows.length ? (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+          No CMS pages exist yet. Create a page to open the editor.
+        </div>
+      ) : null}
+      {rows.length ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="grid grid-cols-[minmax(0,1fr)_8rem_7rem] border-b border-slate-200 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span>Page</span>
+            <span>Status</span>
+            <span className="text-right">Action</span>
+          </div>
+          {rows.map((page) => (
+            <div
+              key={page.id}
+              className="grid grid-cols-[minmax(0,1fr)_8rem_7rem] items-center border-b border-slate-100 px-4 py-4 last:border-0"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-900">
+                  {page.title || page.slug}
+                </p>
+                <p className="mt-1 truncate font-mono text-xs text-slate-500">
+                  /p/{page.slug}
+                </p>
+              </div>
+              <span className="text-xs text-slate-500">{page.status}</span>
+              <button
+                type="button"
+                className="justify-self-end text-xs font-semibold text-primary underline"
+                onClick={() => openPage(page)}
+              >
+                Open editor
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

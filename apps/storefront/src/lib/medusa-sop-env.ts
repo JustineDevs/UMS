@@ -1,4 +1,4 @@
 export {
   listMissingMedusaStorefrontEnv,
-  assertMedusaStorefrontEnvProduction,
-} from "@apparel-commerce/sdk";
+  
+} from "@universal-music-store/sdk";

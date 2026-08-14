@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "@apparel-commerce/platform-data";
+import { isMissingTableOrSchemaError } from "@universal-music-store/platform-data";
 import type { AdminOperationResult } from "@/lib/admin-operation-result";
 import { adminErr, adminOk } from "@/lib/admin-operation-result";
 
@@ -22,7 +22,8 @@ export type EntityWorkflowType =
   | "sales_order"
   | "inventory_adjustment"
   | "campaign"
-  | "cms_page";
+  | "cms_page"
+  | "chat_order";
 
 const ALLOWED: Record<string, Set<string>> = {
   draft: new Set([
@@ -51,11 +52,13 @@ const WORKFLOW_UPSERT_ATTEMPTS = 3;
 export async function upsertEntityWorkflow(
   client: SupabaseClient,
   input: {
+    organizationId: string;
     entityType: EntityWorkflowType;
     entityId: string;
     state: string;
     previousState?: string | null;
     notes?: string | null;
+    expectedUpdatedAt?: string;
     actorEmail?: string | null;
   },
 ): Promise<AdminOperationResult<{ id: string }>> {
@@ -67,13 +70,14 @@ export async function upsertEntityWorkflow(
         {
           entity_type: input.entityType,
           entity_id: input.entityId,
+          organization_id: input.organizationId,
           state: input.state,
           previous_state: input.previousState ?? null,
           notes: input.notes ?? null,
           actor_email: input.actorEmail ?? null,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "entity_type,entity_id", ignoreDuplicates: false },
+        { onConflict: "organization_id,entity_type,entity_id", ignoreDuplicates: false },
       )
       .select("id")
       .maybeSingle();
@@ -123,7 +127,7 @@ export type EntityWorkflowRow = {
  */
 export async function listEntityWorkflows(
   client: SupabaseClient,
-  opts?: { limit?: number; offset?: number; entityType?: string },
+  opts: { organizationId: string; limit?: number; offset?: number; entityType?: string },
 ): Promise<EntityWorkflowRow[]> {
   const limit = Math.min(200, Math.max(1, opts?.limit ?? 50));
   const offset = Math.max(0, opts?.offset ?? 0);
@@ -134,6 +138,7 @@ export async function listEntityWorkflows(
     )
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
+  q = q.eq("organization_id", opts.organizationId);
   if (opts?.entityType) {
     q = q.eq("entity_type", opts.entityType);
   }
@@ -163,6 +168,7 @@ export async function listEntityWorkflows(
 
 export async function getEntityWorkflow(
   client: SupabaseClient,
+  organizationId: string,
   entityType: EntityWorkflowType,
   entityId: string,
 ): Promise<{
@@ -176,6 +182,7 @@ export async function getEntityWorkflow(
     .select("state,previous_state,notes,updated_at")
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
 
   if (error || !data) return null;
@@ -195,19 +202,32 @@ export async function getEntityWorkflow(
 export async function transitionEntityWorkflow(
   client: SupabaseClient,
   input: {
+    organizationId: string;
     entityType: EntityWorkflowType;
     entityId: string;
     toState: string;
     actorEmail: string;
     notes?: string | null;
+    expectedUpdatedAt?: string;
   },
 ): Promise<AdminOperationResult<{ state: string }>> {
   const current = await getEntityWorkflow(
     client,
+    input.organizationId,
     input.entityType,
     input.entityId,
   );
   const from = current?.state ?? "draft";
+  if (
+    input.expectedUpdatedAt &&
+    (!current || current.updated_at !== input.expectedUpdatedAt)
+  ) {
+    return adminErr(
+      "WORKFLOW_CONFLICT",
+      "Workflow changed; reload before transitioning",
+      409,
+    );
+  }
   if (!isAllowedTransition(from, input.toState)) {
     return adminErr(
       "WORKFLOW_TRANSITION",
@@ -216,6 +236,7 @@ export async function transitionEntityWorkflow(
     );
   }
   const res = await upsertEntityWorkflow(client, {
+    organizationId: input.organizationId,
     entityType: input.entityType,
     entityId: input.entityId,
     state: input.toState,

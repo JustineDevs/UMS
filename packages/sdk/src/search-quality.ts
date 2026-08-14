@@ -1,19 +1,17 @@
 export type SynonymGroup = string[];
 
 const SYNONYM_GROUPS: SynonymGroup[] = [
-  ["tshirt", "t-shirt", "tee", "shirt"],
-  ["pants", "trousers", "jeans", "bottoms"],
-  ["sneakers", "shoes", "kicks", "trainers"],
-  ["hoodie", "hooded sweater", "pullover"],
-  ["jacket", "coat", "outerwear"],
-  ["dress", "gown", "frock"],
-  ["cap", "hat", "headwear"],
-  ["socks", "stockings", "hosiery"],
-  ["bag", "backpack", "purse", "tote"],
-  ["small", "sm", "s"],
-  ["medium", "md", "m"],
-  ["large", "lg", "l"],
-  ["extra large", "xl"],
+  ["guitar", "electric guitar", "acoustic guitar", "bass guitar"],
+  ["keyboard", "piano", "digital piano", "stage piano", "synth", "keys"],
+  ["drums", "drum kit", "drum set", "percussion", "cymbals"],
+  ["amplifier", "amp", "speaker cabinet", "cab"],
+  ["pedal", "effects pedal", "fx", "stompbox"],
+  ["strings", "string set", "guitar strings"],
+  ["pick", "plectrum", "guitar pick"],
+  ["strap", "instrument strap", "guitar strap"],
+  ["cable", "instrument cable", "patch cable"],
+  ["stand", "instrument stand", "rack"],
+  ["accessories", "gear", "instrument accessories", "accessories & gear"],
 ];
 
 export function expandSynonyms(query: string): string[] {
@@ -21,12 +19,10 @@ export function expandSynonyms(query: string): string[] {
   const terms = lower.split(/\s+/);
   const expanded = new Set<string>(terms);
 
-  for (const term of terms) {
-    for (const group of SYNONYM_GROUPS) {
-      if (group.some((s) => s === term)) {
-        for (const synonym of group) {
-          expanded.add(synonym);
-        }
+  for (const group of SYNONYM_GROUPS) {
+    if (group.some((s) => lower.includes(s))) {
+      for (const synonym of group) {
+        expanded.add(synonym);
       }
     }
   }

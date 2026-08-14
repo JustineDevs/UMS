@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPaymentPlatformMetrics } from "@apparel-commerce/platform-data";
+import { getPaymentPlatformMetrics } from "@universal-music-store/platform-data";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 

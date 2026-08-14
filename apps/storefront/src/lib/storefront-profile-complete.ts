@@ -1,4 +1,4 @@
-import { isPhilippinesMobilePhone } from "@apparel-commerce/validation";
+import { isPhilippinesMobilePhone } from "@universal-music-store/validation";
 import type { ServerCustomerProfile } from "@/lib/server-customer-profile";
 
 function requiresBarangay(country: string | undefined): boolean {

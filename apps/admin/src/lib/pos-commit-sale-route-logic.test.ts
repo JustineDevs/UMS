@@ -62,6 +62,54 @@ test("posCommitSaleRouteLogic rejects missing items", async () => {
   assert.equal(error.body.code, "BAD_REQUEST");
 });
 
+test("posCommitSaleRouteLogic rejects an uncertified payment terminal", async () => {
+  const result = await posCommitSaleRouteLogic({
+    body: {
+      items: [{ variantId: "variant_1", quantity: 1 }],
+      paymentTerminalId: "terminal_1",
+    },
+    correlationId: "req_1",
+    envReady: true,
+    completedReplayOrderNumber: null,
+    findExistingOrderByOfflineSaleId: async () => null,
+    assertStock: async () => ({ ok: true }),
+    loadShiftStatus: async () => "open",
+    assertTerminalReady: async () => false,
+    evaluatePolicy: () => ({ allowed: true, violations: [] }),
+    createDraftOrder: async () => ({ id: "draft_1" }),
+    convertDraftToOrder: async () => ({ id: "order_1", display_id: "1001" }),
+    patchOrderMetadata: async () => {},
+    rememberCompletedReplay: () => {},
+  });
+  const error = expectError(result);
+  assert.equal(error.status, 409);
+  assert.equal(error.body.code, "POS_POLICY_DENIED");
+});
+
+test("posCommitSaleRouteLogic requires a terminal or provider reference for non-cash sales", async () => {
+  const result = await posCommitSaleRouteLogic({
+    body: {
+      items: [{ variantId: "variant_1", quantity: 1 }],
+      paymentMethod: "card",
+    },
+    correlationId: "req_1",
+    envReady: true,
+    completedReplayOrderNumber: null,
+    findExistingOrderByOfflineSaleId: async () => null,
+    assertStock: async () => ({ ok: true }),
+    loadShiftStatus: async () => "open",
+    evaluatePolicy: () => ({ allowed: true, violations: [] }),
+    createDraftOrder: async () => ({ id: "draft_1" }),
+    convertDraftToOrder: async () => ({ id: "order_1", display_id: "1001" }),
+    patchOrderMetadata: async () => {},
+    rememberCompletedReplay: () => {},
+  });
+
+  const error = expectError(result);
+  assert.equal(error.status, 409);
+  assert.equal(error.body.code, "POS_POLICY_DENIED");
+});
+
 test("posCommitSaleRouteLogic enforces stock and policy denials", async () => {
   const stockDenied = await posCommitSaleRouteLogic({
     body: { items: [{ variantId: "variant_1", quantity: 2 }] },
@@ -140,6 +188,8 @@ test("posCommitSaleRouteLogic creates order, patches metadata, and remembers ide
       email: "cashier@example.com",
       offlineSaleId: "offline_1",
       shiftId: "shift_1",
+      paymentMethod: "cash",
+      receiptReference: "receipt_1",
     },
     correlationId: "req_1",
     idempotencyKey: "idem_1",
@@ -166,6 +216,9 @@ test("posCommitSaleRouteLogic creates order, patches metadata, and remembers ide
   assert.deepEqual(patched[0], {
     pos_offline_id: "offline_1",
     pos_shift_id: "shift_1",
+    pos_payment_method: "cash",
+    pos_receipt_reference: "receipt_1",
+    pos_channel: "in_store",
   });
   assert.deepEqual(remembered[0], { key: "idem_1", orderNumber: "1001" });
 });

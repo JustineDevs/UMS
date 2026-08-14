@@ -6,13 +6,13 @@ This repo reads configuration from process environment at runtime. Use a secrets
 
 1. Create a project with configs `dev`, `staging`, `production`.
 2. Import keys from `.env.example` and set real values per config.
-3. Local: install the Doppler CLI and run `doppler run -- pnpm run dev` from the repo root, or sync a local `.env` with `doppler secrets download --no-file --format env > .env` when allowed by your policy.
+3. Local: install the Doppler CLI and run `doppler run -- pnpm run dev` from the repo root, or sync a local `.env.local` with `doppler secrets download --no-file --format env > .env.local` when allowed by your policy.
 
 ## Infisical
 
 1. Create a project and environments (e.g. `dev`, `prod`).
 2. Add secrets matching `.env.example` names.
-3. Local: use the Infisical CLI to inject env for a command, or export a scoped `.env` for development.
+3. Local: use the Infisical CLI to inject env for a command, or export a scoped `.env.local` for development.
 
 ## Rules
 

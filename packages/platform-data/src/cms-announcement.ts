@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export const CMS_ANNOUNCEMENT_DEFAULT_ID = "default";
 
@@ -55,8 +55,10 @@ function inTimeWindow(startsAt: string | null, endsAt: string | null): boolean {
 }
 
 /** All announcement rows (admin). */
-export async function listCmsAnnouncementsAdmin(supabase: SupabaseClient): Promise<CmsAnnouncementRow[]> {
-  const { data, error } = await supabase.from("cms_announcement").select("*");
+export async function listCmsAnnouncementsAdmin(supabase: SupabaseClient, organizationId?: string): Promise<CmsAnnouncementRow[]> {
+  let query = supabase.from("cms_announcement").select("*");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-announcement] list admin", error.message);
@@ -90,8 +92,11 @@ export async function listCmsAnnouncementsForLocalePublic(
   supabase: SupabaseClient,
   locale: string,
   regionCode?: string | null,
+  organizationId?: string,
 ): Promise<CmsAnnouncementRow[]> {
-  const { data, error } = await supabase.from("cms_announcement").select("*").eq("locale", locale);
+  let query = supabase.from("cms_announcement").select("*").eq("locale", locale);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-announcement] list public", error.message);
@@ -128,7 +133,7 @@ export type UpsertCmsAnnouncementInput = Partial<
     | "stackGroup"
     | "regionCode"
   >
-> & { id?: string };
+> & { id?: string; organization_id?: string };
 
 export async function upsertCmsAnnouncement(
   supabase: SupabaseClient,
@@ -141,6 +146,7 @@ export async function upsertCmsAnnouncement(
     .select("*")
     .eq("id", id)
     .eq("locale", locale)
+    .eq("organization_id", row.organization_id ?? "")
     .maybeSingle();
   const ex = existing ? rowFromDb(existing as Record<string, unknown>) : null;
   const { error } = await supabase.from("cms_announcement").upsert(
@@ -157,9 +163,10 @@ export async function upsertCmsAnnouncement(
       priority: row.priority ?? ex?.priority ?? 0,
       stack_group: row.stackGroup !== undefined ? row.stackGroup : ex?.stackGroup ?? null,
       region_code: row.regionCode !== undefined ? row.regionCode : ex?.regionCode ?? null,
+      organization_id: row.organization_id ?? null,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "id,locale" },
+    { onConflict: "organization_id,id,locale" },
   );
   if (error) throw new Error(error.message);
 }
@@ -168,8 +175,11 @@ export async function deleteCmsAnnouncement(
   supabase: SupabaseClient,
   id: string,
   locale: string,
+  organizationId?: string,
 ): Promise<boolean> {
-  const { error } = await supabase.from("cms_announcement").delete().eq("id", id).eq("locale", locale);
+  let query = supabase.from("cms_announcement").delete().eq("id", id).eq("locale", locale);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { error } = await query;
   if (error) {
     console.error("[cms-announcement] delete", error.message);
     return false;
@@ -179,8 +189,11 @@ export async function deleteCmsAnnouncement(
 
 export async function getCmsAnnouncementAnalyticsMap(
   supabase: SupabaseClient,
+  organizationId?: string,
 ): Promise<Map<string, CmsAnnouncementAnalyticsRow>> {
-  const { data, error } = await supabase.from("cms_announcement_analytics").select("*");
+  let query = supabase.from("cms_announcement_analytics").select("*");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return new Map();
     console.error("[cms-announcement] analytics list", error.message);
@@ -208,14 +221,16 @@ export async function incrementCmsAnnouncementMetric(
   announcementId: string,
   locale: string,
   metric: "impressions" | "clicks" | "dismisses",
+  organizationId?: string,
 ): Promise<void> {
-  const key = { announcement_id: announcementId, locale };
-  const { data: cur } = await supabase
+  const key = { announcement_id: announcementId, locale, organization_id: organizationId ?? null };
+  let query = supabase
     .from("cms_announcement_analytics")
     .select("*")
     .eq("announcement_id", announcementId)
-    .eq("locale", locale)
-    .maybeSingle();
+    .eq("locale", locale);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data: cur } = await query.maybeSingle();
   const r = cur as Record<string, unknown> | null;
   const impressions = Number(r?.impressions) || 0;
   const clicks = Number(r?.clicks) || 0;
@@ -228,7 +243,7 @@ export async function incrementCmsAnnouncementMetric(
     updated_at: new Date().toISOString(),
   };
   const { error } = await supabase.from("cms_announcement_analytics").upsert(next, {
-    onConflict: "announcement_id,locale",
+    onConflict: "organization_id,announcement_id,locale",
   });
   if (error) console.error("[cms-announcement] increment metric", error.message);
 }

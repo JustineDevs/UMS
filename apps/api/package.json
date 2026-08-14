@@ -1,5 +1,5 @@
 {
-  "name": "@apparel-commerce/api",
+  "name": "@universal-music-store/api",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -12,11 +12,10 @@
   },
   "dependencies": {
     "dotenv": "^16.4.0",
-    "@apparel-commerce/platform-data": "workspace:*",
-    "@apparel-commerce/validation": "workspace:*",
-    "@apparel-commerce/database": "workspace:*",
-    "@apparel-commerce/rate-limits": "workspace:*",
-    "@apparel-commerce/sdk": "workspace:*",
+    "@universal-music-store/validation": "workspace:*",
+    "@universal-music-store/database": "workspace:*",
+    "@universal-music-store/rate-limits": "workspace:*",
+    "@universal-music-store/sdk": "workspace:*",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-async-errors": "^3.1.1",
@@ -24,8 +23,8 @@
     "helmet": "^7.1.0"
   },
   "devDependencies": {
-    "@apparel-commerce/config-eslint": "workspace:*",
-    "@apparel-commerce/config-typescript": "workspace:*",
+    "@universal-music-store/config-eslint": "workspace:*",
+    "@universal-music-store/config-typescript": "workspace:*",
     "eslint": "^9.0.0",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

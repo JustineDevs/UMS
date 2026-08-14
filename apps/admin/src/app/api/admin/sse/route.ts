@@ -1,22 +1,19 @@
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import {
   registerSseClient,
   unregisterSseClient,
 } from "@/lib/admin-sse-hub";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffSessionWithPermission } from "@/lib/requireStaffSession";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { tagResponse } from "@/lib/staff-api-response";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const staff = await requireStaffSessionWithPermission("dashboard:read");
+  const staff = await requireStaffApiSession("dashboard:read");
   if (!staff.ok) {
     return tagResponse(staff.response, cid);
   }
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.email ?? "anon";
+  const userId = staff.session.user?.email ?? "anon";
 
   const stream = new ReadableStream({
     start(controller) {

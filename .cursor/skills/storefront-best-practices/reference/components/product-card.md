@@ -60,7 +60,7 @@ Product cards display products in grids (product listings, search results, relat
 
 **Decision:**
 - Simple products (1-2 variants): Add first variant
-- Fashion/apparel with sizes: Require size selection (redirect or Quick View)
+- Music instruments with required variants: Require variant selection (redirect or Quick View)
 - Complex products (3+ variant types): Redirect to product page
 
 **Button behavior:**

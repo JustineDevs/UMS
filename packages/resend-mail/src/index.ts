@@ -8,6 +8,12 @@ export type ResendTransactionalParams = {
   html: string;
   replyTo?: string;
   tags?: Array<{ name: string; value: string }>;
+  /**
+   * Resend idempotency key. When provided the SDK forwards it as the
+   * `Idempotency-Key` header so that duplicate deliveries with the same key
+   * are suppressed by the Resend platform.
+   */
+  idempotencyKey?: string;
 };
 
 export type ResendTransactionalResult =
@@ -22,14 +28,20 @@ export async function sendResendTransactionalEmail(
   params: ResendTransactionalParams,
 ): Promise<ResendTransactionalResult> {
   const resend = new Resend(params.apiKey);
-  const { data, error } = await resend.emails.send({
-    from: params.from,
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-    ...(params.replyTo ? { reply_to: params.replyTo } : {}),
-    ...(params.tags?.length ? { tags: params.tags } : {}),
-  });
+  const options = params.idempotencyKey
+    ? { idempotencyKey: params.idempotencyKey }
+    : undefined;
+  const { data, error } = await resend.emails.send(
+    {
+      from: params.from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+      ...(params.replyTo ? { reply_to: params.replyTo } : {}),
+      ...(params.tags?.length ? { tags: params.tags } : {}),
+    },
+    options,
+  );
   if (error) {
     return {
       ok: false,

@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
+import { BotIdClient } from "botid/client";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
 import { StorefrontPreferenceSync } from "@/components/StorefrontPreferenceSync";
@@ -9,8 +10,12 @@ import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
 import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
 import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
+import { PostHogAnalytics } from "@/components/PostHogAnalytics";
 import { MedusaCartProvider } from "@/context/MedusaCartContext";
 import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
+import { RecaptchaScript } from "@/components/RecaptchaScript";
+import { WishlistSyncOnLogin } from "@/components/WishlistSyncOnLogin";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -47,23 +52,22 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   keywords: [
     SITE_NAME,
-    "custom apparel Philippines",
-    "uniforms",
-    "corporate wear",
-    "school uniforms",
-    "custom jerseys",
-    "Filipino apparel",
-    "Philippines clothing",
-    "custom shorts",
+    "music store Philippines",
+    "guitars",
+    "bass",
+    "drums",
+    "amplifiers",
+    "instrument accessories",
+    "Philippines music gear",
   ],
   applicationName: SITE_NAME,
   openGraph: {
     type: "website",
     locale: "en_PH",
     siteName: SITE_NAME,
-    title: `${SITE_NAME} — Apparel store`,
+    title: `${SITE_NAME} — Music store`,
     description: SITE_DESCRIPTION,
-    images: [{ url: "/brand/maharlika-logo-design.svg", alt: SITE_NAME }],
+    images: [{ url: "/UVS/UVS_logo_landscape.png", alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
@@ -107,16 +111,30 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-          rel="stylesheet"
-        />
-      </head>
       <body className="min-h-[100dvh] min-w-0 overflow-x-hidden bg-surface text-on-surface font-body antialiased supports-[height:100dvh]:min-h-dvh">
         <NextAuthSessionProvider>
           <MedusaCartProvider>
+            <PostHogAnalytics />
+            <BotIdClient
+              protect={[
+                { path: "/api/checkout", method: "POST" },
+                { path: "/api/checkout/cod-cart-payload", method: "POST" },
+                { path: "/api/checkout/cod-place-order", method: "POST" },
+                { path: "/api/checkout/complete-medusa-cart", method: "POST" },
+                { path: "/api/checkout/apply-promo", method: "POST" },
+                { path: "/api/checkout/verify-stock", method: "POST" },
+                { path: "/api/checkout/upload-payment-receipt", method: "POST" },
+                { path: "/api/account/profile", method: "PATCH" },
+                { path: "/api/account/orders/*/cancel", method: "POST" },
+                { path: "/api/reviews", method: "POST" },
+                { path: "/api/cart/medusa-bind", method: "POST" },
+                { path: "/api/cart/abandonment", method: "POST" },
+                { path: "/api/newsletter", method: "POST" },
+                { path: "/api/back-in-stock", method: "POST" },
+              ]}
+            />
             <CartSyncOnSignIn />
+            <WishlistSyncOnLogin />
             <StorefrontPreferenceSync />
             <CartAbandonmentBeacon />
             <Suspense fallback={null}>
@@ -126,7 +144,9 @@ export default function RootLayout({
             </Suspense>
           </MedusaCartProvider>
         </NextAuthSessionProvider>
+        <RecaptchaScript />
         <VercelWebAnalytics />
+        <CookieConsentBanner />
       </body>
     </html>
   );

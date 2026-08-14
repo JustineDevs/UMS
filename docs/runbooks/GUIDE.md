@@ -4,18 +4,24 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## Render (Backend Hosting)
+## Fly.io (Backend Hosting)
 
-**URL:** https://render.com
+**URL:** https://fly.io
 
-**What you get:** A place to run the commerce backend. You will get a URL (e.g. `https://your-app.onrender.com`) after setup.
+**What you get:** A production runtime for the Medusa commerce backend. The deployment produces a URL such as `https://universal-music-store-medusa.fly.dev`.
 
-**Payment required?** No for the free tier. Free services spin down when idle; paid plans keep them running.
+**Payment required?** Fly.io billing and machine pricing apply. Keep at least one machine running for checkout and webhook availability.
 
 **Steps:**
 
-1. Go to https://render.com and click **Get started** or **Sign in**.
-2. Sign up with **GitHub** (recommended) or email.
+1. Install `flyctl` and sign in with `fly auth login`.
+2. From the repository root, review `fly.toml` and change `app` if the name is unavailable.
+3. Create the app without generating a second configuration: `fly apps create universal-music-store-medusa`.
+4. Set runtime secrets with `fly secrets set --app universal-music-store-medusa DATABASE_URL=... JWT_SECRET=... COOKIE_SECRET=... STORE_CORS=... ADMIN_CORS=... AUTH_CORS=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...`.
+5. Deploy from the repository root: `fly deploy --config fly.toml --remote-only`.
+6. Verify `https://universal-music-store-medusa.fly.dev/health` returns HTTP 200 before pointing Vercel at it.
+
+Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in `fly.toml`, Docker build arguments, or git. Fly secrets are injected at runtime.
 
 ---
 
@@ -48,42 +54,41 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## PayMongo (Philippines)
+## Xendit (Philippines)
 
-**URL:** https://dashboard.paymongo.com
+**URL:** https://dashboard.xendit.co
 
-**What you get:** Secret key and webhook secret. Used for GCash, Maya, cards, e-wallets, BillEase in the Philippines.
+**What you get:** Secret key and webhook token. Used for GCash, bank transfer, cards, and e-wallets in the Philippines.
 
-**Payment required?** No signup fee. PayMongo charges per transaction. **Business verification (KYC) is required** before going live.
+**Payment required?** No signup fee. Xendit charges per transaction. **Business verification** may be required before going live.
 
 **Steps:**
 
-1. Go to https://dashboard.paymongo.com and sign up or log in.
-2. Complete your **business verification** (KYC) when prompted. This is required to accept real payments.
+1. Go to https://dashboard.xendit.co and sign up or log in.
+2. Complete any required business verification when prompted. This is required to accept real payments.
 3. In the left menu, go to **Developers** → **API Keys**.
 
 ---
 
-## Maya (Philippines)
+## Hosted payment providers
 
 **URLs:**  
-- Developer docs: https://developers.maya.ph  
-- Business manager: https://pbm.paymaya.com
+- Xendit docs: https://docs.xendit.co
 
-**What you get:** Secret key and webhook secret. Used for Maya Checkout, GCash, Maya wallet, cards, QRPH in the Philippines.
+**What you get:** Secret key and webhook token. Used for hosted GCash, bank transfer, cards, and e-wallet payment flows in the Philippines.
 
-**Payment required?** No signup fee. Maya charges per transaction. **Business onboarding** is required for live payments.
+**Payment required?** No signup fee. Hosted payment providers charge per transaction. **Business onboarding** may be required for live payments.
 
 **Steps:**
 
-1. Go to https://pbm.paymaya.com and sign up for **Maya Business Manager**.
+1. Go to the provider dashboard and sign up for the business account.
 2. Complete business onboarding and activation.
 
 ---
 
-## AfterShip (Shipment Tracking)
+## Shipment Tracking
 
-**URL:** https://admin.aftership.com
+**URL:** Use the configured tracking provider dashboard.
 
 **What you get:** API key for shipment tracking (e.g. J&T Express Philippines).
 
@@ -91,8 +96,10 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 **Steps:**
 
-1. Go to https://admin.aftership.com and sign up or log in.
+1. Go to the configured tracking provider dashboard and sign up or log in.
 2. In the left menu, go to **App Center** or **Settings** → **API**.
+
+**Repo-specific integration notes:** see [J&T Integration Map](./JNT-INTEGRATION.md) for the current carrier boundary model, reference pattern, and verification checklist.
 
 ---
 
@@ -100,11 +107,16 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 | Service      | Signup fee | To get API keys      | For live transactions  |
 |-------------|------------|----------------------|------------------------|
-| Render      | No         | Free tier OK         | Paid plans for always-on |
+| Fly.io      | No         | Account and billing setup | Paid machine runtime |
 | Stripe      | No         | Free                 | % per transaction      |
 | PayPal      | No         | Free                 | % per transaction      |
-| PayMongo    | No         | KYC required         | % per transaction      |
-| Maya        | No         | Business onboarding  | % per transaction      |
-| AfterShip   | No         | Free tier OK         | Paid for higher volume |
+| Xendit      | No         | Business onboarding  | % per transaction      |
+| Tracking service | No      | Free tier OK         | Paid for higher volume |
 
-Hand these credentials to your developer. They will configure them in the correct system (Render, Vercel, etc.).
+Hand these credentials to your developer. They will configure them in Fly.io or Vercel without committing secrets to the repository.
+
+## Production env files
+
+- `/.env.local` is for development only.
+- `/.env.production` mirrors the production host configuration without localhost origins.
+- Use `https://universalmusic.vercel.app` for storefront/admin public links unless a route-specific override is documented elsewhere.

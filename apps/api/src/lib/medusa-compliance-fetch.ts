@@ -1,7 +1,10 @@
 /**
  * Server-side Medusa Admin reads for GDPR export (commerce of record).
  */
-import { getMedusaStoreBaseUrl, getMedusaSecretApiKey } from "@apparel-commerce/sdk";
+import {
+  getMedusaAdminBaseUrl,
+  getMedusaSecretApiKey,
+} from "@universal-music-store/sdk";
 
 function medusaAdminAuthHeader(secret: string): string {
   const payload = `${secret}:`;
@@ -12,7 +15,7 @@ function medusaAdminAuthHeader(secret: string): string {
 export async function fetchMedusaOrdersForComplianceEmail(
   email: string,
 ): Promise<{ orders: unknown[]; error: string | null }> {
-  const root = getMedusaStoreBaseUrl();
+  const root = getMedusaAdminBaseUrl();
   const secret = getMedusaSecretApiKey();
   if (!secret) {
     return { orders: [], error: "medusa_not_configured" };
@@ -35,7 +38,7 @@ export async function fetchMedusaOrdersForComplianceEmail(
 export async function deleteMedusaCustomerByEmail(
   email: string,
 ): Promise<{ deleted: boolean; error: string | null }> {
-  const root = getMedusaStoreBaseUrl();
+  const root = getMedusaAdminBaseUrl();
   const secret = getMedusaSecretApiKey();
   if (!secret) {
     return { deleted: false, error: "medusa_not_configured" };

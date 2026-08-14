@@ -1,26 +1,46 @@
 export {
   getMedusaStoreBaseUrl,
+  getMedusaAdminBaseUrl,
   getMedusaPublishableKey,
   getMedusaRegionId,
   getMedusaPaymentProviderId,
   getMedusaSalesChannelId,
   getMedusaSecretApiKey,
   withSalesChannelId,
-} from "./medusa-env";
+} from "./medusa-env.js";
 
 export {
   generateTrackingToken,
   verifyTrackingToken,
   buildTrackingUrl,
-} from "./tracking-token";
+} from "./tracking-token.js";
+export {
+  ensurePostHogClient,
+  identifyPostHogClient,
+  resetPostHogClient,
+  capturePostHogClientEvent,
+  capturePostHogClientException,
+} from "./posthog-client.js";
 
 export {
   listMissingMedusaStorefrontEnv,
   assertMedusaStorefrontEnvProduction,
-} from "./env/medusa-storefront";
-export { assertAdminMedusaEnvProduction } from "./env/admin-medusa";
-export { DEFAULT_PUBLIC_SITE_ORIGIN } from "./public-site-url";
-export { PH_VAT_RATE, PH_VAT_PERCENT, computeDisplayVat } from "./ph-tax";
+} from "./env/medusa-storefront.js";
+export { assertAdminMedusaEnvProduction } from "./env/admin-medusa.js";
+export {
+  getPostHogProjectToken,
+  getPostHogApiKey,
+  getPostHogHost,
+  listMissingPostHogEnv,
+  assertPostHogEnvProduction,
+} from "./env/posthog.js";
+export { DEFAULT_PUBLIC_SITE_ORIGIN } from "./public-site-url.js";
+export {
+  sanitizeSafeUrl,
+  sanitizeSameOriginUrl,
+  sanitizeTrustedPublicUrl,
+} from "./safe-url.js";
+export { PH_VAT_RATE, PH_VAT_PERCENT, computeDisplayVat } from "./ph-tax.js";
 
 export {
   loadGoogleCredentials,
@@ -30,7 +50,7 @@ export {
   isSessionStaff,
   normalizeEmail,
   type SharedSessionUser,
-} from "./auth-shared";
+} from "./auth-shared.js";
 
 export {
   type PrinterProfile,
@@ -42,7 +62,7 @@ export {
   runPeakHourHealthCheck,
   DEFAULT_THERMAL_PRINTER,
   DEFAULT_DRAWER,
-} from "./pos-hardware";
+} from "./pos-hardware.js";
 
 export {
   isCmsPubliclyVisible,
@@ -83,4 +103,11 @@ export {
   type CmsFormKey,
   type BuildCmsPreviewUrlInput,
   type CmsPreviewUrlKind,
-} from "./cms";
+} from "./cms.js";
+
+export {
+  STORE_PRODUCT_TYPES,
+  STORE_PRODUCT_TAGS,
+} from "./store-taxonomy.js";
+
+export { capturePostHogEvent, type PostHogCaptureInput } from "./posthog.js";

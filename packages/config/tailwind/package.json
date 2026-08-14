@@ -1,7 +1,10 @@
 {
-  "name": "@apparel-commerce/config-tailwind",
+  "name": "@universal-music-store/config-tailwind",
   "version": "1.0.0",
   "private": true,
   "main": "tailwind.config.js",
-  "files": ["tailwind.config.js", "postcss.config.js"]
+  "files": ["tailwind.config.js", "postcss.config.js"],
+  "dependencies": {
+    "tailwindcss": "^3.4.15"
+  }
 }

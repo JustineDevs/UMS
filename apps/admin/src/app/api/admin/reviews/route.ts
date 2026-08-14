@@ -26,17 +26,23 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status")?.trim().toLowerCase() ?? "";
   const productId = url.searchParams.get("medusaProductId")?.trim() ?? "";
   const q = url.searchParams.get("q")?.trim().toLowerCase() ?? "";
-  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 80));
+  const limit = Math.min(
+    200,
+    Math.max(1, Number(url.searchParams.get("limit")) || 80),
+  );
 
   let query = sup.client
     .from("product_reviews")
     .select(
-      "id,product_slug,medusa_product_id,rating,author_name,body,status,created_at,customer_email,medusa_customer_id,is_verified_buyer,verified_medusa_order_id,verified_at,moderated_by_staff_email,moderated_at,moderation_note",
+      "id,product_slug,medusa_product_id,rating,author_name,body,status,created_at,is_verified_buyer,moderated_at,moderation_note",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (status && ["pending", "approved", "rejected", "hidden"].includes(status)) {
+  if (
+    status &&
+    ["pending", "approved", "rejected", "hidden"].includes(status)
+  ) {
     query = query.eq("status", status);
   }
   if (productId) {
@@ -53,7 +59,7 @@ export async function GET(req: Request) {
   if (error) {
     return correlatedJson(
       correlationId,
-      { error: error.message, code: "REVIEWS_QUERY_FAILED" },
+      { error: "Unable to load reviews", code: "REVIEWS_QUERY_FAILED" },
       { status: 502 },
     );
   }

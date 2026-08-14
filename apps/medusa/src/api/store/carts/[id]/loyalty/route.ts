@@ -9,9 +9,10 @@ import {
   emailFromCustomerRow,
   needsCustomerEmailLookup,
 } from "../../../../../lib/loyalty-resolve-email";
+import { tryCreateSupabaseClient } from "../../../../../lib/payment-supabase-bridge";
 
 type Body = {
-  points?: number;
+  points: number;
 };
 
 /** 1 loyalty point = 1.00 currency unit off; amounts use smallest currency unit (e.g. centavos). */
@@ -27,12 +28,8 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     throw new MedusaError(MedusaError.Types.INVALID_DATA, "Missing cart id");
   }
 
-  const body = (req.body ?? {}) as Body;
+  const body = ((req as MedusaRequest & { validatedBody?: Body }).validatedBody ?? req.body ?? {}) as Body;
   const points = Math.floor(Number(body.points ?? 0));
-
-  if (points <= 0) {
-    return res.status(200).json({ cart_id: cartId, skipped: true as const });
-  }
 
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
   const { data: cartRows } = await query.graph({
@@ -74,16 +71,10 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     );
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_ANON_KEY?.trim();
-  if (!supabaseUrl || !supabaseKey) {
+  const sb = tryCreateSupabaseClient();
+  if (!sb) {
     throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "Supabase is not configured");
   }
-
-  const { createClient } = await import("@supabase/supabase-js");
-  const sb = createClient(supabaseUrl, supabaseKey);
   const { data: acct, error: acctErr } = await sb
     .from("loyalty_accounts")
     .select("id,points_balance")

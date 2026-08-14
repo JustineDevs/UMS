@@ -8,6 +8,7 @@ import {
   updateLineQuantity,
   type CartLine,
 } from "@/lib/cart";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export function CartPageClient() {
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -60,6 +61,7 @@ export function CartPageClient() {
                   fill
                   sizes="80px"
                   className="object-cover"
+                  unoptimized={shouldUnoptimizeImage(l.thumbnail)}
                 />
               </div>
             ) : (
@@ -75,7 +77,7 @@ export function CartPageClient() {
                 {l.name}
               </Link>
               <p className="text-on-surface-variant text-xs mt-0.5">
-                {[l.size, l.color].filter(Boolean).join(" / ") || "One size"}
+                {[l.type, l.finish].filter(Boolean).join(" / ") || "Default"}
                 {l.sku ? (
                   <span className="text-on-surface-variant/70"> · {l.sku}</span>
                 ) : null}
@@ -105,6 +107,17 @@ export function CartPageClient() {
                   aria-label="Increase quantity"
                 >
                   +
+                </button>
+                <button
+                  type="button"
+                  className="ml-1 inline-flex h-8 items-center rounded border border-outline-variant/30 px-2.5 text-xs font-semibold text-on-surface-variant hover:border-destructive/40 hover:bg-destructive/5 hover:text-destructive"
+                  onClick={() => {
+                    updateLineQuantity(l.variantId, 0);
+                    refresh();
+                  }}
+                  aria-label={`Remove ${l.name} from bag`}
+                >
+                  Remove
                 </button>
               </div>
             </div>

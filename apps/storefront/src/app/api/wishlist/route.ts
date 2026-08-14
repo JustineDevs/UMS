@@ -5,18 +5,11 @@ import { applyRateLimit } from "@/lib/cart-api-helpers";
 
 export const dynamic = "force-dynamic";
 
-type WishlistRow = {
-  product_slug: string;
-  product_name: string;
-  medusa_product_id?: string | null;
-  added_at: string;
-};
-
 /**
  * GET /api/wishlist
  * Returns the server-side wishlist for the authenticated customer.
  */
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   const session = await getServerSession(authOptions);
   const customerId = (session?.user as Record<string, unknown> | undefined)?.medusaCustomerId as string | undefined;
   if (!session?.user || !customerId?.trim()) {
@@ -73,7 +66,10 @@ export async function POST(req: Request) {
   }, { onConflict: "medusa_customer_id,product_slug" });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json(
+      { error: error.message },
+      { status: /not found|missing|does not exist/i.test(error.message) ? 404 : 503 },
+    );
   }
   return Response.json({ ok: true });
 }

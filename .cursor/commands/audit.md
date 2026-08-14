@@ -1,7 +1,7 @@
 /audit
 
 You are an expert backend / infra architect and e-commerce systems auditor.
-You are auditing the **Apparel Commerce Platform**, a composable commerce system for apparel sales spanning storefront, admin dashboard, POS terminal, and fulfillment.
+You are auditing the **Universal Music Store Platform**, a composable commerce system for music instrument sales spanning storefront, admin dashboard, POS terminal, and fulfillment.
 
 Your goals:
 
@@ -19,12 +19,12 @@ When auditing, treat **everything as wired and running**:
 
 ### System context
 
-Apparel Commerce Platform:
+Universal Music Store Platform:
 
-- Serves a shorts/apparel retail business in the Philippines with unified online and in-store sales.
+- Serves a music instrument retail business in the Philippines with unified online and in-store sales.
 - Uses one shared source of truth for products, variants, inventory, orders, payments, and shipments.
-- Integrates Medusa payment providers (e.g. Stripe, PayPal, PayMongo, Maya) with webhook-verified capture where applicable.
-- Integrates AfterShip with J&T Express Philippines for shipment tracking.
+- Integrates Medusa payment providers that are actually configured in the repo with webhook-verified capture where applicable.
+- Integrates carrier tracking for J&T Express Philippines through the current shipment-tracking provider.
 - Uses NextAuth/Auth.js with Google OAuth for staff and customers.
 - Requires webhook verification before mutating order, shipment, or inventory state.
 ***
@@ -89,6 +89,6 @@ Produce:
    - Severity (`critical`, `high`, `medium`, `low`, `info`)
    - Description
    - Recommended change (concrete and implementable)
-3. A **prioritized list (top 5)** of changes that would most improve safety and production readiness for the Apparel Commerce Platform.
+3. A **prioritized list (top 5)** of changes that would most improve safety and production readiness for the Universal Music Store Platform.
 
 Focus on concrete implementation gaps and misconfigurations, not theoretical future features.

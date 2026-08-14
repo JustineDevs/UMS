@@ -1,14 +1,21 @@
 import nextDynamic from "next/dynamic";
-import { loadStorefrontHomeContentForPublic } from "@apparel-commerce/platform-data";
+import { loadStorefrontHomeContentForPublic, storefrontSocialLinks } from "@universal-music-store/platform-data";
 import Link from "next/link";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
+import { StorefrontHomePreviewBridge } from "@/components/StorefrontHomePreviewBridge";
 import { fetchFeaturedProducts } from "@/lib/catalog-fetch";
+import {
+  fetchHomepageCustomerCount,
+  fetchHomepageSocialProof,
+} from "@/lib/homepage-social-proof";
 import {
   buildJsonLdOrganization,
   buildJsonLdWebSite,
-  canonicalUrl,
+  buildPageMetadata,
+  SEO_KEYWORDS,
   SITE_NAME,
 } from "@/lib/seo";
+import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
 const HomeScrollExperience = nextDynamic(
   () =>
@@ -28,11 +35,18 @@ const HomeScrollExperience = nextDynamic(
 
 export const dynamic = "force-dynamic";
 
-export const metadata = {
-  alternates: { canonical: canonicalUrl("/") },
-};
+export const metadata = buildPageMetadata({
+  title: SITE_NAME,
+  description: "Browse Universal Music Store for guitars, bass, drums, keyboards, and accessories in the Philippines.",
+  path: "/",
+  keywords: [...SEO_KEYWORDS.home],
+});
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ adminPreview?: string | string[] }>;
+}) {
   const [featured, home] = await Promise.all([
     fetchFeaturedProducts(4),
     loadStorefrontHomeContentForPublic(),
@@ -62,8 +76,21 @@ export default async function HomePage() {
     );
   }
 
-  const orgJsonLd = buildJsonLdOrganization();
+  const [customerCount, reviewSummary] = await Promise.all([
+    fetchHomepageCustomerCount(),
+    fetchHomepageSocialProof(),
+  ]);
+  const publicMeta = await getCachedPublicSiteMetadata().catch(() => null);
+  const orgJsonLd = buildJsonLdOrganization({
+    sameAs: publicMeta ? storefrontSocialLinks(publicMeta).map((link) => link.href) : [],
+    contactEmail: publicMeta?.supportEmail ?? null,
+    contactPhone: publicMeta?.supportPhone ?? null,
+  });
   const webJsonLd = buildJsonLdWebSite();
+  const adminPreview = (await searchParams).adminPreview;
+  const isAdminPreview =
+    adminPreview === "1" ||
+    (Array.isArray(adminPreview) && adminPreview.includes("1"));
 
   return (
     <>
@@ -75,7 +102,19 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(webJsonLd) }}
       />
-      <HomeScrollExperience products={featured.products} home={home} />
+      {isAdminPreview ? (
+        <StorefrontHomePreviewBridge
+          products={featured.products}
+          home={home}
+          socialProof={{ customerCount, reviewSummary }}
+        />
+      ) : (
+        <HomeScrollExperience
+          products={featured.products}
+          home={home}
+          socialProof={{ customerCount, reviewSummary }}
+        />
+      )}
     </>
   );
 }

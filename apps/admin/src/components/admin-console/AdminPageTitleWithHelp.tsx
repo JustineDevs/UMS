@@ -10,7 +10,7 @@ export function AdminPageTitleWithHelp({ title }: { title: string }) {
 
   return (
     <div className="flex min-w-0 flex-wrap items-start gap-2">
-      <h1 className="font-headline text-3xl font-extrabold tracking-tighter text-primary">
+      <h1 className="font-headline text-2xl font-semibold leading-8 tracking-tight text-primary">
         {title}
       </h1>
       {help ? <AdminPageHelpTip purpose={help.purpose} usage={help.usage} /> : null}

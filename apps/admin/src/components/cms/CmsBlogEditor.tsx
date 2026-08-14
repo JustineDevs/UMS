@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import { CatalogMediaPickerDialog } from "@/components/catalog/CatalogMediaPickerDialog";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 
 type Post = {
   id: string;
@@ -30,15 +32,17 @@ type Post = {
 export function CmsBlogEditor({ postId }: { postId: string }) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [row, setRow] = useState<Post | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
-  const [mediaPick, setMediaPick] = useState<{ id: string; public_url: string }[]>([]);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
-  const siteBase =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")) || "";
+  const siteBase = getStorefrontPublicOrigin();
 
   const load = useCallback(() => {
     fetch(`/api/admin/cms/blog/${postId}`)
@@ -51,22 +55,14 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         setRow(p);
         if (p) setTagsInput(p.tags.join(", "));
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Load failed"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Load failed"),
+      );
   }, [postId]);
 
   useEffect(() => {
     load();
   }, [load]);
-
-  const openMedia = () => {
-    void fetch("/api/admin/cms/media?limit=48&sort=created_desc")
-      .then(async (r) => {
-        const j = (await r.json()) as { data?: { id: string; public_url: string }[] };
-        if (!r.ok) return;
-        setMediaPick(j.data ?? []);
-      })
-      .catch(() => setMediaPick([]));
-  };
 
   const save = async () => {
     if (!row || !canWrite) return;
@@ -173,7 +169,10 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-mono"
           value={row.scheduled_publish_at ?? ""}
           onChange={(e) =>
-            setRow({ ...row, scheduled_publish_at: e.target.value.trim() || null })
+            setRow({
+              ...row,
+              scheduled_publish_at: e.target.value.trim() || null,
+            })
           }
           placeholder="2026-04-01T12:00:00.000Z"
         />
@@ -196,11 +195,18 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           </button>
         </div>
         {previewUrl ? (
-          <a href={previewUrl} className="mt-2 inline-block text-primary underline" target="_blank" rel="noreferrer">
+          <a
+            href={previewUrl}
+            className="mt-2 inline-block text-primary underline"
+            target="_blank"
+            rel="noreferrer"
+          >
             Open preview
           </a>
         ) : (
-          <p className="mt-2">Set NEXT_PUBLIC_SITE_URL and generate a token for a storefront preview link.</p>
+          <p className="mt-2">
+            Generate a token for a storefront preview link.
+          </p>
         )}
       </div>
 
@@ -226,45 +232,41 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         <input
           className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
           value={row.cover_image_url ?? ""}
-          onChange={(e) => setRow({ ...row, cover_image_url: e.target.value || null })}
+          onChange={(e) =>
+            setRow({ ...row, cover_image_url: e.target.value || null })
+          }
         />
       </label>
       <button
         type="button"
         className="text-xs text-primary underline"
-        onClick={() => {
-          openMedia();
-        }}
+        onClick={() => setMediaPickerOpen(true)}
       >
         Pick from media library
       </button>
-      {mediaPick.length > 0 ? (
-        <ul className="grid max-h-48 grid-cols-4 gap-2 overflow-auto rounded border border-slate-100 p-2">
-          {mediaPick.map((m) => (
-            <li key={m.id}>
-              <button
-                type="button"
-                className="block w-full truncate text-left text-[10px] text-primary underline"
-                onClick={() => {
-                  setRow({ ...row, cover_image_url: m.public_url });
-                  setMediaPick([]);
-                }}
-              >
-                {m.public_url.slice(-24)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       <label className="block text-xs font-medium text-slate-600">
         Author name
         <input
           className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
           value={row.author_name ?? ""}
-          onChange={(e) => setRow({ ...row, author_name: e.target.value || null })}
+          onChange={(e) =>
+            setRow({ ...row, author_name: e.target.value || null })
+          }
         />
       </label>
+
+      <CatalogMediaPickerDialog
+        open={mediaPickerOpen}
+        mediaScope="cms"
+        addPlacement="main"
+        onAddPlacementChange={() => undefined}
+        onClose={() => setMediaPickerOpen(false)}
+        onPickMany={(urls) => {
+          const [coverImageUrl] = urls;
+          if (coverImageUrl) setRow({ ...row, cover_image_url: coverImageUrl });
+        }}
+      />
       <label className="block text-xs font-medium text-slate-600">
         Tags (comma-separated)
         <input
@@ -275,7 +277,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
       </label>
 
       <fieldset className="space-y-2 rounded-lg border border-slate-200 p-3">
-        <legend className="px-1 text-xs font-semibold text-slate-800">RSS and SEO</legend>
+        <legend className="px-1 text-xs font-semibold text-slate-800">
+          RSS and SEO
+        </legend>
         <label className="flex items-center gap-2 text-xs text-slate-700">
           <input
             type="checkbox"
@@ -289,7 +293,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           <input
             className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
             value={row.meta_title ?? ""}
-            onChange={(e) => setRow({ ...row, meta_title: e.target.value || null })}
+            onChange={(e) =>
+              setRow({ ...row, meta_title: e.target.value || null })
+            }
           />
         </label>
         <label className="block text-xs font-medium text-slate-600">
@@ -297,7 +303,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           <textarea
             className="mt-1 w-full min-h-[60px] rounded border border-slate-200 px-3 py-2 text-sm"
             value={row.meta_description ?? ""}
-            onChange={(e) => setRow({ ...row, meta_description: e.target.value || null })}
+            onChange={(e) =>
+              setRow({ ...row, meta_description: e.target.value || null })
+            }
           />
         </label>
         <label className="block text-xs font-medium text-slate-600">
@@ -305,7 +313,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           <input
             className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
             value={row.canonical_url ?? ""}
-            onChange={(e) => setRow({ ...row, canonical_url: e.target.value || null })}
+            onChange={(e) =>
+              setRow({ ...row, canonical_url: e.target.value || null })
+            }
           />
         </label>
         <label className="block text-xs font-medium text-slate-600">
@@ -313,7 +323,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           <input
             className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
             value={row.og_image_url ?? ""}
-            onChange={(e) => setRow({ ...row, og_image_url: e.target.value || null })}
+            onChange={(e) =>
+              setRow({ ...row, og_image_url: e.target.value || null })
+            }
           />
         </label>
       </fieldset>
@@ -333,7 +345,9 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
           className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-800"
           onClick={async () => {
             if (!confirm("Delete this post?")) return;
-            const r = await fetch(`/api/admin/cms/blog/${postId}`, { method: "DELETE" });
+            const r = await fetch(`/api/admin/cms/blog/${postId}`, {
+              method: "DELETE",
+            });
             if (r.ok) router.push("/admin/cms/blog");
             else setError("Delete failed");
           }}

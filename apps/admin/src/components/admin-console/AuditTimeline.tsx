@@ -70,28 +70,28 @@ export function AuditTimeline({
   }, [resourcePrefix]);
 
   return (
-    <div className={`rounded-lg border border-outline-variant/15 bg-white p-4 shadow-sm ${className}`}>
-      <h3 className="font-headline text-sm font-bold tracking-tight text-primary">{title}</h3>
+    <div className={`rounded-[var(--admin-card-radius)] border border-border bg-card p-4 shadow-xs ${className}`}>
+      <h3 className="font-heading text-sm font-medium tracking-tight text-foreground">{title}</h3>
       {error ? (
-        <p className="mt-1 text-xs text-on-surface-variant">{error}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{error}</p>
       ) : null}
       {entries === null ? (
-        <p className="mt-3 text-xs text-on-surface-variant">Loading…</p>
+        <p className="mt-3 text-xs text-muted-foreground">Loading…</p>
       ) : entries.length === 0 ? (
-        <p className="mt-3 text-xs text-on-surface-variant">No activity yet.</p>
+        <p className="mt-3 text-xs text-muted-foreground">No activity yet.</p>
       ) : (
         <ul className="mt-3 max-h-64 space-y-3 overflow-y-auto text-xs">
           {entries.map((e) => (
-            <li key={e.id} className="border-b border-outline-variant/10 pb-2 last:border-0">
-              <p className="font-medium text-primary">
+            <li key={e.id} className="border-b border-border/60 pb-2 last:border-0">
+              <p className="font-medium text-foreground">
                 {formatAuditActionLabel(e.action)}
               </p>
               {e.resource ? (
-                <p className="text-on-surface-variant">
+                <p className="text-muted-foreground">
                   {formatAuditResourceLabel(e.resource)}
                 </p>
               ) : null}
-              <p className="text-[10px] text-on-surface-variant/80">
+              <p className="text-[10px] text-muted-foreground/80">
                 By {formatAuditActorLabel(e)} · {new Date(e.created_at).toLocaleString()}
               </p>
             </li>

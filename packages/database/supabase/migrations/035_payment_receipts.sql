@@ -1,4 +1,4 @@
--- Migration 035: payment_receipts table for manual payment proof uploads (e.g. GCash/Maya receipt).
+-- Migration 035: payment_receipts table for manual payment proof uploads.
 -- Admin reviews and confirms, then manually captures payment in Medusa when applicable.
 
 create table if not exists public.payment_receipts (

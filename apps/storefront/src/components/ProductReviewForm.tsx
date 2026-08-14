@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import { REVIEW_STAR_PATH } from "@/components/ReviewStarRatingDisplay";
+import { getRecaptchaToken } from "@/components/RecaptchaScript";
 
 export function ProductReviewForm({
   productSlug,
@@ -30,6 +31,11 @@ export function ProductReviewForm({
     setError(null);
     setSaving(true);
     try {
+      const recaptchaToken = await getRecaptchaToken("review");
+      if (!recaptchaToken) {
+        setError("Security verification is unavailable. Please try again later.");
+        return;
+      }
       const res = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,6 +44,7 @@ export function ProductReviewForm({
           medusaProductId,
           rating,
           body: body.trim(),
+          recaptchaToken,
         }),
       });
       const j = (await res.json()) as {

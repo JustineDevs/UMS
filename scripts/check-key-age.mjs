@@ -11,7 +11,7 @@
  * Add to your release gate or CI pre-flight:
  *   node scripts/check-key-age.mjs
  *
- * Set in .env (or CI secrets):
+ * Set in .env.local (or CI secrets):
  *   SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT=2026-01-15T00:00:00Z
  */
 import { readFileSync } from "node:fs";
@@ -20,9 +20,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Load .env if present (best-effort).
+// Load .env.local if present (best-effort).
 try {
-  const envPath = join(__dirname, "..", ".env");
+  const envPath = join(__dirname, "..", ".env.local");
   const lines = readFileSync(envPath, "utf-8").split("\n");
   for (const line of lines) {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
@@ -31,11 +31,11 @@ try {
     }
   }
 } catch {
-  // .env not present; rely on system environment.
+  // .env.local not present; rely on system environment.
 }
 
 const ROTATION_THRESHOLD_DAYS = Number(
-  process.env.KEY_ROTATION_THRESHOLD_DAYS ?? "90"
+  process.env.KEY_ROTATION_THRESHOLD_DAYS ?? "90",
 );
 
 const rotatedAt = process.env.SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT?.trim();
@@ -43,7 +43,7 @@ const rotatedAt = process.env.SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT?.trim();
 if (!rotatedAt) {
   console.log(
     "[key-age] SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT is not set. " +
-      "Set it to the date of last key rotation (ISO 8601) to enable age enforcement."
+      "Set it to the date of last key rotation (ISO 8601) to enable age enforcement.",
   );
   process.exit(0);
 }
@@ -51,7 +51,7 @@ if (!rotatedAt) {
 const rotationDate = new Date(rotatedAt);
 if (isNaN(rotationDate.getTime())) {
   console.error(
-    `[key-age] SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT="${rotatedAt}" is not a valid ISO 8601 date.`
+    `[key-age] SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT="${rotatedAt}" is not a valid ISO 8601 date.`,
   );
   process.exit(1);
 }
@@ -64,13 +64,13 @@ if (ageDays > threshold) {
   console.error(
     `[key-age] FAIL: Supabase service role key is ${ageDays} days old ` +
       `(threshold: ${threshold} days). ` +
-      "Rotate the key and update SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT before releasing."
+      "Rotate the key and update SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT before releasing.",
   );
   process.exit(1);
 }
 
 console.log(
   `[key-age] OK: Supabase service role key is ${ageDays} day(s) old ` +
-    `(threshold: ${threshold} days).`
+    `(threshold: ${threshold} days).`,
 );
 process.exit(0);

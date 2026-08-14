@@ -12,7 +12,7 @@ import {
  * Thirteen end-to-end checks aligned with cross-app commerce architecture.
  * Tags: @architecture @smoke — filter with `pnpm exec playwright test --grep "@architecture"`.
  */
-test.describe("@architecture @smoke Maharlika commerce architecture (13 scenarios)", () => {
+test.describe("@architecture @smoke Universal Music Store commerce architecture (13 scenarios)", () => {
   test("1. Customer path: shop health, optional PDP when catalog exists", async ({
     page,
     request,

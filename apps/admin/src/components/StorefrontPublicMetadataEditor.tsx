@@ -4,7 +4,7 @@ import {
   EMPTY_STOREFRONT_PUBLIC_METADATA,
   type StorefrontPublicMetadataPayload,
   staffHasPermission,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -118,6 +118,27 @@ export function StorefrontPublicMetadataEditor() {
             disabled={!canWrite}
           />
         </div>
+        {([
+          ["facebookUrl", "Facebook URL", "https://facebook.com/yourshop"],
+          ["tiktokUrl", "TikTok URL", "https://tiktok.com/@yourshop"],
+          ["youtubeUrl", "YouTube URL", "https://youtube.com/@yourshop"],
+          ["xUrl", "X URL", "https://x.com/yourshop"],
+          ["linkedinUrl", "LinkedIn URL", "https://linkedin.com/company/yourshop"],
+          ["whatsappUrl", "WhatsApp URL", "https://wa.me/639..."],
+          ["messengerUrl", "Messenger URL", "https://m.me/yourshop"],
+        ] as const).map(([key, label, placeholder]) => (
+          <div key={key}>
+            <label className={labelClass()} htmlFor={`pub-${key}`}>{label}</label>
+            <input
+              id={`pub-${key}`}
+              className={inputClass()}
+              value={payload[key]}
+              onChange={(e) => update({ [key]: e.target.value })}
+              placeholder={placeholder}
+              disabled={!canWrite}
+            />
+          </div>
+        ))}
         <div>
           <label className={labelClass()} htmlFor="pub-email">
             Support email

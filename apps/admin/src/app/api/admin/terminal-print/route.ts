@@ -1,14 +1,14 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
-import { authOptions } from "@/lib/auth";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import { terminalPrintBodySchema } from "@/lib/terminal-print-schemas";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
@@ -55,3 +55,5 @@ export async function POST(req: NextRequest) {
   }
   return correlatedJson(cid, agentPayload, { status: res.status });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/terminal-print:POST", post);

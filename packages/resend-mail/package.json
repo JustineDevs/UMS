@@ -1,5 +1,5 @@
 {
-  "name": "@apparel-commerce/resend-mail",
+  "name": "@universal-music-store/resend-mail",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -17,12 +17,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@react-email/render": "1.1.2",
+    "html-to-text": "9.0.5",
     "resend": "^4.8.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
-    "@apparel-commerce/config-eslint": "workspace:*",
-    "@apparel-commerce/config-typescript": "workspace:*",
+    "@universal-music-store/config-eslint": "workspace:*",
+    "@universal-music-store/config-typescript": "workspace:*",
     "eslint": "^9.0.0",
     "typescript": "^5.6.0"
   }

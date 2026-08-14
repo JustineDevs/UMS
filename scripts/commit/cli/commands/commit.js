@@ -9,7 +9,7 @@ const parallelCommitPath = path.join(__dirname, '../../parallel-commit.js');
 
 async function run(opts = {}) {
   const prevArgv = process.argv.slice();
-  const args = ['node', 'apparel-commerce-commit'];
+  const args = ['node', 'universal-music-store-commit'];
   if (opts.dryRun) args.push('--dry-run');
   if (opts.noSecurityCheck) args.push('--no-security-check');
   if (opts.warnOnly) args.push('--warn-only');
@@ -25,7 +25,7 @@ async function run(opts = {}) {
 
 function help() {
   console.log(`
-  apparel-commerce-commit commit [options]
+  universal-music-store-commit commit [options]
 
   Parallel commit with security checks. Commits each changed file individually.
 

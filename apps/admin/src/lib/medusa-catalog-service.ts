@@ -4,6 +4,7 @@
  */
 
 import { getMedusaAdminSdk, getMedusaRegionId, optionRowsToSizeColor } from "@/lib/medusa-pos";
+import { createHash } from "node:crypto";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { fetchVariantStockedQuantity } from "@/lib/medusa-catalog-inventory-stock";
 import {
@@ -85,6 +86,8 @@ export type CatalogProductDetail = {
   editorialSurfaceSignature: string;
   /** Stable string for non-price storefront metadata (brand, SEO, related, hotspots, etc.). */
   storefrontMetadataSignature: string;
+  /** Hash of the loaded editable state used for optimistic concurrency. */
+  revision?: string;
 };
 
 /** PHP amount in minor units (centavos) for Medusa `prices[].amount`. */
@@ -369,6 +372,24 @@ export async function fetchCatalogProductDetail(
         typeof product.thumbnail === "string" ? product.thumbnail : null,
       imageUrls,
     });
+    const revision = createHash("sha256")
+      .update(
+        JSON.stringify({
+          id: product.id,
+          title: product.title,
+          handle: product.handle,
+          description: product.description,
+          status: product.status,
+          thumbnail: product.thumbnail,
+          imageUrls,
+          categoryIds,
+          variantSellPriceSignature,
+          variantCompareAtSignature,
+          storefrontMetadataSignature,
+          variantStockRows: loadedRows.map((row) => [row.variantId, row.stockedQuantity]),
+        }),
+      )
+      .digest("hex");
 
     return {
       id: String(product.id),
@@ -397,6 +418,7 @@ export async function fetchCatalogProductDetail(
       variantStockRows,
       variantBarcode,
       storefrontMetadata,
+      revision,
       variantSummaries,
       variantSellPriceSignature,
       variantCompareAtSignature,

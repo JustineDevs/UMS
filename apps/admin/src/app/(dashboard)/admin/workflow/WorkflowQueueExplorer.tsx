@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   AdminEmptyState,
   AdminErrorState,
@@ -18,11 +19,14 @@ type WorkflowRow = {
   updated_at: string;
 };
 
+const NEXT_STATES: Record<string, string[]> = { draft: ["pending_review", "published", "archived", "canceled"], pending_review: ["draft", "approved", "canceled"], approved: ["scheduled", "published", "draft"], scheduled: ["published", "draft", "canceled"], published: ["archived", "draft"], archived: ["draft"], failed: ["draft", "pending_review"] };
+
 export function WorkflowQueueExplorer() {
   const [entityType, setEntityType] = useState("");
   const [limit, setLimit] = useState(50);
   const [rows, setRows] = useState<WorkflowRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [transitioning, setTransitioning] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
@@ -50,6 +54,17 @@ export function WorkflowQueueExplorer() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function transition(row: WorkflowRow, toState: string) {
+    setTransitioning(row.id);
+    setError(null);
+    const response = await fetch("/api/admin/workflow/transition", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ entity_type: row.entity_type, entity_id: row.entity_id, to_state: toState }) });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { error?: string };
+      setError(body.error ?? "Workflow transition failed");
+    } else load();
+    setTransitioning(null);
+  }
 
   return (
     <div className="space-y-6">
@@ -112,6 +127,7 @@ export function WorkflowQueueExplorer() {
                   <th className="px-4 py-3 font-medium">Previous</th>
                   <th className="px-4 py-3 font-medium">Actor</th>
                   <th className="px-4 py-3 font-medium">Updated</th>
+                  <th className="px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -136,6 +152,7 @@ export function WorkflowQueueExplorer() {
                     <td className="px-4 py-3 align-top text-xs text-on-surface-variant">
                       {new Date(row.updated_at).toLocaleString()}
                     </td>
+                    <td className="px-4 py-3 align-top"><div className="flex flex-wrap gap-1">{(NEXT_STATES[row.state] ?? []).slice(0, 2).map((next) => <Button key={next} size="sm" variant="outline" disabled={transitioning === row.id} onClick={() => void transition(row, next)}>{next.replace(/_/g, " ")}</Button>)}</div></td>
                   </tr>
                 ))}
               </tbody>

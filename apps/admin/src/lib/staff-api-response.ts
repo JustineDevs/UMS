@@ -44,9 +44,13 @@ export function correlatedError(
   message: string,
   code: AdminApiErrorCode,
 ): NextResponse {
+  const safeMessage =
+    code === "INTERNAL_ERROR" || code === "SERVICE_UNAVAILABLE" || code === "MEDUSA_UNAVAILABLE"
+      ? "The request could not be completed."
+      : message;
   return correlatedJson(
     correlationId,
-    { error: message, code, requestId: correlationId },
+    { error: safeMessage, code, requestId: correlationId },
     { status },
   );
 }

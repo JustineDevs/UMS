@@ -55,7 +55,7 @@ export function isDirectVideoUrl(url: string): boolean {
 }
 
 /** Extract YouTube video id for poster thumbnails, or null. */
-export function youtubeVideoId(url: string): string | null {
+function youtubeVideoId(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname === "youtu.be") {

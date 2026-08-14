@@ -254,7 +254,9 @@ async function adminDeleteProductVariant(
   );
   if (!res.ok && res.status !== 404) {
     const t = await res.text().catch(() => "");
-    throw new Error(`Delete variant failed (${res.status}): ${t.slice(0, 400)}`);
+    throw new Error(
+      `Delete variant failed (${res.status}): ${t.slice(0, 400)}`,
+    );
   }
 }
 
@@ -289,7 +291,9 @@ async function adminCreateProductVariant(
     text = await res.text();
   }
   if (!res.ok) {
-    throw new Error(`Create variant failed (${res.status}): ${text.slice(0, 800)}`);
+    throw new Error(
+      `Create variant failed (${res.status}): ${text.slice(0, 800)}`,
+    );
   }
   let parsed: unknown;
   try {
@@ -410,8 +414,7 @@ export async function createCatalogProduct(
         variantsPayload.push({
           manage_inventory: true,
           title: `${sz} / ${col}`,
-          sku:
-            variantCount === 1 ? body.sku?.trim() || undefined : undefined,
+          sku: variantCount === 1 ? body.sku?.trim() || undefined : undefined,
           barcode: variantCount === 1 ? barcodeTrim || undefined : undefined,
           options: { Size: sz, Color: col },
           prices: [{ amount, currency_code: priceCurrency }],
@@ -447,14 +450,21 @@ export async function createCatalogProduct(
     });
     const id = product?.id;
     if (!id) {
-      return adminErr("COMMERCE_ERROR", "Create succeeded but product id missing.", 502);
+      return adminErr(
+        "COMMERCE_ERROR",
+        "Create succeeded but product id missing.",
+        502,
+      );
     }
     const productId = String(id);
     const stockQty = normalizeStockQuantity(body.stockQuantity);
     if (stockQty !== undefined) {
-      const { product: withVariants } = await sdk.admin.product.retrieve(productId, {
-        fields: "id,*variants",
-      });
+      const { product: withVariants } = await sdk.admin.product.retrieve(
+        productId,
+        {
+          fields: "id,*variants",
+        },
+      );
       const vids = (withVariants?.variants ?? [])
         .map((v) => v?.id)
         .filter((id): id is string => typeof id === "string" && id.length > 0);
@@ -465,11 +475,7 @@ export async function createCatalogProduct(
           stockedQuantity: stockQty,
         });
         if (!applied.ok) {
-          return adminErr(
-            "COMMERCE_ERROR",
-            `Stock: ${applied.message}`,
-            502,
-          );
+          return adminErr("COMMERCE_ERROR", `Stock: ${applied.message}`, 502);
         }
       }
     }
@@ -614,21 +620,16 @@ export async function updateCatalogProduct(
       titleSlug || "product",
     );
 
-    const productUpdatePayload: Parameters<
-      typeof sdk.admin.product.update
-    >[1] = {
-      title,
-      handle: normalizedHandle,
-      description: body.description?.trim() || null,
-      status: body.status === "published" ? "published" : "draft",
-      thumbnail: imgUrls[0] ?? null,
-      images: imgUrls.map((url) => ({ url })),
-      categories: categoryLinks(categoryIds),
-      options: [
-        { title: "Size", values: sizeLabels },
-        { title: "Color", values: colorLabels },
-      ],
-    };
+    const productUpdatePayload: Parameters<typeof sdk.admin.product.update>[1] =
+      {
+        title,
+        handle: normalizedHandle,
+        description: body.description?.trim() || null,
+        status: body.status === "published" ? "published" : "draft",
+        thumbnail: imgUrls[0] ?? null,
+        images: imgUrls.map((url) => ({ url })),
+        categories: categoryLinks(categoryIds),
+      };
 
     const mergedChannels = mergeSalesChannelsForProductUpdate(
       (current as { sales_channels?: Array<{ id?: string | null }> })
@@ -695,7 +696,9 @@ export async function updateCatalogProduct(
     );
     const freshList = (afterOptions?.variants ?? []) as CatalogVariantLike[];
 
-    function variantMapFromList(list: CatalogVariantLike[]): Map<string, string> {
+    function variantMapFromList(
+      list: CatalogVariantLike[],
+    ): Map<string, string> {
       const m = new Map<string, string>();
       for (const v of list) {
         const vid = v.id ? String(v.id) : "";
@@ -798,8 +801,7 @@ export async function updateCatalogProduct(
     const defaultStock = normalizeStockQuantity(body.stockQuantity);
     const overrideMap = new Map<string, number>();
     for (const row of body.variantStocks ?? []) {
-      const id =
-        typeof row.variantId === "string" ? row.variantId.trim() : "";
+      const id = typeof row.variantId === "string" ? row.variantId.trim() : "";
       if (!id) continue;
       const q = normalizeStockQuantity(row.quantity);
       if (q === undefined) continue;
@@ -818,13 +820,10 @@ export async function updateCatalogProduct(
       if (q === undefined) continue;
       overrideMap.set(vid, q);
     }
-    const hasStockPatch =
-      defaultStock !== undefined || overrideMap.size > 0;
+    const hasStockPatch = defaultStock !== undefined || overrideMap.size > 0;
     if (hasStockPatch) {
       for (const vid of keyToVariantId.values()) {
-        const qty = overrideMap.has(vid)
-          ? overrideMap.get(vid)!
-          : defaultStock;
+        const qty = overrideMap.has(vid) ? overrideMap.get(vid)! : defaultStock;
         if (qty === undefined) continue;
         const applied = await applyVariantStockedQuantity({
           productId,
@@ -832,11 +831,7 @@ export async function updateCatalogProduct(
           stockedQuantity: qty,
         });
         if (!applied.ok) {
-          return adminErr(
-            "COMMERCE_ERROR",
-            `Stock: ${applied.message}`,
-            502,
-          );
+          return adminErr("COMMERCE_ERROR", `Stock: ${applied.message}`, 502);
         }
       }
     }

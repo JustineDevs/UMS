@@ -1,20 +1,20 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import {
   listPendingQueue,
   enqueueOfflineSale,
   markSynced,
   markFailed,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   if (!staffSessionAllows(session, "pos:use")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
@@ -27,9 +27,9 @@ export async function GET(req: NextRequest) {
   return correlatedJson(cid, { data });
 }
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   if (!staffSessionAllows(session, "pos:use")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
   return correlatedJson(cid, { data: item }, { status: 201 });
 }
 
-export async function PATCH(req: NextRequest) {
+async function patch(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   if (!staffSessionAllows(session, "pos:use")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
@@ -66,3 +66,6 @@ export async function PATCH(req: NextRequest) {
   }
   return correlatedJson(cid, { success: true });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/offline-queue:POST", post);
+export const PATCH = withAdminMutationIdempotency("/admin/offline-queue:PATCH", patch);

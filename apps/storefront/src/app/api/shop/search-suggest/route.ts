@@ -7,6 +7,7 @@ import {
 import {
   getMedusaPublishableKey,
   getMedusaRegionId,
+  getMedusaSalesChannelId,
   withSalesChannelId,
 } from "@/lib/storefront-medusa-env";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/lib/storefront-api-rate-limit";
 
 const FIELDS =
-  "*variants,*variants.calculated_price,+variants.inventory_quantity,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
+  "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
@@ -32,28 +33,42 @@ export async function GET(req: Request) {
   if (q.length < 2) {
     return NextResponse.json({ suggestions: [] });
   }
+  if (q.length > 100) {
+    return NextResponse.json({ suggestions: [] });
+  }
   if (!getMedusaPublishableKey()?.trim() || !getMedusaRegionId()?.trim()) {
     return NextResponse.json({ suggestions: [] });
   }
   try {
     const sdk = createStorefrontMedusaSdk();
     const regionId = getMedusaRegionId()!;
-    const { products } = await sdk.store.product.list(
-      withSalesChannelId({
-        region_id: regionId,
-        q,
-        limit: 8,
-        fields: FIELDS,
-      }) as Parameters<typeof sdk.store.product.list>[0],
+    const baseParams = {
+      region_id: regionId,
+      q,
+      limit: 8,
+      fields: FIELDS,
+    };
+    const { products: primary } = await sdk.store.product.list(
+      withSalesChannelId({ ...baseParams }) as Parameters<typeof sdk.store.product.list>[0],
     );
+    const products =
+      (primary?.length ?? 0) > 0 || !getMedusaSalesChannelId()
+        ? primary
+        : (
+            await sdk.store.product.list(baseParams as Parameters<
+              typeof sdk.store.product.list
+            >[0])
+          ).products;
     const suggestions = (products ?? [])
       .map((raw) => {
         const p = catalogProductFromMedusaRaw(raw as never);
         if (!p) return null;
+        const imageUrl = p.images?.[0]?.imageUrl?.trim() || undefined;
         return {
           slug: p.slug,
           name: p.name,
           minPrice: minVariantPrice(p),
+          imageUrl,
         };
       })
       .filter((s): s is NonNullable<typeof s> => s != null);

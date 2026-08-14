@@ -17,8 +17,13 @@ export interface ProductVariant {
   productId: string;
   sku: string;
   barcode: string | null;
-  size: string;
-  color: string;
+  type: string;
+  finish: string;
+  pickupConfig: string;
+  bodyWood: string;
+  condition: string;
+  skillLevel: string;
+  shippingSpeed: string;
   price: number;
   compareAtPrice: number | null;
   cost: number | null;
@@ -65,3 +70,5 @@ export interface Product {
   /** SEO helper stored in metadata; storefront can prefer over auto-truncated description. */
   seoDescription: string | null;
 }
+
+export { inferReviewProofMedia, type ReviewProofMedia, type ReviewProofMediaKind } from "./review-proof-media";

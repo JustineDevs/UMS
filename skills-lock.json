@@ -6,6 +6,12 @@
       "sourceType": "github",
       "computedHash": "34649754abc1d10e39f7cc62800235882ec4bbcf6cd6369452244a29fd0c9473"
     },
+    "analyzing-docker-container-forensics": {
+      "source": "mukul975/anthropic-cybersecurity-skills",
+      "sourceType": "github",
+      "skillPath": "skills/analyzing-docker-container-forensics/SKILL.md",
+      "computedHash": "9c974713bbe9f66fc92b61b18727fab5f8087d99f3499b7ae4411aafb661cf04"
+    },
     "authentication-setup": {
       "source": "supercent-io/skills-template",
       "sourceType": "github",
@@ -19,17 +25,32 @@
     "building-admin-dashboard-customizations": {
       "source": "medusajs/medusa-agent-skills",
       "sourceType": "github",
-      "computedHash": "fdf61048a7c3872c70a16861c8bb3e5cf9973a04d55b97139cd49e352fa3f82c"
+      "skillPath": "plugins/medusa-dev/skills/building-admin-dashboard-customizations/SKILL.md",
+      "computedHash": "97cb3b31a4e5bf0ec7a3627d2d21e601603f267d64cda41387274ad5e38acf6f"
+    },
+    "building-nango-functions-locally": {
+      "source": "nangohq/skills",
+      "sourceType": "github",
+      "skillPath": "skills/building-nango-functions-locally/SKILL.md",
+      "computedHash": "bdaa22c737aee6480f31d132aaa860fe84ff70cb0be7ab2ebbce96647f8bc0e9"
+    },
+    "building-storefronts": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-dev/skills/building-storefronts/SKILL.md",
+      "computedHash": "288f645ffd2b29f925f5c70077b9e57af6b787843fc98b276e84150d253511a7"
     },
     "building-with-medusa": {
       "source": "medusajs/medusa-agent-skills",
       "sourceType": "github",
-      "computedHash": "a0b03d86b418f29a2e822579e139174fe6e06c10d62ea23022047d30a66aa5e2"
+      "skillPath": "plugins/medusa-dev/skills/building-with-medusa/SKILL.md",
+      "computedHash": "e8a523a6f33e7aae2ef6b451187dd0553dbb5f18e8ee15ed240c10cf3e1f2713"
     },
     "co-star-ui": {
       "source": "justinedevs/collection",
       "sourceType": "github",
-      "computedHash": "e15c54ceff775f3f1530d9d714525b88285be69618ebd93a7188ed9828181d9b"
+      "skillPath": "co-star-ui/SKILL.md",
+      "computedHash": "0d8447328cc964829509d5de99dfb808f1f1c3bb4661c238ca2c1c0dac4d0d25"
     },
     "context-engineering": {
       "source": "justinedevs/collection",
@@ -41,6 +62,24 @@
       "sourceType": "github",
       "computedHash": "f0f4975092d31e94410a711033ba0d7bbdb56a48eab3440924b0058af6379a32"
     },
+    "creating-agents-in-medusa": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-dev/skills/creating-internal-agents/SKILL.md",
+      "computedHash": "2b76cede98433a050244fbc4913f23580a984720a1fcf61f95811c36d15e8e23"
+    },
+    "db-generate": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-dev/skills/db-generate/SKILL.md",
+      "computedHash": "054793865ece11794c7d0738304257775ca9a86460301e91233f4633c06cc9c5"
+    },
+    "db-migrate": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-dev/skills/db-migrate/SKILL.md",
+      "computedHash": "67e08aa2633481106be84d196381320a4ba88410e6d710395234e23e394cd07e"
+    },
     "debugging-code": {
       "source": "AlmogBaku/debug-skill",
       "sourceType": "github",
@@ -50,6 +89,12 @@
       "source": "cristicretu/family-taste-skill",
       "sourceType": "github",
       "computedHash": "b595748f7247b247fd3342383aab4b7f9372dfab2114fcb8ca1d95bc6cc3de7f"
+    },
+    "docker-best-practices": {
+      "source": "josiahsiegel/claude-plugin-marketplace",
+      "sourceType": "github",
+      "skillPath": "plugins/docker-master/skills/docker-best-practices/SKILL.md",
+      "computedHash": "aa4f4c45dc4b71aa392a8cf204e5610426fe2534db9cc4c0c26a335f04cf5a68"
     },
     "dogfood": {
       "source": "vercel-labs/agent-browser",
@@ -66,6 +111,78 @@
       "sourceType": "github",
       "computedHash": "645b891da1edbae76ab79c7b088d4e73397464f8396edaf773c0e01971ce75d6"
     },
+    "github": {
+      "source": "callstackincubator/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/github/SKILL.md",
+      "computedHash": "32131aefe2317287d83e1d3ed5b2a83ca5b1a08142ee3b9bb4fc9d54ea348c31"
+    },
+    "learning-medusa": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/learn-medusa/skills/learning-medusa/SKILL.md",
+      "computedHash": "71755c0b2531080d547a7ddacf840e6a1cdd394dc5af92879cfc604ce1be1102"
+    },
+    "mcloud-deployments": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-deployments/SKILL.md",
+      "computedHash": "795c3f9d890cb1aea8cd0932c4d8db11a0856bea892c46f23d0d2afda978aad4"
+    },
+    "mcloud-environments": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-environments/SKILL.md",
+      "computedHash": "07fa7f6c43c5fa7d5381d0c62d292b28bcd3dc2afc6945b15a9bcf74e0f9be18"
+    },
+    "mcloud-local": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-local/SKILL.md",
+      "computedHash": "95f5ce7d4bd11d520752872ab6f782d9848859a6468f1ece2d2a34e10eb33bb3"
+    },
+    "mcloud-logs": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-logs/SKILL.md",
+      "computedHash": "2cd6ca87446171761748fb6641f36d00bf8dd818c82b98d7615e566baca850fd"
+    },
+    "mcloud-organizations": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-organizations/SKILL.md",
+      "computedHash": "7bff45de709c75badc330f3500e4c6ea7fe9c28cff1c2193e860a99e3b2b215f"
+    },
+    "mcloud-projects": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-projects/SKILL.md",
+      "computedHash": "6f20fbdedf675b1713d2ddba19ceb06570b6cd23d9b7cda6debedc008d9abadc"
+    },
+    "mcloud-variables": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/mcloud-variables/SKILL.md",
+      "computedHash": "6c878304c91de3bd546be8e8d1e4acebd76e34ac16d78d4ebd03919b8af99329"
+    },
+    "medusa-admin": {
+      "source": "orcaqubits/agentic-commerce-skills-plugins",
+      "sourceType": "github",
+      "skillPath": "medusa-commerce/skills/medusa-admin/SKILL.md",
+      "computedHash": "92c9d7103ed9cd3259c2973aacade61c042a5b45edcc63f1ab0f7b35714f0a84"
+    },
+    "nango": {
+      "source": "membranedev/application-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nango/SKILL.md",
+      "computedHash": "b5b0691d3f339ecc6bc9882d0da277d9801918a0b9f9db3d8625d6b4f3da4690"
+    },
+    "new-user": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-dev/skills/new-user/SKILL.md",
+      "computedHash": "8474aef2e05fc8cf48e793d3ca1eca74095bfe23e8be8242b7c4613d401f52ac"
+    },
     "nextjs-performance": {
       "source": "giuseppe-trisciuoglio/developer-kit",
       "sourceType": "github",
@@ -80,6 +197,12 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "31587378379f3a6ae5e3040f3602a9b9063b855173f2cc0bff0e6a175012f478"
+    },
+    "production-grade": {
+      "source": "a-tokyo/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/production-grade/SKILL.md",
+      "computedHash": "13f7178ab27dc7f30bbc7b5c807a22dd2035edcc4075da21780f8acd89695a6d"
     },
     "programmatic-seo": {
       "source": "coreyhaines31/marketingskills",
@@ -109,7 +232,8 @@
     "storefront-best-practices": {
       "source": "medusajs/medusa-agent-skills",
       "sourceType": "github",
-      "computedHash": "e0a9b5a1ca1d4e5eb488cf4366a28a8317000ddaa2eb62a06a35b0c6b0f06085"
+      "skillPath": "plugins/ecommerce-storefront/skills/storefront-best-practices/SKILL.md",
+      "computedHash": "77d72eeab90e60c65129718531b0efaa80b50dd37c5d6163980abc986349ea06"
     },
     "stripe-integration": {
       "source": "wshobson/agents",
@@ -124,12 +248,20 @@
     "ui-ux-pro-max": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",
-      "computedHash": "6337038fe1fe6bbe1b9f252ab678ee575859190bab6f0f246f4061824eb40875"
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "ae6989c5c68a8a0cebbc2504e44f933dddd50d17974f295dc2fa5a80cb3d63ed"
+    },
+    "using-medusa-cloud": {
+      "source": "medusajs/medusa-agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/medusa-cloud/skills/using-medusa-cloud/SKILL.md",
+      "computedHash": "976a778d9cab6dbf77f998e88e9e0330deaed72590f325378c5a6074fa065931"
     },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
-      "computedHash": "d8e7d3afe37dcc8a97b99ffb5afdb4d0919ae0092ea8b68f44eb201f035e33ac"
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
     }
   }
 }

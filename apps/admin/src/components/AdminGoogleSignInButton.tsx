@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, cn } from "@apparel-commerce/ui";
+import { Button, cn } from "@universal-music-store/ui";
 import { signIn } from "next-auth/react";
 
 type Props = {

@@ -4,7 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { medusaAdminFetch } from "./medusa-admin-fetch";
+import {
+  MedusaAdminConfigurationError,
+  medusaAdminFetch,
+} from "./medusa-admin-fetch";
 import {
   ensureStorefrontRuntimeEnvLoaded,
   resetStorefrontRuntimeEnvForTests,
@@ -59,7 +62,7 @@ test("medusaAdminFetch loads repo-root env for storefront runtime paths", async 
   await withTempWorkspace(
     {
       "pnpm-workspace.yaml": "packages:\n  - apps/*\n",
-      ".env": [
+      ".env.local": [
         "MEDUSA_SECRET_API_KEY=sk_repo_root",
         "MEDUSA_BACKEND_URL=https://repo-root.example.com/",
       ].join("\n"),
@@ -96,6 +99,24 @@ test("medusaAdminFetch loads repo-root env for storefront runtime paths", async 
   resetStorefrontRuntimeEnvForTests();
 });
 
+test("medusaAdminFetch throws MedusaAdminConfigurationError when secret is unset", async () => {
+  const beforeCwd = process.cwd();
+  clearRuntimeEnv();
+  resetStorefrontRuntimeEnvForTests();
+  process.chdir(beforeCwd);
+
+  await assert.rejects(
+    medusaAdminFetch("/admin/test", { method: "GET" }),
+    (err: unknown) => {
+      assert.ok(err instanceof MedusaAdminConfigurationError);
+      return true;
+    },
+  );
+
+  clearRuntimeEnv();
+  resetStorefrontRuntimeEnvForTests();
+});
+
 test("medusaAdminFetch keeps explicit process env over repo-root dotenv values", async () => {
   const beforeCwd = process.cwd();
   const beforeFetch = global.fetch;
@@ -106,7 +127,7 @@ test("medusaAdminFetch keeps explicit process env over repo-root dotenv values",
   await withTempWorkspace(
     {
       "pnpm-workspace.yaml": "packages:\n  - apps/*\n",
-      ".env": [
+      ".env.local": [
         "MEDUSA_SECRET_API_KEY=sk_repo_root",
         "MEDUSA_BACKEND_URL=https://repo-root.example.com/",
       ].join("\n"),

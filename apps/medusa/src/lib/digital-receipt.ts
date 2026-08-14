@@ -1,5 +1,5 @@
 /**
- * Local copy of receipt helpers (same behavior as @apparel-commerce/platform-data digital-receipts)
+ * Local copy of receipt helpers (same behavior as @universal-music-store/platform-data digital-receipts)
  * so Medusa backend build does not compile the whole platform-data package under Medusa's TS config.
  *
  * Uses a structural client type so `createClient()` from a dynamic import matches without duplicate
@@ -72,7 +72,7 @@ export function buildReceiptHtml(order: {
 <head><meta charset="utf-8"><title>Receipt</title></head>
 <body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
   <div style="text-align:center;margin-bottom:24px">
-    <h2 style="margin:0">${order.storeName ?? "Apparel Commerce"}</h2>
+    <h2 style="margin:0">${order.storeName ?? "Universal Music Store"}</h2>
     <p style="color:#666;margin:4px 0">Order #${order.display_id ?? order.id}</p>
     <p style="color:#666;margin:4px 0">${order.created_at ? new Date(order.created_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
   </div>

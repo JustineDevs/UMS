@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Site map",
-};
+  description: "Structured list of main storefront pages.",
+  path: "/sitemap",
+  keywords: [...SEO_KEYWORDS.sitewide],
+  noindex: true,
+});
 
 const links: { href: string; label: string }[] = [
   { href: "/", label: "Home" },

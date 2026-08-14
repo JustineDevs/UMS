@@ -2,9 +2,9 @@
  * Shared E2E environment: URLs and strict-mode flags for Playwright specs.
  */
 
-export const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 export const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
-export const medusaBase = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
+const medusaBase = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
 export function strictCatalog(): boolean {
   return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
@@ -47,6 +47,6 @@ export function resolveStorefrontStorageStatePath(): string | undefined {
   return raw || undefined;
 }
 
-export function suiteMode(): string {
+function suiteMode(): string {
   return (process.env.MAHARLIKA_SUITE ?? "all").trim().toLowerCase();
 }

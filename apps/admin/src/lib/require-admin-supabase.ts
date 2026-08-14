@@ -1,8 +1,8 @@
-import { tryCreateSupabaseClient } from "@apparel-commerce/platform-data";
+import { tryCreateSupabaseClient } from "@universal-music-store/platform-data";
 import { correlatedJson } from "@/lib/staff-api-response";
 
 const CONFIG_HINT =
-  "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY for local dev). Apply migrations: pnpm --filter @apparel-commerce/database migrate";
+  "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY for local dev). Apply migrations: pnpm --filter @universal-music-store/database migrate";
 
 type SupabaseClientNonNull = NonNullable<
   ReturnType<typeof tryCreateSupabaseClient>

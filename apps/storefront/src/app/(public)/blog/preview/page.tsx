@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { createSupabaseClient, getCmsBlogPostBySlugPreview } from "@apparel-commerce/platform-data";
-import { sanitizeCmsHtml } from "@apparel-commerce/validation";
+import { createSupabaseClient, getCmsBlogPostBySlugPreview } from "@universal-music-store/platform-data";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
+import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,7 @@ export default async function BlogPreviewPage({ searchParams }: Props) {
             sizes="(max-width: 768px) 100vw, 48rem"
             className="object-cover"
             priority
+            unoptimized={shouldUnoptimizeImage(post.cover_image_url)}
           />
         </div>
       ) : null}

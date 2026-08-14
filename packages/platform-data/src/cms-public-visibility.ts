@@ -1,4 +1,4 @@
-import type { CmsPublishStatus } from "./cms-types";
+import type { CmsPublishStatus } from "./cms-types.js";
 
 /**
  * Whether a CMS page or blog row may be shown on the public storefront.

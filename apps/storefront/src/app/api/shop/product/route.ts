@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { storefrontProductSlugSchema } from "@apparel-commerce/validation";
+import { storefrontProductSlugSchema } from "@universal-music-store/validation";
 
 import { fetchProductBySlug } from "@/lib/catalog-fetch";
 import {

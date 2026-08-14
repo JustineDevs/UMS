@@ -3,16 +3,14 @@
  */
 export function parseOptionalStockQuantity(
   body: Record<string, unknown>,
-):
-  | { ok: true; value: number | undefined }
-  | { ok: false; error: string } {
+): { ok: true; value: number | undefined } | { ok: false; error: string } {
   if (!("stockQuantity" in body)) return { ok: true, value: undefined };
   const raw = body.stockQuantity;
   if (raw === undefined || raw === null || raw === "") {
     return { ok: true, value: undefined };
   }
   const n = typeof raw === "number" ? raw : Number(String(raw).trim());
-  if (!Number.isFinite(n) || n < 0) {
+  if (!Number.isSafeInteger(n) || n < 0 || n > 10_000_000) {
     return { ok: false, error: "Stock must be a non-negative whole number." };
   }
   if (!Number.isInteger(n)) {
@@ -44,8 +42,7 @@ export function parseOptionalVariantStocks(
       return { ok: false, error: `Invalid variantStocks entry at index ${i}.` };
     }
     const o = item as Record<string, unknown>;
-    const variantId =
-      typeof o.variantId === "string" ? o.variantId.trim() : "";
+    const variantId = typeof o.variantId === "string" ? o.variantId.trim() : "";
     if (!variantId) {
       return {
         ok: false,
@@ -55,7 +52,7 @@ export function parseOptionalVariantStocks(
     const qRaw = o.quantity;
     const n =
       typeof qRaw === "number" ? qRaw : Number(String(qRaw ?? "").trim());
-    if (!Number.isFinite(n) || n < 0) {
+    if (!Number.isSafeInteger(n) || n < 0 || n > 10_000_000) {
       return {
         ok: false,
         error: `Stock for variant ${variantId} must be a non-negative whole number.`,
@@ -65,6 +62,12 @@ export function parseOptionalVariantStocks(
       return {
         ok: false,
         error: `Stock for variant ${variantId} must be a whole number (no decimals).`,
+      };
+    }
+    if (variantId.length > 200) {
+      return {
+        ok: false,
+        error: `variantStocks[${i}]: variantId is too long.`,
       };
     }
     out.push({ variantId, quantity: n });
@@ -96,11 +99,13 @@ export function parseOptionalMatrixCellStocks(
   for (let i = 0; i < raw.length; i++) {
     const item = raw[i];
     if (!item || typeof item !== "object") {
-      return { ok: false, error: `Invalid matrixCellStocks entry at index ${i}.` };
+      return {
+        ok: false,
+        error: `Invalid matrixCellStocks entry at index ${i}.`,
+      };
     }
     const o = item as Record<string, unknown>;
-    const sizeLabel =
-      typeof o.sizeLabel === "string" ? o.sizeLabel.trim() : "";
+    const sizeLabel = typeof o.sizeLabel === "string" ? o.sizeLabel.trim() : "";
     const colorLabel =
       typeof o.colorLabel === "string" ? o.colorLabel.trim() : "";
     if (!sizeLabel || !colorLabel) {
@@ -112,7 +117,7 @@ export function parseOptionalMatrixCellStocks(
     const qRaw = o.quantity;
     const n =
       typeof qRaw === "number" ? qRaw : Number(String(qRaw ?? "").trim());
-    if (!Number.isFinite(n) || n < 0) {
+    if (!Number.isSafeInteger(n) || n < 0 || n > 10_000_000) {
       return {
         ok: false,
         error: `matrixCellStocks[${i}]: quantity must be a non-negative whole number.`,
@@ -122,6 +127,12 @@ export function parseOptionalMatrixCellStocks(
       return {
         ok: false,
         error: `matrixCellStocks[${i}]: quantity must be a whole number.`,
+      };
+    }
+    if (sizeLabel.length > 200 || colorLabel.length > 200) {
+      return {
+        ok: false,
+        error: `matrixCellStocks[${i}]: option labels are too long.`,
       };
     }
     out.push({ sizeLabel, colorLabel, quantity: n });

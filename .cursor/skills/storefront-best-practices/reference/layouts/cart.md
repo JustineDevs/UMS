@@ -75,7 +75,7 @@ Horizontal card (image left, details right), clear visual separation between ite
 - Customer confirmation before checkout
 - Prevents returns from wrong variant purchases
 - Allows easy correction if wrong variant in cart
-- Essential for clothing, shoes, configurable products
+- Essential for instruments, accessories, configurable products
 
 ### Price Display
 

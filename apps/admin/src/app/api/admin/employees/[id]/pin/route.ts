@@ -1,29 +1,35 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
+import { getStaffSession } from "@/lib/requireStaffSession";
+import { staffSessionAllows } from "@universal-music-store/database";
 import {
   setEmployeePin,
   verifyEmployeePin,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { parseAdminJson, stepUpRequired } from "@/lib/admin-api-security";
+import { z } from "zod";
+
+const pinSchema = z.object({ pin: z.string().regex(/^\d{4,8}$/) }).strict();
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export async function PUT(req: NextRequest, ctx: Ctx) {
+async function put(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   if (!staffSessionAllows(session, "employees:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  const { id } = await ctx.params;
-  const { pin } = await req.json();
-  if (!pin || typeof pin !== "string") {
-    return correlatedJson(cid, { error: "pin is required" }, { status: 400 });
+  if (!stepUpRequired("employees.pin.write", req)) {
+    return correlatedJson(cid, { error: "Step-up authentication required" }, { status: 403 });
   }
+  const { id } = await ctx.params;
+  const parsed = await parseAdminJson(req, pinSchema);
+  if (!parsed.ok) return correlatedJson(cid, { error: parsed.error }, { status: parsed.status });
+  const { pin } = parsed.data;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
@@ -31,18 +37,23 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   return correlatedJson(cid, { success: true });
 }
 
-export async function POST(req: NextRequest, ctx: Ctx) {
+async function post(req: NextRequest, ctx: Ctx) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
+  const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  const { id } = await ctx.params;
-  const { pin } = await req.json();
-  if (!pin) {
-    return correlatedJson(cid, { error: "pin is required" }, { status: 400 });
+  if (!staffSessionAllows(session, "employees:read")) {
+    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
+  const { id } = await ctx.params;
+  const parsed = await parseAdminJson(req, pinSchema);
+  if (!parsed.ok) return correlatedJson(cid, { error: parsed.error }, { status: parsed.status });
+  const { pin } = parsed.data;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
   const valid = await verifyEmployeePin(sb, id, pin);
   return correlatedJson(cid, { valid });
 }
+
+export const PUT = withAdminMutationIdempotency("/admin/employees/[id]/pin:PUT", put);
+export const POST = withAdminMutationIdempotency("/admin/employees/[id]/pin:POST", post);

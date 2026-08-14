@@ -7,6 +7,7 @@ const { spawnSync } = require("node:child_process");
 const projectRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(projectRoot, "..", "..");
 const configHome = path.join(repoRoot, ".cache", "medusa-config");
+const cliShimPath = path.join(__dirname, "medusa-cli-shim.cjs");
 
 mkdirSync(configHome, { recursive: true });
 
@@ -16,11 +17,24 @@ const cliPath = require.resolve("@medusajs/cli/cli.js", {
 
 const result = spawnSync(
   process.execPath,
-  [cliPath, "develop", ...process.argv.slice(2)],
+  ["--require", cliShimPath, cliPath, "develop", ...process.argv.slice(2)],
   {
     cwd: projectRoot,
     env: {
       ...process.env,
+      ADMIN_AUTH_TYPE: process.env.ADMIN_AUTH_TYPE || "jwt",
+      ADMIN_JWT_TOKEN_STORAGE_KEY:
+        process.env.ADMIN_JWT_TOKEN_STORAGE_KEY || "medusa_auth_token",
+      // `medusa develop` is always a development server. A root `.env.local` copied from
+      // production often sets NODE_ENV=production, which incorrectly triggers
+      // production-only guards (e.g. PAYPAL_ENVIRONMENT must be production) and
+      // blocks PayPal sandbox + local PSP keys. Override unless explicitly opted out.
+      NODE_ENV:
+        process.env.MEDUSA_DEVELOP_PRESERVE_NODE_ENV === "1"
+          ? process.env.NODE_ENV
+          : "development",
+      // Prefer SWC when the platform binary is present (Windows: @swc/core-win32-x64-msvc).
+      // If SWC is missing, ts-node falls back in ways that can pull TS sources from node_modules.
       TS_NODE_SWC: process.env.TS_NODE_SWC ?? "true",
       XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || configHome,
       APPDATA: process.env.APPDATA || configHome,

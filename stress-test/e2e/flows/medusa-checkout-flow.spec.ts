@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 import { expectCheckoutShellVisible } from "../helpers/storefront";
 
-/** Deployed: https://maharlika-apparel-custom.vercel.app */
+/** Deployed: https://universal-music-store-custom.vercel.app */
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 /**

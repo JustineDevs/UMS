@@ -19,21 +19,21 @@ Current repository structure and reference. Use this to orient agents and contri
     - `config/` – TypeScript, ESLint, Tailwind configuration.
     - `sdk/` – Medusa env helpers and shared constants.
 
-- **internal/docs/** – Internal documentation
-  - `spec.md` – Apparel Commerce Platform specification.
+- **docs/** – Internal documentation
+  - `spec.md` – Universal Music Store Platform specification.
   - `blueprint.md` – Sprint plan and technical blueprint.
   - `privacy-terms.md` – PRD, service agreement, GDPR/PDPA compliance.
 
 - **.cursor/** – Agent rules, commands, skills, LLM context
   - `commands/` – Cursor commands (audit, docs, hardening, QA, repo-map, trace, etc.).
   - `rules/` – Project rules and standards.
-  - `llm/` – LLM context and indexed docs (payments, AfterShip, etc.).
+  - `llm/` – LLM context and indexed docs (payments, shipment tracking, etc.).
 
 - **.github/** – Workflows, issue/PR templates (if present)
 
 ## Reference
 
-Canonical spec and blueprint: see **internal/docs/spec.md** and **internal/docs/blueprint.md** for system scope, tech stack, data model, OMS flow, and sprint plan.
+Canonical spec and blueprint: see **docs/spec.md** and **docs/spec.md** for system scope, tech stack, data model, OMS flow, and sprint plan.
 
 ## Ownership
 

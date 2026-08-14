@@ -23,9 +23,10 @@ Primary navigation for ecommerce storefronts. Desktop: horizontal menu with cate
 ```typescript
 // WRONG - Static hardcoded categories
 const categories = [
-  { name: "Women", href: "/categories/women" },
-  { name: "Men", href: "/categories/men" },
-  { name: "Accessories", href: "/categories/accessories" }
+  { name: "Guitars", href: "/categories/guitars" },
+  { name: "Bass", href: "/categories/bass" },
+  { name: "Drums", href: "/categories/drums" },
+  { name: "Accessories & Gear", href: "/categories/accessories-gear" }
 ]
 ```
 
@@ -69,7 +70,7 @@ useEffect(() => {
 - Deep hierarchy (3+ levels)
 - Need to showcase featured products in navigation
 - Complex product catalog
-- Fashion, electronics, or large inventory
+- Instruments, electronics, or large inventory
 
 **Mobile**: Always use drawer with accordion pattern, never megamenu on mobile.
 
@@ -122,12 +123,12 @@ See [megamenu.md](megamenu.md) for megamenu implementation details.
 ❌ **WRONG - These are all incorrect approaches:**
 ```typescript
 // WRONG - Hardcoded array
-const categories = ["Women", "Men", "Kids", "Accessories"]
+const categories = ["Guitars", "Bass", "Drums", "Pianos", "Accessories & Gear"]
 
 // WRONG - Static object array
 const categories = [
-  { id: 1, name: "Women", slug: "women" },
-  { id: 2, name: "Men", slug: "men" }
+  { id: 1, name: "Guitars", slug: "guitars" },
+  { id: 2, name: "Bass", slug: "bass" }
 ]
 
 // WRONG - Importing static data
@@ -314,7 +315,7 @@ import { categories } from "./categories.ts"
 
 ## Common Ecommerce Mistakes
 
-❌ **CRITICAL: Hardcoded static categories** - NEVER create static category arrays like `const categories = ["Women", "Men"]` or import from static files. ALWAYS fetch from backend API. Categories change constantly - new categories added, names changed, ordering updated. Hardcoded categories require developer intervention for simple changes and defeat the purpose of dynamic commerce platforms. This is the #1 most common mistake.
+❌ **CRITICAL: Hardcoded static categories** - NEVER create static category arrays like `const categories = ["Guitars", "Bass"]` or import from static files. ALWAYS fetch from backend API. Categories change constantly - new categories added, names changed, ordering updated. Hardcoded categories require developer intervention for simple changes and defeat the purpose of dynamic commerce platforms. This is the #1 most common mistake.
 
 ❌ **Hiding cart in mobile drawer** - Users expect cart always visible. Keep cart icon in header (top-right), not hidden inside hamburger menu.
 

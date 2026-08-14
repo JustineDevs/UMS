@@ -1,7 +1,16 @@
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@apparel-commerce/sdk";
+import type { Metadata } from "next";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 import { redirect } from "next/navigation";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = buildPageMetadata({
+  title: "Track order",
+  description: "Enter your order number and tracking code to view delivery status.",
+  path: "/track",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 type Props = {
   searchParams: Promise<{ orderId?: string; t?: string }>;

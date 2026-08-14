@@ -1,82 +1,64 @@
 <div align="center">
-  <img src="public/Maharlika%20Logo%20Design(white).png" alt="MAHARLIKA APPAREL CUSTOM" width="800" />
+  <img src="public/Universal Music Store%20Logo%20Design(white).png" alt="UNIVERSAL MUSIC STORE" width="800" />
 </div>
 
-# Apparel Commerce Platform
+# Universal Music Store
 
-A **Medusa-first** apparel commerce stack with custom back-office tooling, POS scaffolding, and merchant workflows. Built for a shorts and clothing business using a customer storefront, internal admin dashboard, local terminal agent, and Medusa as the commerce system of record.
+A Medusa-first music commerce monorepo built with Turborepo, pnpm workspaces, Next.js 15, Medusa 2.x, an Express API, and Supabase-backed platform data.
 
 ## Overview
 
-The monorepo connects **Medusa** (products, carts, orders, payments, inventory) with **Supabase** for staff identity, RBAC, audits, and operational tables. Web and admin surfaces read commerce through Medusa APIs. This is **headless apparel commerce with custom operational modules**, not a single proprietary OMS engine.
+- Storefront: product discovery, cart, checkout, tracking, and customer account
+- Admin dashboard: catalog, orders, POS, fulfillment, CMS, and staff workflows
+- Medusa: commerce source of truth for products, carts, orders, payments, and inventory
+- Supabase: staff identity, RBAC, CMS, loyalty, campaigns, and operational tables
 
-### Key Features
+## Tech Stack
 
-- **Storefront**: Product discovery, cart, checkout, order tracking, and customer account
-- **Admin Dashboard**: Analytics, **inventory visibility** from Medusa, order tools, POS workflow scaffolding
-- **Medusa-centered operations**: Commerce truth lives in Medusa. Supabase holds platform and staff data per `docs/data-ownership.md`
-- **Payments**: Medusa providers (Stripe, PayPal, PayMongo, Maya, COD). Hosted checkout and webhooks where configured. COD authorization at checkout; capture on delivery via AfterShip where wired
-- **Shipping**: AfterShip integration with J&T Express Philippines for tracking
-
-### Tech Stack
-
-| Layer | Technology |
-|-------|------------|
+| Layer    | Technology                                  |
+| -------- | ------------------------------------------- |
 | Frontend | Next.js App Router, Tailwind CSS, shadcn/ui |
-| API | Node.js + Express |
-| Database | PostgreSQL via Supabase |
-| Monorepo | Turborepo + pnpm workspaces |
-| Auth | NextAuth/Auth.js with Google provider |
-| Payments | Stripe, PayPal, PayMongo, Maya, COD (Medusa) |
-| Shipping | AfterShip + J&T Express Philippines |
+| API      | Node.js + Express                           |
+| Database | PostgreSQL via Supabase + Medusa Postgres   |
+| Monorepo | Turborepo + pnpm workspaces                 |
+| Auth     | NextAuth/Auth.js with Google provider       |
+| Payments | Stripe, PayPal, Xendit, COD                 |
+| Shipping | Shipment tracking + J&T Express Philippines |
 
-## Live preview
+## Live Preview
 
-**Storefront (Vercel):** https://maharlika-apparel-custom.vercel.app — see [VERCEL.md](VERCEL.md)  
-**Medusa backend (Render):** See [GUIDE.md](docs/GUIDE.md) for credentials and deploy via `render.yaml`.
-
-Configure `NEXT_PUBLIC_SITE_URL` and related env vars to this origin when deploying.
+**Storefront (Vercel):** https://universalmusic.vercel.app — see [docs/runbooks/VERCEL.md](docs/runbooks/VERCEL.md)  
+**Medusa backend (Fly.io):** deployment and credentials notes are in [docs/runbooks/FLY.md](docs/runbooks/FLY.md)
 
 ## Project Structure
 
-```
+```text
 apps/
 ├── storefront/   # Public customer storefront
 ├── admin/        # Dashboard, POS, fulfillment
-├── api/          # Health, compliance (internal API key)
+├── api/          # Express health + compliance APIs
 └── medusa/       # Medusa 2 commerce backend
 packages/
-├── types/        # Domain types (Product, variants)
-├── validation/   # Zod schemas (shop query, order status, roles)
-├── rate-limits/  # Env-driven rate-limit presets (Express API)
-├── database/     # Supabase legacy, compliance, OAuth upsert
-├── config/       # TypeScript, ESLint, Tailwind
-└── sdk/          # Medusa env helpers, shared constants
-internal/docs/     # Spec, blueprint, privacy-terms
+├── database/     # Legacy Supabase schema, migrations, seeds
+├── rate-limits/  # Shared rate-limit policies
+├── sdk/          # Shared env helpers and constants
+├── types/        # Shared domain types
+├── ui/           # Shared UI primitives
+└── validation/   # Shared validation schemas
+docs/             # Specs, runbooks, ADRs, privacy/terms
+stress-test/      # E2E, release-gate, runtime helpers, and dev orchestration scripts
 ```
 
-## Getting Started
+## Development
 
 ### Prerequisites
 
-- Node.js >= 20
-- pnpm 9.x
-- Supabase project
-- Payment provider and AfterShip API credentials as needed
-- Google OAuth client (for NextAuth)
-
-### Local development ports
-
-| Port | Service |
-|------|---------|
-| 3000 | Storefront |
-| 3001 | Admin dashboard |
-| 4000 | Express API (health, compliance) |
-| 9000 | Medusa commerce backend |
-
-- **Storefront** (3000): http://localhost:3000 — shop, cart, checkout, sign-in
-- **Admin** (3001): http://localhost:3001/admin — dashboard, orders, POS
-- **Medusa** (9000): http://localhost:9000/health — commerce API
+- Node 20.x
+- pnpm 10.x
+- Docker Desktop / Docker Engine for the Medusa backend container
+- A Supabase project for the legacy/platform schema
+- A Postgres database for Medusa
+- A root `.env.local` for development and a root `.env.production` for production-mode parity
 
 ### Install
 
@@ -86,45 +68,61 @@ pnpm install
 
 ### Environment
 
-Copy `.env.example` to `.env` and configure:
+Copy `.env.example` to `.env.local`, then fill the required local-development values. For production-mode local runs and production-host parity, mirror the same keys into `.env.production` without any localhost origins:
 
-- `DATABASE_URL` – Supabase Postgres connection string
-- `NEXTAUTH_SECRET`, `NEXTAUTH_URL` – NextAuth configuration
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` – Google OAuth
-- See `apps/medusa/.env.template` for Stripe, PayPal, Paymongo, Maya, and related credentials
-- AfterShip API key
+- `DATABASE_URL`
+- `LEGACY_DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `NEXTAUTH_URL`
+- `ADMIN_NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `NEXT_PUBLIC_MEDUSA_URL`
+- `MEDUSA_BACKEND_URL`
+- `JWT_SECRET`
+- `COOKIE_SECRET`
+- `STORE_CORS`
+- `ADMIN_CORS`
+- `AUTH_CORS`
+- `CORS_ORIGIN`
 
-### Database
+`NODE_ENV` must stay `development` in the local repo `.env.local`. Use `.env.production` for production host parity, and set `NODE_ENV=production` only in real deployment environment variables on Fly.io or Vercel.
+
+The Next.js apps load the root env through `scripts/load-monorepo-root-env.cjs`, which intentionally skips `NODE_ENV` so `next dev` and `next build` keep their own mode handling. That guard protects storefront/admin from a copied production-style `.env.local` or `.env.production`.
+
+`pnpm dev` starts the Medusa backend in Docker from `docker-compose.medusa.yml`, then runs the Express API, storefront, and admin apps on the host. The container reads the root `.env.local`, and the Next.js apps keep their normal host runtime flow. Set `MEDUSA_DOCKER_TARGET=runtime` if you want to run the production-style Medusa image instead of the default dev target.
+
+### Database Setup
 
 ```bash
 pnpm db:migrate
-pnpm db:seed
+pnpm --filter medusa exec medusa db:migrate
 ```
 
-### Development
+Run `pnpm db:seed` or `pnpm --filter medusa seed:ph` only when you need sample or baseline data.
+
+### Startup Sequence
 
 ```bash
 pnpm dev
 ```
 
-Runs storefront, admin, and API in development mode.
-
-### Build
-
-```bash
-pnpm build
-```
-
 ## Documentation
 
-- [Payment Integration](docs/runbooks/PAYMENT-INTEGRATION.md) – Stripe, PayPal, Paymongo (GCash), Maya setup
-- [Specification](docs/spec.md) – System scope, tech stack, functional requirements
-- [Blueprint](docs/blueprint.md) – Sprint plan, data model, OMS flow
-- [Privacy & Terms](docs/privacy-terms.md) – PRD, service agreement, GDPR/PDPA
+- [docs/runbooks/GUIDE.md](docs/runbooks/GUIDE.md) — provider credential runbook
+- [docs/runbooks/FLY.md](docs/runbooks/FLY.md) — Fly.io Medusa deployment
+- [docs/runbooks/VERCEL.md](docs/runbooks/VERCEL.md) — Vercel-specific deployment notes
+- [docs/runbooks/PAYMENT-INTEGRATION.md](docs/runbooks/PAYMENT-INTEGRATION.md) — payment provider setup
+- [docs/spec.md](docs/spec.md) — system scope and functional requirements
+- [docs/validation-truth-matrix.md](docs/validation-truth-matrix.md) — verification matrix and audit commands
+- [docs/privacy-terms.md](docs/privacy-terms.md) — privacy, compliance, and terms
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for reporting vulnerabilities and security practices.
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and security practices.
 
 ## License
 

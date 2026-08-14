@@ -7,18 +7,22 @@ import {
   createStorefrontAnonSupabase,
   createStorefrontServiceSupabase,
 } from "@/lib/storefront-supabase";
-import { verifyTurnstileIfConfigured } from "@/lib/storefront-turnstile";
 import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { withBotIdProtection } from "@/lib/botid-protection";
+import {
+  isRecaptchaConfigured,
+  verifyRecaptchaAction,
+} from "@/lib/recaptcha-enterprise";
 import {
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
-} from "@apparel-commerce/validation";
+} from "@universal-music-store/validation";
 
 const PUBLIC_REVIEW_FIELDS =
-  "id,rating,author_name,body,created_at,product_slug,medusa_product_id,is_verified_buyer,status";
+  "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,status";
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
@@ -65,7 +69,7 @@ export async function GET(req: Request) {
   }
   const { data, error } = await q;
   if (error) {
-    return Response.json({ error: "Unable to load reviews" }, { status: 500 });
+    return Response.json({ error: "Unable to load reviews" }, { status: 503 });
   }
   const rows = data ?? [];
   const seen = new Set<string>();
@@ -88,7 +92,7 @@ function displayNameFromSession(params: {
   return local.slice(0, 120) || "Customer";
 }
 
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-post:${ip}`, 15, 60_000);
   if (!rl.ok) {
@@ -114,6 +118,16 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  if (!isRecaptchaConfigured()) {
+    return Response.json({ error: "Security verification unavailable" }, { status: 503 });
+  }
+  const recaptchaToken =
+    body && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>).recaptchaToken
+      : undefined;
+  if (!(await verifyRecaptchaAction(req, recaptchaToken, "review"))) {
+    return Response.json({ error: "Verification failed" }, { status: 400 });
+  }
   const postParsed = storefrontReviewPostBodySchema.safeParse(body);
   if (!postParsed.success) {
     return Response.json(
@@ -122,10 +136,6 @@ export async function POST(req: Request) {
     );
   }
   const o = postParsed.data;
-  const turnstile = await verifyTurnstileIfConfigured(o.turnstileToken);
-  if (!turnstile.ok) {
-    return Response.json({ error: turnstile.error }, { status: 400 });
-  }
 
   const productSlug = o.productSlug;
   const medusaProductId = o.medusaProductId;
@@ -163,6 +173,12 @@ export async function POST(req: Request) {
     medusa_product_id: medusaProductId,
     rating,
     author_name: authorName,
+    image_url:
+      typeof o.proofMediaUrl === "string"
+        ? o.proofMediaUrl.trim() || null
+        : typeof o.imageUrl === "string"
+          ? o.imageUrl.trim() || null
+          : null,
     body: reviewBody,
     status: "pending" as const,
     medusa_customer_id: customerId,
@@ -191,7 +207,7 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
-    return Response.json({ error: "Unable to save review" }, { status: 500 });
+    return Response.json({ error: "Unable to save review" }, { status: 503 });
   }
 
   return Response.json({
@@ -200,3 +216,5 @@ export async function POST(req: Request) {
     isVerifiedBuyer: verified.verified,
   });
 }
+
+export const POST = withBotIdProtection(handlePOST);

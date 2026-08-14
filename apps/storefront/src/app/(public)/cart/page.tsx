@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { CartPageClient } from "./cart-client";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Cart",
-};
+  description: "Review items before checkout.",
+  path: "/cart",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default function CartPage() {
   return (

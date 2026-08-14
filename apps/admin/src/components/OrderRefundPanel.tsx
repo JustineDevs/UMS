@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import type { MedusaPaymentSummary } from "@/lib/medusa-order-bridge";
 
 function minorToMajor(minor: number): number {

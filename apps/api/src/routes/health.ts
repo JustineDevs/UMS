@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { createSupabaseClient } from "@apparel-commerce/database";
-import { getMedusaStoreBaseUrl } from "@apparel-commerce/sdk";
+import { createSupabaseClient } from "@universal-music-store/database";
+import { getMedusaStoreBaseUrl } from "@universal-music-store/sdk";
 
 export const healthRouter: ReturnType<typeof Router> = Router();
 
@@ -26,6 +26,27 @@ async function checkSupabase(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export type ReadinessPayload = {
+  ready: boolean;
+  medusa: "ok" | "unavailable";
+  supabase: "ok" | "unavailable";
+  timestamp: string;
+};
+
+export async function getReadinessPayload(): Promise<ReadinessPayload> {
+  const [medusa, supabaseOk] = await Promise.all([
+    checkMedusa(),
+    checkSupabase(),
+  ]);
+  const allOk = medusa.ok && supabaseOk;
+  return {
+    ready: allOk,
+    medusa: medusa.ok ? "ok" : "unavailable",
+    supabase: supabaseOk ? "ok" : "unavailable",
+    timestamp: new Date().toISOString(),
+  };
 }
 
 healthRouter.get("/commerce", async (_req, res) => {
@@ -55,18 +76,7 @@ healthRouter.get("/", async (_req, res) => {
 });
 
 healthRouter.get("/ready", async (_req, res) => {
-  const [medusa, supabaseOk] = await Promise.all([
-    checkMedusa(),
-    checkSupabase(),
-  ]);
-
-  const allOk = medusa.ok && supabaseOk;
-  const httpStatus = allOk ? 200 : 503;
-
-  res.status(httpStatus).json({
-    ready: allOk,
-    medusa: medusa.ok ? "ok" : "unavailable",
-    supabase: supabaseOk ? "ok" : "unavailable",
-    timestamp: new Date().toISOString(),
-  });
+  const body = await getReadinessPayload();
+  const httpStatus = body.ready ? 200 : 503;
+  res.status(httpStatus).json(body);
 });

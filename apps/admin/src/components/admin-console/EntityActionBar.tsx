@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 export type EntityActionBarButton = {
   key: string;
@@ -16,36 +17,28 @@ export type EntityActionBarProps = {
   trailing?: ReactNode;
 };
 
-const btnBase =
-  "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50";
-
 export function EntityActionBar({ actions, trailing }: EntityActionBarProps) {
   return (
     <div className="flex flex-wrap items-center gap-2 border-t border-outline-variant/15 pt-4">
       {actions.map((a) => {
-        const cls =
-          a.variant === "danger"
-            ? `${btnBase} bg-red-600 text-white hover:bg-red-700`
-            : a.variant === "primary"
-              ? `${btnBase} bg-primary text-white hover:opacity-95`
-              : `${btnBase} border border-outline-variant/30 bg-white text-primary hover:bg-surface-container-low`;
+        const variant: "default" | "outline" | "destructive" = a.variant === "danger" ? "destructive" : a.variant === "primary" ? "default" : "outline";
         if (a.href) {
           return (
-            <a key={a.key} href={a.href} className={cls}>
-              {a.label}
-            </a>
+            <Button key={a.key} asChild variant={variant} disabled={a.disabled}>
+              <a href={a.href}>{a.label}</a>
+            </Button>
           );
         }
         return (
-          <button
+          <Button
             key={a.key}
             type="button"
-            className={cls}
+            variant={variant}
             onClick={a.onClick}
             disabled={a.disabled}
           >
             {a.label}
-          </button>
+          </Button>
         );
       })}
       {trailing}

@@ -5,6 +5,19 @@ import { z } from "zod";
 
 const devOk = z.string().min(1);
 
+function nangoIntegrationConfigured(...keys: string[]): boolean {
+  const configured = new Set(
+    (process.env.NANGO_PAYMENT_INTEGRATIONS ?? "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  return Boolean(process.env.NANGO_API_KEY?.trim()) && keys.some((key) => {
+    const normalized = key.toLowerCase();
+    return configured.has(normalized) || configured.has(`${normalized}-sandbox`);
+  });
+}
+
 function productionStripeSchema() {
   return z
     .object({
@@ -13,48 +26,49 @@ function productionStripeSchema() {
     })
     .refine(
       (d) => {
-        if (!d.STRIPE_API_KEY?.trim()) return true;
+        if (!d.STRIPE_API_KEY?.trim() && !nangoIntegrationConfigured("stripe")) return true;
         return Boolean(d.STRIPE_WEBHOOK_SECRET?.trim());
       },
       {
         message:
-          "STRIPE_WEBHOOK_SECRET is required in production when STRIPE_API_KEY is set",
+          "STRIPE_WEBHOOK_SECRET is required in production when Stripe is configured directly or through Nango",
       },
     );
 }
 
-function productionPaymongoSchema() {
+function productionXenditSchema() {
   return z
     .object({
-      PAYMONGO_SECRET_KEY: z.string().optional(),
-      PAYMONGO_WEBHOOK_SECRET: z.string().optional(),
+      XENDIT_SECRET_KEY: z.string().optional(),
+      XENDIT_WEBHOOK_TOKEN: z.string().optional(),
     })
     .refine(
       (d) => {
-        if (!d.PAYMONGO_SECRET_KEY?.trim()) return true;
-        return Boolean(d.PAYMONGO_WEBHOOK_SECRET?.trim());
+        if (!d.XENDIT_SECRET_KEY?.trim()) return true;
+        return Boolean(d.XENDIT_WEBHOOK_TOKEN?.trim());
       },
       {
         message:
-          "PAYMONGO_WEBHOOK_SECRET is required in production when PAYMONGO_SECRET_KEY is set",
+          "XENDIT_WEBHOOK_TOKEN is required in production when XENDIT_SECRET_KEY is set",
       },
     );
 }
 
-function productionMayaSchema() {
+function productionPancakePosSchema() {
   return z
     .object({
-      MAYA_SECRET_KEY: z.string().optional(),
-      MAYA_WEBHOOK_SECRET: z.string().optional(),
+      PANCAKE_POS_API_URL: z.string().optional(),
+      PANCAKE_POS_API_KEY: z.string().optional(),
+      PANCAKE_POS_SHOP_ID: z.string().optional(),
     })
     .refine(
       (d) => {
-        if (!d.MAYA_SECRET_KEY?.trim()) return true;
-        return Boolean(d.MAYA_WEBHOOK_SECRET?.trim());
+        if (!d.PANCAKE_POS_API_KEY?.trim()) return true;
+        return Boolean(d.PANCAKE_POS_SHOP_ID?.trim());
       },
       {
         message:
-          "MAYA_WEBHOOK_SECRET is required in production when MAYA_SECRET_KEY is set",
+          "PANCAKE_POS_SHOP_ID is required in production when PANCAKE_POS_API_KEY is set",
       },
     );
 }
@@ -68,6 +82,7 @@ function productionPayPalSchema() {
     })
     .refine(
       (d) => {
+        if (nangoIntegrationConfigured("paypal")) return true;
         if (!d.PAYPAL_CLIENT_ID?.trim()) return true;
         return Boolean(d.PAYPAL_CLIENT_SECRET?.trim());
       },
@@ -78,7 +93,7 @@ function productionPayPalSchema() {
     )
     .refine(
       (d) => {
-        if (!d.PAYPAL_CLIENT_ID?.trim()) return true;
+        if (!d.PAYPAL_CLIENT_ID?.trim() && !nangoIntegrationConfigured("paypal")) return true;
         return Boolean(d.PAYPAL_WEBHOOK_ID?.trim());
       },
       {
@@ -110,6 +125,19 @@ export function validateMedusaProcessEnv(): void {
   if (!r.success) {
     throw new Error(
       `Medusa: DATABASE_URL is required — ${r.error.message}`,
+    );
+  }
+
+  // Always-on: PSP webhook secrets are required whenever the corresponding key is set,
+  // regardless of NODE_ENV. A missing webhook secret means unsigned webhooks are accepted — never safe.
+  if (process.env.XENDIT_SECRET_KEY?.trim() && !process.env.XENDIT_WEBHOOK_TOKEN?.trim()) {
+    throw new Error(
+      "Medusa: XENDIT_WEBHOOK_TOKEN is required when XENDIT_SECRET_KEY is set",
+    );
+  }
+  if (process.env.PANCAKE_POS_API_KEY?.trim() && !process.env.PANCAKE_POS_SHOP_ID?.trim()) {
+    throw new Error(
+      "Medusa: PANCAKE_POS_SHOP_ID is required when PANCAKE_POS_API_KEY is set",
     );
   }
 
@@ -147,13 +175,6 @@ export function validateMedusaProcessEnv(): void {
       );
     }
 
-    const paymongo = productionPaymongoSchema().safeParse(process.env);
-    if (!paymongo.success) {
-      throw new Error(
-        `Medusa: ${paymongo.error.issues[0]?.message ?? "Paymongo env invalid"}`,
-      );
-    }
-
     const paypal = productionPayPalSchema().safeParse(process.env);
     if (!paypal.success) {
       throw new Error(
@@ -161,16 +182,37 @@ export function validateMedusaProcessEnv(): void {
       );
     }
 
-    const maya = productionMayaSchema().safeParse(process.env);
-    if (!maya.success) {
+    const xendit = productionXenditSchema().safeParse(process.env);
+    if (!xendit.success) {
       throw new Error(
-        `Medusa: ${maya.error.issues[0]?.message ?? "Maya env invalid"}`,
+        `Medusa: ${xendit.error.issues[0]?.message ?? "Xendit env invalid"}`,
       );
+    }
+
+    const pancakePos = productionPancakePosSchema().safeParse(process.env);
+    if (!pancakePos.success) {
+      throw new Error(
+        `Medusa: ${pancakePos.error.issues[0]?.message ?? "Pancake POS env invalid"}`,
+      );
+    }
+
+    if (process.env.PAYPAL_CLIENT_ID?.trim() || nangoIntegrationConfigured("paypal")) {
+      const pe = process.env.PAYPAL_ENVIRONMENT?.trim().toLowerCase() ?? "";
+      if (pe !== "production" && pe !== "live") {
+        throw new Error(
+        "Medusa: PAYPAL_ENVIRONMENT must be production when PayPal is configured directly or through Nango",
+        );
+      }
     }
   }
 
   const resendKeys = ["RESEND_API_KEY", "RESEND_FROM_EMAIL"];
   warnPartialOptionalProvider("Resend", resendKeys, process.env as Record<string, string | undefined>);
+  warnPartialOptionalProvider(
+    "Pancake POS",
+    ["PANCAKE_POS_API_URL", "PANCAKE_POS_API_KEY", "PANCAKE_POS_SHOP_ID"],
+    process.env as Record<string, string | undefined>,
+  );
   if (
     resendKeys.every((k) => process.env[k]?.trim()) &&
     !process.env.TRACKING_HMAC_SECRET?.trim()
@@ -184,8 +226,4 @@ export function validateMedusaProcessEnv(): void {
       "[env] Resend is configured but TRACKING_HMAC_SECRET is not set — order tracking links will be unsigned; set TRACKING_HMAC_SECRET before production",
     );
   }
-
-  warnPartialOptionalProvider("AfterShip", [
-    "AFTERSHIP_API_KEY",
-  ], process.env as Record<string, string | undefined>);
 }

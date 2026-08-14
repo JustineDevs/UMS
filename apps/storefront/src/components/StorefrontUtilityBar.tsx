@@ -20,16 +20,7 @@ export function StorefrontUtilityBar() {
         <Link href="/contact" className={linkClass}>
           Contact
         </Link>
-        <Link
-          href="/search"
-          className={`inline-flex items-center gap-0.5 ${linkClass}`}
-        >
-          <span
-            className="material-symbols-outlined text-[14px] sm:text-base"
-            aria-hidden
-          >
-            search
-          </span>
+        <Link href="/search" className={linkClass}>
           Search
         </Link>
         <Link href="/sign-in" className={linkClass}>

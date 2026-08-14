@@ -11,7 +11,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-config({ path: resolve(__dirname, "../../../.env") });
+const repoRoot = resolve(__dirname, "../../../");
+config({ path: resolve(repoRoot, ".env.local"), override: true });
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -41,10 +42,12 @@ async function main(): Promise<void> {
       .delete()
       .eq("user_id", userId);
     if (delErr) throw delErr;
-    const { error: insErr } = await supabase.from("staff_permission_grants").insert({
-      user_id: userId,
-      permission_key: "*",
-    });
+    const { error: insErr } = await supabase
+      .from("staff_permission_grants")
+      .insert({
+        user_id: userId,
+        permission_key: "*",
+      });
     if (insErr) throw insErr;
   }
 

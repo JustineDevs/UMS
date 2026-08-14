@@ -1,11 +1,11 @@
-You are performing a BRUTAL COMMERCE-TRUTH AND IMPLEMENTATION-TRUTH INSPECTION of Maharlika Apparel in response to the accusation that it is “mostly a standard Medusa store/admin with Supabase tables and apparel branding layered on top.”
+You are performing a BRUTAL COMMERCE-TRUTH AND IMPLEMENTATION-TRUTH INSPECTION of Universal Music Store in response to the accusation that it is “mostly a standard Medusa store/admin with Supabase tables and branding layered on top.”
 
 
 Goal:
 Determine whether this product is actually:
 - a thin themed headless-commerce shell
 - a partially differentiated operations workflow over commodity tools
-- a real unified apparel commerce system with defensible implementation depth
+- a real unified music commerce system with defensible implementation depth
 
 
 Do not defend the product emotionally.
@@ -15,7 +15,7 @@ Do not assume “unified commerce,” “POS,” “real-time inventory,” “o
 
 Your mission:
 Prove or disprove the accusation:
-“This is basically Medusa + Next.js + Supabase + some UI screens, with Maharlika branding on top.”
+“This is basically Medusa + Next.js + Supabase + some UI screens, with Universal Music Store branding on top.”
 
 
 You must inspect the entire project and answer:
@@ -47,7 +47,7 @@ Evaluate the product against this challenge:
 - a Next.js admin shell
 - Supabase for CMS, loyalty, campaigns, devices, and staff tables
 - basic POS route handlers
-then what exactly is Maharlika Apparel doing that is NOT just commodity headless commerce assembly?”
+then what exactly is Universal Music Store doing that is NOT just commodity headless commerce assembly?”
 
 
 You must answer this directly.
@@ -98,7 +98,7 @@ SECTION 3 — CLAIMS AUDIT
 
 
 Inventory all major claims made by the product, docs, landing page, README, UI labels, internal docs, and admin surfaces, including claims like:
-- unified apparel commerce platform
+- unified music commerce platform
 - real-time inventory
 - POS-ready
 - omnichannel
@@ -174,7 +174,7 @@ SECTION 5 — DIFFERENTIATION TEST
 ==================================================
 
 
-Identify what could genuinely differentiate Maharlika Apparel from a standard Medusa + Next + Supabase stack.
+Identify what could genuinely differentiate Universal Music Store from a standard Medusa + Next + Supabase stack.
 
 Potential differentiation areas to verify:
 - clear system-of-record boundaries
@@ -204,11 +204,11 @@ For each potential differentiator ask:
 
 
 ==================================================
-SECTION 6 — APPAREL COMMERCE TRUTH TEST
+SECTION 6 — MUSIC COMMERCE TRUTH TEST
 ==================================================
 
 
-Inspect whether the product truly handles apparel-commerce complexity beyond generic catalog CRUD.
+Inspect whether the product truly handles universal-music-store complexity beyond generic catalog CRUD.
 
 Validate:
 - size / color variant handling
@@ -226,7 +226,7 @@ Validate:
 
 
 Questions:
-- Is apparel complexity handled at the data model and workflow level, or just displayed?
+- Is product complexity handled at the data model and workflow level, or just displayed?
 - Are size/color/variant assumptions explicit and robust?
 - Are prices and stock authoritative in one place?
 - Can the system fail safely when catalog or inventory configuration is wrong?
@@ -413,7 +413,7 @@ SECTION 13 — REPRODUCIBILITY TEST
 
 
 Try to answer:
-“What percentage of Maharlika Apparel’s current value can be reproduced with:
+“What percentage of Universal Music Store’s current value can be reproduced with:
 - Medusa starter setup
 - a standard Next.js storefront
 - a standard Next.js admin shell
@@ -568,9 +568,9 @@ Provide:
 8. Product repositioning
 Give a sharper positioning statement based on implementation truth.
 Examples:
-- “Medusa-first apparel commerce stack with custom store ops tooling”
-- “Apparel back-office and POS workflow layer over Medusa”
-- “Headless apparel commerce platform with partial custom operations modules”
+- “Medusa-first music commerce stack with custom store ops tooling”
+- “Music retail back-office and POS workflow layer over Medusa”
+- “Headless music commerce platform with partial custom operations modules”
 Do not overclaim.
 
 

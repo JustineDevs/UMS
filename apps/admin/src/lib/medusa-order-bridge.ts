@@ -103,6 +103,7 @@ export type MedusaAdminOrderDetail = {
   shipping_fee: number;
   grand_total: number;
   created_at: string;
+  metadata: Record<string, unknown>;
   order_items?: MedusaAdminOrderItem[] | null;
 };
 
@@ -111,6 +112,13 @@ function deriveOmsStatus(order: Record<string, unknown>): string {
   const fromMeta = meta?.oms_status;
   if (typeof fromMeta === "string" && fromMeta.trim()) {
     return fromMeta.trim();
+  }
+  if (
+    meta?.payment_provider === "cod" &&
+    meta?.cod_payment_status !== "captured" &&
+    meta?.cod_capture_complete !== true
+  ) {
+    return "pending";
   }
   const ps = String(order.payment_status ?? "");
   const fs = String(order.fulfillment_status ?? "");
@@ -233,6 +241,7 @@ export async function fetchMedusaOrderDetailForAdmin(
     subtotal,
     shipping_fee: shippingFee,
     grand_total: grandTotal,
+    metadata: metadata ?? {},
     created_at:
       typeof order.created_at === "string"
         ? order.created_at

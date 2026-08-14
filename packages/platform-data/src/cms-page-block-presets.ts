@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
-import type { CmsBlock, CmsPageBlockPresetRow } from "./cms-types";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
+import type { CmsBlock, CmsPageBlockPresetRow } from "./cms-types.js";
 
 function parseBlocks(v: unknown): CmsBlock[] {
   if (!Array.isArray(v)) return [];
@@ -21,10 +21,12 @@ function parseBlocks(v: unknown): CmsBlock[] {
 
 export async function listCmsPageBlockPresets(
   supabase: SupabaseClient,
+  organizationId: string,
 ): Promise<CmsPageBlockPresetRow[]> {
   const { data, error } = await supabase
     .from("cms_page_block_presets")
     .select("id, name, blocks, created_at")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
@@ -44,13 +46,14 @@ export async function listCmsPageBlockPresets(
 
 export async function insertCmsPageBlockPreset(
   supabase: SupabaseClient,
-  input: { name: string; blocks: CmsBlock[] },
+  input: { name: string; blocks: CmsBlock[]; organizationId: string },
 ): Promise<CmsPageBlockPresetRow | null> {
   const { data, error } = await supabase
     .from("cms_page_block_presets")
     .insert({
       name: input.name.trim(),
       blocks: input.blocks as unknown as Record<string, unknown>[],
+      organization_id: input.organizationId,
     })
     .select("id, name, blocks, created_at")
     .single();
@@ -70,8 +73,13 @@ export async function insertCmsPageBlockPreset(
 export async function deleteCmsPageBlockPreset(
   supabase: SupabaseClient,
   id: string,
+  organizationId: string,
 ): Promise<boolean> {
-  const { error } = await supabase.from("cms_page_block_presets").delete().eq("id", id);
+  const { error } = await supabase
+    .from("cms_page_block_presets")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) {
     console.error("[cms-page-block-presets] delete", error.message);
     return false;

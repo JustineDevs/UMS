@@ -1,8 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 
 type ProductRow = {
   id: string;
@@ -27,17 +30,20 @@ export function CmsCommerceSearch() {
   const [categoryId, setCategoryId] = useState("");
   const [published, setPublished] = useState("");
   const [rows, setRows] = useState<ProductRow[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string; handle: string }[]>([]);
+  const [categories, setCategories] = useState<
+    { id: string; name: string; handle: string }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const siteBase =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")) || "";
+  const siteBase = getStorefrontPublicOrigin();
 
   const loadCategories = useCallback(() => {
     void fetch("/api/admin/catalog/categories")
       .then(async (r) => {
-        const j = (await r.json()) as { categories?: { id: string; name: string; handle: string }[] };
+        const j = (await r.json()) as {
+          categories?: { id: string; name: string; handle: string }[];
+        };
         if (!r.ok) return;
         setCategories(j.categories ?? []);
       })
@@ -58,8 +64,13 @@ export function CmsCommerceSearch() {
     if (published) params.set("published", published);
     params.set("limit", "60");
     try {
-      const r = await fetch(`/api/admin/commerce/products/lookup?${params.toString()}`);
-      const j = (await r.json()) as { data?: { products: ProductRow[] }; error?: string };
+      const r = await fetch(
+        `/api/admin/commerce/products/lookup?${params.toString()}`,
+      );
+      const j = (await r.json()) as {
+        data?: { products: ProductRow[] };
+        error?: string;
+      };
       if (!r.ok) throw new Error(j.error ?? r.statusText);
       setRows(j.data?.products ?? []);
     } catch (e: unknown) {
@@ -70,12 +81,14 @@ export function CmsCommerceSearch() {
     }
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
     <div className="max-w-5xl space-y-4">
       <p className="text-sm text-slate-600">
-        Table uses the live Medusa catalog. Links open the staff product editor and storefront PDP.
+        Table uses the live Medusa catalog. Links open the staff product editor
+        and storefront PDP.
       </p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-xs font-medium text-slate-600">
@@ -128,19 +141,36 @@ export function CmsCommerceSearch() {
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase text-slate-600">
             <tr>
-              <th className="px-3 py-2">Thumb</th>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">SKU</th>
-              <th className="px-3 py-2">Handle</th>
-              <th className="px-3 py-2">Id</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Links</th>
+              <th scope="col" className="px-3 py-2">
+                Thumb
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Title
+              </th>
+              <th scope="col" className="px-3 py-2">
+                SKU
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Handle
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Id
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Status
+              </th>
+              <th scope="col" className="px-3 py-2">
+                Links
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
+                <td
+                  colSpan={7}
+                  className="px-3 py-6 text-center text-slate-500"
+                >
                   No results. Run a search.
                 </td>
               </tr>
@@ -149,16 +179,22 @@ export function CmsCommerceSearch() {
                 <tr key={p.id} className="border-b border-slate-100">
                   <td className="px-3 py-2">
                     {p.thumbnail_url ? (
-                      <img
+                      <Image
                         src={p.thumbnail_url}
                         alt=""
+                        width={40}
+                        height={40}
+                        unoptimized
                         className="h-10 w-10 rounded object-cover"
                       />
                     ) : (
                       <span className="text-xs text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="max-w-[200px] truncate px-3 py-2" title={p.title}>
+                  <td
+                    className="max-w-[200px] truncate px-3 py-2"
+                    title={p.title}
+                  >
                     {p.title}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
@@ -167,6 +203,7 @@ export function CmsCommerceSearch() {
                       <button
                         type="button"
                         className="text-primary underline"
+                        aria-label={`Copy SKU ${p.sku}`}
                         onClick={() => copyText(p.sku)}
                       >
                         Copy
@@ -178,6 +215,7 @@ export function CmsCommerceSearch() {
                     <button
                       type="button"
                       className="text-primary underline"
+                      aria-label={`Copy handle ${p.handle}`}
                       onClick={() => copyText(p.handle)}
                     >
                       Copy
@@ -188,6 +226,7 @@ export function CmsCommerceSearch() {
                     <button
                       type="button"
                       className="text-primary underline"
+                      aria-label={`Copy product id ${p.id}`}
                       onClick={() => copyText(p.id)}
                     >
                       Copy
@@ -201,18 +240,14 @@ export function CmsCommerceSearch() {
                     >
                       Admin product
                     </a>
-                    {siteBase ? (
-                      <a
-                        href={`${siteBase}/shop/${encodeURIComponent(p.handle)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-primary underline"
-                      >
-                        Storefront PDP
-                      </a>
-                    ) : (
-                      <span className="text-slate-500">Set NEXT_PUBLIC_SITE_URL for PDP link</span>
-                    )}
+                    {sanitizeTrustedPublicUrl(`${siteBase}/shop/${encodeURIComponent(p.handle)}`, [siteBase]) ? <a
+                      href={sanitizeTrustedPublicUrl(`${siteBase}/shop/${encodeURIComponent(p.handle)}`, [siteBase]) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-primary underline"
+                    >
+                      Storefront PDP
+                    </a> : null}
                   </td>
                 </tr>
               ))

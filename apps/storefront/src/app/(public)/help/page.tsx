@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Help center",
-};
+  description: "Support links for orders, shipping, returns, accessibility, privacy, and contact.",
+  path: "/help",
+  keywords: [...SEO_KEYWORDS.help],
+});
 
 const cards: { title: string; description: string; href: string }[] = [
   {

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { Button, Input, Label } from "@apparel-commerce/ui";
+import { Button, Input, Label } from "@universal-music-store/ui";
+import { sanitizeSameOriginUrl } from "@universal-music-store/sdk";
 
 type Props = {
   callbackUrl: string;
@@ -41,9 +42,11 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
       }
       const raw =
         typeof res.url === "string" && res.url.length > 0 ? res.url : callbackUrl;
-      const target = raw.startsWith("http")
-        ? raw
-        : `${window.location.origin}${raw.startsWith("/") ? raw : `/${raw}`}`;
+      const target = sanitizeSameOriginUrl(raw, window.location.origin);
+      if (!target) {
+        setError("Sign-in returned an invalid redirect.");
+        return;
+      }
       window.location.assign(target);
     } finally {
       setBusy(false);

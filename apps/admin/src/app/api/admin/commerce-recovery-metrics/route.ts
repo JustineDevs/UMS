@@ -1,4 +1,4 @@
-import { fetchPaymentAttemptInvalidationDayBuckets } from "@apparel-commerce/platform-data";
+import { fetchPaymentAttemptInvalidationDayBuckets } from "@universal-music-store/platform-data";
 import { randomUUID } from "crypto";
 
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";

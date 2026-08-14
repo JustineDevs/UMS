@@ -1,6 +1,6 @@
 "use client";
 
-import { sanitizeCmsHtml } from "@apparel-commerce/validation";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -54,7 +54,7 @@ export function CmsAnnouncementStack({
   );
 }
 
-export function CmsAnnouncementBar({
+function CmsAnnouncementBar({
   announcementId,
   locale,
   body,

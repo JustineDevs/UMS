@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export const CMS_FORM_KEYS = ["contact", "newsletter", "lead"] as const;
 export type CmsFormKey = (typeof CMS_FORM_KEYS)[number];
@@ -16,6 +16,7 @@ export type CmsFormSubmissionRow = {
 };
 
 export type ListCmsFormSubmissionsOptions = {
+  organization_id?: string;
   form_key?: string;
   from?: string;
   to?: string;
@@ -73,6 +74,10 @@ export async function listCmsFormSubmissions(
     .select("id, form_key, payload, created_at, ip_hash, read_at, assigned_to, spam_score")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
+  if (opts.organization_id) {
+    countQ = countQ.eq("organization_id", opts.organization_id);
+    dataQ = dataQ.eq("organization_id", opts.organization_id);
+  }
 
   if (opts.form_key?.trim()) {
     const fk = opts.form_key.trim();
@@ -105,6 +110,7 @@ export async function updateCmsFormSubmission(
   supabase: SupabaseClient,
   id: string,
   patch: Partial<Pick<CmsFormSubmissionRow, "read_at" | "assigned_to" | "spam_score">>,
+  organizationId?: string,
 ): Promise<CmsFormSubmissionRow | null> {
   const payload: Record<string, unknown> = {};
   if (patch.read_at !== undefined) payload.read_at = patch.read_at;
@@ -115,6 +121,7 @@ export async function updateCmsFormSubmission(
       .from("cms_form_submissions")
       .select("id, form_key, payload, created_at, ip_hash, read_at, assigned_to, spam_score")
       .eq("id", id)
+      .eq("organization_id", organizationId ?? "")
       .maybeSingle();
     return data ? mapSubmission(data as Record<string, unknown>) : null;
   }
@@ -122,6 +129,7 @@ export async function updateCmsFormSubmission(
     .from("cms_form_submissions")
     .update(payload)
     .eq("id", id)
+    .eq("organization_id", organizationId ?? "")
     .select("id, form_key, payload, created_at, ip_hash, read_at, assigned_to, spam_score")
     .single();
   if (error) {
@@ -131,8 +139,10 @@ export async function updateCmsFormSubmission(
   return mapSubmission(data as Record<string, unknown>);
 }
 
-export async function getCmsFormSettings(supabase: SupabaseClient): Promise<CmsFormSettingsRow | null> {
-  const { data, error } = await supabase.from("cms_form_settings").select("*").eq("id", "default").maybeSingle();
+export async function getCmsFormSettings(supabase: SupabaseClient, organizationId?: string): Promise<CmsFormSettingsRow | null> {
+  let query = supabase.from("cms_form_settings").select("*").eq("id", "default");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-forms] get settings", error.message);
@@ -151,8 +161,9 @@ export async function getCmsFormSettings(supabase: SupabaseClient): Promise<CmsF
 export async function upsertCmsFormSettings(
   supabase: SupabaseClient,
   input: Partial<Pick<CmsFormSettingsRow, "webhook_url" | "notify_email">>,
+  organizationId?: string,
 ): Promise<CmsFormSettingsRow | null> {
-  const existing = await getCmsFormSettings(supabase);
+  const existing = await getCmsFormSettings(supabase, organizationId);
   const row = {
     id: "default",
     webhook_url:
@@ -160,8 +171,9 @@ export async function upsertCmsFormSettings(
     notify_email:
       input.notify_email !== undefined ? input.notify_email : existing?.notify_email ?? null,
     updated_at: new Date().toISOString(),
+    organization_id: organizationId ?? null,
   };
-  const { data, error } = await supabase.from("cms_form_settings").upsert(row).select("*").single();
+  const { data, error } = await supabase.from("cms_form_settings").upsert(row, { onConflict: "organization_id,id" }).select("*").single();
   if (error) {
     console.error("[cms-forms] upsert settings", error.message);
     return null;
@@ -177,7 +189,7 @@ export async function upsertCmsFormSettings(
 
 export async function insertCmsFormSubmission(
   supabase: SupabaseClient,
-  input: { form_key: CmsFormKey | string; payload: Record<string, unknown>; ip_hash?: string | null },
+  input: { form_key: CmsFormKey | string; payload: Record<string, unknown>; ip_hash?: string | null; organization_id?: string },
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("cms_form_submissions")
@@ -186,6 +198,7 @@ export async function insertCmsFormSubmission(
       payload: input.payload,
       ip_hash: input.ip_hash ?? null,
       created_at: new Date().toISOString(),
+      organization_id: input.organization_id ?? null,
     })
     .select("id")
     .single();

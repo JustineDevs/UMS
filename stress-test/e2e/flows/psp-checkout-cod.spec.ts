@@ -22,13 +22,38 @@ import { signInAsAdmin } from "../fixtures/admin-auth";
 
 const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
 const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+let createdCodOrderId: string | null = null;
 
 function shouldFailOnMissingPrereq(): boolean {
   return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
 }
 
 test.describe("@checkout @cod COD checkout flow", () => {
+  test.describe.configure({ mode: "serial" });
+
   test("complete checkout with Cash on Delivery reaches /track/:orderId", async ({ page }) => {
+    if (process.env.AUTH_DISABLED === "true") {
+      const profile = await page.request.patch(`${storefrontBase}/api/account/profile`, {
+        data: {
+          displayName: "E2E Tester",
+          phone: "+639171234567",
+          shippingAddresses: [
+            {
+              fullName: "E2E Tester",
+              line1: "123 Test Street",
+              city: "Manila",
+              postalCode: "1000",
+              barangay: "Barangay Test",
+              province: "Metro Manila",
+              country: "PH",
+              phone: "+639171234567",
+            },
+          ],
+        },
+        failOnStatusCode: false,
+      });
+      expect(profile.status(), "local auth-disabled profile seed").toBe(200);
+    }
     await navigateToShopAndAddFirstProduct(page);
     await navigateToCheckout(page);
     await fillCheckoutShippingInfo(page);
@@ -49,6 +74,7 @@ test.describe("@checkout @cod COD checkout flow", () => {
     expect(trackUrl, "Must redirect to /track/:orderId after COD order placement").toMatch(
       /\/track\/order_/i,
     );
+    createdCodOrderId = trackUrl.match(/(order_[a-z0-9]+)/i)?.[1] ?? null;
 
     await expect(page.getByRole("heading", { name: /order/i })).toBeVisible({
       timeout: 30_000,
@@ -60,31 +86,38 @@ test.describe("@checkout @cod COD checkout flow", () => {
   });
 
   test("COD order appears in admin with status pending", async ({ page }) => {
+    if (!createdCodOrderId) {
+      test.skip(true, "COD order id was not captured from the checkout flow");
+      return;
+    }
+
     const result = await signInAsAdmin(page);
     if (result !== "ok") {
       test.skip(true, `Admin sign-in not available: ${result}`);
       return;
     }
 
-    await page.goto(`${adminBase}/admin/orders`);
-    await expect(page.getByRole("heading", { name: /orders/i })).toBeVisible({
+    await page.goto(`${adminBase}/admin/orders/${encodeURIComponent(createdCodOrderId)}`);
+    await expect(
+      page.getByRole("heading", { name: /^order\s+\d+$/i })
+        .or(page.getByRole("heading", { name: /^\d+$/ }))
+        .or(page.getByRole("heading", { name: /order/i })),
+    ).toBeVisible({
       timeout: 20_000,
     });
-
-    const orderRows = page.locator("[data-testid='order-row'], tr[data-order-id]");
-    const rowCount = await orderRows.count();
-    expect(rowCount, "Admin orders list must show at least one COD order").toBeGreaterThan(0);
+    await expect(page.getByText("pending", { exact: true })).toBeVisible({ timeout: 20_000 });
   });
 
-  test("POST /api/checkout/cod-cart-payload returns 400 without active cart", async ({ request }) => {
+  test("POST /api/checkout/cod-cart-payload returns the verified delivery profile", async ({ request }) => {
     const res = await request.post(`${storefrontBase}/api/checkout/cod-cart-payload`, {
       failOnStatusCode: false,
     });
     const status = res.status();
-    expect(
-      [400, 401, 403].includes(status),
-      `/api/checkout/cod-cart-payload without cart → expected 400/401/403, got ${status}`,
-    ).toBeTruthy();
+    expect(status, "/api/checkout/cod-cart-payload with a complete local profile").toBe(200);
+    const body = (await res.json()) as { email?: string; shipping_address?: unknown; billing_address?: unknown };
+    expect(body.email).toBeTruthy();
+    expect(body.shipping_address).toBeTruthy();
+    expect(body.billing_address).toBeTruthy();
   });
 
   test("POST /api/checkout/cod-place-order returns 400 without valid body", async ({ request }) => {

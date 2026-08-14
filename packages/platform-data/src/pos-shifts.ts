@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export type PosShift = {
   id: string;
@@ -31,12 +31,13 @@ function rowToShift(row: Record<string, unknown>): PosShift {
 
 export async function openShift(
   supabase: SupabaseClient,
-  input: { employee_id: string; device_name?: string; opening_cash?: number },
+  input: { employee_id: string; organization_id: string; device_name?: string; opening_cash?: number },
 ): Promise<PosShift> {
   const { data, error } = await supabase
     .from("pos_shifts")
     .insert({
       employee_id: input.employee_id,
+      organization_id: input.organization_id,
       device_name: input.device_name ?? "Terminal 01",
       opening_cash: input.opening_cash ?? 0,
       status: "open",
@@ -50,7 +51,7 @@ export async function openShift(
 export async function closeShift(
   supabase: SupabaseClient,
   shiftId: string,
-  input: { closing_cash: number; expected_cash?: number; notes?: string },
+  input: { organization_id: string; closing_cash: number; expected_cash?: number; notes?: string },
 ): Promise<PosShift> {
   const { data, error } = await supabase
     .from("pos_shifts")
@@ -62,6 +63,7 @@ export async function closeShift(
       status: "closed",
     })
     .eq("id", shiftId)
+    .eq("organization_id", input.organization_id)
     .select("*")
     .single();
   if (error) throw error;
@@ -71,15 +73,17 @@ export async function closeShift(
 export async function getActiveShift(
   supabase: SupabaseClient,
   employeeId: string,
+  organizationId?: string,
 ): Promise<PosShift | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("pos_shifts")
     .select("*")
     .eq("employee_id", employeeId)
     .eq("status", "open")
     .order("opened_at", { ascending: false })
     .limit(1)
-    .maybeSingle();
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     throw error;
@@ -91,12 +95,14 @@ export async function getActiveShift(
 export async function getShiftById(
   supabase: SupabaseClient,
   shiftId: string,
+  organizationId?: string,
 ): Promise<PosShift | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("pos_shifts")
     .select("*")
     .eq("id", shiftId)
-    .maybeSingle();
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     throw error;
@@ -107,7 +113,7 @@ export async function getShiftById(
 
 export async function listShifts(
   supabase: SupabaseClient,
-  opts?: { limit?: number; status?: "open" | "closed" },
+  opts?: { limit?: number; status?: "open" | "closed"; organizationId?: string },
 ): Promise<PosShift[]> {
   let q = supabase
     .from("pos_shifts")
@@ -117,6 +123,7 @@ export async function listShifts(
   if (opts?.status) {
     q = q.eq("status", opts.status);
   }
+  if (opts?.organizationId) q = q.eq("organization_id", opts.organizationId);
   const { data, error } = await q;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];

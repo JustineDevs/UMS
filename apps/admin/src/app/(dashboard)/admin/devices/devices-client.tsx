@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
 
 type Device = {
   id: string;
@@ -39,14 +40,7 @@ const ADAPTER_OPTIONS_BASE = [
   { value: "epson-epos", label: "Epson HTTP raw" },
 ] as const;
 
-/** Mock is development-only; production builds omit it (NODE_ENV at build time). */
-const ADAPTER_OPTIONS =
-  process.env.NODE_ENV === "development"
-    ? ([
-        { value: "mock", label: "Mock (development only)" },
-        ...ADAPTER_OPTIONS_BASE,
-      ] as const)
-    : ADAPTER_OPTIONS_BASE;
+const ADAPTER_OPTIONS = ADAPTER_OPTIONS_BASE;
 
 function configToEditForm(d: Device): EditForm {
   const c = d.config ?? {};
@@ -100,6 +94,7 @@ export function DevicesPageClient() {
   const [editing, setEditing] = useState<Device | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDevices = useCallback(async () => {
     setLoading(true);
@@ -117,11 +112,17 @@ export function DevicesPageClient() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/admin/devices", {
+    setError(null);
+    const response = await fetch("/api/admin/devices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      setError(body.error ?? "Device could not be registered.");
+      return;
+    }
     setShowForm(false);
     setForm({ name: "", type: "terminal", ip_address: "" });
     void fetchDevices();
@@ -131,8 +132,9 @@ export function DevicesPageClient() {
     e.preventDefault();
     if (!editing || !editForm) return;
     setSaving(true);
+    setError(null);
     const config = buildConfigPatch(editForm);
-    await fetch(`/api/admin/devices/${editing.id}`, {
+    const response = await fetch(`/api/admin/devices/${editing.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -140,6 +142,12 @@ export function DevicesPageClient() {
         config,
       }),
     });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: string };
+      setError(body.error ?? "Device could not be updated.");
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     setEditing(null);
     setEditForm(null);
@@ -168,17 +176,18 @@ export function DevicesPageClient() {
         />
       }
       actions={
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-90"
-        >
+        <Button type="button" onClick={() => setShowForm(true)}>
           <span className="material-symbols-outlined text-base">add</span>
           Add Device
-        </button>
+        </Button>
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
+      {error && (
+        <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
+          {error}
+        </p>
+      )}
       {loading ? (
         <div className="text-center py-20 text-on-surface-variant text-sm">Loading...</div>
       ) : (
@@ -199,13 +208,9 @@ export function DevicesPageClient() {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className={`w-2.5 h-2.5 rounded-full mt-1 ${d.is_active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                  <button
-                    type="button"
-                    onClick={() => openEdit(d)}
-                    className="text-xs font-bold uppercase tracking-widest text-primary hover:underline"
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(d)}>
                     Edit
-                  </button>
+                  </Button>
                 </div>
               </div>
               {d.ip_address && <p className="text-xs text-on-surface-variant mt-3">IP: {d.ip_address}</p>}
@@ -245,8 +250,8 @@ export function DevicesPageClient() {
             </select>
             <input placeholder="IP Address (optional)" value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowForm(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Add</button>
+              <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button type="submit">Add</Button>
             </div>
           </form>
         </div>
@@ -310,24 +315,23 @@ export function DevicesPageClient() {
               placeholder="Optional"
             />
             <div className="flex gap-3 justify-end pt-4">
-              <button
+              <Button
+                variant="outline"
                 type="button"
                 disabled={saving}
                 onClick={() => {
                   setEditing(null);
                   setEditForm(null);
                 }}
-                className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={saving}
-                className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save"}
-              </button>
+              </Button>
             </div>
           </form>
         </div>

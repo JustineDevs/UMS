@@ -1,4 +1,4 @@
-# CO-STAR UI Creator: Universal Command
+# CO-STAR UI Creator — Universal Command
 
 This file is the **universal actual command** for the CO-STAR UI Creator. When invoked, the AI must **decide and weigh** which resource to use based on the user's intent, then apply it.
 
@@ -23,9 +23,9 @@ Search the project (e.g. `.cursor/rules/CO-STAR-UI-CREATOR/`, `.cursor/commands/
 
 | If the user wants to… | Use this | Weight / priority |
 |------------------------|----------|--------------------|
-| **Build, implement, or change UI**: components, pages, design system, integration with shadcn/Magic UI/etc., refactors, new features | **CO-STAR-PROMPT.md** | Primary. Follow its full flow (discovery → plan → implementation). |
-| **Create or customize a CO STAR prompt**: their own prompt, design system, product goals, or CO-STAR template from scratch | **CO-STAR-CREATOR.md** | Primary. Use it to guide them through Context, Objective, Style, Tone, Audience, Response. |
-| **Unclear or mixed intent**: e.g. “help with UI and also I want my own prompt” | **Weigh by main ask.** If the main ask is implementation → CO-STAR-PROMPT.md first; if the main ask is “create my prompt” → CO-STAR-CREATOR.md first. Optionally do the second as a follow-up. |
+| **Build, implement, or change UI** — components, pages, design system, integration with shadcn/Magic UI/etc., refactors, new features | **CO-STAR-PROMPT.md** | Primary. Follow its full flow (discovery → plan → implementation). |
+| **Create or customize a CO STAR prompt** — their own prompt, design system, product goals, or CO-STAR template from scratch | **CO-STAR-CREATOR.md** | Primary. Use it to guide them through Context, Objective, Style, Tone, Audience, Response. |
+| **Unclear or mixed intent** — e.g. “help with UI and also I want my own prompt” | **Weigh by main ask.** If the main ask is implementation → CO-STAR-PROMPT.md first; if the main ask is “create my prompt” → CO-STAR-CREATOR.md first. Optionally do the second as a follow-up. |
 
 ---
 

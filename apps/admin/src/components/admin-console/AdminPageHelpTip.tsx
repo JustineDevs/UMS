@@ -44,7 +44,7 @@ export function AdminPageHelpTip({ purpose, usage }: AdminPageHelpTipProps) {
     <div ref={wrapRef} className="relative inline-flex shrink-0 pt-1">
       <button
         type="button"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant/25 bg-surface-container-low text-on-surface-variant transition-colors hover:border-primary/30 hover:bg-surface-container-high hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         aria-expanded={open}
         aria-controls={panelId}
         aria-describedby={open ? panelId : undefined}
@@ -61,18 +61,18 @@ export function AdminPageHelpTip({ purpose, usage }: AdminPageHelpTipProps) {
           id={panelId}
           role="region"
           aria-label="Page guide"
-          className="absolute left-0 top-full z-[100] mt-2 w-[min(100vw-2rem,22rem)] rounded-lg border border-outline-variant/20 bg-white p-4 text-left shadow-lg"
+            className="absolute left-0 top-full z-[100] mt-2 w-[min(100vw-2rem,22rem)] rounded-lg border border-border bg-popover p-4 text-left text-popover-foreground shadow-lg"
         >
-          <p className="text-[10px] font-bold uppercase tracking-widest text-primary">
+          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
             Overview
           </p>
-          <p className="mt-2 font-body text-sm leading-relaxed text-on-surface">
+          <p className="mt-2 text-sm leading-relaxed">
             {purpose}
           </p>
-          <p className="mt-4 text-[10px] font-bold uppercase tracking-widest text-primary">
+          <p className="mt-4 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
             Tips
           </p>
-          <p className="mt-2 font-body text-sm leading-relaxed text-on-surface-variant">
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             {usage}
           </p>
         </div>

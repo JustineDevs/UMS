@@ -1,9 +1,10 @@
 "use client";
 
-import type { CmsBlock } from "@apparel-commerce/platform-data";
+import type { CmsBlock } from "@universal-music-store/platform-data";
 import { useSession } from "next-auth/react";
-import { staffHasPermission } from "@apparel-commerce/platform-data";
+import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
+import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
 
 type Row = {
@@ -19,18 +20,23 @@ type CatOpt = { id: string; name: string; handle: string };
 
 export function CmsCategoryEditor() {
   const { data: session, status } = useSession();
-  const canWrite = staffHasPermission(session?.user?.permissions ?? [], "content:write");
+  const canWrite = staffHasPermission(
+    session?.user?.permissions ?? [],
+    "content:write",
+  );
   const [rows, setRows] = useState<Row[]>([]);
   const [editing, setEditing] = useState<Row | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
   const [categories, setCategories] = useState<CatOpt[]>([]);
   const [gaps, setGaps] = useState<CatOpt[]>([]);
   const [gapLocale, setGapLocale] = useState("en");
 
-  const siteBase =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "")) || "";
+  const siteBase = getStorefrontPublicOrigin();
 
   const load = useCallback(() => {
+    setLoadingRows(true);
+    setError(null);
     fetch("/api/admin/cms/category-content")
       .then(async (r) => {
         const j = (await r.json()) as { data?: Row[]; error?: string };
@@ -45,7 +51,10 @@ export function CmsCategoryEditor() {
           })),
         ),
       )
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load content"));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : "Unable to load content"),
+      )
+      .finally(() => setLoadingRows(false));
   }, []);
 
   const loadCategories = useCallback(() => {
@@ -59,7 +68,9 @@ export function CmsCategoryEditor() {
   }, []);
 
   const loadGaps = useCallback(() => {
-    void fetch(`/api/admin/cms/category-content/catalog-gaps?locale=${encodeURIComponent(gapLocale)}`)
+    void fetch(
+      `/api/admin/cms/category-content/catalog-gaps?locale=${encodeURIComponent(gapLocale)}`,
+    )
       .then(async (r) => {
         const j = (await r.json()) as { data?: { missing?: CatOpt[] } };
         if (!r.ok) return;
@@ -102,7 +113,8 @@ export function CmsCategoryEditor() {
     loadGaps();
   };
 
-  if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
+  if (status === "loading")
+    return <p className="text-sm text-slate-600">Loading…</p>;
 
   const previewCollection =
     siteBase && editing
@@ -116,11 +128,15 @@ export function CmsCategoryEditor() {
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <div>
-        <h3 className="font-headline text-lg font-bold text-primary mb-3">Rows</h3>
+        <h3 className="font-headline text-lg font-bold text-primary mb-3">
+          Rows
+        </h3>
         {error ? <p className="text-sm text-red-700 mb-2">{error}</p> : null}
 
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-sm">
-          <p className="font-semibold text-amber-950">Missing CMS rows (catalog has category, no CMS row)</p>
+          <p className="font-semibold text-amber-950">
+            Missing CMS rows (catalog has category, no CMS row)
+          </p>
           <label className="mt-2 block text-xs text-amber-900">
             Locale
             <select
@@ -144,10 +160,22 @@ export function CmsCategoryEditor() {
           </ul>
         </div>
 
-        <ul className="space-y-2">
+        {loadingRows ? (
+          <p className="text-sm text-slate-600">Loading category rows...</p>
+        ) : null}
+        {!loadingRows && rows.length === 0 ? (
+          <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600">
+            No category content rows exist yet.
+          </p>
+        ) : null}
+        <ul className="space-y-2" aria-label="Category content rows">
           {rows.map((r) => (
             <li key={r.id}>
-              <button type="button" className="text-sm underline" onClick={() => setEditing(r)}>
+              <button
+                type="button"
+                className="text-sm underline"
+                onClick={() => setEditing(r)}
+              >
                 {r.collection_handle} ({r.locale})
               </button>
             </li>
@@ -159,7 +187,7 @@ export function CmsCategoryEditor() {
           onClick={() =>
             setEditing({
               id: "",
-              collection_handle: categories[0]?.handle ?? "shorts",
+              collection_handle: categories[0]?.handle ?? "",
               locale: "en",
               intro_html: "",
               banner_url: null,
@@ -212,15 +240,20 @@ export function CmsCategoryEditor() {
                 </a>
               </>
             ) : (
-              "set NEXT_PUBLIC_SITE_URL"
+              "Storefront URL unavailable"
             )}
             . Index:{" "}
             {siteBase ? (
-              <a href={`${siteBase}/collections`} className="text-primary underline" target="_blank" rel="noreferrer">
+              <a
+                href={`${siteBase}/collections`}
+                className="text-primary underline"
+                target="_blank"
+                rel="noreferrer"
+              >
                 /collections
               </a>
             ) : (
-              "/collections"
+              "Storefront URL unavailable"
             )}
           </p>
           <label className="block text-xs font-medium text-slate-600">
@@ -228,7 +261,9 @@ export function CmsCategoryEditor() {
             <input
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
               value={editing.locale}
-              onChange={(e) => setEditing({ ...editing, locale: e.target.value })}
+              onChange={(e) =>
+                setEditing({ ...editing, locale: e.target.value })
+              }
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
@@ -236,7 +271,9 @@ export function CmsCategoryEditor() {
             <textarea
               className="mt-1 w-full min-h-[100px] rounded border border-slate-200 px-3 py-2 text-sm font-mono"
               value={editing.intro_html}
-              onChange={(e) => setEditing({ ...editing, intro_html: e.target.value })}
+              onChange={(e) =>
+                setEditing({ ...editing, intro_html: e.target.value })
+              }
             />
           </label>
           <label className="block text-xs font-medium text-slate-600">
@@ -244,7 +281,9 @@ export function CmsCategoryEditor() {
             <input
               className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
               value={editing.banner_url ?? ""}
-              onChange={(e) => setEditing({ ...editing, banner_url: e.target.value || null })}
+              onChange={(e) =>
+                setEditing({ ...editing, banner_url: e.target.value || null })
+              }
             />
           </label>
           <div>
@@ -257,8 +296,8 @@ export function CmsCategoryEditor() {
           </div>
           <button
             type="button"
-            disabled={!canWrite}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
+            disabled={!canWrite || !editing.collection_handle.trim()}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             onClick={() => void save()}
           >
             Save

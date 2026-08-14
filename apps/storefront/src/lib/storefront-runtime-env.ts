@@ -3,6 +3,9 @@ import path from "node:path";
 import { parse } from "dotenv";
 
 const STOREFRONT_RUNTIME_ENV_KEYS = [
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
   "MEDUSA_SECRET_API_KEY",
   "MEDUSA_ADMIN_API_SECRET",
   "MEDUSA_BACKEND_URL",
@@ -44,7 +47,7 @@ function findWorkspaceRoot(startDir: string): string | null {
   return null;
 }
 
-/** Unique monorepo roots to scan for root `.env` (Windows / turbo cwd quirks). */
+/** Unique monorepo roots to scan for the root env file (Windows / turbo cwd quirks). */
 function collectMonorepoRoots(preferredCwd?: string): string[] {
   const candidates: string[] = [];
   const monorepoRootEnv = process.env.MONOREPO_ROOT?.trim();
@@ -74,11 +77,19 @@ function collectMonorepoRoots(preferredCwd?: string): string[] {
   return out;
 }
 
+function getRuntimeEnvFileName(): string {
+  return process.env.NODE_ENV === "production"
+    ? ".env.production"
+    : ".env.local";
+}
+
 function readEnvFileUtf8(filePath: string): string {
   return fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
 }
 
-function parseEnvFile(filePath: string): Partial<Record<StorefrontRuntimeEnvKey, string>> {
+function parseEnvFile(
+  filePath: string,
+): Partial<Record<StorefrontRuntimeEnvKey, string>> {
   if (!fs.existsSync(filePath)) {
     return {};
   }
@@ -98,13 +109,15 @@ function parseEnvFile(filePath: string): Partial<Record<StorefrontRuntimeEnvKey,
 function mergeRootEnv(
   rootDir: string,
 ): Partial<Record<StorefrontRuntimeEnvKey, string>> {
+  const envFileName = getRuntimeEnvFileName();
   return {
-    ...parseEnvFile(path.join(rootDir, ".env")),
-    ...parseEnvFile(path.join(rootDir, ".env.local")),
+    ...parseEnvFile(path.join(rootDir, envFileName)),
   };
 }
 
-function applyMergedEnv(envFromFiles: Partial<Record<StorefrontRuntimeEnvKey, string>>) {
+function applyMergedEnv(
+  envFromFiles: Partial<Record<StorefrontRuntimeEnvKey, string>>,
+) {
   for (const key of STOREFRONT_RUNTIME_ENV_KEYS) {
     const fromFile = envFromFiles[key];
     const trimmedFile = typeof fromFile === "string" ? fromFile.trim() : "";
@@ -135,10 +148,8 @@ export function ensureStorefrontRuntimeEnvLoaded(options?: {
     }
   } else {
     const fallback = path.resolve(process.cwd(), "..", "..");
-    if (
-      fs.existsSync(path.join(fallback, ".env")) ||
-      fs.existsSync(path.join(fallback, ".env.local"))
-    ) {
+    const envFileName = getRuntimeEnvFileName();
+    if (fs.existsSync(path.join(fallback, envFileName))) {
       applyMergedEnv(mergeRootEnv(fallback));
     }
   }

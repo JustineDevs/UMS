@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { WishlistPageClient } from "@/components/WishlistPageClient";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Saved items",
-};
+  description: "Items saved in this browser session.",
+  path: "/wishlist",
+  keywords: [...SEO_KEYWORDS.utility],
+  noindex: true,
+});
 
 export default function WishlistPage() {
   return (

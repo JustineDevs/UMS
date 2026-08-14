@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { checkStaffRole, isStaffRole } from "./admin-users";
+import { checkStaffRole, isStaffRole } from "./admin-users.js";
 
 describe("isStaffRole", () => {
   it("returns true for admin and staff", () => {

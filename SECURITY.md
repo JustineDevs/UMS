@@ -6,7 +6,7 @@ We release patches for security vulnerabilities for the current major version. C
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in the Apparel Commerce Platform, please report it responsibly.
+If you discover a security vulnerability in the Universal Music Store Platform, please report it responsibly.
 
 ### How to Report
 
@@ -34,13 +34,13 @@ In-scope for security reporting:
 
 Out-of-scope:
 
-- Issues in third-party services (payment processors, AfterShip, Supabase, NextAuth) – report to those providers
+- Issues in third-party services (payment processors, shipping providers, Supabase, NextAuth) – report to those providers
 - Social engineering or physical access
 - Denial of service that requires significant resources
 
 ## Security Practices
 
-The Apparel Commerce Platform follows these security practices:
+The Universal Music Store Platform follows these security practices:
 
 ### Payment and Webhooks
 

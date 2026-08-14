@@ -96,7 +96,10 @@ export function ChatIntakeForm() {
 
     const res = await fetch("/api/integrations/chat-orders/intake", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `chat-${crypto.randomUUID()}`,
+      },
       body: JSON.stringify({
         source,
         raw_text: rawText.trim() || undefined,
@@ -242,7 +245,7 @@ export function ChatIntakeForm() {
 
         {lines.length === 0 ? (
           <p className="text-xs text-on-surface-variant">
-            No catalog lines yet. You can still save notes-only intake without products.
+            Add at least one catalog line before submitting this intake.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -277,7 +280,7 @@ export function ChatIntakeForm() {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || lines.length === 0}
         className="rounded bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-primary disabled:opacity-50"
       >
         {loading ? "Saving…" : "Submit intake"}

@@ -1,14 +1,12 @@
-import { getServerSession } from "next-auth/next";
-import {
-  checkStaffRole,
-  staffHasPermission,
-  staffPermissionListForSession,
-} from "@apparel-commerce/database";
-import { authOptions } from "@/lib/auth";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { auditActorCsvCell } from "@/lib/audit-actor-format";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import {
+  correlatedError,
+  correlatedJson,
+  tagResponse,
+} from "@/lib/staff-api-response";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 export const dynamic = "force-dynamic";
 
@@ -25,29 +23,13 @@ function escapeCsvCell(value: string): string {
  */
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  const roleCheck = checkStaffRole(session);
-  if (!roleCheck.ok) {
-    const status = roleCheck.status === 401 ? 401 : 403;
-    return correlatedJson(
-      correlationId,
-      { error: status === 401 ? "Unauthorized" : "Forbidden", code: roleCheck.code },
-      { status },
-    );
-  }
-
   const url = new URL(req.url);
   const format = url.searchParams.get("format")?.trim().toLowerCase() ?? "";
   const isCsv = format === "csv" || format === "text/csv";
-
-  const perms = staffPermissionListForSession(session);
-  if (isCsv) {
-    if (!staffHasPermission(perms, "analytics:export")) {
-      return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
-    }
-  } else if (!staffHasPermission(perms, "dashboard:read")) {
-    return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
-  }
+  const staff = await requireStaffApiSession(
+    isCsv ? "analytics:export" : "dashboard:read",
+  );
+  if (!staff.ok) return tagResponse(staff.response, correlationId);
 
   const defaultLimit = isCsv ? 500 : 20;
   const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || defaultLimit));
@@ -85,7 +67,12 @@ export async function GET(req: Request) {
 
   const { data, error } = await q;
   if (error) {
-    return correlatedJson(correlationId, { error: error.message }, { status: 502 });
+    return correlatedError(
+      correlationId,
+      502,
+      "Audit log service unavailable",
+      "SERVICE_UNAVAILABLE",
+    );
   }
 
   const rows = data ?? [];

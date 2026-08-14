@@ -1,32 +1,31 @@
+import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { staffSessionAllows } from "@apparel-commerce/database";
 import {
   CMS_MEDIA_TAG_CATALOG_PRODUCT,
   insertCmsMedia,
   listCmsMedia,
   type ListCmsMediaOptions,
-} from "@apparel-commerce/platform-data";
+} from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { authOptions } from "@/lib/auth";
+import { requireStaffApiSessionAny } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  const canContentRead = staffSessionAllows(session, "content:read");
-  const canCatalogList =
-    staffSessionAllows(session, "catalog:read") ||
-    staffSessionAllows(session, "catalog:write");
-  if (!canContentRead && !canCatalogList) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSessionAny([
+    "content:read",
+    "catalog:read",
+    "catalog:write",
+  ]);
+  if (!auth.ok) return auth.response;
+  const canContentRead = auth.permission === "content:read";
+  const canCatalogList = auth.permission !== "content:read";
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sp = req.nextUrl.searchParams;
   const opts: ListCmsMediaOptions = {
     limit: Math.min(Number(sp.get("limit")) || 200, 500),
@@ -34,6 +33,7 @@ export async function GET(req: NextRequest) {
     mimePrefix: sp.get("mime") ?? undefined,
     sort: (sp.get("sort") as ListCmsMediaOptions["sort"]) || "created_desc",
     tag: sp.get("tag") ?? undefined,
+    organizationId: organization.id,
   };
   if (!canContentRead && canCatalogList) {
     opts.tag = CMS_MEDIA_TAG_CATALOG_PRODUCT;
@@ -42,17 +42,14 @@ export async function GET(req: NextRequest) {
   return correlatedJson(cid, { data });
 }
 
-export async function POST(req: NextRequest) {
+async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getServerSession(authOptions);
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSessionAny(["content:write", "catalog:write"]);
+  if (!auth.ok) return auth.response;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sb = sup.client;
 
   let form: FormData;
@@ -67,6 +64,12 @@ export async function POST(req: NextRequest) {
     return correlatedJson(cid, { error: "Missing file" }, { status: 400 });
   }
   const mime = (file as File).type || "";
+  const extensionAllowed = /\.(png|jpe?g|gif|webp|avif|svg|bmp|mp4|webm|mov|ogg)$/i.test(
+    typeof (file as File).name === "string" ? (file as File).name : "",
+  );
+  if (!(mime.startsWith("image/") || mime.startsWith("video/")) && !extensionAllowed) {
+    return correlatedJson(cid, { error: "Only image or video uploads are allowed" }, { status: 400 });
+  }
   if (mime.startsWith("image/") && altText.trim().length === 0) {
     return correlatedJson(
       cid,
@@ -108,7 +111,13 @@ export async function POST(req: NextRequest) {
     height: null,
     display_name: safe,
     byte_size: file.size,
+    organization_id: organization.id,
   });
-  if (!row) return correlatedJson(cid, { error: "Unable to save metadata" }, { status: 500 });
+  if (!row) {
+    await sb.storage.from("cms").remove([path]).catch(() => undefined);
+    return correlatedJson(cid, { error: "Unable to save metadata" }, { status: 500 });
+  }
   return correlatedJson(cid, { data: row });
 }
+
+export const POST = withAdminMutationIdempotency("/admin/cms/media:POST", post);

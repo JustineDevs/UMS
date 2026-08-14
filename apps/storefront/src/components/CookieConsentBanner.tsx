@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-const CONSENT_KEY = "maharlika-cookie-consent-v1";
-
-type ConsentValue = "accepted" | "essential-only";
+import {
+  ANALYTICS_CONSENT_EVENT,
+  ANALYTICS_CONSENT_KEY,
+  type AnalyticsConsentValue,
+} from "@/lib/analytics-consent";
 
 export function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(CONSENT_KEY);
+      const stored = localStorage.getItem(ANALYTICS_CONSENT_KEY);
       if (!stored) setVisible(true);
     } catch {
       setVisible(true);
@@ -21,22 +22,34 @@ export function CookieConsentBanner() {
 
   function accept() {
     try {
-      localStorage.setItem(CONSENT_KEY, "accepted" satisfies ConsentValue);
+      localStorage.setItem(
+        ANALYTICS_CONSENT_KEY,
+        "accepted" satisfies AnalyticsConsentValue,
+      );
     } catch {
       /* localStorage unavailable */
+    }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT));
     }
     setVisible(false);
   }
 
   function essentialOnly() {
     try {
-      localStorage.setItem(CONSENT_KEY, "essential-only" satisfies ConsentValue);
+      localStorage.setItem(
+        ANALYTICS_CONSENT_KEY,
+        "essential-only" satisfies AnalyticsConsentValue,
+      );
     } catch {
       /* localStorage unavailable */
     }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT));
+    }
     setVisible(false);
     if (typeof window !== "undefined" && "gtag" in window) {
-      (window as { gtag?: (...args: unknown[]) => void }).gtag?.("consent", "update", {
+      (window as { gtag?: (..._args: unknown[]) => void }).gtag?.("consent", "update", {
         analytics_storage: "denied",
         ad_storage: "denied",
       });
@@ -84,13 +97,4 @@ export function CookieConsentBanner() {
       </div>
     </div>
   );
-}
-
-/** Helper: check if user has given full analytics consent (call client-side). */
-export function hasAnalyticsConsent(): boolean {
-  try {
-    return localStorage.getItem(CONSENT_KEY) === "accepted";
-  } catch {
-    return false;
-  }
 }

@@ -4,9 +4,9 @@ import type { TestInfo } from "@playwright/test";
 
 export type ConsoleIssue = { type: "error" | "warning"; text: string };
 
-const consoleIssuesKey = Symbol("maharlikaConsoleIssuesHandlers");
+const consoleIssuesKey = Symbol("universal-music-storeConsoleIssuesHandlers");
 
-const browserRuntimeLogKey = Symbol("maharlikaBrowserRuntimeLogCleanup");
+const browserRuntimeLogKey = Symbol("universal-music-storeBrowserRuntimeLogCleanup");
 
 function appendLine(filePath: string, line: string): void {
   fs.appendFileSync(filePath, `${line}\n`, "utf8");
@@ -146,7 +146,7 @@ export function detachBrowserRuntimeLog(page: Page): void {
 }
 
 /** Named checkpoint screenshot under Playwright's test output dir. */
-export async function screenshotCheckpoint(
+async function screenshotCheckpoint(
   page: Page,
   testInfo: TestInfo,
   name: string,

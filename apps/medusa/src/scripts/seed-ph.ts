@@ -1,24 +1,12 @@
-import { ExecArgs } from "@medusajs/framework/types";
+import { CreateInventoryLevelInput, ExecArgs } from "@medusajs/framework/types";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import {
   createWorkflow,
   transform,
   WorkflowResponse,
 } from "@medusajs/framework/workflows-sdk";
-import {
-  createApiKeysWorkflow,
-  createRegionsWorkflow,
-  createSalesChannelsWorkflow,
-  createShippingOptionsWorkflow,
-  createShippingProfilesWorkflow,
-  createStockLocationsWorkflow,
-  createTaxRegionsWorkflow,
-  linkSalesChannelsToApiKeyWorkflow,
-  linkSalesChannelsToStockLocationWorkflow,
-  updateStoresStep,
-  updateStoresWorkflow,
-} from "@medusajs/medusa/core-flows";
 import { ApiKey } from "../../.medusa/types/query-entry-points";
+import { seedStoreTaxonomy } from "./seed-store-taxonomy";
 
 const SALES_CHANNEL_NAME = "Web PH";
 const REGION_NAME = "Philippines";
@@ -26,6 +14,10 @@ const STOCK_LOCATION_NAME = "Warehouse PH";
 const FULFILLMENT_SET_NAME = "PH Warehouse delivery";
 const SHIPPING_OPTION_STANDARD = "Standard PH";
 const LEGACY_LOC_META_KEY = "legacy_inventory_location_code";
+
+type CoreFlowsModule = typeof import("@medusajs/medusa/core-flows");
+
+let coreFlowsModule: CoreFlowsModule | null = null;
 
 /** Aligns with `medusa-config.ts` provider registration (pp_{id}_{id}). */
 function buildPaymentProviderIdsForSeed(): string[] {
@@ -40,41 +32,13 @@ function buildPaymentProviderIdsForSeed(): string[] {
     ids.push("pp_paypal_paypal");
   }
   if (
-    process.env.PAYMONGO_SECRET_KEY?.trim() &&
-    process.env.PAYMONGO_WEBHOOK_SECRET?.trim()
+    process.env.XENDIT_SECRET_KEY?.trim() &&
+    process.env.XENDIT_WEBHOOK_TOKEN?.trim()
   ) {
-    ids.push("pp_paymongo_paymongo");
-  }
-  if (
-    process.env.MAYA_SECRET_KEY?.trim() &&
-    process.env.MAYA_WEBHOOK_SECRET?.trim()
-  ) {
-    ids.push("pp_maya_maya");
+    ids.push("pp_xendit_xendit");
   }
   return [...new Set(ids)];
 }
-
-const updateStoreCurrencies = createWorkflow(
-  "update-store-currencies-ph",
-  (input: {
-    supported_currencies: { currency_code: string; is_default?: boolean }[];
-    store_id: string;
-  }) => {
-    const normalizedInput = transform({ input }, (data) => ({
-      selector: { id: data.input.store_id },
-      update: {
-        supported_currencies: data.input.supported_currencies.map(
-          (currency) => ({
-            currency_code: currency.currency_code,
-            is_default: currency.is_default ?? false,
-          }),
-        ),
-      },
-    }));
-    const stores = updateStoresStep(normalizedInput);
-    return new WorkflowResponse(stores);
-  },
-);
 
 export default async function seedPhilippines(args: ExecArgs) {
   const logger = args.container.resolve(ContainerRegistrationKeys.LOGGER);
@@ -98,13 +62,53 @@ async function runPhilippinesSeed({ container }: ExecArgs) {
   const salesChannelModuleService = container.resolve(Modules.SALES_CHANNEL);
   const regionModuleService = container.resolve(Modules.REGION);
   const taxModuleService = container.resolve(Modules.TAX);
+  const inventoryModuleService = container.resolve(Modules.INVENTORY);
   const stockLocationModuleService = container.resolve(Modules.STOCK_LOCATION);
   const fulfillmentModuleService = container.resolve(Modules.FULFILLMENT);
+  coreFlowsModule = await import("@medusajs/medusa/core-flows");
+  const {
+    createApiKeysWorkflow,
+    batchInventoryItemLevelsWorkflow,
+    createRegionsWorkflow,
+    createSalesChannelsWorkflow,
+    createShippingOptionsWorkflow,
+    createShippingProfilesWorkflow,
+    createStockLocationsWorkflow,
+    createTaxRegionsWorkflow,
+    updateProductVariantsWorkflow,
+    linkSalesChannelsToApiKeyWorkflow,
+    linkSalesChannelsToStockLocationWorkflow,
+    updateStoresWorkflow,
+  } = coreFlowsModule;
+  const updateStoreCurrencies = createWorkflow(
+    "update-store-currencies-ph",
+    (input: {
+      supported_currencies: { currency_code: string; is_default?: boolean }[];
+      store_id: string;
+    }) => {
+      const normalizedInput = transform({ input }, (data) => ({
+        selector: { id: data.input.store_id },
+        update: {
+          supported_currencies: data.input.supported_currencies.map(
+            (currency) => ({
+              currency_code: currency.currency_code,
+              is_default: currency.is_default ?? false,
+            }),
+          ),
+        },
+      }));
+      const stores = coreFlowsModule!.updateStoresStep(normalizedInput);
+      return new WorkflowResponse(stores);
+    },
+  );
 
   const legacyLocationCode =
     process.env.MEDUSA_SEED_LEGACY_LOCATION_CODE ?? "WH1";
   const flatShippingMinorUnits = Number(
     process.env.MEDUSA_PH_FLAT_SHIPPING_MINOR ?? 15000,
+  );
+  const defaultProductPriceMinorUnits = Number(
+    process.env.MEDUSA_PH_SEED_PRICE_MINOR ?? 85000,
   );
 
   const [store] = await storeModuleService.listStores();
@@ -113,6 +117,44 @@ async function runPhilippinesSeed({ container }: ExecArgs) {
   }
 
   logger.info("PH seed: store currencies → PHP");
+  await seedStoreTaxonomy(container);
+  // Existing demo catalogs may have been seeded with EUR/USD before the PH
+  // region was enabled. Reconcile the missing PHP price without replacing
+  // provider-specific prices or creating duplicate price rows.
+  const { data: existingProducts } = await query.graph({
+    entity: "product",
+    fields: ["id", "variants.id", "variants.prices.*"],
+    pagination: { take: 1000 },
+  });
+  for (const product of existingProducts ?? []) {
+    for (const variant of product.variants ?? []) {
+      const prices = (
+        variant as unknown as {
+          prices?: Array<{ amount: number; currency_code: string }>;
+        }
+      ).prices ?? [];
+      if (prices.some((price) => price.currency_code.toLowerCase() === "php")) {
+        continue;
+      }
+      await updateProductVariantsWorkflow(container).run({
+        input: {
+          selector: { id: variant.id },
+          update: {
+            prices: [
+              ...prices.map((price) => ({
+                amount: price.amount,
+                currency_code: price.currency_code,
+              })),
+              { amount: defaultProductPriceMinorUnits, currency_code: "php" },
+            ],
+          },
+        },
+      });
+    }
+  }
+  logger.info(
+    `PH seed: reconciled PHP prices for ${existingProducts?.length ?? 0} products`,
+  );
   await updateStoreCurrencies(container).run({
     input: {
       store_id: store.id,
@@ -226,6 +268,19 @@ async function runPhilippinesSeed({ container }: ExecArgs) {
       },
     },
   });
+
+  try {
+    await link.create({
+      [Modules.SALES_CHANNEL]: {
+        sales_channel_id: webPhChannels[0].id,
+      },
+      [Modules.STOCK_LOCATION]: {
+        stock_location_id: stockLocation.id,
+      },
+    });
+  } catch {
+    // the sales-channel/stock-location link may already exist
+  }
 
   try {
     await link.create({
@@ -428,6 +483,38 @@ async function runPhilippinesSeed({ container }: ExecArgs) {
         `linkSalesChannelsToApiKey key=${key.id} (may already be linked): ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+  }
+
+  // Existing catalogs can predate the PH stock location. Reconcile every
+  // inventory item so cart validation can resolve a location for each variant.
+  const { data: inventoryItems } = await query.graph({
+    entity: "inventory_item",
+    fields: ["id"],
+  });
+  const createLevels: CreateInventoryLevelInput[] = [];
+  const updateLevels: Array<{
+    id: string;
+    inventory_item_id: string;
+    location_id: string;
+    stocked_quantity: number;
+  }> = [];
+  for (const item of inventoryItems ?? []) {
+    const existing = await inventoryModuleService.listInventoryLevels({
+      inventory_item_id: item.id,
+      location_id: stockLocation.id,
+    });
+    const level = {
+      inventory_item_id: item.id,
+      location_id: stockLocation.id,
+      stocked_quantity: Number(process.env.MEDUSA_PH_SEED_STOCK ?? 1000000),
+    };
+    if (existing[0]) updateLevels.push({ id: existing[0].id, ...level });
+    else createLevels.push(level);
+  }
+  if (createLevels.length || updateLevels.length) {
+    await batchInventoryItemLevelsWorkflow(container).run({
+      input: { create: createLevels, update: updateLevels },
+    });
   }
 
   logger.info(

@@ -54,26 +54,26 @@ function deriveOptions(variants: Record<string, unknown>[]) {
   const active = variants.filter(
     (v) => v.is_active !== false && v.is_active !== "false",
   );
-  const sizes = [
+  const types = [
     ...new Set(
       active
-        .map((v) => String(v.size ?? "").trim())
+        .map((v) => String(v.type ?? v.size ?? "").trim())
         .filter((x) => x.length > 0),
     ),
   ];
-  const colors = [
+  const finishes = [
     ...new Set(
       active
-        .map((v) => String(v.color ?? "").trim())
+        .map((v) => String(v.finish ?? v.color ?? "").trim())
         .filter((x) => x.length > 0),
     ),
   ];
   const options: { title: string; values: string[] }[] = [];
-  if (sizes.length) {
-    options.push({ title: "Size", values: sizes });
+  if (types.length) {
+    options.push({ title: "Type", values: types });
   }
-  if (colors.length) {
-    options.push({ title: "Color", values: colors });
+  if (finishes.length) {
+    options.push({ title: "Finish", values: finishes });
   }
   if (!options.length) {
     options.push({ title: "Variant", values: ["Default"] });
@@ -198,20 +198,20 @@ export default async function importLegacyCatalogJsonl({
 
     const variants = active.map((v) => {
       const titleBits = [
-        v.size != null && String(v.size).trim() ? String(v.size) : null,
-        v.color != null && String(v.color).trim() ? String(v.color) : null,
+        v.type != null && String(v.type).trim() ? String(v.type) : null,
+        v.finish != null && String(v.finish).trim() ? String(v.finish) : null,
       ].filter(Boolean);
       const title =
         titleBits.join(" / ") || String(v.sku ?? "Variant") || handle;
 
       const opt: Record<string, string> = {};
-      const hasSize = options.some((o) => o.title === "Size");
-      const hasColor = options.some((o) => o.title === "Color");
-      if (hasSize) {
-        opt.Size = String(v.size ?? "").trim() || "One Size";
+      const hasType = options.some((o) => o.title === "Type");
+      const hasFinish = options.some((o) => o.title === "Finish");
+      if (hasType) {
+        opt.Type = String(v.type ?? v.size ?? "").trim() || "Default";
       }
-      if (hasColor) {
-        opt.Color = String(v.color ?? "").trim() || "Default";
+      if (hasFinish) {
+        opt.Finish = String(v.finish ?? v.color ?? "").trim() || "Default";
       }
       if (options[0]?.title === "Variant") {
         opt.Variant = "Default";

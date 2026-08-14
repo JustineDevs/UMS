@@ -2,7 +2,7 @@
 
 **Return and Exchange Policy**
 
-We accept returns or exchanges for eligible apparel items that are defective, damaged, incorrectly delivered, or materially different from the product ordered. For eligible non-defective items, we may allow size exchange within 7 days from receipt, provided the item is unused, unwashed, unaltered, with original tags, packaging, and proof of purchase.
+We accept returns or exchanges for eligible products that are defective, damaged, incorrectly delivered, or materially different from the product ordered. For eligible non-defective items, we may allow an exchange within 7 days from receipt, provided the item is unused, unwashed, unaltered, with original tags, packaging, and proof of purchase.
 
 Items reported as defective, damaged, or not as described may qualify for replacement, exchange, or refund after inspection. Philippine consumer rules recognize repair, replacement, or refund as valid remedies for defective products.
 
@@ -24,7 +24,7 @@ The following are not eligible for return or exchange unless defective or incorr
 - Clearance or final-sale items, if clearly marked as such before purchase.
 - Intimate or hygiene-sensitive items such as underwear, socks, stockings, swimwear bottoms, or pierced accessories.
 
-Hygiene-based exclusions for intimate apparel and similar items are common retail practice, but defective items should still be handled with an appropriate remedy.
+Hygiene-based exclusions for intimate or personal-use items are common retail practice, but defective items should still be handled with an appropriate remedy.
 
 ## Process and timeline
 
@@ -47,4 +47,4 @@ You can use this simple refund rule:
 
 Here is a short storefront-ready version:
 
-> We accept returns or exchanges for defective, damaged, incorrect, or misdescribed items. Size exchanges for unused apparel may be requested within 7 days of delivery. Items must be unwashed, unworn, with original tags and proof of purchase. Hygiene-sensitive items are non-returnable unless defective or incorrectly shipped. Approved seller-fault claims qualify for replacement, exchange, or refund.
+> We accept returns or exchanges for defective, damaged, incorrect, or misdescribed items. Exchanges for unused products may be requested within 7 days of delivery. Items must be unwashed, unworn, with original tags and proof of purchase. Hygiene-sensitive items are non-returnable unless defective or incorrectly shipped. Approved seller-fault claims qualify for replacement, exchange, or refund.

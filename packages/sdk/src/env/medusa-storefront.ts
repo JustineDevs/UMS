@@ -2,8 +2,12 @@ import {
   getMedusaPublishableKey,
   getMedusaRegionId,
   getMedusaSalesChannelId,
+  getMedusaSecretApiKey,
   getMedusaStoreBaseUrl,
-} from "../medusa-env";
+} from "../medusa-env.js";
+
+const STOREFRONT_DEPLOY_ENV_HINT =
+  "Configure these on the host (Vercel/Render env UI), not only local .env.local files. See repo docs for the Medusa storefront env checklist.";
 
 export function listMissingMedusaStorefrontEnv(): string[] {
   const missing: string[] = [];
@@ -27,6 +31,11 @@ export function listMissingMedusaStorefrontEnv(): string[] {
         "NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID (or MEDUSA_SALES_CHANNEL_ID) so listings, carts, and Medusa seed use the same channel",
       );
     }
+    if (!getMedusaSecretApiKey()) {
+      missing.push(
+        "MEDUSA_SECRET_API_KEY (or MEDUSA_ADMIN_API_SECRET) for server-side checkout, totals, and inventory checks against Medusa Admin API",
+      );
+    }
   }
   return missing;
 }
@@ -38,7 +47,7 @@ export function assertMedusaStorefrontEnvProduction(): void {
   const missing = listMissingMedusaStorefrontEnv();
   if (missing.length > 0) {
     throw new Error(
-      `Medusa storefront: required env missing: ${missing.join("; ")}`,
+      `Medusa storefront: required env missing: ${missing.join("; ")}. ${STOREFRONT_DEPLOY_ENV_HINT}`,
     );
   }
 }

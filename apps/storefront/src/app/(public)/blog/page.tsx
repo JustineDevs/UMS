@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { loadCmsBlogListPublic } from "@apparel-commerce/platform-data";
-import { canonicalUrl } from "@/lib/seo";
+import { loadCmsBlogListPublic } from "@universal-music-store/platform-data";
+import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = buildPageMetadata({
   title: "Journal",
-  description: "Articles and updates from the store team.",
-  alternates: { canonical: canonicalUrl("/blog") },
-};
+  description: "Articles and updates from the store team about products, buying guides, and store news.",
+  path: "/blog",
+  keywords: [...SEO_KEYWORDS.blog],
+});
 
 export default async function BlogIndexPage() {
   const posts = await loadCmsBlogListPublic("en");

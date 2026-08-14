@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { parseAsInteger, useQueryStates } from "nuqs";
 import { useEffect, useState } from "react";
 import {
   Card,
@@ -12,11 +12,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@apparel-commerce/ui";
+} from "@universal-music-store/ui";
 import {
   writeAdminPreferences,
   type AdminPreferences,
-} from "@apparel-commerce/user-preferences";
+} from "@universal-music-store/user-preferences";
 
 export type InventoryRow = {
   variantId: string;
@@ -56,12 +56,31 @@ export function InventoryTableWithRefresh({
   pageSize: number;
   total: number;
 }) {
-  const router = useRouter();
+  const [, setQuery] = useQueryStates(
+    {
+      page: parseAsInteger.withDefault(page),
+      pageSize: parseAsInteger.withDefault(pageSize),
+    },
+    { history: "push", shallow: false },
+  );
   const [rows, setRows] = useState(initialRows);
   const [totalCount, setTotalCount] = useState(total);
-  const [lastSync, setLastSync] = useState(() => new Date().toISOString());
+  // Keep the first render deterministic; the browser supplies the live timestamp after mount.
+  const [lastSync, setLastSync] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"sse" | "poll" | "connecting">("connecting");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adjustmentMode, setAdjustmentMode] = useState<"set" | "delta">("set");
+  const [quantity, setQuantity] = useState(0);
+  const [delta, setDelta] = useState(0);
+  const [reason, setReason] = useState<
+    "receive" | "count" | "damage" | "loss" | "return" | "correction" | "transfer"
+  >("correction");
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLastSync(new Date().toISOString());
+  }, []);
 
   useEffect(() => {
     setRows(initialRows);
@@ -168,14 +187,13 @@ export function InventoryTableWithRefresh({
 
   function applyDefaultPageSize(next: AdminPreferences["inventoryPageSize"]) {
     writeAdminPreferences({ inventoryPageSize: next });
-    router.push(`/admin/inventory?${buildQuery(1, next)}`);
-    router.refresh();
+    void setQuery({ page: 1, pageSize: next });
   }
 
   return (
     <div>
       <p className="mb-4 text-xs font-medium text-on-surface-variant">
-        Last updated: {lastSync}
+        Last updated: {lastSync ?? "not available"}
         {error ? (
           <span className="ml-2 text-error" role="alert">
             {error}
@@ -195,13 +213,14 @@ export function InventoryTableWithRefresh({
                 <TableHead>Size</TableHead>
                 <TableHead>Color</TableHead>
                 <TableHead className="text-right">Stock</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="py-16 text-center text-on-surface-variant"
                   >
                     No stock to show yet. Add products in your main store admin
@@ -225,6 +244,91 @@ export function InventoryTableWithRefresh({
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {row.available}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {editingId === row.variantId ? (
+                        <form
+                          className="flex justify-end gap-1"
+                          onSubmit={async (event) => {
+                            event.preventDefault();
+                            if (!row.productId) {
+                              setError("This variant has no product reference");
+                              return;
+                            }
+                            setSavingId(row.variantId);
+                            setError(null);
+                            try {
+                            const response = await fetch("/api/admin/inventory/adjust", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  "Idempotency-Key": crypto.randomUUID(),
+                                },
+                                body: JSON.stringify({
+                                  productId: row.productId,
+                                  variantId: row.variantId,
+                                  ...(adjustmentMode === "set"
+                                    ? { stockedQuantity: quantity }
+                                    : { delta }),
+                                  expectedStockedQuantity: row.available,
+                                  reason,
+                                }),
+                              });
+                              if (!response.ok) {
+                                const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+                                setError(payload?.error ?? `Unable to save stock (${response.status})`);
+                                return;
+                              }
+                              const nextQuantity = adjustmentMode === "set" ? quantity : row.available + delta;
+                              setRows((current) => current.map((item) => item.variantId === row.variantId ? { ...item, available: nextQuantity } : item));
+                              setEditingId(null);
+                            } catch {
+                              setError("Unable to save stock");
+                            } finally {
+                              setSavingId(null);
+                            }
+                          }}
+                        >
+                          <select
+                            aria-label={`Adjustment mode for ${row.productName}`}
+                            className="rounded border px-2 py-1 text-xs"
+                            value={adjustmentMode}
+                            onChange={(event) => setAdjustmentMode(event.target.value as "set" | "delta")}
+                          >
+                            <option value="set">Set</option>
+                            <option value="delta">Delta</option>
+                          </select>
+                          <input
+                            aria-label={`${adjustmentMode === "set" ? "Stock quantity" : "Stock change"} for ${row.productName}`}
+                            type="number"
+                            min={adjustmentMode === "set" ? 0 : undefined}
+                            className="w-20 rounded border px-2 py-1 text-right"
+                            value={adjustmentMode === "set" ? quantity : delta}
+                            onChange={(event) => {
+                              const value = Number(event.target.value);
+                              if (adjustmentMode === "set") setQuantity(value);
+                              else setDelta(value);
+                            }}
+                          />
+                          <select
+                            aria-label={`Adjustment reason for ${row.productName}`}
+                            className="max-w-28 rounded border px-2 py-1 text-xs"
+                            value={reason}
+                            onChange={(event) => setReason(event.target.value as typeof reason)}
+                          >
+                            <option value="correction">Correction</option>
+                            <option value="receive">Receive</option>
+                            <option value="count">Count</option>
+                            <option value="damage">Damage</option>
+                            <option value="loss">Loss</option>
+                            <option value="return">Return</option>
+                            <option value="transfer">Transfer</option>
+                          </select>
+                          <button type="submit" className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground" disabled={savingId === row.variantId}>{savingId === row.variantId ? "..." : "Save"}</button>
+                        </form>
+                      ) : (
+                        <button type="button" className="text-xs text-primary underline-offset-4 hover:underline" onClick={() => { setEditingId(row.variantId); setAdjustmentMode("set"); setQuantity(Math.max(0, row.available)); setDelta(0); setReason("correction"); }}>Adjust</button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

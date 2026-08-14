@@ -3,16 +3,16 @@
  * Two tabs: higher lexicographic tab id "wins" active checkout; the other is read-only.
  */
 
-const CHANNEL_NAME = "maharlika-checkout-lease-v1";
+const CHANNEL_NAME = "universal-music-store-checkout-lease-v1";
 
-export type CheckoutLeaseMessage =
+type CheckoutLeaseMessage =
   | { type: "owner"; tabId: string; ts: number }
   | { type: "release"; tabId: string };
 
 function getTabId(): string {
   if (typeof window === "undefined") return "";
   try {
-    const k = "maharlika_checkout_tab_id";
+    const k = "universal_music_store_checkout_tab_id";
     let id = sessionStorage.getItem(k)?.trim();
     if (!id) {
       id =
@@ -82,4 +82,4 @@ export function createCheckoutLeaseSubscriber(
   };
 }
 
-export { getTabId, CHANNEL_NAME };
+;

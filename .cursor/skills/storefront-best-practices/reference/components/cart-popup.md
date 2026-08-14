@@ -98,7 +98,7 @@ Without variant details, users can't confirm they added the correct variant. Thi
 - User confirmation: "Did I add the right size?"
 - Prevents cart abandonment from uncertainty
 - Allows corrections before checkout
-- Essential for products with multiple variants (clothing, shoes, configurable products)
+- Essential for products with multiple variants (instruments, accessories, configurable products)
 
 ## Actions and CTAs
 

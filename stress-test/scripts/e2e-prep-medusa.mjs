@@ -4,7 +4,7 @@
  * if the store API already returns at least one product for the configured region,
  * seed steps are skipped (no duplicate seed runs).
  *
- * Requires apps/medusa/.env (DATABASE_URL) when seed runs. For the HTTP probe,
+ * Requires apps/medusa/.env.local (DATABASE_URL) when seed runs. For the HTTP probe,
  * Medusa must be listening (e.g. pnpm --filter medusa dev); if the probe cannot
  * run, falls through to `medusa exec` seed (works with Medusa stopped).
  *
@@ -22,7 +22,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 attach(import.meta.url);
 
 try {
-  dotenv.config({ path: path.resolve(__dirname, "../../.env") });
   dotenv.config({ path: path.resolve(__dirname, "../../.env.local"), override: true });
 } catch {
   /* dotenv optional */
@@ -69,7 +68,7 @@ async function storeAlreadyHasProducts() {
   const region = regionId();
   if (!base || !key || !region) {
     console.log(
-      "[e2e-prep-medusa] Skip probe: set MEDUSA_BACKEND_URL or NEXT_PUBLIC_MEDUSA_URL, publishable key, and MEDUSA_REGION_ID in root .env to enable skip-when-ready.",
+      "[e2e-prep-medusa] Skip probe: set MEDUSA_BACKEND_URL or NEXT_PUBLIC_MEDUSA_URL, publishable key, and MEDUSA_REGION_ID in root .env.local to enable skip-when-ready.",
     );
     return false;
   }

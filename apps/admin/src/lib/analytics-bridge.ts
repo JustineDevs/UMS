@@ -37,11 +37,11 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   };
 }
 
-export async function fetchValidatedAnalyticsCharts(): Promise<
+export async function fetchValidatedAnalyticsCharts(horizonDays = 30): Promise<
   AnalyticsChartsPayload | null
 > {
   const { orders } = await fetchMedusaOrdersForAdmin(500, 0);
-  const built = buildAnalyticsChartsPayload(orders, { horizonDays: 30 });
+  const built = buildAnalyticsChartsPayload(orders, { horizonDays });
   if (!built.ok) {
     console.error("[analytics-bridge] chart payload invalid", built.error.flatten());
     return null;

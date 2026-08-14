@@ -3,7 +3,7 @@
 /**
  * One JSON line per duplicate webhook delivery (audit: measure webhook duplicate rate).
  * Plain JS so tsx/node test runners on Windows resolve the module when parent `.ts` is loaded via require interop.
- * @param {"stripe" | "paypal" | "paymongo" | "maya" | "aftership"} provider
+ * @param {"stripe" | "paypal" | "xendit"} provider
  * @param {string} dedupId
  */
 function logWebhookDedupDuplicate(provider, dedupId) {

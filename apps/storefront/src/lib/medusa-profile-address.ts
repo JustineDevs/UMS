@@ -1,4 +1,4 @@
-import type { StorefrontShippingAddress } from "@apparel-commerce/validation";
+import type { StorefrontShippingAddress } from "@universal-music-store/validation";
 import type { ServerCustomerProfile } from "@/lib/server-customer-profile";
 
 /** Medusa Store API cart address shape (snake_case). */
@@ -44,8 +44,14 @@ export function storefrontShippingToMedusaAddress(
     province: addr.province.trim().toLowerCase().slice(0, 100),
     country_code: (addr.country ?? "PH").trim().toLowerCase(),
   };
+  const brgy = addr.barangay?.trim();
   const l2 = addr.line2?.trim();
-  if (l2) out.address_2 = l2.slice(0, 200);
+  const parts = [brgy ? `Barangay ${brgy}` : null, l2].filter(
+    (x): x is string => Boolean(x && x.length > 0),
+  );
+  if (parts.length > 0) {
+    out.address_2 = parts.join(". ").slice(0, 200);
+  }
   const pc = addr.postalCode?.trim();
   if (pc) out.postal_code = pc.slice(0, 20);
   return out;

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingTableOrSchemaError } from "./supabase-errors";
+import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 /** Avoid `node:crypto` so this module does not break Webpack when re-exported into client bundles (e.g. SDK). Node 20+ and browsers expose Web Crypto. */
 function randomUuid(): string {
@@ -27,10 +27,23 @@ export function normalizeCatalogMediaUrlForDb(url: string): string | null {
   }
 }
 
-function isHttpOrHttpsUrl(normalized: string): boolean {
+export function isCatalogMediaUrlAllowed(normalized: string): boolean {
   try {
     const u = new URL(normalized);
-    return u.protocol === "http:" || u.protocol === "https:";
+    if (u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host === "::1" ||
+      host === "0.0.0.0" ||
+      host === "127.0.0.1" ||
+      host.startsWith("10.") ||
+      host.startsWith("192.168.") ||
+      host.startsWith("169.254.")
+    ) return false;
+    const private172 = host.match(/^172\.(\d+)\./);
+    return !(private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31);
   } catch {
     return false;
   }
@@ -72,14 +85,17 @@ function displayNameFromCatalogUrl(url: string): string {
 export async function findCmsMediaCatalogProductByPublicUrl(
   supabase: SupabaseClient,
   publicUrl: string,
+  organizationId?: string,
 ): Promise<CmsMediaRow | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_media")
     .select("*")
     .eq("public_url", publicUrl)
     .contains("tags", [CMS_MEDIA_TAG_CATALOG_PRODUCT])
     .is("deleted_at", null)
     .limit(1);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-media] findCatalogByPublicUrl", error.message);
@@ -98,15 +114,16 @@ export async function findCmsMediaCatalogProductByPublicUrl(
 export async function ensureExternalCatalogProductMediaRows(
   supabase: SupabaseClient,
   rawUrls: string[],
+  organizationId?: string,
 ): Promise<void> {
   const dedup = new Set<string>();
   for (const raw of rawUrls) {
     const normalized = normalizeCatalogMediaUrlForDb(raw);
-    if (!normalized || !isHttpOrHttpsUrl(normalized)) continue;
+    if (!normalized || !isCatalogMediaUrlAllowed(normalized)) continue;
     if (dedup.has(normalized)) continue;
     dedup.add(normalized);
 
-    const existing = await findCmsMediaCatalogProductByPublicUrl(supabase, normalized);
+    const existing = await findCmsMediaCatalogProductByPublicUrl(supabase, normalized, organizationId);
     if (existing) continue;
 
     const row = await insertCmsMedia(supabase, {
@@ -119,6 +136,7 @@ export async function ensureExternalCatalogProductMediaRows(
       display_name: displayNameFromCatalogUrl(normalized),
       byte_size: null,
       tags: [CMS_MEDIA_TAG_CATALOG_PRODUCT],
+      organization_id: organizationId ?? null,
     });
     if (!row) {
       console.error("[cms-media] ensureExternalCatalogProductMediaRows insert failed", normalized);
@@ -139,6 +157,7 @@ export type CmsMediaRow = {
   display_name: string | null;
   byte_size: number | null;
   tags: string[];
+  organization_id: string | null;
 };
 
 export type ListCmsMediaOptions = {
@@ -148,6 +167,7 @@ export type ListCmsMediaOptions = {
   sort?: "created_desc" | "created_asc" | "name_asc" | "name_desc";
   includeDeleted?: boolean;
   tag?: string;
+  organizationId?: string;
 };
 
 function mapRow(x: Record<string, unknown>): CmsMediaRow {
@@ -165,6 +185,7 @@ function mapRow(x: Record<string, unknown>): CmsMediaRow {
     display_name: x.display_name != null ? String(x.display_name) : null,
     byte_size: typeof x.byte_size === "number" ? x.byte_size : x.byte_size != null ? Number(x.byte_size) : null,
     tags: Array.isArray(tags) ? tags.map(String) : [],
+    organization_id: typeof x.organization_id === "string" ? x.organization_id : null,
   };
 }
 
@@ -180,7 +201,10 @@ export async function listCmsMedia(
     q = q.is("deleted_at", null);
   }
   if (opts.search?.trim()) {
-    q = q.ilike("public_url", `%${opts.search.trim()}%`);
+    const search = opts.search.trim().replace(/[(),]/g, " ");
+    q = q.or(
+      `public_url.ilike.%${search}%,display_name.ilike.%${search}%,alt_text.ilike.%${search}%`,
+    );
   }
   if (opts.mimePrefix?.trim()) {
     q = q.ilike("mime_type", `${opts.mimePrefix.trim()}%`);
@@ -188,6 +212,7 @@ export async function listCmsMedia(
   if (opts.tag?.trim()) {
     q = q.contains("tags", [opts.tag.trim()]);
   }
+  if (opts.organizationId) q = q.eq("organization_id", opts.organizationId);
   const sort = opts.sort ?? "created_desc";
   if (sort === "created_asc") q = q.order("created_at", { ascending: true });
   else if (sort === "name_asc") q = q.order("display_name", { ascending: true, nullsFirst: false });
@@ -206,8 +231,11 @@ export async function listCmsMedia(
 export async function getCmsMediaById(
   supabase: SupabaseClient,
   id: string,
+  organizationId?: string,
 ): Promise<CmsMediaRow | null> {
-  const { data, error } = await supabase.from("cms_media").select("*").eq("id", id).maybeSingle();
+  let query = supabase.from("cms_media").select("*").eq("id", id);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-media] getById", error.message);
@@ -219,8 +247,9 @@ export async function getCmsMediaById(
 
 export async function insertCmsMedia(
   supabase: SupabaseClient,
-  row: Omit<CmsMediaRow, "id" | "created_at" | "deleted_at" | "tags"> & {
+  row: Omit<CmsMediaRow, "id" | "created_at" | "deleted_at" | "tags" | "organization_id"> & {
     tags?: string[];
+    organization_id?: string | null;
     byte_size?: number | null;
     display_name?: string | null;
   },
@@ -237,6 +266,7 @@ export async function insertCmsMedia(
       display_name: row.display_name ?? null,
       byte_size: row.byte_size ?? null,
       tags: row.tags ?? [],
+      organization_id: row.organization_id ?? null,
       created_at: new Date().toISOString(),
     })
     .select("*")
@@ -252,18 +282,20 @@ export async function updateCmsMedia(
   supabase: SupabaseClient,
   id: string,
   patch: Partial<Pick<CmsMediaRow, "alt_text" | "display_name" | "tags">>,
+  organizationId?: string,
 ): Promise<CmsMediaRow | null> {
   const payload: Record<string, unknown> = {};
   if (patch.alt_text !== undefined) payload.alt_text = patch.alt_text;
   if (patch.display_name !== undefined) payload.display_name = patch.display_name;
   if (patch.tags !== undefined) payload.tags = patch.tags;
-  if (Object.keys(payload).length === 0) return getCmsMediaById(supabase, id);
-  const { data, error } = await supabase
+  if (Object.keys(payload).length === 0) return getCmsMediaById(supabase, id, organizationId);
+  let query = supabase
     .from("cms_media")
     .update(payload)
     .eq("id", id)
-    .select("*")
-    .single();
+    .select("*");
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.single();
   if (error) {
     console.error("[cms-media] update", error.message);
     return null;
@@ -271,11 +303,13 @@ export async function updateCmsMedia(
   return mapRow(data as Record<string, unknown>);
 }
 
-export async function softDeleteCmsMedia(supabase: SupabaseClient, id: string): Promise<boolean> {
-  const { error } = await supabase
+export async function softDeleteCmsMedia(supabase: SupabaseClient, id: string, organizationId?: string): Promise<boolean> {
+  let query = supabase
     .from("cms_media")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { error } = await query;
   if (error) {
     console.error("[cms-media] softDelete", error.message);
     return false;
@@ -289,12 +323,15 @@ export type CmsMediaReferenceHit = { source: string; detail: string };
 export async function findCmsMediaReferences(
   supabase: SupabaseClient,
   publicUrl: string,
+  organizationId?: string,
 ): Promise<CmsMediaReferenceHit[]> {
   const hits: CmsMediaReferenceHit[] = [];
   const needle = publicUrl.trim();
   if (!needle) return hits;
 
-  const { data: pages } = await supabase.from("cms_pages").select("id, slug, locale, body, og_image_url");
+  let pagesQuery = supabase.from("cms_pages").select("id, slug, locale, body, og_image_url");
+  if (organizationId) pagesQuery = pagesQuery.eq("organization_id", organizationId);
+  const { data: pages } = await pagesQuery;
   for (const p of pages ?? []) {
     const r = p as Record<string, unknown>;
     const blob = `${r.body ?? ""} ${r.og_image_url ?? ""}`;
@@ -306,9 +343,11 @@ export async function findCmsMediaReferences(
     }
   }
 
-  const { data: cats } = await supabase
+  let catsQuery = supabase
     .from("cms_category_content")
     .select("collection_handle, locale, intro_html, banner_url, blocks");
+  if (organizationId) catsQuery = catsQuery.eq("organization_id", organizationId);
+  const { data: cats } = await catsQuery;
   for (const c of cats ?? []) {
     const r = c as Record<string, unknown>;
     const blob = JSON.stringify(r);
@@ -320,9 +359,11 @@ export async function findCmsMediaReferences(
     }
   }
 
-  const { data: posts } = await supabase
+  let postsQuery = supabase
     .from("cms_blog_posts")
     .select("slug, locale, body, excerpt, cover_image_url, og_image_url");
+  if (organizationId) postsQuery = postsQuery.eq("organization_id", organizationId);
+  const { data: posts } = await postsQuery;
   for (const p of posts ?? []) {
     const r = p as Record<string, unknown>;
     const blob = `${r.body ?? ""}${r.excerpt ?? ""}${r.cover_image_url ?? ""}${r.og_image_url ?? ""}`;
@@ -331,7 +372,9 @@ export async function findCmsMediaReferences(
     }
   }
 
-  const { data: nav } = await supabase.from("cms_navigation").select("id, header_links, footer_columns");
+  let navQuery = supabase.from("cms_navigation").select("id, header_links, footer_columns");
+  if (organizationId) navQuery = navQuery.eq("organization_id", organizationId);
+  const { data: nav } = await navQuery;
   for (const n of nav ?? []) {
     const r = n as Record<string, unknown>;
     if (JSON.stringify(r).includes(needle)) {

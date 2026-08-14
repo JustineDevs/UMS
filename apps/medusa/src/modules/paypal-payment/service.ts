@@ -25,6 +25,7 @@ import type {
   UpdatePaymentOutput,
   WebhookActionResult,
 } from "@medusajs/framework/types";
+import { CheckoutPaymentIntent } from "@paypal/paypal-server-sdk";
 import {
   AbstractPaymentProvider,
   MedusaError,
@@ -36,18 +37,28 @@ import {
   claimPayPalWebhookDedup,
 } from "../../lib/paypal-webhook-dedup";
 import {
+  capturePayPalAuthorization,
   createPayPalOrder,
+  authorizePayPalOrder,
   capturePayPalOrder,
   getPayPalOrder,
   refundPayPalCapture,
+  voidPayPalAuthorization,
   verifyPayPalWebhookSignature,
   type PayPalClientOptions,
 } from "../../lib/paypal-sdk-client";
+import {
+  getNangoPaymentCredentials,
+  nangoContextFrom,
+  nangoPaymentProxyConfigured,
+  nangoPaymentProviderConfigured,
+} from "../../lib/nango-payment-credentials";
 
 export type PayPalPaymentOptions = {
   clientId: string;
   clientSecret: string;
   sandbox: boolean;
+  captureMode?: "automatic" | "manual";
 };
 
 function minorToMajor(amountMinor: number, currency: string): string {
@@ -74,13 +85,42 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     };
   }
 
+  private async sdkOptionsFor(context: unknown): Promise<PayPalClientOptions> {
+    const contextNango = nangoContextFrom(context);
+    const nangoContext = {
+      nango_connection_id: contextNango?.nango_connection_id ?? process.env.NANGO_PAYMENT_CONNECTION_ID?.trim(),
+      nango_provider_config_key: contextNango?.nango_provider_config_key ?? process.env.NANGO_PAYMENT_PROVIDER_CONFIG_KEY?.trim(),
+    };
+    const credentials = nangoPaymentProxyConfigured(nangoContext)
+      ? null
+      : await getNangoPaymentCredentials(nangoContext);
+    const clientId = [credentials?.client_id, credentials?.clientId]
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    const clientSecret = [credentials?.client_secret, credentials?.clientSecret]
+      .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    return {
+      clientId: clientId?.trim() || this.options_.clientId,
+      clientSecret: clientSecret?.trim() || this.options_.clientSecret,
+      sandbox: this.options_.sandbox,
+      accessToken: typeof credentials?.access_token === "string" ? credentials.access_token.trim() : undefined,
+      nangoApiKey: process.env.NANGO_API_KEY?.trim(),
+      nangoConnectionId: nangoContext?.nango_connection_id,
+      nangoProviderConfigKey: nangoContext?.nango_provider_config_key,
+    };
+  }
+
+  private captureMode(input?: { data?: Record<string, unknown> }): "automatic" | "manual" {
+    const value = input?.data?.capture_mode ?? this.options_.captureMode ?? process.env.PAYPAL_CAPTURE_MODE;
+    return String(value ?? "automatic").toLowerCase() === "manual" ? "manual" : "automatic";
+  }
+
   static validateOptions(options: Record<string, unknown>): void {
     const clientId = String(options.clientId ?? "").trim();
     const clientSecret = String(options.clientSecret ?? "").trim();
-    if (!clientId || !clientSecret) {
+    if ((!clientId || !clientSecret) && !nangoPaymentProviderConfigured(["paypal", "paypal-sandbox"])) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
-        'PayPal payment provider: "clientId" and "clientSecret" are required.',
+        'PayPal payment provider requires direct credentials or a configured Nango PayPal integration.',
       );
     }
   }
@@ -123,13 +163,16 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
 
     try {
       const { orderId, approvalUrl } = await createPayPalOrder(
-        this.sdkOptions,
+        await this.sdkOptionsFor(input.context),
         {
           sessionId,
           amountMajor: value,
           currencyCode: currency,
           returnUrl,
           cancelUrl,
+          intent: this.captureMode(input) === "manual"
+            ? CheckoutPaymentIntent.Authorize
+            : undefined,
         },
       );
 
@@ -165,25 +208,35 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     }
 
     try {
-      const { status, captureAmountMinor, captureId } = await capturePayPalOrder(
-        this.sdkOptions,
-        orderId,
-      );
-      if (status !== "COMPLETED") {
+      const mode = this.captureMode(input);
+      const requestId = `uvs-auth-${orderId}-${Date.now()}`;
+      const authorization = mode === "manual"
+        ? await authorizePayPalOrder(await this.sdkOptionsFor(input.data), orderId, requestId)
+        : null;
+      const capture = mode === "automatic"
+        ? await capturePayPalOrder(await this.sdkOptionsFor(input.data), orderId, { requestId })
+        : null;
+      const operationStatus = authorization?.status ?? capture?.status ?? "";
+      if (operationStatus !== "COMPLETED") {
         throw new MedusaError(
           MedusaError.Types.NOT_ALLOWED,
-          `PayPal order not completed after capture: ${status}`,
+          `PayPal order not completed after ${mode}: ${operationStatus}`,
         );
       }
 
       return {
-        status: PaymentSessionStatus.AUTHORIZED,
+        status: mode === "automatic" ? PaymentSessionStatus.CAPTURED : PaymentSessionStatus.AUTHORIZED,
         data: {
           ...((input.data as Record<string, unknown>) ?? {}),
           paypal_order_id: orderId,
-          ...(captureId?.trim() ? { paypal_capture_id: captureId.trim() } : {}),
-          ...(captureAmountMinor != null && Number.isFinite(captureAmountMinor)
-            ? { captured_amount_minor: captureAmountMinor }
+          ...(authorization?.authorizationId
+            ? { paypal_authorization_id: authorization.authorizationId }
+            : {}),
+          ...(capture?.captureId?.trim()
+            ? { paypal_capture_id: capture.captureId.trim() }
+            : {}),
+          ...(capture?.captureAmountMinor != null && Number.isFinite(capture.captureAmountMinor)
+            ? { captured_amount_minor: capture.captureAmountMinor }
             : {}),
         },
       };
@@ -197,15 +250,37 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   }
 
   async capturePayment(input: CapturePaymentInput): Promise<CapturePaymentOutput> {
-    return { data: input.data ?? {} };
+    const data = (input.data as Record<string, unknown>) ?? {};
+    const orderId = String(data.paypal_order_id ?? data.id ?? "").trim();
+    if (!orderId) throw new MedusaError(MedusaError.Types.INVALID_DATA, "PayPal capturePayment: missing order id.");
+    const currency = String(data.currency ?? "PHP").toUpperCase();
+    const amount = Number(data.amount);
+    const requestId = `uvs-capture-${orderId}-${Date.now()}`;
+    const options = await this.sdkOptionsFor(input.data);
+    const authorizationId = String(data.paypal_authorization_id ?? "").trim();
+    const captureInput = {
+      requestId,
+      ...(Number.isFinite(amount) && amount > 0
+        ? { amountMajor: minorToMajor(amount, currency), currencyCode: currency }
+        : {}),
+    };
+    const result = authorizationId
+      ? await capturePayPalAuthorization(options, authorizationId, captureInput)
+      : await capturePayPalOrder(options, orderId, captureInput);
+    if (result.status !== "COMPLETED") throw new MedusaError(MedusaError.Types.NOT_ALLOWED, `PayPal capture failed: ${result.status}`);
+    return { data: { ...data, paypal_order_id: orderId, ...(result.captureId ? { paypal_capture_id: result.captureId } : {}), ...(result.captureAmountMinor != null ? { captured_amount_minor: result.captureAmountMinor } : {}) } };
   }
 
   async cancelPayment(input: CancelPaymentInput): Promise<CancelPaymentOutput> {
-    return { data: input.data ?? {} };
+    const data = (input.data as Record<string, unknown>) ?? {};
+    const authorizationId = String(data.paypal_authorization_id ?? "").trim();
+    if (!authorizationId) throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "PayPal cancelPayment: no authorization to void.");
+    await voidPayPalAuthorization(await this.sdkOptionsFor(input.data), authorizationId, `uvs-void-${authorizationId}-${Date.now()}`);
+    return { data: { ...data, paypal_authorization_id: authorizationId, paypal_voided: true } };
   }
 
   async deletePayment(input: DeletePaymentInput): Promise<DeletePaymentOutput> {
-    return { data: input.data ?? {} };
+    return this.cancelPayment(input as unknown as CancelPaymentInput) as Promise<DeletePaymentOutput>;
   }
 
   async getPaymentStatus(input: GetPaymentStatusInput): Promise<GetPaymentStatusOutput> {
@@ -218,11 +293,14 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         "PayPal getPaymentStatus: missing paypal_order_id in session data.",
       );
     }
-    const order = await getPayPalOrder(this.sdkOptions, orderId.trim());
+    const order = await getPayPalOrder(await this.sdkOptionsFor(input.data), orderId.trim());
     const st = (order.status ?? "").toUpperCase();
     const base = (input.data as Record<string, unknown>) ?? {};
     if (st === "COMPLETED") {
-      return { status: PaymentSessionStatus.AUTHORIZED, data: base };
+      return {
+        status: base.paypal_capture_id ? PaymentSessionStatus.CAPTURED : PaymentSessionStatus.AUTHORIZED,
+        data: base,
+      };
     }
     if (st === "VOIDED" || st === "CANCELLED" || st === "CANCELED") {
       return { status: PaymentSessionStatus.CANCELED, data: base };
@@ -248,7 +326,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         ? Number(input.amount).toFixed(decimals)
         : undefined;
     try {
-      await refundPayPalCapture(this.sdkOptions, {
+      await refundPayPalCapture(await this.sdkOptionsFor(input.data), {
         captureId,
         currencyCode: currency,
         amountMajor: major,
@@ -263,11 +341,14 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   }
 
   async retrievePayment(input: RetrievePaymentInput): Promise<RetrievePaymentOutput> {
-    return { data: input.data ?? {} };
+    const orderId = String(input.data?.paypal_order_id ?? input.data?.id ?? "").trim();
+    if (!orderId) throw new MedusaError(MedusaError.Types.INVALID_DATA, "PayPal retrievePayment: missing order id.");
+    const order = await getPayPalOrder(await this.sdkOptionsFor(input.data), orderId);
+    return { data: { ...((input.data as Record<string, unknown>) ?? {}), paypal_order: order } };
   }
 
   async updatePayment(input: UpdatePaymentInput): Promise<UpdatePaymentOutput> {
-    return { data: input.data ?? {} };
+    throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "PayPal payment metadata is immutable after checkout creation.");
   }
 
   async createAccountHolder(
@@ -313,7 +394,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     }
     if (webhookId) {
       const valid = await verifyPayPalWebhookSignature(
-        this.sdkOptions,
+        await this.sdkOptionsFor(payload.data),
         payload.headers,
         raw,
         webhookId,
