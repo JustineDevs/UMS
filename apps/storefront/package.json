@@ -35,6 +35,7 @@
     "@universal-music-store/ui": "workspace:*",
     "@universal-music-store/user-preferences": "workspace:*",
     "@universal-music-store/validation": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
     "botid": "1.5.11",
     "call-bind-apply-helpers": "1.0.2",
     "call-bound": "1.0.4",

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
@@ -12,7 +13,6 @@ import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { PostHogAnalytics } from "@/components/PostHogAnalytics";
 import { MedusaCartProvider } from "@/context/MedusaCartContext";
-import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 import { RecaptchaScript } from "@/components/RecaptchaScript";
 import { WishlistSyncOnLogin } from "@/components/WishlistSyncOnLogin";
@@ -148,7 +148,7 @@ export default function RootLayout({
           </MedusaCartProvider>
         </NextAuthSessionProvider>
         <RecaptchaScript />
-        <VercelWebAnalytics />
+        {process.env.VERCEL === "1" ? <Analytics /> : null}
         <CookieConsentBanner />
       </body>
     </html>
