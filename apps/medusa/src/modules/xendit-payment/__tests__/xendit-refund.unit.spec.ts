@@ -3,6 +3,7 @@ import { MedusaError, PaymentSessionStatus } from "@medusajs/framework/utils";
 import XenditPaymentProviderService from "../service";
 import {
   cancelXenditPayment,
+  createXenditPaymentSession,
   getXenditPaymentSession,
   refundXenditPayment,
 } from "../../../lib/xendit-sdk-client";
@@ -118,5 +119,23 @@ describe("Xendit refundPayment", () => {
       xendit_payment_id: "pay_123",
       provider_deleted: true,
     });
+  });
+});
+
+describe("Xendit callback URL contract", () => {
+  it("rejects non-HTTPS callbacks before making a provider request", async () => {
+    await expect(
+      createXenditPaymentSession(
+        { secretKey: "xk_test" },
+        {
+          amountMinor: 100,
+          currency: "PHP",
+          description: "test",
+          referenceId: "medusa_ps:test",
+          successUrl: "http://localhost:3000/checkout/hosted-return",
+          cancelUrl: "https://example.test/cancel",
+        },
+      ),
+    ).rejects.toThrow("successUrl must be an absolute HTTPS URL");
   });
 });

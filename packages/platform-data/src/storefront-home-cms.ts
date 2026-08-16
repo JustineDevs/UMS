@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
+import { cmsTreeToBlocks, getCmsPageBySlugLocalePublic } from "./cms-pages.js";
+import type { CmsNode } from "./cms-types.js";
 
 /** One home-page tile for an instrument-led storefront. */
 export type StorefrontHomeTile = {
@@ -47,7 +49,7 @@ export type StorefrontHomePayload = {
       contentWidth: "standard" | "wide" | "extra";
     };
   };
-  tiles: [StorefrontHomeTile, StorefrontHomeTile, StorefrontHomeTile];
+  tiles: StorefrontHomeTile[];
   latestSection: {
     title: string;
     viewAllLabel: string;
@@ -235,11 +237,9 @@ function mergeTile(
 function mergeTiles(raw: unknown): StorefrontHomePayload["tiles"] {
   const d = DEFAULT_STOREFRONT_HOME_PAYLOAD.tiles;
   if (!Array.isArray(raw)) return d;
-  return [
-    mergeTile(raw[0], d[0]),
-    mergeTile(raw[1], d[1]),
-    mergeTile(raw[2], d[2]),
-  ] as StorefrontHomePayload["tiles"];
+  return raw.length
+    ? raw.map((item, index) => mergeTile(item, d[index] ?? d[index % d.length]))
+    : d;
 }
 
 function mergeLatest(partial: unknown): StorefrontHomePayload["latestSection"] {
@@ -344,9 +344,67 @@ export async function loadStorefrontHomeContentForPublic(): Promise<StorefrontHo
   }
   try {
     const sb = createClient(url, anonKey);
+    const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined;
+    const canonical = await getCmsPageBySlugLocalePublic(sb, "home", "en", organizationId);
+    if (canonical?.tree.length) return mergeCanonicalHomeTree(canonical.tree);
     return await getStorefrontHomeContent(sb);
   } catch (e) {
     console.warn("[storefront-home-cms] loadStorefrontHomeContentForPublic", e);
     return mergeStorefrontHomePayload(null);
   }
+}
+
+/** The published page tree is authoritative; legacy home content is only a migration fallback. */
+function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
+  const blocks = cmsTreeToBlocks(tree);
+  const raw: Record<string, unknown> = {};
+  const hero = blocks.find((block) => block.id === "home-hero")?.props;
+  if (hero) {
+    const lines = String(hero.title ?? "").split(/\r?\n/);
+    raw.hero = {
+      line1: lines[0] ?? "",
+      line2: lines.slice(1).join(" "),
+      lead: String(hero.subtitle ?? ""),
+      imageUrl: String(hero.imageUrl ?? ""),
+      mediaType: hero.mediaType,
+      videoUrl: String(hero.videoUrl ?? ""),
+      ctaHref: String(hero.href ?? "/shop"),
+      ctaLabel: String(hero.ctaLabel ?? "Shop Now"),
+      showPrivacyLink: Boolean(hero.showPrivacyLink),
+      layout: hero.layout,
+      style: hero.style,
+    };
+    raw.domOverrides = hero.domOverrides;
+  }
+  const tiles = blocks.find((block) => block.id === "home-tiles")?.props;
+  if (tiles) {
+    raw.tiles = tiles.tiles;
+    raw.sectionLayout = { tiles: tiles.layout };
+  }
+  const latest = blocks.find((block) => block.id === "home-latest")?.props;
+  if (latest) {
+    raw.latestSection = {
+      title: latest.title,
+      viewAllLabel: latest.viewAllLabel,
+      viewAllHref: latest.viewAllHref,
+    };
+    raw.sectionLayout = {
+      ...(raw.sectionLayout as Record<string, unknown> | undefined),
+      latest: latest.layout,
+    };
+  }
+  const newsletter = blocks.find((block) => block.id === "home-newsletter")?.props;
+  if (newsletter) {
+    raw.newsletter = {
+      title: newsletter.heading,
+      body: newsletter.subtitle,
+      placeholder: newsletter.placeholder,
+      buttonLabel: newsletter.buttonLabel,
+    };
+    raw.sectionLayout = {
+      ...(raw.sectionLayout as Record<string, unknown> | undefined),
+      newsletter: newsletter.layout,
+    };
+  }
+  return mergeStorefrontHomePayload(raw);
 }

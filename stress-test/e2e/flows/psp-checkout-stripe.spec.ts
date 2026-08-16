@@ -22,6 +22,7 @@ import {
   payWithStripeSandboxCard,
   clickContinueToStripeHostedCheckout,
   fillStripeHostedCheckoutTestCard,
+  enablePublicTunnelBypass,
   STRIPE_SANDBOX_TEST_CARD_SUCCESS,
   STRIPE_SANDBOX_TEST_CARD_DECLINE,
 } from "../helpers/checkout";
@@ -45,7 +46,8 @@ function shouldFailOnMissingPrereq(): boolean {
 }
 
 test.describe("@checkout @stripe Stripe checkout flow", () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
+    await enablePublicTunnelBypass(page);
     isStripeTestKey();
     skipUnlessPspConfigured("stripe");
   });
@@ -63,7 +65,6 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
     }
-
     await payWithStripeSandboxCard(page, STRIPE_SANDBOX_TEST_CARD_SUCCESS ?? STRIPE_SUCCESS_CARD);
     await expectOrderConfirmation(page);
 
@@ -78,6 +79,10 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
   });
 
   test("admin sees Stripe order after successful payment", async ({ page }) => {
+    if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
+      test.skip(true, "Admin auth disabled; run with staff E2E credentials for admin order proof.");
+      return;
+    }
     const availability = await page.request.get(
       `${process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000"}/api/checkout/available-payment-methods`,
       { failOnStatusCode: false },
@@ -101,7 +106,7 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       timeout: 20_000,
     });
 
-    const orderRows = page.locator("[data-testid='order-row'], tr[data-order-id]");
+    const orderRows = page.locator("table tbody tr:has(a[href*='/admin/orders/'])");
     const rowCount = await orderRows.count();
     expect(rowCount, "Admin orders list must show at least one order after Stripe payment").toBeGreaterThan(0);
   });

@@ -87,30 +87,40 @@ export function buildAuthOptions(): NextAuthOptions {
               password: { label: "Password", type: "password" },
             },
             async authorize(credentials) {
-              if (!credentials?.email || !credentials?.password) return null;
+              const reject = (reason: string) => {
+                if (process.env.NEXTAUTH_DEBUG === "true") {
+                  console.warn(`[admin auth] e2e credentials rejected: ${reason}`);
+                }
+                return null;
+              };
+              if (!credentials?.email || !credentials?.password) {
+                return reject(
+                  `missing credentials (email=${Boolean(credentials?.email)}, password=${Boolean(credentials?.password)}, keys=${Object.keys(credentials ?? {}).join(",")})`,
+                );
+              }
               const emailRaw =
                 typeof credentials.email === "string" ? credentials.email : "";
               const pwd =
                 typeof credentials.password === "string" ? credentials.password : "";
               const emailNorm = normalizeEmail(emailRaw);
               const allowed = parseAdminAllowedEmailList();
-              if (!allowed.includes(emailNorm)) return null;
-              if (pwd !== process.env.NEXTAUTH_SECRET?.trim()) return null;
+              if (!allowed.includes(emailNorm)) return reject("email not allow-listed");
+              if (pwd !== process.env.NEXTAUTH_SECRET?.trim()) return reject("password mismatch");
               const supabase = tryCreateSupabaseClient();
-              if (!supabase) return null;
+              if (!supabase) return reject("Supabase unavailable");
               const { data } = await supabase
                 .from("users")
                 .select("id")
                 .eq("email", emailNorm)
                 .maybeSingle();
-              if (!data?.id) return null;
+              if (!data?.id) return reject("user not found");
               const { data: roleRow } = await supabase
                 .from("user_roles")
                 .select("role")
                 .eq("user_id", data.id)
                 .maybeSingle();
               const role = roleRow?.role as string | undefined;
-              if (!isStaffRole(role ?? "")) return null;
+              if (!isStaffRole(role ?? "")) return reject(`role ${role ?? "missing"} is not staff`);
               return {
                 id: data.id as string,
                 email: emailNorm,
@@ -205,7 +215,7 @@ export function buildAuthOptions(): NextAuthOptions {
           if (session.user.email) {
             const snapshot = await getCachedStaffSnapshot(session.user.email);
             session.user.permissions = snapshot.permissions;
-            session.user.role = snapshot.role ?? (token.role as string | undefined);
+            session.user.role = (token.role as string | undefined) ?? snapshot.role;
           } else {
             session.user.role = token.role as string | undefined;
           }

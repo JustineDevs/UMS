@@ -120,10 +120,15 @@ export type CmsComponentDefinition = {
   category: string;
   version: number;
   structure: string;
+  /** Optional isolated-canvas source for reusable visual authoring. */
+  markup?: string;
+  styles?: string;
   styleTokens: Record<string, string>;
   props: CmsComponentPropDefinition[];
   slots: CmsComponentSlotDefinition[];
   variants: CmsComponentVariant[];
+  /** Optional reusable parent definition. Child fields override parent fields. */
+  extendsComponentId?: string;
   defaultVariantId?: string;
   isGlobal?: boolean;
   match?: CmsComponentMatch;
@@ -154,6 +159,32 @@ export type CmsBlock = {
   styleOverrides?: Record<string, string>;
 };
 
+export type CmsNode = {
+  id: string;
+  componentId: string;
+  parentId: string | null;
+  slot: string | null;
+  props: Record<string, unknown>;
+  styles: Record<string, string>;
+  children: string[];
+  variantId?: string;
+  blockType?: string;
+  lockedStructure?: boolean;
+};
+
+export type CmsMutationRecord = {
+  type: string;
+  nodeId?: string;
+  parentId?: string | null;
+  beforeParentId?: string | null;
+  slot?: string;
+  index?: number;
+  key?: string;
+  before?: unknown;
+  after?: unknown;
+  node?: unknown;
+};
+
 export type CmsPageRow = {
   id: string;
   organization_id: string | null;
@@ -163,6 +194,8 @@ export type CmsPageRow = {
   title: string;
   body: string;
   blocks: CmsBlock[];
+  tree: CmsNode[];
+  mutations?: CmsMutationRecord[];
   status: CmsPublishStatus;
   published_at: string | null;
   scheduled_publish_at: string | null;

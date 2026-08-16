@@ -6,7 +6,10 @@ import {
 
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
-import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import {
+  finalizeMedusaCartFromServer,
+  getPublicOriginFromRequest,
+} from "@/lib/finalize-medusa-cart-server";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
@@ -82,6 +85,7 @@ async function handlePOST(req: Request) {
   try {
     const result = await finalizeMedusaCartFromServer(cartId, {
       maxCompleteAttempts: 6,
+      publicOrigin: getPublicOriginFromRequest(req),
     });
 
     if (!result.ok) {

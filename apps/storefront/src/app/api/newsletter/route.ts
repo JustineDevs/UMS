@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   insertCmsFormSubmission,
 } from "@universal-music-store/platform-data";
+import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
+import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
 import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
 import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";
+import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import {
+  finishPublicDeliveryAttempt,
+  publicDeliveryIdempotencyKey,
+  recordPublicDeliveryAttempt,
+} from "@/lib/public-delivery";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import {
   isRecaptchaConfigured,
@@ -54,36 +62,75 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
   }
 
-  const sb = createStorefrontAnonSupabase();
-  if (!sb) {
+  const service = createStorefrontServiceSupabase();
+  const sb = createStorefrontAnonSupabase() ?? service;
+  if (!service || !sb) {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+  }
+
+  const resendKey = process.env.RESEND_API_KEY?.trim();
+  const resendFrom =
+    process.env.RESEND_FROM_EMAIL?.trim() ||
+    process.env.RESEND_FROM?.trim();
+  if (!resendKey || !resendFrom) {
+    return NextResponse.json({ error: "Subscription service unavailable" }, { status: 503 });
+  }
+
+  const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim() || null;
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const source = typeof raw.source === "string" ? raw.source.slice(0, 80) : "homepage";
+  const { data: confirmation, error: confirmationError } = await service
+    .from("newsletter_confirmations")
+    .insert({
+      organization_id: organizationId,
+      email,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    })
+    .select("id")
+    .single();
+  if (confirmationError || !confirmation?.id) {
+    return NextResponse.json({ error: "Subscription failed" }, { status: 503 });
+  }
+
+  const deliveryKey = publicDeliveryIdempotencyKey(
+    "newsletter_confirmation",
+    confirmation.id,
+  );
+  await recordPublicDeliveryAttempt(service, {
+    kind: "newsletter_confirmation",
+    aggregateId: confirmation.id,
+    recipient: email,
+    provider: "resend",
+    idempotencyKey: deliveryKey,
+  });
+
+  const storefrontOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
+  const confirmUrl = `${storefrontOrigin.replace(/\/$/, "")}/api/newsletter/confirm?token=${encodeURIComponent(token)}`;
+  const sent = await sendResendTransactionalEmail({
+    apiKey: resendKey,
+    from: resendFrom,
+    to: email,
+    subject: "Confirm your newsletter subscription",
+    html: `<p>Confirm your subscription to receive updates.</p><p><a href="${confirmUrl}">Confirm subscription</a></p><p>This link expires in 24 hours.</p>`,
+    idempotencyKey: `newsletter-confirmation:${confirmation.id}`,
+  });
+  await finishPublicDeliveryAttempt(service, deliveryKey, sent.ok
+    ? { status: "sent", providerMessageId: sent.id ?? null }
+    : { status: "failed", error: sent.message });
+  if (!sent.ok) {
+    return NextResponse.json({ error: "Subscription delivery failed" }, { status: 503 });
   }
 
   const ipHash = createHash("sha256").update(ip).digest("hex").slice(0, 32);
   const submissionId = await insertCmsFormSubmission(sb, {
     form_key: "newsletter",
-    payload: { email, source: typeof raw.source === "string" ? raw.source : "homepage" },
+    payload: { email, source, confirmationId: confirmation.id },
     ip_hash: ipHash,
   });
-
-  await sb.from("marketing_preferences").upsert(
-    {
-      organization_id: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
-      email,
-      channel: "email",
-      consent_status: "subscribed",
-      source: typeof raw.source === "string" ? raw.source.slice(0, 80) : "homepage",
-      consented_at: new Date().toISOString(),
-      unsubscribed_at: null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "organization_id,email,channel" },
-  );
-
-  if (!submissionId) {
-    return NextResponse.json({ error: "Subscription failed" }, { status: 503 });
-  }
-
   return NextResponse.json({ ok: true, id: submissionId });
 }
 

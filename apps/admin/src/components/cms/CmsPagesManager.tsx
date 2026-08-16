@@ -3,11 +3,16 @@
 import { useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import {
+  cmsBlocksToTree,
+  cmsTreeToBlocks,
   staffHasPermission,
   type CmsBlock,
+  type CmsMutationRecord,
+  type CmsNode,
 } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { cmsPagePreviewUrl } from "@/lib/cms-preview-url";
 import { StorefrontPublicMetadataEditor } from "@/components/StorefrontPublicMetadataEditor";
 import { CmsPageBuilder } from "./CmsPageBuilder";
 import { StorefrontHomeVisualEditor } from "./StorefrontHomeVisualEditor";
@@ -20,6 +25,7 @@ type CmsPageRow = {
   title: string;
   body: string;
   blocks: unknown;
+  tree?: unknown;
   status: string;
   published_at: string | null;
   scheduled_publish_at: string | null;
@@ -31,7 +37,12 @@ type CmsPageRow = {
   json_ld: unknown | null;
   parent_slug: string | null;
   breadcrumb_label: string | null;
+  version?: number;
 };
+
+function idempotencyKey(scope: string): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${scope}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function emptyPage(): CmsPageRow {
   return {
@@ -53,22 +64,23 @@ function emptyPage(): CmsPageRow {
     json_ld: null,
     parent_slug: null,
     breadcrumb_label: null,
+    version: 1,
   };
 }
 
 export function CmsPagesManager() {
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
-  const canWrite = staffHasPermission(
-    session?.user?.permissions ?? [],
-    "content:write",
-  );
+  const canWrite =
+    process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+    staffHasPermission(session?.user?.permissions ?? [], "content:write");
   const [rows, setRows] = useState<CmsPageRow[]>([]);
   const [editing, setEditing] = useState<CmsPageRow | null>(null);
   const [loadingRows, setLoadingRows] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [mutations, setMutations] = useState<CmsMutationRecord[]>([]);
   const [blocksJson, setBlocksJson] = useState("[]");
   const [showBlocksAdvancedJson, setShowBlocksAdvancedJson] = useState(false);
   const [jsonLdText, setJsonLdText] = useState("");
@@ -114,16 +126,21 @@ export function CmsPagesManager() {
   }, [editing]);
 
   const openPage = (page: CmsPageRow) => {
+    setMutations([]);
     setSlugWhenOpened(page.slug);
     setRedirectMessage(null);
     setSaveError(null);
     setEditing({
       ...page,
+      blocks: Array.isArray(page.tree) && page.tree.length
+        ? cmsTreeToBlocks(page.tree as CmsNode[])
+        : page.blocks,
       parent_slug: page.parent_slug ?? null,
       breadcrumb_label: page.breadcrumb_label ?? null,
     });
   };
   const openNewPage = () => {
+    setMutations([]);
     setSlugWhenOpened(null);
     setRedirectMessage(null);
     setSaveError(null);
@@ -134,10 +151,12 @@ export function CmsPagesManager() {
     if (!editing || !canWrite) return;
     setSaving(true);
     setSaveError(null);
-    let blocks: unknown = editing.blocks ?? [];
+    let blocks: CmsBlock[] = Array.isArray(editing.blocks)
+      ? (editing.blocks as CmsBlock[])
+      : [];
     if (showBlocksAdvancedJson) {
       try {
-        blocks = JSON.parse(blocksJson) as unknown;
+        blocks = JSON.parse(blocksJson) as CmsBlock[];
         if (!Array.isArray(blocks)) throw new Error();
       } catch {
         setSaveError("Blocks must be a valid JSON array");
@@ -162,6 +181,8 @@ export function CmsPagesManager() {
       title: editing.title,
       body: editing.body,
       blocks,
+      tree: cmsBlocksToTree(blocks),
+      mutations,
       status: editing.status,
       published_at: editing.published_at,
       scheduled_publish_at: editing.scheduled_publish_at,
@@ -173,6 +194,7 @@ export function CmsPagesManager() {
       json_ld,
       parent_slug: editing.parent_slug,
       breadcrumb_label: editing.breadcrumb_label,
+      ...(editing.id && editing.version ? { expectedVersion: editing.version } : {}),
     };
     if (editing.id) payload.id = editing.id;
     try {
@@ -182,7 +204,10 @@ export function CmsPagesManager() {
           : "/api/admin/cms/pages",
         {
           method: editing.id ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey(`cms-page-${editing.id ?? "new"}`),
+          },
           body: JSON.stringify(payload),
         },
       );
@@ -194,6 +219,7 @@ export function CmsPagesManager() {
       if (json.data) {
         setEditing(json.data);
         setSlugWhenOpened(json.data.slug);
+        setMutations([]);
       }
       load();
     } catch (error: unknown) {
@@ -207,6 +233,7 @@ export function CmsPagesManager() {
     if (!editing?.id || !canWrite || !confirm("Delete this page?")) return;
     const response = await fetch(`/api/admin/cms/pages/${editing.id}`, {
       method: "DELETE",
+      headers: { "Idempotency-Key": idempotencyKey(`cms-page-delete-${editing.id}`) },
     });
     if (!response.ok) {
       const json = (await response.json()) as { error?: string };
@@ -229,7 +256,10 @@ export function CmsPagesManager() {
     const to_path = `/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
     const response = await fetch("/api/admin/cms/redirects", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey(`cms-redirect-${editing.id}`),
+      },
       body: JSON.stringify({
         from_path,
         to_path,
@@ -279,6 +309,7 @@ export function CmsPagesManager() {
 
   if (editing) {
     const pageUrl = `${getStorefrontPublicOrigin()}/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const previewUrl = cmsPagePreviewUrl(pageUrl, editing.preview_token);
     const settings = (
       <div className="space-y-4 text-xs">
         <div>
@@ -402,7 +433,7 @@ export function CmsPagesManager() {
           </label>
           <a
             className="mt-3 inline-flex text-xs text-primary underline"
-            href={`${pageUrl}${editing.preview_token ? `?preview=${encodeURIComponent(editing.preview_token)}` : ""}`}
+            href={previewUrl}
             target="_blank"
             rel="noreferrer"
           >
@@ -534,7 +565,7 @@ export function CmsPagesManager() {
         pageTitle={editing.title}
         pageBody={editing.body}
         onPageBodyChange={(body) => setEditing({ ...editing, body })}
-        previewUrl={pageUrl}
+        previewUrl={previewUrl}
         pages={rows.map((page) => ({
           id: page.id,
           title: page.title,
@@ -562,6 +593,7 @@ export function CmsPagesManager() {
         onChange={(next: CmsBlock[]) =>
           setEditing({ ...editing, blocks: next })
         }
+        onMutation={(mutation) => setMutations((current) => [...current, mutation])}
       />
     );
   }

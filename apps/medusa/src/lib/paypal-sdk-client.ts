@@ -3,10 +3,8 @@ import {
   Client,
   Environment,
   OrdersController,
-  PaypalExperienceUserAction,
   type Order,
   type OrderAuthorizeResponse,
-  type OrderRequest,
 } from "@paypal/paypal-server-sdk";
 
 const PAYPAL_TIMEOUT_MS = 30_000;
@@ -72,36 +70,45 @@ export async function createPayPalOrder(
     if (!orderId || !approvalUrl) throw new Error("PayPal create order response missing id or approve link.");
     return { orderId, approvalUrl };
   }
-  const client = getPayPalClient(options);
-  const ordersController = new OrdersController(client);
-
-  const body: OrderRequest = {
-    intent: input.intent ?? CheckoutPaymentIntent.Capture,
-    purchaseUnits: [
-      {
-        customId: input.sessionId.slice(0, 127),
-        amount: {
-          currencyCode: input.currencyCode,
-          value: input.amountMajor,
-        },
-      },
-    ],
-    paymentSource: {
-      paypal: {
-        experienceContext: {
-          returnUrl: input.returnUrl,
-          cancelUrl: input.cancelUrl,
-          userAction: PaypalExperienceUserAction.PayNow,
-        },
-      },
+  const base = options.sandbox
+    ? "https://api-m.sandbox.paypal.com"
+    : "https://api-m.paypal.com";
+  const token = await payPalRestToken(options);
+  const response = await fetch(`${base}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
     },
+    body: JSON.stringify({
+      intent: input.intent === CheckoutPaymentIntent.Authorize ? "AUTHORIZE" : "CAPTURE",
+      purchase_units: [{
+        custom_id: input.sessionId.slice(0, 127),
+        amount: { currency_code: input.currencyCode, value: input.amountMajor },
+      }],
+      payment_source: {
+        paypal: {
+          experience_context: {
+            return_url: input.returnUrl,
+            cancel_url: input.cancelUrl,
+            user_action: "PAY_NOW",
+          },
+        },
+      },
+    }),
+  });
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`PayPal create order failed: ${response.status} ${responseText}`);
+  }
+  const result = JSON.parse(responseText) as {
+    id?: string;
+    links?: Array<{ rel?: string; href?: string }>;
   };
-
-  const { result } = await ordersController.createOrder({ body });
-
   const orderId = result.id;
   const approvalLink = result.links?.find(
-    (l) => l.rel === "approve" || l.rel === "payer-action",
+    (link) => link.rel === "approve" || link.rel === "payer-action",
   );
   const approvalUrl = approvalLink?.href;
 

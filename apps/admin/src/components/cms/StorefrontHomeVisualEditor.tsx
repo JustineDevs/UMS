@@ -2,14 +2,19 @@
 
 import {
   staffHasPermission,
+  cmsBlocksToTree,
+  cmsTreeToBlocks,
   type CmsBlock,
-  type StorefrontHomeSectionLayout,
+  type CmsComponentInstance,
+  type CmsNode,
+  type CmsMutationRecord,
   type StorefrontHomePayload,
 } from "@universal-music-store/platform-data";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import { StorefrontPublicMetadataEditor } from "@/components/StorefrontPublicMetadataEditor";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 import { CmsPageBuilder } from "./CmsPageBuilder";
 
 const IDS = {
@@ -25,21 +30,31 @@ const IDS = {
 } as const;
 
 function toBlocks(payload: StorefrontHomePayload): CmsBlock[] {
+  const headerNavigation: CmsComponentInstance = {
+    id: IDS.headerNavigation,
+    componentId: "header-navigation",
+    props: {},
+    slots: {},
+  };
+  const headerActions: CmsComponentInstance = {
+    id: IDS.headerActions,
+    componentId: "header-actions",
+    props: {},
+    slots: {},
+  };
+  const footerColumns: CmsComponentInstance = {
+    id: IDS.footerColumns,
+    componentId: "footer-columns",
+    props: {},
+    slots: {},
+  };
   return [
     {
       id: IDS.header,
       type: "storefront_header",
-      props: { editorHref: "/admin/cms/navigation" },
-    },
-    {
-      id: IDS.headerNavigation,
-      type: "header_navigation",
-      props: { editorHref: "/admin/cms/navigation" },
-    },
-    {
-      id: IDS.headerActions,
-      type: "header_actions",
-      props: { editorHref: "/admin/cms/navigation" },
+      componentId: "storefront-header",
+      props: {},
+      slots: { navigation: [headerNavigation], actions: [headerActions] },
     },
     {
       id: IDS.hero,
@@ -78,71 +93,11 @@ function toBlocks(payload: StorefrontHomePayload): CmsBlock[] {
     {
       id: IDS.footer,
       type: "storefront_footer",
-      props: { editorHref: "/admin/cms/navigation" },
-    },
-    {
-      id: IDS.footerColumns,
-      type: "footer_columns",
-      props: { editorHref: "/admin/cms/navigation" },
+      componentId: "storefront-footer",
+      props: {},
+      slots: { columns: [footerColumns] },
     },
   ];
-}
-
-function fromBlocks(
-  blocks: CmsBlock[],
-  previous: StorefrontHomePayload,
-): StorefrontHomePayload {
-  const next = JSON.parse(JSON.stringify(previous)) as StorefrontHomePayload;
-  next.domOverrides = Object.assign(
-    {},
-    ...blocks.map((block) =>
-      block.props.domOverrides && typeof block.props.domOverrides === "object"
-        ? block.props.domOverrides
-        : {},
-    ),
-  ) as StorefrontHomePayload["domOverrides"];
-  const heroBlock = blocks.find((block) => block.id === IDS.hero);
-  const hero = heroBlock?.props;
-  if (hero) {
-    const lines = String(hero.title ?? "").split(/\r?\n/);
-    next.hero = {
-      ...next.hero,
-      line1: lines[0] ?? "",
-      line2: lines.slice(1).join(" "),
-      lead: String(hero.subtitle ?? ""),
-      imageUrl: String(hero.imageUrl ?? ""),
-      mediaType: hero.mediaType === "video" ? "video" : "image",
-      videoUrl: String(hero.videoUrl ?? ""),
-      ctaHref: String(hero.href ?? "/shop"),
-      ctaLabel: String(hero.ctaLabel ?? "Shop Now"),
-      showPrivacyLink: Boolean(hero.showPrivacyLink),
-      layout: hero.layout as StorefrontHomePayload["hero"]["layout"],
-      style: (hero.style ?? next.hero.style) as StorefrontHomePayload["hero"]["style"],
-    };
-  }
-  const tilesBlock = blocks.find((block) => block.id === IDS.tiles)?.props;
-  const tiles = tilesBlock?.tiles;
-  if (Array.isArray(tiles) && tiles.length >= 3)
-    next.tiles = tiles.slice(0, 3) as StorefrontHomePayload["tiles"];
-  if (tilesBlock?.layout) next.sectionLayout = { ...next.sectionLayout, tiles: tilesBlock.layout as StorefrontHomeSectionLayout };
-  const latest = blocks.find((block) => block.id === IDS.latest)?.props;
-  if (latest)
-    next.latestSection = {
-      title: String(latest.title ?? ""),
-      viewAllLabel: String(latest.viewAllLabel ?? ""),
-      viewAllHref: String(latest.viewAllHref ?? "/shop"),
-    };
-  if (latest?.layout) next.sectionLayout = { ...next.sectionLayout, latest: latest.layout as StorefrontHomeSectionLayout };
-  const newsletter = blocks.find((block) => block.id === IDS.newsletter)?.props;
-  if (newsletter)
-    next.newsletter = {
-      title: String(newsletter.heading ?? ""),
-      body: String(newsletter.subtitle ?? ""),
-      placeholder: String(newsletter.placeholder ?? "email@address.com"),
-      buttonLabel: String(newsletter.buttonLabel ?? "Subscribe"),
-    };
-  if (newsletter?.layout) next.sectionLayout = { ...next.sectionLayout, newsletter: newsletter.layout as StorefrontHomeSectionLayout };
-  return next;
 }
 
 export function StorefrontHomeVisualEditor({
@@ -158,24 +113,41 @@ export function StorefrontHomeVisualEditor({
   );
   const [payload, setPayload] = useState<StorefrontHomePayload | null>(null);
   const [blocks, setBlocks] = useState<CmsBlock[]>([]);
+  const [tree, setTree] = useState<CmsNode[]>([]);
+  const [mutations, setMutations] = useState<CmsMutationRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/admin/storefront-home")
-      .then(async (response) => {
-        const json = (await response.json()) as {
+    void Promise.all([
+      fetch("/api/admin/storefront-home"),
+      fetch("/api/admin/cms/pages?locale=en&slug=home"),
+    ])
+      .then(async ([legacyResponse, canonicalResponse]) => {
+        const legacyJson = (await legacyResponse.json()) as {
           data?: StorefrontHomePayload;
           error?: string;
           devMode?: boolean;
         };
-        if (!response.ok) throw new Error(json.error ?? response.statusText);
-        if (!cancelled && json.data) {
-          setDevMode(Boolean(json.devMode));
-          setPayload(json.data);
-          setBlocks(toBlocks(json.data));
+        if (!legacyResponse.ok) throw new Error(legacyJson.error ?? legacyResponse.statusText);
+        const canonicalJson = canonicalResponse.ok
+          ? ((await canonicalResponse.json()) as { data?: Array<{ tree?: CmsNode[] }> })
+          : { data: [] };
+        if (!cancelled && legacyJson.data) {
+          setDevMode(Boolean(legacyJson.devMode));
+          setPayload(legacyJson.data);
+          const canonicalTree = canonicalJson.data?.[0]?.tree;
+          if (canonicalTree?.length) {
+            setTree(canonicalTree);
+            setBlocks(cmsTreeToBlocks(canonicalTree));
+          } else {
+            // Legacy content is read only for first-run migration.
+            const legacyBlocks = toBlocks(legacyJson.data);
+            setBlocks(legacyBlocks);
+            setTree(cmsBlocksToTree(legacyBlocks));
+          }
         }
       })
       .catch((reason: unknown) => {
@@ -201,20 +173,25 @@ export function StorefrontHomeVisualEditor({
     setError(null);
     setSaved(false);
     try {
-      const response = await fetch("/api/admin/storefront-home", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fromBlocks(blocks, payload)),
+      const canonical = await fetch("/api/admin/cms/pages", {
+        method: "POST",
+        headers: { ...cmsMutationHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug: "home",
+          locale: "en",
+          page_type: "landing",
+          title: "Homepage",
+          status: "published",
+          tree,
+          blocks: cmsTreeToBlocks(tree),
+          mutations,
+        }),
       });
-      const json = (await response.json()) as {
-        data?: StorefrontHomePayload;
-        error?: string;
-      };
-      if (!response.ok) throw new Error(json.error ?? response.statusText);
-      if (json.data) {
-        setPayload(json.data);
-        setBlocks(toBlocks(json.data));
+      if (!canonical.ok) {
+        const canonicalJson = (await canonical.json().catch(() => ({}))) as { error?: string };
+        throw new Error(canonicalJson.error ?? "Unable to persist the canonical homepage tree");
       }
+      setBlocks(cmsTreeToBlocks(tree));
       setSaved(true);
     } catch (reason: unknown) {
       setError(
@@ -236,7 +213,11 @@ export function StorefrontHomeVisualEditor({
   return (
     <CmsPageBuilder
       value={blocks}
-      onChange={setBlocks}
+      onChange={(next) => {
+        setBlocks(next);
+        setTree(cmsBlocksToTree(next));
+      }}
+      onMutation={(mutation) => setMutations((current) => [...current, mutation])}
       disabled={!canWrite}
       immersive
       pageTitle="Homepage"

@@ -20,6 +20,7 @@ build/
 # Environment and secrets
 .env
 .env.*
+.env.local
 !.env.example
 !.env.sample
 !.env.template
@@ -59,6 +60,7 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+artifacts
 
 # Testing
 coverage/
@@ -119,3 +121,4 @@ yarn.lock
 bruno/
 **/__pycache__/
 **/__MACOSX/
+.env*

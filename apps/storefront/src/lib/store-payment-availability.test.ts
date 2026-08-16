@@ -32,3 +32,14 @@ test("Xendit requires both server credentials unless an active connection exists
     ["XENDIT", "COD"],
   );
 });
+
+test("local sandbox credentials enable direct Stripe and PayPal without a Nango row", () => {
+  assert.deepEqual(
+    filterConnectedPaymentProviders(
+      ["STRIPE", "PAYPAL", "COD"],
+      [],
+      { stripeConfigured: true, paypalConfigured: true, xenditConfigured: false },
+    ),
+    ["STRIPE", "PAYPAL", "COD"],
+  );
+});

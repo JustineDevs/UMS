@@ -1,5 +1,8 @@
 "use client";
 
+import {
+  cmsTreeToBlocks,
+} from "@universal-music-store/platform-data";
 import type {
   CmsBlock,
   StorefrontHomeSectionLayout,
@@ -21,6 +24,14 @@ type Props = {
 
 function draftHome(blocks: CmsBlock[], previous: StorefrontHomePayload) {
   const next = structuredClone(previous);
+  next.domOverrides = Object.assign(
+    {},
+    ...blocks.map((block) =>
+      block.props?.domOverrides && typeof block.props.domOverrides === "object"
+        ? block.props.domOverrides
+        : {},
+    ),
+  ) as StorefrontHomePayload["domOverrides"];
   const hero = blocks.find((block) => block.id === "home-hero")?.props;
   if (hero) {
     const lines = String(hero.title ?? "").split(/\r?\n/);
@@ -30,6 +41,8 @@ function draftHome(blocks: CmsBlock[], previous: StorefrontHomePayload) {
       line2: lines.slice(1).join(" "),
       lead: String(hero.subtitle ?? ""),
       imageUrl: String(hero.imageUrl ?? ""),
+      mediaType: hero.mediaType === "video" ? "video" : "image",
+      videoUrl: String(hero.videoUrl ?? ""),
       ctaHref: String(hero.href ?? "/shop"),
       ctaLabel: String(hero.ctaLabel ?? "Shop Now"),
       showPrivacyLink: Boolean(hero.showPrivacyLink),
@@ -39,8 +52,8 @@ function draftHome(blocks: CmsBlock[], previous: StorefrontHomePayload) {
   }
   const tilesBlock = blocks.find((block) => block.id === "home-tiles")?.props;
   const tiles = tilesBlock?.tiles;
-  if (Array.isArray(tiles) && tiles.length >= 3) {
-    next.tiles = tiles.slice(0, 3) as StorefrontHomePayload["tiles"];
+  if (Array.isArray(tiles)) {
+    next.tiles = tiles as StorefrontHomePayload["tiles"];
   }
   if (tilesBlock?.layout) next.sectionLayout = { ...next.sectionLayout, tiles: tilesBlock.layout as StorefrontHomeSectionLayout };
   const latest = blocks.find((block) => block.id === "home-latest")?.props;
@@ -110,7 +123,11 @@ export function StorefrontHomePreviewBridge({
       if (event.data?.source !== "cms-builder-draft" || event.data.mode !== "home") {
         return;
       }
-      const blocks = Array.isArray(event.data.blocks) ? event.data.blocks : [];
+      const blocks = Array.isArray(event.data.tree)
+        ? cmsTreeToBlocks(event.data.tree as Parameters<typeof cmsTreeToBlocks>[0])
+        : Array.isArray(event.data.blocks)
+          ? event.data.blocks
+          : [];
       setHome((current) => draftHome(blocks as CmsBlock[], current));
     };
     window.addEventListener("message", onMessage);

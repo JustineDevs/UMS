@@ -20,6 +20,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 import { useCallback, useEffect, useState } from "react";
 
 type NavPayload = CmsNavigationPayload;
@@ -767,7 +768,7 @@ export function CmsNavigationEditor() {
       const payload = getPayloadFromEditor();
       const r = await fetch("/api/admin/cms/navigation", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: cmsMutationHeaders(),
         body: JSON.stringify({ mode: "draft", payload }),
       });
       const j = (await r.json()) as {
@@ -801,7 +802,7 @@ export function CmsNavigationEditor() {
       }
       const r = await fetch("/api/admin/cms/navigation", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: cmsMutationHeaders(),
         body: JSON.stringify(payload),
       });
       const j = (await r.json()) as {
@@ -825,7 +826,7 @@ export function CmsNavigationEditor() {
     setError(null);
     setSaved(false);
     try {
-      const r = await fetch("/api/admin/cms/navigation/publish", { method: "POST" });
+      const r = await fetch("/api/admin/cms/navigation/publish", { method: "POST", headers: cmsMutationHeaders() });
       const j = (await r.json()) as {
         data?: NavPayload;
         meta?: { hasDraft?: boolean };

@@ -78,6 +78,20 @@ export async function createXenditPaymentSession(
   options: XenditClientOptions,
   input: XenditCreateSessionInput,
 ): Promise<XenditCreateSessionResult> {
+  for (const [name, value] of [
+    ["successUrl", input.successUrl],
+    ["cancelUrl", input.cancelUrl],
+  ] as const) {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error(`Xendit ${name} must be an absolute HTTPS URL.`);
+    }
+    if (url.protocol !== "https:") {
+      throw new Error(`Xendit ${name} must be an absolute HTTPS URL.`);
+    }
+  }
   const mode = input.mode ?? "PAYMENT_LINK";
   const sessionType = input.sessionType ?? "PAY";
   const body: Record<string, unknown> = {

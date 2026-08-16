@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 import { getServerSession } from "next-auth/next";
 import { AccountProfilePanel } from "@/components/AccountProfilePanel";
 import { authOptions } from "@/lib/auth";
@@ -195,7 +196,7 @@ export default async function AccountPage() {
                         View details
                       </Link>
                       <Link
-                        href={`/track/${order.id}`}
+                        href={buildTrackingUrl(process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN, order.id) ?? `/track/${order.id}`}
                         className="text-xs text-primary hover:underline"
                       >
                         Track

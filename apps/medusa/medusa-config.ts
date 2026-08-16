@@ -19,14 +19,18 @@ if (preservedNodeEnv === undefined) {
 validateMedusaProcessEnv();
 
 /** Hosted Stripe Checkout (checkout.sessions) — same provider id `pp_stripe_stripe` as the stock plugin. */
-const stripeManagedByNango = nangoPaymentProviderConfigured("stripe");
-const stripeProvider = stripeManagedByNango
+const directSandboxCredentialsAllowed = process.env.NODE_ENV !== "production";
+const stripeDirectConfigured =
+  directSandboxCredentialsAllowed && Boolean(process.env.STRIPE_API_KEY?.trim());
+const stripeManagedByNango =
+  !stripeDirectConfigured && nangoPaymentProviderConfigured("stripe");
+const stripeProvider = stripeManagedByNango || stripeDirectConfigured
   ? [
       {
         resolve: "./src/modules/stripe-checkout-payment",
         id: "stripe",
         options: {
-          apiKey: "",
+          apiKey: stripeManagedByNango ? "" : process.env.STRIPE_API_KEY,
           webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
           successUrl: process.env.STRIPE_CHECKOUT_SUCCESS_URL?.trim(),
           cancelUrl: process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim(),
@@ -43,16 +47,22 @@ const codProvider = [
   },
 ];
 
-const paypalManagedByNango = nangoPaymentProviderConfigured(["paypal", "paypal-sandbox"]);
+const paypalDirectConfigured = Boolean(
+  directSandboxCredentialsAllowed &&
+    process.env.PAYPAL_CLIENT_ID?.trim() &&
+    process.env.PAYPAL_CLIENT_SECRET?.trim(),
+);
+const paypalManagedByNango =
+  !paypalDirectConfigured && nangoPaymentProviderConfigured(["paypal", "paypal-sandbox"]);
 const paypalProvider =
-  paypalManagedByNango
+  paypalManagedByNango || paypalDirectConfigured
     ? [
         {
           resolve: "./src/modules/paypal-payment",
           id: "paypal",
           options: {
-            clientId: "",
-            clientSecret: "",
+            clientId: paypalManagedByNango ? "" : process.env.PAYPAL_CLIENT_ID,
+            clientSecret: paypalManagedByNango ? "" : process.env.PAYPAL_CLIENT_SECRET,
             sandbox:
               process.env.PAYPAL_ENVIRONMENT === "sandbox" ||
               nangoPaymentProviderConfigured("paypal-sandbox") ||

@@ -2,7 +2,7 @@ import {
   getMedusaStoreBaseUrl,
   getMedusaPublishableKey,
 } from "@/lib/storefront-medusa-env";
-import { applyRateLimit } from "@/lib/cart-api-helpers";
+import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { withBotIdProtection } from "@/lib/botid-protection";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +92,14 @@ async function handlePOST(req: Request) {
     const msg = e instanceof Error ? e.message : "Failed to apply promo code";
     return Response.json({ ok: false, error: msg, code: "REQUEST_FAILED" }, { status: 502 });
   }
+
+  const cookieCartId = await readCartIdFromCookie();
+  if (!cookieCartId || cookieCartId !== cartId) {
+    return Response.json(
+      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
+      { status: 403 },
+    );
+  }
 }
 
 /**
@@ -149,6 +157,14 @@ async function handleDELETE(req: Request) {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to remove promo code";
     return Response.json({ ok: false, error: msg, code: "REQUEST_FAILED" }, { status: 502 });
+  }
+
+  const cookieCartId = await readCartIdFromCookie();
+  if (!cookieCartId || cookieCartId !== cartId) {
+    return Response.json(
+      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
+      { status: 403 },
+    );
   }
 }
 

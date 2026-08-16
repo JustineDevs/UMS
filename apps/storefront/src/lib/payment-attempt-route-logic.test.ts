@@ -188,6 +188,105 @@ test("finalizeCheckoutIntentRouteLogic marks attempt completed on success", asyn
   assert.equal(events[0].outcome, "success");
 });
 
+test("finalizeCheckoutIntentRouteLogic rejects a duplicate finalization claim", async () => {
+  let finalized = false;
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_duplicate",
+    cartId: "cart_1",
+    row: {
+      cart_id: "cart_1",
+      correlation_id: "corr_duplicate",
+      provider: "stripe",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    claimFinalizeAttempt: async () => false,
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 409);
+  assert.deepEqual(result.body, {
+    error: "Checkout finalization is already in progress",
+  });
+  assert.equal(finalized, false);
+});
+
+test("finalizeCheckoutIntentRouteLogic replays a completed order idempotently", async () => {
+  let finalized = false;
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_completed",
+    cartId: "cart_1",
+    row: {
+      cart_id: "cart_1",
+      correlation_id: "corr_completed",
+      provider: "stripe",
+      status: "completed",
+      medusa_order_id: "order_existing",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    claimFinalizeAttempt: async () => {
+      throw new Error("must not claim a completed attempt");
+    },
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, {
+    ok: true,
+    orderId: "order_existing",
+    redirectUrl: "/track/order_existing",
+    replayed: true,
+  });
+  assert.equal(finalized, false);
+});
+
+test("finalizeCheckoutIntentRouteLogic fails closed when the finalization claim is unavailable", async () => {
+  let finalized = false;
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_claim_error",
+    cartId: "cart_1",
+    row: {
+      cart_id: "cart_1",
+      correlation_id: "corr_claim_error",
+      provider: "paypal",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    claimFinalizeAttempt: async () => {
+      throw new Error("ledger unavailable");
+    },
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 503);
+  assert.deepEqual(result.body, {
+    error: "Payment finalization is temporarily unavailable",
+  });
+  assert.equal(finalized, false);
+});
+
 test("finalizeCheckoutIntentRouteLogic rejects cart mismatch", async () => {
   const result = await finalizeCheckoutIntentRouteLogic({
     correlationId: "corr_1",
@@ -410,6 +509,39 @@ test("codPlaceOrderRouteLogic completes order exactly once per correlation", asy
   assert.equal(result.status, 200);
   assert.equal(result.body.orderId, "order_cod");
   assert.equal(patches[0].status, "completed");
+});
+
+test("codPlaceOrderRouteLogic replays a completed order idempotently", async () => {
+  let finalized = false;
+  const result = await codPlaceOrderRouteLogic({
+    correlationId: "corr_cod_completed",
+    cartId: "cart_cod",
+    row: {
+      cart_id: "cart_cod",
+      correlation_id: "corr_cod_completed",
+      provider: "cod",
+      status: "completed",
+      order_id: "order_cod_existing",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    claimFinalizeAttempt: async () => {
+      throw new Error("must not claim a completed attempt");
+    },
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.orderId, "order_cod_existing");
+  assert.equal(result.body.replayed, true);
+  assert.equal(finalized, false);
 });
 
 test("codPlaceOrderRouteLogic expires stale quote mismatches", async () => {

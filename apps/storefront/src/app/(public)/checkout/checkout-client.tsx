@@ -558,10 +558,11 @@ export function CheckoutClient({
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Stay in touch
             </h2>
-            <label className="block text-xs font-medium text-on-surface-variant mb-2">
+            <label htmlFor="checkout-email" className="block text-xs font-medium text-on-surface-variant mb-2">
               Email for your receipt
             </label>
             <input
+              id="checkout-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -688,7 +689,7 @@ export function CheckoutClient({
                 </p>
               )}
               {!medusaPricePreview?.cartId && !promoApplied && (
-                <p className="mt-1 text-xs text-on-surface-variant/60">
+                <p className="mt-1 text-xs text-on-surface-variant">
                   A Medusa cart must be initialised before a code can be
                   applied. The code field is active once your bag totals load.
                 </p>

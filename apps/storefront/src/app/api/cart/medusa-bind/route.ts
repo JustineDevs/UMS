@@ -6,14 +6,18 @@ import {
   applyRateLimit,
   parseJsonBody,
   isValidCartId,
+  readCartIdFromCookie,
   writeCartCookie,
 } from "@/lib/cart-api-helpers";
+import { validateCartSessionBinding } from "@/lib/cart-session-boundary";
+import { cookies } from "next/headers";
+import { verifyCartBindToken } from "@/lib/cart-session-boundary";
 
 async function handlePOST(req: Request) {
   const rl = await applyRateLimit(req, "cart-bind", 40, 60_000);
   if (!rl.ok) return rl.response;
 
-  const parsed = await parseJsonBody<{ cartId?: string }>(req);
+  const parsed = await parseJsonBody<{ cartId?: string; bindToken?: string }>(req);
   if (!parsed.ok) return parsed.response;
 
   const cartId = typeof parsed.data.cartId === "string" ? parsed.data.cartId.trim() : "";
@@ -21,14 +25,33 @@ async function handlePOST(req: Request) {
     return NextResponse.json({ error: "cartId required" }, { status: 400 });
   }
 
+  const cookieCartId = await readCartIdFromCookie();
+  const bindCookie = (await cookies()).get("cart_bind_nonce")?.value ?? "";
+  const bindToken = typeof parsed.data.bindToken === "string" ? parsed.data.bindToken : "";
+  const ownership = validateCartSessionBinding(cartId, cookieCartId);
+  if (!cookieCartId && (!bindCookie || bindCookie !== bindToken || !verifyCartBindToken(bindToken))) {
+    return NextResponse.json({ error: "Cart ownership could not be verified" }, { status: 403 });
+  }
+  if (ownership.status !== 200) {
+    return NextResponse.json(ownership.body, { status: ownership.status });
+  }
+
   try {
     const sdk = createStorefrontMedusaSdk();
-    await sdk.store.cart.retrieve(cartId, { fields: "id" } as never);
+    const { cart } = await sdk.store.cart.retrieve(cartId, { fields: "id,+metadata" } as never);
+    if (!cookieCartId && (cart as { metadata?: Record<string, unknown> }).metadata?.uvs_cart_bind_token !== bindToken) {
+      return NextResponse.json({ error: "Cart ownership could not be verified" }, { status: 403 });
+    }
   } catch {
     return NextResponse.json({ error: "Invalid cart" }, { status: 400 });
   }
 
   await writeCartCookie(cartId);
+
+  if (!cookieCartId) {
+    const jar = await cookies();
+    jar.delete("cart_bind_nonce");
+  }
 
   return NextResponse.json({ ok: true });
 }

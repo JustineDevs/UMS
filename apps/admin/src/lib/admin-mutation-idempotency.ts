@@ -3,6 +3,7 @@ import { checkStaffRole } from "@universal-music-store/database";
 import { adminSupabaseOr503 } from "./require-admin-supabase";
 import { getStaffSession } from "./requireStaffSession";
 import { resolveStaffOrganization } from "./staff-organization";
+import { insertStaffAuditLog } from "./staff-audit";
 import {
   claimAdminIdempotency,
   completeAdminIdempotency,
@@ -12,6 +13,22 @@ import {
 
 function errorResponse(error: string, code: string, status: number): Response {
   return NextResponse.json({ error, code }, { status });
+}
+
+async function auditMutation(
+  client: Parameters<typeof insertStaffAuditLog>[0],
+  email: string,
+  actionKey: string,
+  organizationId: string,
+  status: number,
+  outcome: "completed" | "failed",
+): Promise<void> {
+  await insertStaffAuditLog(client, {
+    actorEmail: email,
+    action: outcome === "completed" ? "cms_mutation_completed" : "cms_mutation_failed",
+    resource: "cms_mutation",
+    details: { action_key: actionKey, organization_id: organizationId, status, outcome },
+  });
 }
 
 /**
@@ -83,11 +100,13 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
     } catch {
       const failure = errorResponse("Mutation failed", "MUTATION_FAILED", 500);
       await completeAdminIdempotency(supabase.client, claim.id, failure.status, { error: "MUTATION_FAILED" });
+      await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, failure.status, "failed");
       return failure;
     }
     if (!response) {
       const failure = errorResponse("Mutation did not return a response", "MUTATION_NO_RESPONSE", 500);
       await completeAdminIdempotency(supabase.client, claim.id, failure.status, { error: "MUTATION_NO_RESPONSE" });
+      await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, failure.status, "failed");
       return failure;
     }
     let body: Record<string, unknown>;
@@ -100,6 +119,7 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
       body = { ok: response.ok };
     }
     await completeAdminIdempotency(supabase.client, claim.id, response.status, body);
+    await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, response.status, "completed");
     return response;
   };
   return wrapped as T;

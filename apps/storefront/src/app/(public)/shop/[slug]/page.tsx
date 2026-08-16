@@ -36,6 +36,7 @@ import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 /** ISR-style caching; live stock is enforced at Medusa checkout. */
 export const revalidate = 120;
+export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {
   const { fetchProductSlugsForSitemap } = await import("@/lib/catalog-fetch");
@@ -196,7 +197,7 @@ export default async function ProductPage({ params }: Props) {
             />
             <p className="text-xl font-body text-on-surface-variant">
               PHP {minPrice.toLocaleString("en-PH")}
-              <span className="ml-2 text-xs text-on-surface-variant/60 font-normal uppercase tracking-wider">VAT incl.</span>
+              <span className="ml-2 text-xs text-on-surface-variant font-normal uppercase tracking-wider">VAT incl.</span>
             </p>
             <div className="flex flex-wrap gap-3 pt-1 text-xs">
               <Link

@@ -7,11 +7,17 @@ import type {
   CmsPageBlockPresetRow,
 } from "@universal-music-store/platform-data";
 import {
-  blockFromComponentInstance,
+  getCmsComponentDefinition,
   componentInstanceFromBlock,
+  cmsBlocksToTree,
   listCmsComponentDefinitions,
+  resolveCmsComponentDefinition,
 } from "@universal-music-store/platform-data";
-import { cmsComponentDefinitionSchema } from "@/lib/cms-component-contract";
+import {
+  cmsComponentDefinitionSchema,
+  cmsPreviewMessageSchema,
+} from "@/lib/cms-component-contract";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { createPortal } from "react-dom";
@@ -49,6 +55,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
+import {
+  createCmsHistory,
+  recordCmsCommand,
+  redoCmsCommand,
+  undoCmsCommand,
+  moveCmsInstance,
+  type CmsHistory,
+} from "@/lib/cms-tree-commands";
 
 const BLOCK_TYPES = [
   {
@@ -128,9 +142,14 @@ type ComponentNode = {
   arrayIndex?: number;
   children?: ComponentNode[];
 };
+type CmsMutationShape =
+  | { type: "insert" | "remove" | "move"; nodeId?: string; parentId?: string | null; beforeParentId?: string | null; index?: number; slot?: string; node?: CmsBlock | CmsComponentInstance }
+  | { type: "set-prop" | "set-style"; nodeId: string; key: string; before?: unknown; after?: unknown }
+  | { type: "set-attribute" | "set-text" | "set-html"; nodeId: string; key?: string; before?: unknown; after?: unknown };
 const LABELS: Record<string, string> = Object.fromEntries(
   BLOCK_TYPES.map((b) => [b.type, b.label]),
 );
+LABELS.unknown_component = "Unknown component";
 
 function makeId() {
   return typeof crypto !== "undefined" && crypto.randomUUID
@@ -138,18 +157,109 @@ function makeId() {
     : `block_${Date.now()}`;
 }
 
+function mutationForBlocks(before: CmsBlock[], after: CmsBlock[]): CmsMutationShape {
+  const beforeIds = before.map((block) => block.id);
+  const afterIds = after.map((block) => block.id);
+  if (after.length === before.length && beforeIds.join("|") !== afterIds.join("|")) {
+    const moved = afterIds.find((id, index) => beforeIds[index] !== id);
+    return { type: "move", nodeId: moved, parentId: null, beforeParentId: null, index: moved ? afterIds.indexOf(moved) : undefined, node: after.find((block) => block.id === moved) };
+  }
+  if (after.length === before.length + 1) {
+    const node = after.find((block) => !beforeIds.includes(block.id));
+    return { type: "insert", nodeId: node?.id, parentId: null, index: node ? afterIds.indexOf(node.id) : undefined, node };
+  }
+  if (after.length + 1 === before.length) {
+    const node = before.find((block) => !afterIds.includes(block.id));
+    return { type: "remove", nodeId: node?.id, parentId: null, index: node ? beforeIds.indexOf(node.id) : undefined, node };
+  }
+  const beforeNodes = flattenCmsNodes(before);
+  const afterNodes = flattenCmsNodes(after);
+  const changed = afterNodes.find((node) => {
+    const old = beforeNodes.find((candidate) => candidate.id === node.id);
+    return old && JSON.stringify(old.props) !== JSON.stringify(node.props);
+  });
+  if (changed) {
+    const old = beforeNodes.find((node) => node.id === changed.id)!;
+    return { type: "set-prop", nodeId: changed.id, key: "__props", before: old.props, after: changed.props };
+  }
+  const styled = afterNodes.find((node) => {
+    const old = beforeNodes.find((candidate) => candidate.id === node.id);
+    return old && JSON.stringify(old.styles) !== JSON.stringify(node.styles);
+  });
+  if (styled) {
+    const old = beforeNodes.find((node) => node.id === styled.id)!;
+    return { type: "set-style", nodeId: styled.id, key: "__styles", before: old.styles, after: styled.styles };
+  }
+  return { type: "set-prop", nodeId: after[0]?.id ?? before[0]?.id ?? "", key: "__noop", before: null, after: null };
+}
+
+function flattenCmsNodes(blocks: CmsBlock[]) {
+  const nodes: Array<{ id: string; props: Record<string, unknown>; styles: Record<string, string> }> = [];
+  const visit = (instance: CmsComponentInstance) => {
+    nodes.push({ id: instance.id, props: instance.props, styles: instance.styleOverrides ?? {} });
+    Object.values(instance.slots ?? {}).flat().forEach(visit);
+  };
+  blocks.forEach((block) => {
+    nodes.push({ id: block.id, props: block.props, styles: block.styleOverrides ?? {} });
+    Object.values(block.slots ?? {}).flat().forEach(visit);
+  });
+  return nodes;
+}
+
+function findCmsNode(blocks: CmsBlock[], nodeId: string): CmsBlock | CmsComponentInstance | undefined {
+  for (const block of blocks) {
+    if (block.id === nodeId) return block;
+    const visit = (items: CmsComponentInstance[]): CmsComponentInstance | undefined => {
+      for (const item of items) {
+        if (item.id === nodeId) return item;
+        const nested = visit(Object.values(item.slots ?? {}).flat());
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+    const found = visit(Object.values(block.slots ?? {}).flat());
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function cmsMutationValue(blocks: CmsBlock[], mutation: CmsMutationShape, direction: "before" | "after") {
+  if (mutation.type !== "set-prop" && mutation.type !== "set-style") return undefined;
+  if (direction === "before" && mutation.before !== undefined) return mutation.before;
+  if (direction === "after" && mutation.after !== undefined) return mutation.after;
+  const node = findCmsNode(blocks, mutation.nodeId);
+  if (!node) return undefined;
+  if (mutation.type === "set-prop") return mutation.key === "__props" ? node.props : node.props[mutation.key];
+  return mutation.key === "__styles" ? ("type" in node ? node.styleOverrides ?? {} : node.styleOverrides ?? {}) : ("type" in node ? node.styleOverrides?.[mutation.key] : node.styleOverrides?.[mutation.key]);
+}
+
+function persistedCmsMutation(before: CmsBlock[], after: CmsBlock[], mutation?: CmsMutationShape): CmsMutationShape | undefined {
+  const next = mutation ?? mutationForBlocks(before, after);
+  if (!next) return undefined;
+  if (next.type === "set-prop" || next.type === "set-style") {
+    return {
+      ...next,
+      before: next.before ?? cmsMutationValue(before, next, "after"),
+      after: next.after ?? cmsMutationValue(after, next, "after"),
+    };
+  }
+  const structural = next as Extract<CmsMutationShape, { type: "insert" | "remove" | "move" }>;
+  if (structural.node || !structural.nodeId) return structural;
+  return { ...structural, node: findCmsNode(before, structural.nodeId) };
+}
+
 function defaults(type: string): Record<string, unknown> {
   switch (type) {
     case "storefront_header":
-      return { editorHref: "/admin/cms/navigation" };
+      return {};
     case "header_navigation":
-      return { editorHref: "/admin/cms/navigation" };
+      return {};
     case "header_actions":
-      return { editorHref: "/admin/cms/navigation" };
+      return {};
     case "storefront_footer":
-      return { editorHref: "/admin/cms/navigation" };
+      return {};
     case "footer_columns":
-      return { editorHref: "/admin/cms/navigation" };
+      return {};
     case "hero":
       return {
         title: "New hero",
@@ -214,8 +324,12 @@ function normalize(raw: unknown): CmsBlock[] {
       value && typeof value === "object"
         ? (value as Record<string, unknown>)
         : {};
-    const type =
-      typeof row.type === "string" && LABELS[row.type] ? row.type : "rich_text";
+    const requestedType = typeof row.type === "string" ? row.type : "";
+    const type = requestedType || "unknown_component";
+    const props =
+      row.props && typeof row.props === "object"
+        ? (row.props as Record<string, unknown>)
+        : defaults(type);
     return {
       ...row,
       id: typeof row.id === "string" && row.id ? row.id : makeId(),
@@ -234,9 +348,9 @@ function normalize(raw: unknown): CmsBlock[] {
           ? (row.styleOverrides as Record<string, string>)
           : undefined,
       props:
-        row.props && typeof row.props === "object"
-          ? (row.props as Record<string, unknown>)
-          : defaults(type),
+        type === "unknown_component"
+          ? { ...props, originalType: requestedType || "unknown", originalNode: row }
+          : props,
     } as CmsBlock;
   });
 }
@@ -244,10 +358,6 @@ function normalize(raw: unknown): CmsBlock[] {
 function text(value: unknown, fallback = "") {
   return String(value ?? fallback);
 }
-function plainHtml(value: unknown) {
-  return sanitizeCmsHtml(text(value));
-}
-
 function escapeHtml(value: unknown) {
   return text(value).replace(
     /[&<>\"']/g,
@@ -262,145 +372,33 @@ function escapeHtml(value: unknown) {
   );
 }
 
-function layoutStyle(props: Record<string, unknown>) {
-  const raw = props.layout;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "";
-  const layout = raw as Record<string, unknown>;
-  const safe = (key: string) => {
-    const value = text(layout[key]).trim();
-    return /^[0-9a-zA-Z.#%(),/\-\s]+$/.test(value) ? value : "";
-  };
-  const styles = [
-    ["max-width", safe("maxWidth")],
-    ["min-height", safe("minHeight")],
-    ["padding-block", safe("paddingBlock")],
-    ["padding-inline", safe("paddingInline")],
-    ["margin-block", safe("marginBlock")],
-    ["margin-inline", safe("marginInline")],
-    ["display", safe("display")],
-    ["position", safe("position")],
-    ["inset", safe("inset")],
-    ["font-size", safe("fontSize")],
-    ["font-weight", safe("fontWeight")],
-    ["color", safe("color")],
-    ["background-color", safe("backgroundColor")],
-    ["border-radius", safe("borderRadius")],
-  ].filter(([, value]) => value);
-  return styles.length
-    ? ` style="${styles.map(([key, value]) => `${key}:${escapeHtml(value)}`).join(";")}"`
-    : "";
+function resolvedComponentProps(
+  definition: CmsComponentDefinition | undefined,
+  variantId: string | undefined,
+  props: Record<string, unknown>,
+) {
+  const defaults = Object.fromEntries(
+    (definition?.props ?? [])
+      .filter((item) => item.defaultValue !== undefined)
+      .map((item) => [item.key, item.defaultValue]),
+  );
+  const variant = definition?.variants.find(
+    (item) => item.id === (variantId ?? definition.defaultVariantId),
+  );
+  return { ...defaults, ...(variant?.props ?? {}), ...props };
 }
 
-function blockHtml(block: CmsBlock): string {
-  const p = block.props;
-  const id = escapeHtml(block.id);
-  const label = escapeHtml(LABELS[block.type] ?? block.type);
-  const componentId = escapeHtml(
-    block.componentId ?? block.type.replaceAll("_", "-"),
+function instanceOverrides(
+  definition: CmsComponentDefinition | undefined,
+  variantId: string | undefined,
+  props: Record<string, unknown>,
+) {
+  const inherited = resolvedComponentProps(definition, variantId, {});
+  return Object.fromEntries(
+    Object.entries(props).filter(
+      ([key, value]) => JSON.stringify(value) !== JSON.stringify(inherited[key]),
+    ),
   );
-  const variantId = escapeHtml(block.variantId ?? "default");
-  const slots = Object.entries(block.slots ?? {})
-    .map(
-      ([slot, items]) =>
-        `<div data-cms-slot="${escapeHtml(slot)}" data-cms-id="${escapeHtml(`${block.id}::slot::${slot}`)}" data-cms-label="${escapeHtml(slot)}">${items.map((item) => blockHtml(blockFromComponentInstance(item))).join("")}</div>`,
-    )
-    .join("");
-  const wrap = (content: string, className = "") =>
-    annotateMarkup(
-      block,
-      `<section data-cms-id="${id}" data-cms-label="${label}" data-cms-component-id="${componentId}" data-cms-variant="${variantId}" class="cms-node ${className}"${layoutStyle(p)}>${content}${slots}</section>`,
-    );
-  switch (block.type) {
-    case "storefront_header":
-    case "header_navigation":
-    case "header_actions":
-    case "storefront_footer":
-    case "footer_columns":
-      return "";
-    case "hero":
-      return wrap(
-        `<div class="hero-inner"${p.imageUrl && p.mediaType !== "video" ? ` style="background-image:linear-gradient(90deg,rgba(2,6,23,.94),rgba(2,6,23,.38)),url('${escapeHtml(p.imageUrl)}')"` : ""}>${p.mediaType === "video" && p.videoUrl ? `<video class="hero-media" src="${escapeHtml(p.videoUrl)}" autoplay muted loop playsinline></video>` : ""}<div class="hero-copy"><span class="eyebrow">Featured collection</span><h2>${escapeHtml(p.title || "New hero")}</h2><p>${escapeHtml(p.subtitle || "Add a short introduction")}</p><a href="${escapeHtml(p.href || "#")}">${escapeHtml(p.ctaLabel || "Learn more")}</a></div></div>`,
-        "hero",
-      );
-    case "rich_text":
-      return wrap(
-        `<div class="rich-text">${plainHtml(p.html) || "<p class='muted'>Start writing...</p>"}</div>`,
-      );
-    case "image":
-      return wrap(
-        p.src
-          ? `<figure><img src="${escapeHtml(p.src)}" alt="${escapeHtml(p.alt)}"><figcaption>${escapeHtml(p.alt || "Image")}</figcaption></figure>`
-          : `<div class="placeholder">Add an image URL</div>`,
-      );
-    case "two_column":
-      return wrap(
-        `<div class="two-column ${p.reverse ? "reverse" : ""}"><div class="rich-text">${plainHtml(p.html) || "<p>Tell your story here.</p>"}</div><div class="media-placeholder">${p.imageUrl ? `<img src="${escapeHtml(p.imageUrl)}" alt="${escapeHtml(p.imageAlt)}">` : "Image column"}</div></div>`,
-      );
-    case "cta_row":
-      return wrap(
-        `<div class="cta-row"><a href="${escapeHtml(p.href || "#")}">${escapeHtml(p.label || "Continue")}</a></div>`,
-      );
-    case "trust_strip":
-      return wrap(
-        `<div class="trust-strip">${[1, 2, 3].map((i) => `<div><strong>${escapeHtml(p[`col${i}Title`] || "Trust point")}</strong><span>${escapeHtml(p[`col${i}Body`] || "Add supporting detail")}</span></div>`).join("")}</div>`,
-      );
-    case "contact_strip":
-      return wrap(
-        `<div class="contact-strip"><span>${escapeHtml(p.phone || "Phone")}</span><span>${escapeHtml(p.email || "Email")}</span><span>${escapeHtml(p.hours || "Business hours")}</span></div>`,
-      );
-    case "newsletter":
-      return wrap(
-        `<div class="newsletter"><h2>${escapeHtml(p.heading || "Stay in the loop")}</h2><p>${escapeHtml(p.subtitle || "Subscribe for updates")}</p><div class="newsletter-form"><span>Email address</span><b>Subscribe</b></div></div>`,
-      );
-    case "featured_products":
-      return wrap(
-        `<div class="featured"><h3>Featured products</h3><div class="product-grid">${[1, 2, 3, 4].map((i) => `<div><span></span><small>Product ${i}</small></div>`).join("")}</div></div>`,
-      );
-    case "home_tiles":
-      return wrap(
-        `<div class="home-tiles" style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.8fr);gap:12px;padding:12px">${(Array.isArray(
-          p.tiles,
-        )
-          ? p.tiles
-          : []
-        )
-          .map((item) => {
-            const tile =
-              item && typeof item === "object"
-                ? (item as Record<string, unknown>)
-                : {};
-            return `<div class="home-tile ${escapeHtml(tile.variant || "large")}" style="min-height:150px;display:grid;align-content:end;gap:5px;padding:22px;border-radius:10px;background-color:#334155;color:#fff;${tile.imageUrl ? `background-image:linear-gradient(90deg,rgba(15,23,42,.82),rgba(15,23,42,.25)),url('${escapeHtml(tile.imageUrl)}')` : ""}"><strong>${escapeHtml(tile.title || "Category")}</strong><span style="color:rgba(255,255,255,.78)">${escapeHtml(tile.subtitle || "Explore the collection")}</span><a href="${escapeHtml(tile.href || "#")}" style="color:#fff;text-decoration:underline;text-underline-offset:3px">${escapeHtml(tile.linkLabel || "Shop now")}</a></div>`;
-          })
-          .join("")}</div>`,
-      );
-    case "latest_section":
-      return wrap(
-        `<div class="latest"><div><strong>${escapeHtml(p.title || "THE LATEST DROPS")}</strong><a href="${escapeHtml(p.viewAllHref || "/shop")}">${escapeHtml(p.viewAllLabel || "View All Products")}</a></div><div class="product-grid">${[1, 2, 3, 4].map((i) => `<div><span></span><small>Latest product ${i}</small></div>`).join("")}</div></div>`,
-      );
-    case "faq":
-      return wrap(
-        `<div class="faq">${(Array.isArray(p.items) ? p.items : [])
-          .slice(0, 6)
-          .map((item) => {
-            const row =
-              item && typeof item === "object"
-                ? (item as Record<string, unknown>)
-                : {};
-            return `<details><summary>${escapeHtml(row.q || "Question")}</summary><div>${plainHtml(row.a) || "Answer"}</div></details>`;
-          })
-          .join("")}</div>`,
-      );
-    case "video":
-      return wrap(
-        `<div class="video"><span>${escapeHtml(p.title || "Video preview")}</span><small>${escapeHtml(p.url || "Add a video URL")}</small></div>`,
-      );
-    case "divider":
-      return wrap(
-        `<div style="height:${Math.max(16, Number(p.heightPx) || 24)}px" class="divider"></div>`,
-      );
-    default:
-      return wrap(`<div class="placeholder">${label}</div>`);
-  }
 }
 
 function componentChildId(block: CmsBlock, key: string) {
@@ -563,276 +561,151 @@ function updateComponentInstances(
   });
 }
 
-function childAttrs(block: CmsBlock, key: string, label: string) {
-  return ` data-cms-id="${escapeHtml(componentChildId(block, key))}" data-cms-label="${escapeHtml(label)}"`;
-}
-
-function annotateMarkup(block: CmsBlock, markup: string) {
-  const attr = (key: string, label: string) => childAttrs(block, key, label);
-  switch (block.type) {
-    case "hero":
-      return markup
-        .replace(
-          '<span class="eyebrow">',
-          '<span class="eyebrow"' + attr("eyebrow", "Eyebrow") + ">",
-        )
-        .replace("<h2>", "<h2" + attr("title", "Headline") + ">")
-        .replace("<p>", "<p" + attr("subtitle", "Supporting text") + ">")
-        .replace("<a href=", "<a" + attr("cta", "Primary action") + " href=");
-    case "rich_text":
-      return markup.replace(
-        '<div class="rich-text">',
-        '<div class="rich-text"' + attr("content", "Text content") + ">",
-      );
-    case "image":
-      return markup
-        .replace("<figure>", "<figure" + attr("media", "Image") + ">")
-        .replace(
-          "<figcaption>",
-          "<figcaption" + attr("caption", "Caption") + ">",
-        );
-    case "two_column":
-      return markup
-        .replace(
-          '<div class="rich-text">',
-          '<div class="rich-text"' + attr("content", "Text content") + ">",
-        )
-        .replace(
-          '<div class="media-placeholder">',
-          '<div class="media-placeholder"' + attr("media", "Image") + ">",
-        );
-    case "cta_row":
-      return markup.replace(
-        "<a href=",
-        "<a" + attr("action", "Action") + " href=",
-      );
-    case "contact_strip":
-      return markup
-        .replace("<span>", "<span" + attr("phone", "Phone") + ">")
-        .replace("<span>", "<span" + attr("email", "Email") + ">")
-        .replace("<span>", "<span" + attr("hours", "Business hours") + ">");
-    case "home_tiles": {
-      let index = 0;
-      return markup
-        .replace(
-          '<div class="home-tiles"',
-          '<div class="home-tiles"' + attr("grid", "Tile grid"),
-        )
-        .replace(/<div class="home-tile /g, () => {
-          const value =
-            "<div" +
-            attr(`tile-${index}`, `Category tile ${index + 1}`) +
-            ' class="home-tile ';
-          index += 1;
-          return value;
-        });
-    }
-    case "newsletter":
-      return markup
-        .replace("<h2>", "<h2" + attr("heading", "Signup heading") + ">")
-        .replace(
-          '<div class="newsletter-form">',
-          '<div class="newsletter-form"' + attr("form", "Signup form") + ">",
-        );
-    case "featured_products":
-      return markup
-        .replace("<h3>", "<h3" + attr("heading", "Section heading") + ">")
-        .replace(
-          '<div class="product-grid">',
-          '<div class="product-grid"' + attr("grid", "Product grid") + ">",
-        );
-    case "latest_section":
-      return markup
-        .replace(
-          "<div><strong>",
-          "<div" + attr("header", "Section heading") + "><strong>",
-        )
-        .replace(
-          '<div class="product-grid">',
-          '<div class="product-grid"' + attr("products", "Product grid") + ">",
-        );
-    case "video":
-      return markup.replace(
-        '<div class="video">',
-        '<div class="video"' + attr("player", "Video player") + ">",
-      );
-    case "divider":
-      return markup.replace(
-        'class="divider"',
-        'class="divider"' + attr("spacer", "Spacer"),
-      );
-    case "faq": {
-      let index = 0;
-      return markup.replace(/<details>/g, () => {
-        const value =
-          "<details" + attr(`question-${index}`, `Question ${index + 1}`) + ">";
-        index += 1;
-        return value;
+function removeInstanceFromSlots(
+  slots: Record<string, CmsComponentInstance[]>,
+  id: string,
+): { slots: Record<string, CmsComponentInstance[]>; removed: CmsComponentInstance | null } {
+  let removed: CmsComponentInstance | null = null;
+  const next = Object.fromEntries(
+    Object.entries(slots).map(([slot, items]) => {
+      if (removed) return [slot, items];
+      const directIndex = items.findIndex((item) => item.id === id);
+      if (directIndex >= 0) {
+        removed = items[directIndex];
+        return [slot, items.filter((_, index) => index !== directIndex)];
+      }
+      const children = items.map((item) => {
+        if (removed) return item;
+        const result = removeInstanceFromSlots(item.slots ?? {}, id);
+        if (result.removed) removed = result.removed;
+        return result.removed ? { ...item, slots: result.slots } : item;
       });
-    }
-    default:
-      return markup;
-  }
-}
-
-function canvasDocument(pageBody: string, blocks: CmsBlock[]) {
-  const body = blocks.map(blockHtml).join("");
-  return `<!doctype html><html><head><meta charset="utf-8"><style>
-    *{box-sizing:border-box}html,body{margin:0;background:#fff;color:#1e293b;font:14px/1.5 ui-sans-serif,system-ui,sans-serif}body{min-height:100vh}.sitebar{height:46px;border-bottom:1px solid #e2e8f0;padding:0 28px;display:flex;align-items:center;justify-content:space-between;color:#475569;font-size:12px}.sitebar nav{display:flex;gap:22px;color:#94a3b8;font-size:11px}.page{padding:14px;display:grid;gap:12px}.cms-node{position:relative;cursor:pointer;border:2px solid transparent;transition:border-color .15s,box-shadow .15s}.cms-node:hover{border-color:#93c5fd}.cms-node[data-selected="true"]{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb22}.cms-node:after{content:attr(data-cms-label);display:none;position:absolute;top:-21px;left:-2px;background:#2563eb;color:#fff;padding:2px 7px;border-radius:4px 4px 0 0;font:600 10px/16px ui-sans-serif}.cms-node[data-selected="true"]:after{display:block}.hero{overflow:hidden;background:#020617;color:#fff}.hero-inner{position:relative;min-height:270px;padding:54px 54px;display:flex;align-items:center;background-position:center;background-size:cover}.hero-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.62}.hero-copy{position:relative;z-index:1}.hero h2{font-size:34px;line-height:1.05;margin:12px 0 10px;max-width:560px}.hero p{color:#cbd5e1;max-width:460px}.hero a,.cta-row a{display:inline-block;margin-top:18px;border-radius:999px;background:#fff;color:#0f172a;padding:9px 17px;font-weight:600;text-decoration:none;font-size:12px}.eyebrow{color:#94a3b8;text-transform:uppercase;letter-spacing:.18em;font-size:10px;font-weight:700}.rich-text{padding:28px 34px}.rich-text h1,.rich-text h2,.rich-text h3{margin-top:0}.two-column{display:grid;grid-template-columns:1fr 1fr;gap:22px;padding:28px 34px;align-items:center}.two-column.reverse .rich-text{order:2}.media-placeholder,.placeholder{min-height:150px;display:grid;place-items:center;border-radius:10px;background:#f1f5f9;color:#94a3b8}.media-placeholder img,figure img{display:block;width:100%;height:100%;min-height:180px;object-fit:cover;border-radius:10px}.trust-strip,.contact-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:24px;background:#f8fafc}.trust-strip div{display:grid;gap:5px}.trust-strip span{color:#64748b;font-size:12px}.contact-strip{background:#fff;padding:25px 34px}.cta-row{padding:28px;text-align:center}.newsletter{padding:38px 34px;background:#0f172a;color:#fff}.newsletter h2{margin:0}.newsletter p{color:#94a3b8}.newsletter-form{display:flex;justify-content:space-between;max-width:440px;border:1px solid #334155;color:#94a3b8;padding:10px 12px;border-radius:7px}.newsletter-form b{color:#0f172a;background:#fff;padding:3px 9px;border-radius:4px;font-size:11px}.featured{padding:28px 34px}.featured h3{margin:0}.product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:15px}.product-grid div{border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}.product-grid span{display:block;height:90px;background:#f1f5f9}.product-grid small{display:block;padding:10px;color:#64748b}.faq{padding:25px 34px}.faq details{padding:12px 0;border-bottom:1px solid #e2e8f0}.faq summary{font-weight:600;cursor:pointer}.faq details div{padding-top:8px;color:#64748b}.video{aspect-ratio:16/7;display:grid;place-items:center;background:#0f172a;color:#e2e8f0}.video small{color:#94a3b8}.divider{border-top:1px dashed #cbd5e1}.muted{color:#94a3b8}@media(max-width:600px){.sitebar{padding:0 16px}.sitebar nav{display:none}.hero-inner{padding:38px 25px}.hero h2{font-size:28px}.two-column,.trust-strip,.contact-strip{grid-template-columns:1fr}.two-column.reverse .rich-text{order:0}.product-grid{grid-template-columns:repeat(2,1fr)}}
-  .latest{padding:28px 34px}.latest>div:first-child{display:flex;justify-content:space-between;align-items:center}.latest a{color:#2563eb;font-size:12px}.home-tiles{display:grid;grid-template-columns:1.35fr .8fr;gap:12px;padding:12px}.home-tile{min-height:150px;display:grid;align-content:end;gap:5px;padding:22px;border-radius:10px;background:#e2e8f0;background-position:center;background-size:cover;color:#fff}.home-tile.wide{grid-column:1/-1}.home-tile span{color:#cbd5e1;font-size:12px}.home-tile a{color:#fff;font-size:11px;text-decoration:underline}@media(max-width:600px){.home-tiles{grid-template-columns:1fr}.home-tile.wide{grid-column:auto}}
-  </style></head><body><header class="sitebar cms-node" data-cms-id="storefront-header" data-cms-label="Storefront navbar"><strong>Storefront</strong><nav data-cms-id="header-navigation" data-cms-label="Header navigation"><span>Home</span><span>Catalog</span><span>About</span><span>Contact</span></nav><span data-cms-id="header-actions" data-cms-label="Header actions">Account · Bag</span></header><main class="page">${pageBody ? `<article class="cms-node" data-cms-id="page-body" data-cms-label="Page body"><div class="rich-text">${plainHtml(pageBody)}</div></article>` : ""}${body}${!pageBody && !body ? `<div class="placeholder" style="min-height:520px">Drop a section here or add one from Components</div>` : ""}</main><footer class="muted cms-node" data-cms-id="storefront-footer" data-cms-label="Storefront footer" style="padding:28px 34px;border-top:1px solid #f1f5f9"><div data-cms-id="footer-columns" data-cms-label="Footer columns">Storefront footer columns</div></footer><script>function parentOrigin(){try{return document.referrer?new URL(document.referrer).origin:window.location.origin}catch(e){return window.location.origin}}function nodeRect(n){var r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}}function sendNode(source,n){parent.postMessage({source:source,id:n?n.dataset.cmsId:null,label:n?n.dataset.cmsLabel:null,rect:n?nodeRect(n):null},parentOrigin())}function selectNode(id,notify){document.querySelectorAll('[data-cms-id]').forEach(function(x){x.dataset.selected=x.dataset.cmsId===id?'true':'false'});var n=id?document.querySelector('[data-cms-id="'+CSS.escape(id)+'"]'):null;if(n&&n.dataset.selected!=='true')n.scrollIntoView({block:'nearest'});if(notify)sendNode('cms-builder',n)}document.addEventListener('pointerover',function(e){var n=e.target.closest('[data-cms-id]');if(n)sendNode('cms-builder-hover',n)},true);document.addEventListener('pointerout',function(e){if(!e.relatedTarget||!e.relatedTarget.closest||!e.relatedTarget.closest('[data-cms-id]'))sendNode('cms-builder-hover',null)},true);document.addEventListener('click',function(e){var n=e.target.closest('[data-cms-id]');if(!n)return;e.preventDefault();selectNode(n.dataset.cmsId,true)},true);window.addEventListener('scroll',function(){var n=document.querySelector('[data-cms-id][data-selected="true"]');if(n)sendNode('cms-builder',n)},true);window.addEventListener('resize',function(){var n=document.querySelector('[data-cms-id][data-selected="true"]');if(n)sendNode('cms-builder',n)});window.addEventListener('message',function(e){if(e.source!==parent||e.origin!==parentOrigin()||!e.data||e.data.source!=='cms-builder-select')return;selectNode(e.data.id,false)});parent.postMessage({source:'cms-preview-ready'},parentOrigin());</script></body></html>`;
-}
-
-function canvasEditorRuntime(blocks: CmsBlock[]) {
-  const overrides = Object.fromEntries(
-    blocks.flatMap((block) => {
-      const value = block.props.domOverrides;
-      return value && typeof value === "object" && !Array.isArray(value)
-        ? [[block.id, value]]
-        : [];
+      return [slot, children];
     }),
-  );
-  const payload = JSON.stringify(overrides).replace(/</g, "\\u003c");
-  return `<script>(function(){var overrides=${payload};var allowedStyle={display:1,position:1,width:1,height:1,margin:1,padding:1,color:1,"background-color":1,"font-size":1,"font-weight":1,"border-radius":1};function origin(){try{return document.referrer?new URL(document.referrer).origin:window.location.origin}catch(e){return window.location.origin}}function blockId(id){return id&&id.indexOf("::")>-1?id.split("::")[0]:id}function node(id){return id?document.querySelector('[data-cms-id="'+CSS.escape(id)+'"]'):null}function rect(n){var r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height}}function send(source,n){if(!n){parent.postMessage({source:source,id:null},origin());return}var id=n.dataset.cmsId||"",anchor=n instanceof HTMLAnchorElement?n:n.closest("a[href]"),media=n instanceof HTMLImageElement?n:n.closest("img[src]"),style={};Object.keys(allowedStyle).forEach(function(k){var v=n.style.getPropertyValue(k);if(v)style[k]=v});parent.postMessage({source:source,id:id,blockId:blockId(id),label:n.dataset.cmsLabel||id,tagName:n.tagName.toLowerCase(),text:n.children.length===0?(n.textContent||"").slice(0,2000):"",href:anchor?anchor.href:"",src:media?media.src:"",style:style,rect:rect(n)},origin())}function apply(){Object.keys(overrides).forEach(function(b){var map=overrides[b]||{};Object.keys(map).forEach(function(id){var n=node(id);if(!n)return;Object.keys(map[id]||{}).forEach(function(prop){var v=String(map[id][prop]??"");if(prop==="textContent"&&n.children.length===0)n.textContent=v;else if(prop==="href"&&n instanceof HTMLAnchorElement)n.href=v;else if(prop==="src"&&n instanceof HTMLImageElement)n.src=v;else if(prop.indexOf("style.")===0&&allowedStyle[prop.slice(6)])n.style.setProperty(prop.slice(6),v)})})})}var selected=null;apply();document.addEventListener("click",function(e){var n=e.target.closest&&e.target.closest("[data-cms-id]");if(!n)return;selected=n;send("cms-builder",n)},true);window.addEventListener("message",function(e){if(e.source!==parent||e.origin!==origin()||!e.data||e.data.source!=="cms-builder-dom-edit")return;var n=selected;if(!n||e.data.id!==n.dataset.cmsId)return;var prop=e.data.prop,value=typeof e.data.value==="string"?e.data.value:"";if(value.length>100000)return;if(prop==="textContent"&&n.children.length===0)n.textContent=value;else if(prop==="href"&&n instanceof HTMLAnchorElement&&/^(https?:|\\/|#)/i.test(value))n.href=value;else if(prop==="src"&&n instanceof HTMLImageElement&&/^(https?:|\\/|data:image\\/)/i.test(value))n.src=value;else if(prop.indexOf("style.")===0&&allowedStyle[prop.slice(6)])n.style.setProperty(prop.slice(6),value);else return;parent.postMessage({source:"cms-builder-dom-mutation",id:n.dataset.cmsId,blockId:blockId(n.dataset.cmsId),prop:prop,value:value},origin());send("cms-builder",n)},false);window.addEventListener("scroll",function(){if(selected)send("cms-builder",selected)},true);window.addEventListener("resize",function(){if(selected)send("cms-builder",selected)});})();</script>`;
+  ) as Record<string, CmsComponentInstance[]>;
+  return { slots: next, removed };
 }
 
+function insertInstanceIntoSlots(
+  slots: Record<string, CmsComponentInstance[]>,
+  ownerId: string,
+  slotName: string,
+  child: CmsComponentInstance,
+  index: number,
+): { slots: Record<string, CmsComponentInstance[]>; inserted: boolean } {
+  let inserted = false;
+  const next = Object.fromEntries(
+    Object.entries(slots).map(([slot, items]) => {
+      const children = items.map((item) => {
+        if (inserted) return item;
+        if (item.id === ownerId) {
+          const target = [...(item.slots?.[slotName] ?? [])];
+          target.splice(Math.max(0, Math.min(index, target.length)), 0, child);
+          inserted = true;
+          return { ...item, slots: { ...item.slots, [slotName]: target } };
+        }
+        const result = insertInstanceIntoSlots(item.slots ?? {}, ownerId, slotName, child, index);
+        if (result.inserted) inserted = true;
+        return result.inserted ? { ...item, slots: result.slots } : item;
+      });
+      return [slot, children];
+    }),
+  ) as Record<string, CmsComponentInstance[]>;
+  return { slots: next, inserted };
+}
+
+function _moveInstanceBetweenSlots(
+  blocks: CmsBlock[],
+  sourceBlockId: string,
+  instanceId: string,
+  targetOwnerId: string,
+  targetSlot: string,
+  targetIndex: number,
+): CmsBlock[] {
+  const sourceBlock = blocks.find((block) => block.id === sourceBlockId);
+  if (!sourceBlock) return blocks;
+  const removed = removeInstanceFromSlots(sourceBlock.slots ?? {}, instanceId);
+  if (!removed.removed) return blocks;
+  let inserted = false;
+  const nextBlocks = blocks.map((block) => {
+    if (block.id === sourceBlockId) {
+      const sourceSlots = removed.slots;
+      if (targetOwnerId === sourceBlockId) {
+        const target = [...(sourceSlots[targetSlot] ?? [])];
+        target.splice(Math.max(0, Math.min(targetIndex, target.length)), 0, removed.removed!);
+        inserted = true;
+        return { ...block, slots: { ...sourceSlots, [targetSlot]: target } };
+      }
+      const result = insertInstanceIntoSlots(sourceSlots, targetOwnerId, targetSlot, removed.removed!, targetIndex);
+      if (result.inserted) {
+        inserted = true;
+        return { ...block, slots: result.slots };
+      }
+      return block;
+    }
+    if (targetOwnerId !== block.id) {
+      const target = insertInstanceIntoSlots(block.slots ?? {}, targetOwnerId, targetSlot, removed.removed!, targetIndex);
+      if (target.inserted) {
+        inserted = true;
+        return { ...block, slots: target.slots };
+      }
+      return block;
+    }
+    const target = [...(block.slots?.[targetSlot] ?? [])];
+    target.splice(Math.max(0, Math.min(targetIndex, target.length)), 0, removed.removed!);
+    inserted = true;
+    return { ...block, slots: { ...block.slots, [targetSlot]: target } };
+  });
+  return inserted ? nextBlocks : blocks;
+}
+
+
+function componentCanvasDocument(
+  block: CmsBlock,
+  suppliedDefinition?: CmsComponentDefinition,
+) {
+  const definition = suppliedDefinition ?? getCmsComponentDefinition(block.componentId ?? block.type);
+  const props = resolvedComponentProps(definition, block.variantId, block.props ?? {});
+  const escape = (value: unknown) => escapeHtml(String(value ?? ""));
+  const generatedFields = (definition?.props ?? [])
+    .filter((item) => item.type === "text" || item.type === "rich-text" || item.type === "url")
+    .slice(0, 8)
+    .map((item) => {
+      const value = escape(props[item.key]);
+      const content = `<p data-cms-prop="${escape(item.key)}" contenteditable="true">${value}</p>`;
+      return `<div><small>${escape(item.label)}</small>${item.type === "url" ? `<a data-cms-prop="${escape(item.key)}" href="${value}" contenteditable="true">${value}</a>` : content}</div>`;
+    })
+    .join("");
+  const markup = definition?.markup?.trim()
+    ? sanitizeCmsHtml(definition.markup)
+    : `<section data-cms-node="${escape(block.id)}">${generatedFields || `<h2 data-cms-prop="name" contenteditable="true">${escape(definition?.name ?? block.type)}</h2>`}</section>`;
+  const styles = String(definition?.styles ?? "")
+    .replace(/<\/style/gi, "")
+    .replace(/@import[^;]+;?/gi, "")
+    .replace(/url\s*\([^)]*\)/gi, "none");
+  const serializedProps = JSON.stringify(props).replace(/</g, "\\u003c");
+  const serializedSlots = JSON.stringify(definition?.slots ?? []).replace(/</g, "\\u003c");
+  const rootMarkup = markup.includes("data-cms-node")
+    ? markup
+    : `<div data-cms-node="${escape(block.id)}">${markup}</div>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:24px;font:14px/1.5 system-ui;color:#172033;background:#f8fafc}[data-cms-node]{min-height:32px;outline:1px solid #d9e0ea;outline-offset:3px}[data-cms-slot]{margin-top:16px;padding:18px;border:2px dashed #93c5fd;border-radius:8px;display:grid;gap:4px;color:#475569}${styles}</style></head><body>${rootMarkup}<script>const blockId=${JSON.stringify(block.id)};const props=${serializedProps};const slots=${serializedSlots};const targetOrigin=()=>{try{return document.referrer?new URL(document.referrer).origin:location.origin}catch{return location.origin}};const emit=(payload)=>parent.postMessage({source:'cms-component-canvas-mutation',id:blockId,...payload},targetOrigin());document.querySelectorAll('[data-cms-prop]').forEach((node)=>{const key=node.dataset.cmsProp;if(props[key]!==undefined&&node.innerHTML!==props[key]&&node.children.length===0)node.textContent=String(props[key]);if(node.matches('[contenteditable=true]'))node.addEventListener('input',()=>emit({property:key,value:node.innerHTML}));});const root=document.querySelector('[data-cms-node]');slots.forEach((slot)=>{if(!root.querySelector('[data-cms-slot="'+CSS.escape(slot.name)+'"]')){const drop=document.createElement('div');drop.dataset.cmsSlot=slot.name;drop.dataset.cmsNode=blockId+'::slot::'+slot.name;drop.tabIndex=0;drop.innerHTML='<strong>'+String(slot.label||slot.name)+'</strong><span>Drop a component here</span>';drop.addEventListener('dragover',(event)=>{event.preventDefault();drop.dataset.dragover='true'});drop.addEventListener('dragleave',()=>delete drop.dataset.dragover);drop.addEventListener('drop',(event)=>{event.preventDefault();delete drop.dataset.dragover;const componentId=event.dataTransfer&&event.dataTransfer.getData('application/x-cms-component-id');if(componentId)emit({event:'slot-drop',slot:slot.name,componentId})});root.append(drop);}});emit({event:'ready'});</script></body></html>`;
+}
 const PROPERTY_KEYS: Record<string, string[]> = {
-  storefront_header: ["editorHref"],
-  header_navigation: ["editorHref"],
-  header_actions: ["editorHref"],
-  storefront_footer: ["editorHref"],
-  footer_columns: ["editorHref"],
   hero: ["title", "subtitle", "imageUrl", "mediaType", "videoUrl", "href", "ctaLabel"],
-  rich_text: ["html"],
-  image: ["src", "alt"],
-  two_column: ["html", "imageUrl", "imageAlt", "reverse"],
-  cta_row: ["label", "href"],
-  trust_strip: [
-    "col1Title",
-    "col1Body",
-    "col2Title",
-    "col2Body",
-    "col3Title",
-    "col3Body",
-  ],
-  contact_strip: ["phone", "email", "hours"],
-  newsletter: ["heading", "subtitle", "actionUrl"],
-  featured_products: ["slugs"],
-  home_tiles: ["tiles"],
-  latest_section: ["title", "viewAllLabel", "viewAllHref"],
-  faq: ["items"],
-  video: ["url", "title"],
-  divider: ["heightPx"],
+  rich_text: ["html"], image: ["src", "alt"], two_column: ["html", "imageUrl", "imageAlt", "reverse"],
+  cta_row: ["label", "href"], trust_strip: ["col1Title", "col1Body", "col2Title", "col2Body", "col3Title", "col3Body"],
+  contact_strip: ["phone", "email", "hours"], newsletter: ["heading", "subtitle", "actionUrl"],
+  featured_products: ["slugs"], home_tiles: ["tiles"], latest_section: ["title", "viewAllLabel", "viewAllHref"],
+  faq: ["items"], video: ["url", "title"], divider: ["heightPx"],
 };
 
 function propertyLabel(key: string) {
-  return key
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (value) => value.toUpperCase())
-    .replace(/^Col(\d)/, "Column $1");
+  return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase()).replace(/^Col(\d)/, "Column $1");
 }
 
 function componentChildren(block: CmsBlock): ComponentNode[] {
-  const child = (
-    key: string,
-    label: string,
-    propertyKey?: string,
-    arrayIndex?: number,
-  ): ComponentNode => ({
-    id: componentChildId(block, key),
-    label,
-    blockId: block.id,
-    depth: 1,
-    propertyKey,
-    arrayIndex,
-  });
-  switch (block.type) {
-    case "hero":
-      return [
-        child("image", "Hero image", "imageUrl"),
-        child("eyebrow", "Eyebrow"),
-        child("title", "Headline", "title"),
-        child("subtitle", "Supporting text", "subtitle"),
-        child("cta", "Primary action", "ctaLabel"),
-        child("partners", "Partner marquee"),
-      ];
-    case "home_tiles":
-      return [
-        child("grid", "Tile grid", "tiles"),
-        ...[0, 1, 2].map((index) =>
-          child(`tile-${index}`, `Category tile ${index + 1}`, "tiles", index),
-        ),
-      ];
-    case "latest_section":
-      return [
-        child("header", "Section heading", "title"),
-        child("products", "Product grid"),
-      ];
-    case "newsletter":
-      return [
-        child("heading", "Signup heading", "heading"),
-        child("form", "Signup form", "actionUrl"),
-      ];
-    case "rich_text":
-      return [child("content", "Text content", "html")];
-    case "image":
-      return [
-        child("media", "Image", "src"),
-        child("caption", "Caption", "alt"),
-      ];
-    case "two_column":
-      return [
-        child("content", "Text content", "html"),
-        child("media", "Image", "imageUrl"),
-      ];
-    case "cta_row":
-      return [child("action", "Action", "label")];
-    case "trust_strip":
-      return [1, 2, 3].flatMap((index) => [
-        child(`column-${index}`, `Trust point ${index}`, `col${index}Title`),
-        child(`column-${index}-body`, `Trust point ${index} body`, `col${index}Body`),
-      ]);
-    case "contact_strip":
-      return [
-        child("phone", "Phone", "phone"),
-        child("email", "Email", "email"),
-        child("hours", "Business hours", "hours"),
-      ];
-    case "featured_products":
-      return [
-        child("heading", "Section heading"),
-        child("grid", "Product grid", "slugs"),
-      ];
-    case "faq":
-      return (Array.isArray(block.props.items) ? block.props.items : [])
-        .slice(0, 6)
-        .flatMap((_, index) => [
-          child(`question-${index}`, `Question ${index + 1}`, "items", index),
-          child(`answer-${index}`, `Answer ${index + 1}`, "items", index),
-        ]);
-    case "video":
-      return [
-        child("player", "Video player", "url"),
-        child("title", "Video title", "title"),
-      ];
-    case "divider":
-      return [child("spacer", "Spacer", "heightPx")];
-    case "payment_link":
-      return [
-        child("provider", "Payment provider"),
-        child("title", "Payment title"),
-        child("description", "Payment description"),
-        child("action", "Payment action"),
-      ];
-    case "header_navigation":
-    case "header_actions":
-    case "storefront_header":
-    case "storefront_footer":
-    case "footer_columns":
-      return [];
-    default:
-      return [];
-  }
+  const child = (key: string, label: string, propertyKey?: string, arrayIndex?: number): ComponentNode => ({ id: componentChildId(block, key), label, blockId: block.id, depth: 1, propertyKey, arrayIndex });
+  return (PROPERTY_KEYS[block.type] ?? []).map((key) => child(key, propertyLabel(key), key));
 }
 
 function buildComponentTree(blocks: CmsBlock[]): ComponentNode[] {
@@ -1006,14 +879,20 @@ function LayoutFields({
   block,
   disabled,
   onChange,
+  onAccessibilityChange,
 }: {
   block: CmsBlock;
   disabled: boolean;
   onChange: (_layout: Record<string, unknown>) => void;
+  onAccessibilityChange: (_accessibility: Record<string, unknown>) => void;
 }) {
   const layout =
     block.props.layout && typeof block.props.layout === "object"
       ? (block.props.layout as Record<string, unknown>)
+      : {};
+  const accessibility =
+    block.props.accessibility && typeof block.props.accessibility === "object"
+      ? (block.props.accessibility as Record<string, unknown>)
       : {};
   const fields = [
     ["maxWidth", "Max width"],
@@ -1030,6 +909,14 @@ function LayoutFields({
     ["color", "Text color"],
     ["backgroundColor", "Background"],
     ["borderRadius", "Radius"],
+    ["gap", "Gap"],
+    ["gridTemplateColumns", "Grid columns"],
+    ["alignItems", "Align items"],
+    ["justifyContent", "Justify content"],
+    ["boxShadow", "Shadow"],
+    ["backgroundImage", "Background image"],
+    ["backgroundSize", "Background size"],
+    ["backgroundPosition", "Background position"],
   ] as const;
   return (
     <details className="rounded border border-slate-200" open>
@@ -1051,6 +938,37 @@ function LayoutFields({
             />
           </label>
         ))}
+        <label className="col-span-2 text-[10px] text-slate-500">
+          Semantic element
+          <select
+            className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+            value={text(accessibility.semanticTag, "section")}
+            onChange={(event) =>
+              onAccessibilityChange({ ...accessibility, semanticTag: event.target.value })
+            }
+            disabled={disabled}
+          >
+            {['div', 'section', 'article', 'header', 'nav', 'main', 'aside', 'footer'].map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+        </label>
+        {['ariaLabel', 'ariaDescription', 'role', 'tabIndex'].map((key) => (
+          <label key={key} className="text-[10px] text-slate-500">
+            {propertyLabel(key)}
+            <input
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={text(accessibility[key])}
+              onChange={(event) =>
+                onAccessibilityChange({ ...accessibility, [key]: event.target.value })
+              }
+              disabled={disabled}
+            />
+          </label>
+        ))}
+        <p className="col-span-2 text-[10px] leading-4 text-slate-400">
+          Responsive overrides are stored with the component instance and applied by the storefront preview.
+        </p>
       </div>
     </details>
   );
@@ -1058,20 +976,25 @@ function LayoutFields({
 
 function BlockPropertyFields({
   block,
+  definition,
   disabled,
   onChange,
   focus,
   onPickMedia,
 }: {
   block: CmsBlock;
+  definition?: CmsComponentDefinition;
   disabled: boolean;
   onChange: (_key: string, _value: unknown) => void;
   focus?: Pick<ComponentNode, "propertyKey" | "arrayIndex">;
   onPickMedia?: (_key: string) => void;
 }) {
+  const registryProps = definition?.props ?? [];
   const keys = focus?.propertyKey
     ? [focus.propertyKey]
-    : (PROPERTY_KEYS[block.type] ?? []);
+    : registryProps.length
+      ? registryProps.map((item) => item.key)
+      : (PROPERTY_KEYS[block.type] ?? []);
   if (!keys.length)
     return (
       <p className="text-xs text-slate-500">
@@ -1081,6 +1004,7 @@ function BlockPropertyFields({
   return (
     <div className="space-y-3">
       {keys.map((key) => {
+        const registryProp = registryProps.find((item) => item.key === key);
         const rawValue = block.props[key];
         const value =
           focus?.arrayIndex !== undefined && Array.isArray(rawValue)
@@ -1134,7 +1058,7 @@ function BlockPropertyFields({
             }
             return (
               <label key={key} className="block text-[11px] text-slate-500">
-                {propertyLabel(key)}
+                {registryProp?.label ?? propertyLabel(key)}
                 <textarea
                   className="mt-1 min-h-24 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
                   value={JSON.stringify(value ?? {}, null, 2)}
@@ -1164,13 +1088,13 @@ function BlockPropertyFields({
                 onChange={(event) => onChange(key, event.target.checked)}
                 disabled={disabled}
               />
-              {propertyLabel(key)}
+                {registryProp?.label ?? propertyLabel(key)}
             </label>
           );
         if (Array.isArray(value))
           return (
             <label key={key} className="block text-[11px] text-slate-500">
-              {propertyLabel(key)}
+              {registryProp?.label ?? propertyLabel(key)}
               <textarea
                 className="mt-1 min-h-24 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
                 value={JSON.stringify(value, null, 2)}
@@ -1194,7 +1118,7 @@ function BlockPropertyFields({
         if (key === "mediaType")
           return (
             <label key={key} className="block text-[11px] text-slate-500">
-              Hero media type
+              {registryProp?.label ?? "Hero media type"}
               <select
                 className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
                 value={text(value, "image")}
@@ -1208,7 +1132,7 @@ function BlockPropertyFields({
           );
         return (
           <label key={key} className="block text-[11px] text-slate-500">
-            {propertyLabel(key)}
+            {registryProp?.label ?? propertyLabel(key)}
             {multiline ? (
               <textarea
                 className="mt-1 min-h-20 w-full rounded border border-slate-200 bg-white p-2 text-xs text-slate-700"
@@ -1300,11 +1224,13 @@ export function CmsPageBuilder({
   onClose,
   immersive = false,
   previewMode = "page",
+  onMutation,
 }: {
   value: unknown;
   onChange: (_blocks: CmsBlock[]) => void;
+  onMutation?: (_mutation: CmsMutationShape) => void;
   disabled: boolean;
-  previewUrl?: string;
+  previewUrl: string;
   pages?: BuilderPage[];
   currentPageId?: string;
   onSelectPage?: (_id: string) => void;
@@ -1343,12 +1269,11 @@ export function CmsPageBuilder({
   const [zoom, setZoom] = useState(100);
   const [fullscreen, setFullscreen] = useState(false);
   const [rightTab, setRightTab] = useState<
-    "content" | "style" | "advanced" | "code" | "settings"
+    "content" | "layout" | "style" | "responsive" | "advanced" | "code" | "settings"
   >(
     "content",
   );
-  const [history, setHistory] = useState<CmsBlock[][]>([]);
-  const [future, setFuture] = useState<CmsBlock[][]>([]);
+  const [history, setHistory] = useState<CmsHistory>(() => createCmsHistory());
   const [presets, setPresets] = useState<CmsPageBlockPresetRow[]>([]);
   const [presetId, setPresetId] = useState("");
   const [presetName, setPresetName] = useState("");
@@ -1359,7 +1284,9 @@ export function CmsPageBuilder({
     () => listCmsComponentDefinitions(),
   );
   const [componentVersions, setComponentVersions] = useState<Record<string, number>>({});
+  const [componentStatuses, setComponentStatuses] = useState<Record<string, string>>({});
   const [canvasDraft, setCanvasDraft] = useState("");
+  const [canvasVariantId, setCanvasVariantId] = useState<string | null>(null);
   const [canvasSavePending, setCanvasSavePending] = useState(false);
   const [hoveredPreview, setHoveredPreview] = useState<PreviewTarget | null>(
     null,
@@ -1376,6 +1303,13 @@ export function CmsPageBuilder({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const canvasScrollRef = useRef<HTMLElement>(null);
+  const canvasVisualRef = useRef<HTMLIFrameElement>(null);
+  const addInstanceToSlotRef = useRef<((_slot: string, _componentId: string) => void) | null>(null);
+  const blocksRef = useRef(blocks);
+  const componentNodesRef = useRef<ComponentNode[]>([]);
+  const commitRef = useRef<((..._args: [CmsBlock[], string?, CmsMutationShape?]) => void) | null>(null);
+  const previewOriginRef = useRef("");
+  const zoomRef = useRef(zoom);
   const componentTree = useMemo(() => buildComponentTree(blocks), [blocks]);
   const componentNodes = useMemo(
     () => flattenComponentTree(componentTree),
@@ -1407,11 +1341,15 @@ export function CmsPageBuilder({
             id: selectedInstance.id,
             componentId: selectedInstance.componentId,
             variantId: selectedInstance.variantId,
-            props: selectedInstance.props,
+            props: resolvedComponentProps(
+              resolveCmsComponentDefinition(componentDefinitions, selectedInstance.componentId),
+              selectedInstance.variantId,
+              selectedInstance.props,
+            ),
             slots: selectedInstance.slots,
           }
         : selected,
-    [selected, selectedInstance],
+    [componentDefinitions, selected, selectedInstance],
   );
   const selectedPreviewFocus = useMemo<ComponentNode | undefined>(() => {
     if (
@@ -1451,18 +1389,18 @@ export function CmsPageBuilder({
     const id =
       selectedEditorBlock?.componentId ??
       selectedEditorBlock?.type.replaceAll("_", "-");
-    return componentDefinitions.find((definition) => definition.id === id);
+    return id ? resolveCmsComponentDefinition(componentDefinitions, id) : undefined;
   }, [componentDefinitions, selectedEditorBlock]);
-  const canvasDefinition = componentDefinitions.find(
-    (definition) => definition.id === componentCanvasId,
-  );
+  const canvasDefinition = componentCanvasId
+    ? resolveCmsComponentDefinition(componentDefinitions, componentCanvasId)
+    : undefined;
   useEffect(() => {
     const controller = new AbortController();
     void fetch("/api/admin/cms/components", { signal: controller.signal })
       .then(async (response) => {
         const payload = (await response.json().catch(() => null)) as {
           data?: CmsComponentDefinition[];
-          meta?: { records?: Array<{ id: string; version: number }> };
+          meta?: { records?: Array<{ id: string; version: number; status?: string }> };
         } | null;
         if (!response.ok || !payload?.data?.length) return;
         setComponentDefinitions(payload.data);
@@ -1471,13 +1409,105 @@ export function CmsPageBuilder({
             (payload.meta?.records ?? []).map((record) => [record.id, record.version]),
           ),
         );
+        setComponentStatuses(
+          Object.fromEntries(
+            (payload.meta?.records ?? []).map((record) => [record.id, record.status ?? "draft"]),
+          ),
+        );
       })
       .catch(() => undefined);
     return () => controller.abort();
   }, []);
   useEffect(() => {
     setCanvasDraft(canvasDefinition ? JSON.stringify(canvasDefinition, null, 2) : "");
+    setCanvasVariantId(canvasDefinition?.defaultVariantId ?? canvasDefinition?.variants[0]?.id ?? null);
   }, [canvasDefinition]);
+  const canvasDraftDefinition = useMemo<CmsComponentDefinition | null>(() => {
+    try {
+      const parsed = JSON.parse(canvasDraft) as unknown;
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as CmsComponentDefinition)
+        : canvasDefinition ?? null;
+    } catch {
+      return canvasDefinition ?? null;
+    }
+  }, [canvasDefinition, canvasDraft]);
+  const canvasVisualBlock = useMemo<CmsBlock | null>(() => {
+    if (!canvasDraftDefinition) return null;
+    const variantId = canvasVariantId ?? canvasDraftDefinition.defaultVariantId ?? canvasDraftDefinition.variants[0]?.id ?? "default";
+    return {
+      id: `canvas-${canvasDraftDefinition.id}-${variantId}`,
+      type: canvasDraftDefinition.id.replaceAll("-", "_"),
+      componentId: canvasDraftDefinition.id,
+      variantId,
+      props: resolvedComponentProps(canvasDraftDefinition, variantId, {}),
+      slots: Object.fromEntries(
+        canvasDraftDefinition.slots.map((slot) => [slot.name, []]),
+      ),
+    };
+  }, [canvasDraftDefinition, canvasVariantId]);
+  const updateCanvasVisualProp = useCallback((key: string, value: string) => {
+    if (!canvasDefinition || !canvasVisualBlock) return;
+    let raw: unknown;
+    try {
+      raw = JSON.parse(canvasDraft);
+    } catch {
+      return;
+    }
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+    const definition = raw as CmsComponentDefinition;
+    const variantId = canvasVisualBlock.variantId ?? definition.defaultVariantId ?? definition.variants[0]?.id;
+    const variant = definition.variants.find((item) => item.id === variantId);
+    if (!variant || !definition.props.some((item) => item.key === key)) return;
+    variant.props = { ...(variant.props ?? {}), [key]: value };
+    setCanvasDraft(JSON.stringify(definition, null, 2));
+  }, [canvasDefinition, canvasDraft, canvasVisualBlock]);
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const frame = canvasVisualRef.current?.contentWindow;
+      if (!frame || event.source !== frame || (event.origin !== window.location.origin && event.origin !== "null")) return;
+      if (!event.data || event.data.source !== "cms-component-canvas-mutation") return;
+      if (
+        event.data.event === "slot-drop" &&
+        typeof event.data.slot === "string" &&
+        typeof event.data.componentId === "string"
+      ) {
+        addInstanceToSlotRef.current?.(event.data.slot, event.data.componentId);
+        return;
+      }
+      if (typeof event.data.property !== "string" || typeof event.data.value !== "string") return;
+      updateCanvasVisualProp(event.data.property, event.data.value);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [updateCanvasVisualProp]);
+  useEffect(() => {
+    const frame = canvasVisualRef.current;
+    if (!frame) return;
+    let document: Document | null = null;
+    let onInput: ((event: Event) => void) | null = null;
+    const bind = () => {
+      if (document || !frame.contentDocument?.body) return;
+      document = frame.contentDocument;
+      onInput = (event: Event) => {
+        const target = event.target instanceof HTMLElement
+          ? event.target.closest<HTMLElement>("[data-cms-prop]")
+          : null;
+        if (target?.dataset.cmsProp) updateCanvasVisualProp(target.dataset.cmsProp, target.innerText);
+      };
+      document.oninput = onInput;
+      document.onblur = onInput;
+    };
+    const timer = window.setInterval(bind, 50);
+    bind();
+    return () => {
+      window.clearInterval(timer);
+      if (document && onInput) {
+        if (document.oninput === onInput) document.oninput = null;
+        if (document.onblur === onInput) document.onblur = null;
+      }
+    };
+  }, [updateCanvasVisualProp]);
   const saveCanvasDefinition = useCallback(async () => {
     let raw: unknown;
     try {
@@ -1495,10 +1525,7 @@ export function CmsPageBuilder({
     try {
       const response = await fetch("/api/admin/cms/components", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "Idempotency-Key": globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${parsed.data.id}`,
-        },
+        headers: cmsMutationHeaders(),
         body: JSON.stringify({
           definition: parsed.data,
           ...(componentVersions[parsed.data.id]
@@ -1533,19 +1560,57 @@ export function CmsPageBuilder({
       setCanvasSavePending(false);
     }
   }, [canvasDraft, componentVersions]);
+  const publishCanvasDefinition = useCallback(async () => {
+    if (!canvasDefinition) return;
+    const version = componentVersions[canvasDefinition.id];
+    if (!version) {
+      setMessage("Save the definition before publishing it.");
+      return;
+    }
+    setCanvasSavePending(true);
+    try {
+      const response = await fetch(`/api/admin/cms/components/${encodeURIComponent(canvasDefinition.id)}`, {
+        method: "POST",
+        headers: cmsMutationHeaders(),
+        body: JSON.stringify({ action: "publish", expectedVersion: version }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        data?: { version?: number; definition?: CmsComponentDefinition };
+      } | null;
+      if (!response.ok || !payload?.data) {
+        setMessage(response.status === 409 ? "Definition changed elsewhere. Reload before publishing." : "Unable to publish component definition.");
+        return;
+      }
+      const published = payload.data.definition ?? canvasDefinition;
+      setComponentDefinitions((current) => current.map((item) => (item.id === published.id ? published : item)));
+      setComponentVersions((current) => ({ ...current, [published.id]: payload.data?.version ?? version }));
+      setComponentStatuses((current) => ({ ...current, [published.id]: "published" }));
+      setCanvasDraft(JSON.stringify(published, null, 2));
+      setMessage("Component definition published.");
+    } finally {
+      setCanvasSavePending(false);
+    }
+  }, [canvasDefinition, componentVersions]);
 
   const commit = useCallback(
-    (next: CmsBlock[], select?: string) => {
-      setHistory((current) => [...current.slice(-19), blocks]);
-      setFuture([]);
+    (next: CmsBlock[], select?: string, mutation?: CmsMutationShape) => {
+      const persistedMutation = persistedCmsMutation(blocks, next, mutation);
+      setHistory((current) => recordCmsCommand(current, blocks, next, persistedMutation));
       onChange(next);
+      if (persistedMutation) onMutation?.(persistedMutation);
       if (select) {
         setSelectedId(select);
         setSelectedComponentId(select);
       }
     },
-    [blocks, onChange],
+    [blocks, onChange, onMutation],
   );
+  useEffect(() => {
+    blocksRef.current = blocks;
+    componentNodesRef.current = componentNodes;
+    commitRef.current = commit;
+    zoomRef.current = zoom;
+  }, [blocks, componentNodes, commit, zoom]);
   useEffect(() => {
     if (!selectedId || !blocks.some((b) => b.id === selectedId)) {
       const next = blocks[0]?.id ?? null;
@@ -1573,14 +1638,6 @@ export function CmsPageBuilder({
       if (r.ok) setPresets(j.data ?? []);
     });
   }, []);
-  const documentHtml = useMemo(
-    () =>
-      canvasDocument(pageBody ?? "", blocks).replace(
-        "</body></html>",
-        `${canvasEditorRuntime(blocks)}</body></html>`,
-      ),
-    [blocks, pageBody],
-  );
   const previewOrigin = useMemo(() => {
     if (typeof window === "undefined") return "";
     if (!previewUrl) return window.location.origin;
@@ -1590,6 +1647,9 @@ export function CmsPageBuilder({
       return window.location.origin;
     }
   }, [previewUrl]);
+  useEffect(() => {
+    previewOriginRef.current = previewOrigin;
+  }, [previewOrigin]);
   const sendDomMutation = (property: string, value: string) => {
     const target = selectedPreview;
     if (!target || (!target.id.startsWith("cms-dom-") && !target.id.includes("::"))) return;
@@ -1619,7 +1679,7 @@ export function CmsPageBuilder({
       if (!frame || !canvas) return rect;
       const frameRect = frame.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
-      const scale = zoom / 100;
+      const scale = zoomRef.current / 100;
       const frameScaleX = frame.clientWidth
         ? frameRect.width / frame.clientWidth
         : scale;
@@ -1678,31 +1738,60 @@ export function CmsPageBuilder({
     ) => {
       const frame = iframeRef.current;
       if (!frame || event.source !== frame.contentWindow) return;
-      if (!previewOrigin || event.origin !== previewOrigin) return;
-      const { source, id, blockId, rect, label } = event.data ?? {};
+      if (!previewOriginRef.current || event.origin !== previewOriginRef.current) return;
+      const parsedMessage = cmsPreviewMessageSchema.safeParse(event.data);
+      if (!parsedMessage.success) return;
+      const data = parsedMessage.data as {
+        source: string;
+        id?: string | null;
+        blockId?: string | null;
+        label?: string;
+        rect?: PreviewTarget["rect"];
+        prop?: string;
+        value?: string;
+        tagName?: string;
+        text?: string;
+        href?: string;
+        src?: string;
+        style?: Record<string, string>;
+        parentId?: string | null;
+        propertyKey?: string | null;
+        arrayIndex?: number | null;
+      };
+      const { source, id, blockId, rect, label } = data;
       if (source === "cms-preview-ready") {
         previewReadyRef.current = true;
         sendDraftRef.current?.();
         return;
       }
       if (source === "cms-builder-mutation") {
-        const property = typeof event.data?.prop === "string" ? event.data.prop : "";
-        const value = typeof event.data?.value === "string" ? event.data.value : "";
+        const property = typeof data.prop === "string" ? data.prop : "";
+        const value = typeof data.value === "string" ? data.value : "";
         if (!id || !property || property.length > 80 || value.length > 100_000) return;
-        const next = applyPreviewMutation(blocks, id, property, value);
-        if (next !== blocks) {
-          commit(next, id.split("::", 1)[0]);
+        const next = applyPreviewMutation(blocksRef.current, id, property, value);
+        if (next !== blocksRef.current) {
+          commitRef.current?.(next, id.split("::", 1)[0], {
+            type: "set-prop",
+            nodeId: id,
+            key: property,
+            after: value,
+          });
           setMessage("Canvas change recorded.");
         }
         return;
       }
       if (source === "cms-builder-dom-mutation") {
-        const property = typeof event.data?.prop === "string" ? event.data.prop : "";
-        const value = typeof event.data?.value === "string" ? event.data.value : "";
+        const property = typeof data.prop === "string" ? data.prop : "";
+        const value = typeof data.value === "string" ? data.value : "";
         if (!id || !blockId || !property || value.length > 100_000) return;
-        const next = applyDomMutation(blocks, blockId, id, property, value);
-        if (next !== blocks) {
-          commit(next, blockId);
+        const next = applyDomMutation(blocksRef.current, blockId, id, property, value);
+        if (next !== blocksRef.current) {
+          commitRef.current?.(next, blockId, {
+            type: "set-style",
+            nodeId: id,
+            key: property,
+            after: value,
+          });
           setMessage("Live element change recorded.");
         }
         return;
@@ -1713,7 +1802,7 @@ export function CmsPageBuilder({
           setHoveredPreview((current) => (current ? null : current));
           return;
         }
-        const target = { id, label: label ?? id, rect, tagName: event.data.tagName, text: event.data.text, href: event.data.href, src: event.data.src, style: event.data.style, parentId: event.data.parentId, propertyKey: event.data.propertyKey, arrayIndex: event.data.arrayIndex };
+        const target = { id, label: label ?? id, rect, tagName: data.tagName, text: data.text, href: data.href, src: data.src, style: data.style, parentId: data.parentId, propertyKey: data.propertyKey, arrayIndex: data.arrayIndex };
         rawHoveredPreviewRef.current = target;
         const mapped = toCanvasRect(rect);
         setHoveredPreview((current) => {
@@ -1730,7 +1819,7 @@ export function CmsPageBuilder({
       }
       if (source !== "cms-builder" || !id) return;
       if (rect) {
-        const target = { id, label: label ?? id, rect, tagName: event.data.tagName, text: event.data.text, href: event.data.href, src: event.data.src, style: event.data.style, parentId: event.data.parentId, propertyKey: event.data.propertyKey, arrayIndex: event.data.arrayIndex };
+        const target = { id, label: label ?? id, rect, tagName: data.tagName, text: data.text, href: data.href, src: data.src, style: data.style, parentId: data.parentId, propertyKey: data.propertyKey, arrayIndex: data.arrayIndex };
         rawPreviewRef.current = target;
         const mapped = toCanvasRect(rect);
         const key = `${id}:${Math.round(mapped.x)}:${Math.round(mapped.y)}:${Math.round(mapped.width)}:${Math.round(mapped.height)}`;
@@ -1747,13 +1836,13 @@ export function CmsPageBuilder({
           return { ...target, rect: mapped };
         });
       }
-      const component = componentNodes.find((node) => node.id === id);
+      const component = componentNodesRef.current.find((node) => node.id === id);
       const resolvedBlockId =
-        blockId && blocks.some((block) => block.id === blockId)
+        blockId && blocksRef.current.some((block) => block.id === blockId)
           ? blockId
           :
         component?.blockId ??
-        (blocks.some((block) => block.id === id) ? id : null);
+        (blocksRef.current.some((block) => block.id === id) ? id : null);
       if (!resolvedBlockId) return;
       setSelectedId((current) => (current === resolvedBlockId ? current : resolvedBlockId));
       setSelectedComponentId((current) => (current === id ? current : id));
@@ -1774,6 +1863,12 @@ export function CmsPageBuilder({
     };
     scrollContainer?.addEventListener("scroll", remeasure, { passive: true });
     window.addEventListener("resize", remeasure);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(remeasure);
+    resizeObserver?.observe(iframeRef.current as Element);
+    if (canvasScrollRef.current) resizeObserver?.observe(canvasScrollRef.current);
+    const visualViewport = window.visualViewport;
+    visualViewport?.addEventListener("resize", remeasure);
+    visualViewport?.addEventListener("scroll", remeasure);
     return () => {
       if (remeasureFrameRef.current !== null) {
         window.cancelAnimationFrame(remeasureFrameRef.current);
@@ -1782,8 +1877,11 @@ export function CmsPageBuilder({
       window.removeEventListener("message", onMessage);
       scrollContainer?.removeEventListener("scroll", remeasure);
       window.removeEventListener("resize", remeasure);
+      visualViewport?.removeEventListener("resize", remeasure);
+      visualViewport?.removeEventListener("scroll", remeasure);
+      resizeObserver?.disconnect();
     };
-  }, [blocks, commit, componentNodes, previewOrigin, zoom]);
+  }, []);
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame || !previewUrl) return;
@@ -1795,6 +1893,7 @@ export function CmsPageBuilder({
           mode: previewMode,
           pageBody: pageBody ?? "",
           blocks,
+          tree: cmsBlocksToTree(blocks),
         },
         previewOrigin,
       );
@@ -1883,28 +1982,39 @@ export function CmsPageBuilder({
     setBuilderMode("instance");
     setMessage(`${definition.name} added to the page.`);
   };
-  const addInstanceToSlot = (slotName: string, componentId: string) => {
-    if (!selected || selectedDefinition?.id !== selectedEditorBlock?.componentId) {
+  const addInstanceToSlot = useCallback((slotName: string, componentId: string) => {
+    if (!selected || !selectedDefinition) {
       setMessage("Select the matching component instance before adding a slot item.");
       return;
     }
     const definition = componentDefinitions.find((item) => item.id === componentId);
     if (!definition) return;
+    const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
+    if (!slot) return;
+    const existing = selectedInstance?.slots?.[slotName] ?? selected?.slots?.[slotName] ?? [];
+    if (!slot.multiple && existing.length) {
+      setMessage(`${slot.label} accepts one component.`);
+      return;
+    }
     const type = definition.id.replaceAll("-", "_");
     const child = componentInstanceFromBlock({
       id: makeId(),
       type,
       componentId: definition.id,
       variantId: definition.defaultVariantId,
-      props: {
-        ...defaults(type),
-        ...definition.props.reduce<Record<string, unknown>>((acc, item) => {
-          if (item.defaultValue !== undefined) acc[item.key] = item.defaultValue;
-          return acc;
-        }, {}),
-      },
+      props: {},
       slots: definition.slots.length ? {} : undefined,
     });
+    const slotError =
+      slot.allowedComponentIds?.length && !slot.allowedComponentIds.includes(child.componentId)
+        ? `${selectedDefinition.name} does not allow ${child.componentId} in ${slot.label}.`
+        : !slot.multiple && existing.length
+          ? `${slot.label} accepts one component.`
+          : null;
+    if (slotError) {
+      setMessage(slotError);
+      return;
+    }
     const update = (instance: CmsComponentInstance): CmsComponentInstance => ({
       ...instance,
       slots: {
@@ -1927,12 +2037,85 @@ export function CmsPageBuilder({
       blocks.map((block) =>
         block.id === selected.id ? { ...block, slots: nextSlots } : block,
       ),
+      undefined,
+      {
+        type: "insert",
+        nodeId: child.id,
+        parentId: selectedInstance?.id ?? selected.id,
+        slot: slotName,
+        index: existing.length,
+      },
     );
     setMessage(`${definition.name} added to ${slotName}.`);
+  }, [blocks, commit, componentDefinitions, selected, selectedDefinition, selectedInstance]);
+  useEffect(() => {
+    addInstanceToSlotRef.current = addInstanceToSlot;
+    return () => {
+      if (addInstanceToSlotRef.current === addInstanceToSlot) addInstanceToSlotRef.current = null;
+    };
+  }, [addInstanceToSlot]);
+  const onDropSlot = (event: DragEvent<HTMLDivElement>, slotName: string, dropIndex?: number) => {
+    event.preventDefault();
+    if (!selected) return;
+    const targetOwnerId = selectedInstance?.id ?? selected.id;
+    const encodedInstance = event.dataTransfer.getData("application/x-cms-component-instance");
+    if (encodedInstance) {
+      try {
+        const payload = JSON.parse(encodedInstance) as { id?: string; blockId?: string; componentId?: string };
+        if (payload.id && payload.blockId) {
+          const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
+          if (!slot) return;
+          const moving = findCmsNode(blocks, payload.id);
+          if (!moving || !("componentId" in moving) || !moving.componentId) return;
+          const currentItems = selectedEditorBlock?.slots?.[slotName] ?? [];
+          const movingWithinSameSlot = payload.blockId === selected.id && currentItems.some((item) => item.id === payload.id);
+          if (!slot.multiple && currentItems.length && !movingWithinSameSlot) return;
+          const result = moveCmsInstance(
+            blocks,
+            payload.id,
+            targetOwnerId,
+            slotName,
+            dropIndex ?? currentItems.length,
+          );
+          if (result.error) {
+            setMessage(result.error);
+            return;
+          }
+          if (result.blocks !== blocks) {
+            commit(result.blocks, selected.id, {
+              type: "move",
+              nodeId: payload.id,
+              parentId: targetOwnerId,
+              slot: slotName,
+              index: dropIndex ?? currentItems.length,
+            });
+            setMessage("Component moved into slot.");
+          }
+          return;
+        }
+      } catch {
+        setMessage("Invalid component drag payload.");
+        return;
+      }
+    }
+    const componentId = event.dataTransfer.getData("application/x-cms-component");
+    if (componentId) {
+      if (!selectedDefinition) {
+        setMessage("Select a component before dropping into a slot.");
+        return;
+      }
+      const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
+      if (slot?.allowedComponentIds?.length && !slot.allowedComponentIds.includes(componentId)) {
+        setMessage(`${selectedDefinition.name} does not allow ${componentId} in ${slot.label}.`);
+        return;
+      }
+      addInstanceToSlot(slotName, componentId);
+    }
   };
   const updateSelectedSlot = (
     slotName: string,
     update: (_items: CmsComponentInstance[]) => CmsComponentInstance[],
+    mutation?: CmsMutationShape,
   ) => {
     if (!selected) return;
     const updateOwner = (owner: CmsComponentInstance): CmsComponentInstance => ({
@@ -1961,31 +2144,58 @@ export function CmsPageBuilder({
       blocks.map((block) =>
         block.id === selected.id ? { ...block, slots: nextSlots } : block,
       ),
+      undefined,
+      mutation,
     );
   };
   const removeInstanceFromSlot = (slotName: string, index: number) => {
-    updateSelectedSlot(slotName, (items) => items.filter((_, itemIndex) => itemIndex !== index));
+    const child = (selectedEditorBlock?.slots?.[slotName] ?? [])[index];
+    updateSelectedSlot(
+      slotName,
+      (items) => items.filter((_, itemIndex) => itemIndex !== index),
+      child
+        ? {
+            type: "remove",
+            nodeId: child.id,
+            parentId: selectedInstance?.id ?? selected?.id,
+            slot: slotName,
+            index,
+          }
+        : undefined,
+    );
     setMessage("Slot item removed.");
   };
   const moveInstanceInSlot = (slotName: string, index: number, delta: number) => {
+    const child = (selectedEditorBlock?.slots?.[slotName] ?? [])[index];
     updateSelectedSlot(slotName, (items) => {
       const target = index + delta;
       if (index < 0 || target < 0 || target >= items.length) return items;
       const next = [...items];
       [next[index], next[target]] = [next[target], next[index]];
       return next;
-    });
+    }, child ? {
+      type: "move",
+      nodeId: child.id,
+      parentId: selectedInstance?.id ?? selected?.id,
+      slot: slotName,
+      index: index + delta,
+    } : undefined);
     setMessage("Slot order updated.");
   };
   const updateSelected = (props: Record<string, unknown>) => {
     if (!selected) return;
     if (selectedInstance) {
+      const nextProps = instanceOverrides(
+        selectedDefinition,
+        selectedInstance.variantId,
+        props,
+      );
       const slots = Object.fromEntries(
         Object.entries(selected.slots ?? {}).map(([slot, items]) => [
           slot,
           updateComponentInstances(items, selectedInstance.id, (instance) => ({
             ...instance,
-            props,
+            props: nextProps,
           })) ?? [],
         ]),
       );
@@ -2088,7 +2298,7 @@ export function CmsPageBuilder({
     }
     const r = await fetch("/api/admin/cms/block-presets", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({
         name: presetName.trim(),
         blocks: blocks.filter(
@@ -2136,6 +2346,17 @@ export function CmsPageBuilder({
     index = blocks.length,
   ) => {
     event.preventDefault();
+    const movingId = event.dataTransfer.getData("application/x-cms-block-id");
+    if (movingId) {
+      const from = blocks.findIndex((block) => block.id === movingId);
+      if (from >= 0 && from !== index && !FIXED_COMPONENT_TYPES.has(blocks[from].type)) {
+        const next = [...blocks];
+        const [moving] = next.splice(from, 1);
+        next.splice(Math.max(0, Math.min(index > from ? index - 1 : index, next.length)), 0, moving);
+        commit(next, moving.id, { type: "move", nodeId: moving.id, parentId: null, index: next.indexOf(moving) });
+      }
+      return;
+    }
     const type = event.dataTransfer.getData("application/x-cms-block");
     if (type) addBlockAt(type, index);
   };
@@ -2184,14 +2405,15 @@ export function CmsPageBuilder({
           type="button"
           className="grid size-8 place-items-center rounded hover:bg-slate-100 disabled:opacity-30"
           onClick={() => {
-            const old = history.at(-1);
-            if (old) {
-              setHistory((h) => h.slice(0, -1));
-              setFuture((f) => [...f, blocks]);
-              onChange(old);
+            const result = undoCmsCommand(history, blocks);
+            if (result.state !== blocks) {
+              setHistory(result.history);
+              onChange(result.state);
+              const mutation = persistedCmsMutation(blocks, result.state);
+              if (mutation) onMutation?.(mutation);
             }
           }}
-          disabled={disabled || !history.length}
+          disabled={disabled || !history.past.length}
           aria-label="Undo"
         >
           <Undo2 className="size-4" />
@@ -2200,14 +2422,15 @@ export function CmsPageBuilder({
           type="button"
           className="grid size-8 place-items-center rounded hover:bg-slate-100 disabled:opacity-30"
           onClick={() => {
-            const next = future.at(-1);
-            if (next) {
-              setFuture((f) => f.slice(0, -1));
-              setHistory((h) => [...h, blocks]);
-              onChange(next);
+            const result = redoCmsCommand(history, blocks);
+            if (result.state !== blocks) {
+              setHistory(result.history);
+              onChange(result.state);
+              const mutation = persistedCmsMutation(blocks, result.state);
+              if (mutation) onMutation?.(mutation);
             }
           }}
-          disabled={disabled || !future.length}
+          disabled={disabled || !history.future.length}
           aria-label="Redo"
         >
           <Redo2 className="size-4" />
@@ -2457,6 +2680,14 @@ export function CmsPageBuilder({
                           <button
                             type="button"
                             className="min-w-0 flex-1 text-left"
+                            data-testid={`cms-component-drag-${definition.id}`}
+                            draggable={!disabled}
+                            onDragStart={(event) =>
+                              (() => {
+                                event.dataTransfer.setData("application/x-cms-component", definition.id);
+                                event.dataTransfer.setData("application/x-cms-component-id", definition.id);
+                              })()
+                            }
                             onClick={() => {
                               setComponentCanvasId(definition.id);
                               setBuilderMode("canvas");
@@ -2646,8 +2877,56 @@ export function CmsPageBuilder({
                             <div className="mt-0.5 text-[10px] text-slate-400">
                               {item.key} · {item.type}
                             </div>
+                            <input
+                              className="mt-2 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                              value={String(
+                                (canvasDraftDefinition?.variants.find((variant) => variant.id === canvasVariantId)?.props ?? {})[item.key] ?? item.defaultValue ?? "",
+                              )}
+                              onChange={(event) => updateCanvasVisualProp(item.key, event.target.value)}
+                              disabled={disabled}
+                              aria-label={item.label}
+                            />
                           </div>
                         ))}
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        <p className="text-[10px] text-slate-500">Style tokens</p>
+                        {Object.entries(canvasDraftDefinition?.styleTokens ?? canvasDefinition.styleTokens).map(([key, value]) => (
+                          <label key={key} className="block text-[10px] text-slate-500">
+                            --cms-{key}
+                            <input
+                              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                              value={value}
+                              onChange={(event) => {
+                                try {
+                                  const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                                  next.styleTokens = { ...next.styleTokens, [key]: event.target.value };
+                                  setCanvasDraft(JSON.stringify(next, null, 2));
+                                } catch {
+                                  // Keep invalid JSON in the code editor until it is repaired.
+                                }
+                              }}
+                              disabled={disabled}
+                            />
+                          </label>
+                        ))}
+                        <label className="flex items-center gap-2 text-[10px] text-slate-500">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(canvasDraftDefinition?.responsive)}
+                            onChange={(event) => {
+                              try {
+                                const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                                next.responsive = event.target.checked;
+                                setCanvasDraft(JSON.stringify(next, null, 2));
+                              } catch {
+                                // Keep invalid JSON in the code editor until it is repaired.
+                              }
+                            }}
+                            disabled={disabled}
+                          />
+                          Responsive component
+                        </label>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-1.5">
                         {canvasDefinition.slots.length ? (
@@ -2715,7 +2994,84 @@ export function CmsPageBuilder({
                       >
                         {canvasSavePending ? "Saving..." : "Save definition"}
                       </button>
+                      <button
+                        type="button"
+                        className="h-8 shrink-0 rounded border border-slate-600 px-3 text-xs font-medium text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+                        onClick={() => void publishCanvasDefinition()}
+                        disabled={disabled || canvasSavePending || componentStatuses[canvasDefinition.id] === "published"}
+                      >
+                        {componentStatuses[canvasDefinition.id] === "published" ? "Published" : "Publish version"}
+                      </button>
                     </div>
+                    {canvasVisualBlock ? (
+                      <div className="mt-4 rounded-lg border border-slate-700 bg-white p-3 text-slate-900">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Visual component canvas
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Edit the isolated DOM directly. Text changes update the selected reusable variant.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Component variants">
+                            {canvasDefinition.variants.map((variant) => (
+                              <button
+                                key={variant.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={canvasVisualBlock.variantId === variant.id}
+                                className={`rounded border px-2 py-1 text-[10px] ${canvasVisualBlock.variantId === variant.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                                onClick={() => setCanvasVariantId(variant.id)}
+                              >
+                                {variant.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <iframe
+                          ref={canvasVisualRef}
+                          title="Isolated component definition canvas"
+                          className="h-72 w-full rounded border border-dashed border-slate-300 bg-slate-50"
+                          srcDoc={componentCanvasDocument(canvasVisualBlock, canvasDraftDefinition ?? undefined)}
+                        />
+                        <p className="mt-2 text-[10px] text-slate-500">
+                          Editable fields are marked from the component property registry. Structure, slots, and unsupported elements remain protected.
+                        </p>
+                      </div>
+                    ) : null}
+                    <textarea
+                      value={canvasDraftDefinition?.markup ?? ""}
+                      onChange={(event) => {
+                        try {
+                          const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                          next.markup = event.target.value || undefined;
+                          setCanvasDraft(JSON.stringify(next, null, 2));
+                        } catch {
+                          // Keep invalid JSON in the code editor until it is repaired.
+                        }
+                      }}
+                      spellCheck={false}
+                      className="mt-3 min-h-32 w-full resize-y rounded border border-slate-700 bg-slate-900 p-3 font-mono text-xs leading-5 text-slate-100 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                      aria-label="Component HTML"
+                      placeholder="Optional sanitized component HTML"
+                    />
+                    <textarea
+                      value={canvasDraftDefinition?.styles ?? ""}
+                      onChange={(event) => {
+                        try {
+                          const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                          next.styles = event.target.value || undefined;
+                          setCanvasDraft(JSON.stringify(next, null, 2));
+                        } catch {
+                          // Keep invalid JSON in the code editor until it is repaired.
+                        }
+                      }}
+                      spellCheck={false}
+                      className="mt-3 min-h-32 w-full resize-y rounded border border-slate-700 bg-slate-900 p-3 font-mono text-xs leading-5 text-slate-100 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+                      aria-label="Component CSS"
+                      placeholder="Optional sanitized component CSS"
+                    />
                     <textarea
                       value={canvasDraft}
                       onChange={(event) => setCanvasDraft(event.target.value)}
@@ -2740,27 +3096,22 @@ export function CmsPageBuilder({
                         </span>
                       </div>
                       <div className="min-h-32 overflow-hidden bg-slate-50 p-4">
-                        <div
-                          className="pointer-events-none origin-top-left scale-[.82] rounded border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-sm"
-                          dangerouslySetInnerHTML={{
-                            __html: blockHtml({
+                        <iframe
+                          title={`${variant.label} component definition preview`}
+                          className="h-32 w-full rounded border border-slate-200 bg-white"
+                          srcDoc={componentCanvasDocument(
+                            {
                               id: `canvas-${canvasDefinition.id}-${variant.id}`,
-                              type: canvasDefinition.id.replaceAll("-", "_"),
+                              type: "unknown_component",
                               componentId: canvasDefinition.id,
                               variantId: variant.id,
-                              props: {
-                                ...canvasDefinition.props.reduce<Record<string, unknown>>(
-                                  (acc, item) => {
-                                    if (item.defaultValue !== undefined) acc[item.key] = item.defaultValue;
-                                    return acc;
-                                  },
-                                  {},
-                                ),
-                                ...(variant.props ?? {}),
-                              },
-                              slots: {},
-                            }),
-                          }}
+                              props: resolvedComponentProps(canvasDefinition, variant.id, {}),
+                              slots: Object.fromEntries(
+                                canvasDefinition.slots.map((slot) => [slot.name, []]),
+                              ),
+                            },
+                            canvasDefinition,
+                          )}
                         />
                       </div>
                       <div className="flex items-center justify-between px-4 py-3">
@@ -2824,7 +3175,6 @@ export function CmsPageBuilder({
                     ref={iframeRef}
                     title="Storefront canvas"
                     src={previewUrl}
-                    srcDoc={previewUrl ? undefined : documentHtml}
                     className="block min-h-[720px] w-full border-0 bg-white"
                     style={{ pointerEvents: "auto" }}
                   />
@@ -2896,6 +3246,20 @@ export function CmsPageBuilder({
                 className={`rounded px-2.5 py-1.5 text-[11px] ${rightTab === "style" ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
               >
                 Style
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("layout")}
+                className={`rounded px-2.5 py-1.5 text-[11px] ${rightTab === "layout" ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
+              >
+                Layout
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("responsive")}
+                className={`rounded px-2.5 py-1.5 text-[11px] ${rightTab === "responsive" ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
+              >
+                Responsive
               </button>
               <button
                 type="button"
@@ -3010,7 +3374,7 @@ export function CmsPageBuilder({
                       </label>
                     ) : null}
                     <div className="grid grid-cols-2 gap-2">
-                      {["width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius"].map((property) => (
+                      {["width", "height", "min-width", "max-width", "margin", "padding", "gap", "display", "position", "color", "background-color", "background-image", "background-size", "background-position", "font-family", "font-size", "font-weight", "line-height", "letter-spacing", "border", "border-radius", "box-shadow"].map((property) => (
                         <label key={property} className="block text-[10px] text-slate-600">
                           {property}
                           <input
@@ -3094,7 +3458,10 @@ export function CmsPageBuilder({
                           selectedDefinition.slots.map((slot) => (
                             <div
                               key={slot.name}
-                              className="rounded border border-slate-200 bg-white p-2"
+                              data-testid={`cms-slot-${selected.id}-${slot.name}`}
+                              className="rounded border border-dashed border-slate-300 bg-white p-2 transition-colors hover:border-blue-400 hover:bg-blue-50/30"
+                              onDragOver={(event) => event.preventDefault()}
+                                          onDrop={(event) => onDropSlot(event, slot.name)}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-medium text-slate-600">
@@ -3115,6 +3482,18 @@ export function CmsPageBuilder({
                                     return (
                                       <div
                                         key={child.id}
+                                        draggable={!disabled}
+                                        onDragOver={(event) => event.preventDefault()}
+                                        onDrop={(event) => {
+                                          event.stopPropagation();
+                                          onDropSlot(event, slot.name, index);
+                                        }}
+                                        onDragStart={(event) =>
+                                          event.dataTransfer.setData(
+                                            "application/x-cms-component-instance",
+                                            JSON.stringify({ id: child.id, blockId: selected.id, componentId: child.componentId }),
+                                          )
+                                        }
                                         className="flex items-center gap-1 rounded bg-slate-50 px-2 py-1"
                                       >
                                         <button
@@ -3180,6 +3559,7 @@ export function CmsPageBuilder({
                   <>
                     <BlockPropertyFields
                       block={selectedEditorBlock ?? selected}
+                      definition={selectedDefinition}
                       disabled={disabled}
                       focus={selectedComponent ?? selectedPreviewFocus}
                       onPickMedia={pickMediaForSelected}
@@ -3191,17 +3571,9 @@ export function CmsPageBuilder({
                         setMessage("Property updated.");
                       }}
                     />
-                    {FIXED_COMPONENT_TYPES.has(selected.type) ? (
-                      <a
-                        href="/admin/cms/navigation"
-                        className="flex h-9 items-center justify-center rounded border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                      >
-                        Edit navigation and footer content
-                      </a>
-                    ) : null}
                   </>
                 ) : null}
-                {rightTab === "style" ? (
+                {rightTab === "layout" || rightTab === "style" || rightTab === "responsive" ? (
                   <LayoutFields
                     block={selectedEditorBlock ?? selected}
                     disabled={
@@ -3211,7 +3583,18 @@ export function CmsPageBuilder({
                     onChange={(layout) =>
                       updateSelected({
                         ...(selectedEditorBlock?.props ?? {}),
-                        layout,
+                        layout: {
+                          ...(selectedEditorBlock?.props.layout && typeof selectedEditorBlock.props.layout === "object"
+                            ? selectedEditorBlock.props.layout
+                            : {}),
+                          ...layout,
+                        },
+                      })
+                    }
+                    onAccessibilityChange={(accessibility) =>
+                      updateSelected({
+                        ...(selectedEditorBlock?.props ?? {}),
+                        accessibility,
                       })
                     }
                   />

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { withBotIdProtection } from "@/lib/botid-protection";
+import { fetchProductIdentityBySlug } from "@/lib/catalog-medusa-fetch";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,10 @@ function parseBackInStockPayload(body: unknown):
     return { success: false, details: errors };
   }
 
+  if (!productSlug) {
+    return { success: false, details: { productSlug: ["productSlug is required"] } };
+  }
+
   return {
     success: true,
     data: {
@@ -86,6 +91,20 @@ async function handlePOST(req: NextRequest) {
     );
   }
   const { email, productId, productSlug, variantId } = parsed.data;
+  const requestedProductSlug = productSlug;
+  if (!requestedProductSlug) {
+    return NextResponse.json({ error: "productSlug is required" }, { status: 400 });
+  }
+  const product = await fetchProductIdentityBySlug(requestedProductSlug);
+  if (product.kind === "service_error" || product.kind === "misconfigured") {
+    return NextResponse.json({ error: "Catalog unavailable" }, { status: 503 });
+  }
+  if (product.kind !== "ok" || product.productId !== productId) {
+    return NextResponse.json({ error: "Product not found" }, { status: 404 });
+  }
+  if (variantId && !product.variantIds.includes(variantId)) {
+    return NextResponse.json({ error: "Variant not found" }, { status: 404 });
+  }
 
   const supabase = createStorefrontServiceSupabase();
   if (!supabase) {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getPublicOriginFromRequest } from "./finalize-medusa-cart-server";
 
 import { finalizeCheckoutIntentRouteLogic } from "./payment-attempt-route-logic";
 
@@ -35,11 +36,12 @@ export type FinalizeCheckoutIntentRouteDeps = {
   getPaymentAttemptRow: (_correlationId: string) => Promise<PaymentAttemptRow>;
   readCurrentQuoteFingerprint: (_cartId: string) => Promise<string | null>;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
+  claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
   ) => Promise<void>;
-  finalizeMedusaCart: (_cartId: string) => Promise<FinalizeResult>;
+  finalizeMedusaCart: (_cartId: string, _publicOrigin?: string) => Promise<FinalizeResult>;
   logEvent: (_payload: unknown) => void;
   nowIso: () => string;
 };
@@ -68,8 +70,10 @@ export async function handleFinalizeCheckoutIntentRequest(
     row,
     currentQuoteFingerprint,
     incrementFinalizeAttempts: deps.incrementFinalizeAttempts,
+    claimFinalizeAttempt: deps.claimFinalizeAttempt,
     updatePaymentAttempt: deps.updatePaymentAttempt,
-    finalizeMedusaCart: deps.finalizeMedusaCart,
+    finalizeMedusaCart: (activeCartId) =>
+      deps.finalizeMedusaCart(activeCartId, getPublicOriginFromRequest(req)),
     logEvent: deps.logEvent,
     nowIso: deps.nowIso,
   });

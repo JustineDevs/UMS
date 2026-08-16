@@ -97,4 +97,24 @@ test.describe("@admin Admin operations E2E", () => {
     await redo.click();
     await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
   });
+
+  test("Component Canvas edits a reusable definition through its isolated DOM", async ({ page }) => {
+    test.setTimeout(120_000);
+    const login = await e2eAdminLogin(page);
+    if (login === "skip_no_ui" || login === "skip_no_env") test.skip(true, "Admin E2E auth is not configured.");
+
+    await page.goto(`${adminBase}/admin/cms/builder`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Components", exact: true }).click();
+    await page.getByRole("button", { name: /Hero banner/ }).first().click();
+
+    const canvas = page.locator('iframe[title="Isolated component definition canvas"]');
+    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    const frame = canvas.contentFrame();
+    const title = frame.locator('[data-cms-prop="title"]');
+    await expect(title).toBeVisible();
+    await title.fill("Browser-authored hero");
+    await title.blur();
+    await expect(page.getByLabel("Main component definition JSON")).toContainText("Browser-authored hero");
+    await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
+  });
 });

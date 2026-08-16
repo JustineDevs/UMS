@@ -7,7 +7,181 @@ import type {
   CmsPageRow,
   CmsPageType,
   CmsPublishStatus,
+  CmsNode,
+  CmsMutationRecord,
 } from "./cms-types.js";
+
+export type { CmsNode } from "./cms-types.js";
+
+function parseCmsNode(value: unknown, fallbackId: string): CmsNode | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const id = typeof row.id === "string" && row.id.trim() ? row.id : fallbackId;
+  const componentId = typeof row.componentId === "string" && row.componentId.trim()
+    ? row.componentId
+    : "unknown-component";
+  return {
+    id,
+    componentId,
+    parentId: typeof row.parentId === "string" && row.parentId ? row.parentId : null,
+    slot: typeof row.slot === "string" && row.slot ? row.slot : null,
+    props: isRecord(row.props) ? row.props : {},
+    styles: parseStringRecord(row.styles) ?? {},
+    children: Array.isArray(row.children)
+      ? row.children.filter((child): child is string => typeof child === "string" && child.length > 0)
+      : [],
+    variantId: typeof row.variantId === "string" ? row.variantId : undefined,
+    blockType: typeof row.blockType === "string" ? row.blockType : undefined,
+    lockedStructure: typeof row.lockedStructure === "boolean" ? row.lockedStructure : undefined,
+  };
+}
+
+/** Repairs persisted links while retaining every identifiable CMS node, including unknown components. */
+export function normalizeCmsTree(value: unknown): CmsNode[] {
+  if (!Array.isArray(value)) return [];
+  const nodes: CmsNode[] = [];
+  const byId = new Map<string, CmsNode>();
+  value.forEach((item, index) => {
+    const node = parseCmsNode(item, `cms_node_${index}`);
+    if (!node || byId.has(node.id)) return;
+    byId.set(node.id, node);
+    nodes.push(node);
+  });
+  for (const node of nodes) {
+    if (node.parentId && !byId.has(node.parentId)) node.parentId = null;
+  }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const breakCycles = (node: CmsNode) => {
+    if (visited.has(node.id)) return;
+    if (visiting.has(node.id)) {
+      node.parentId = null;
+      return;
+    }
+    visiting.add(node.id);
+    if (node.parentId) {
+      const parent = byId.get(node.parentId);
+      if (parent) breakCycles(parent);
+      if (node.parentId && node.parentId === node.id) node.parentId = null;
+    }
+    visiting.delete(node.id);
+    visited.add(node.id);
+  };
+  nodes.forEach(breakCycles);
+  for (const parent of nodes) {
+    const listed = new Set<string>();
+    const children = parent.children.filter((id) => {
+      const child = byId.get(id);
+      if (!child || child.parentId !== parent.id || listed.has(id)) return false;
+      listed.add(id);
+      return true;
+    });
+    for (const child of nodes) {
+      if (child.parentId === parent.id && !listed.has(child.id)) children.push(child.id);
+    }
+    parent.children = children;
+  }
+  return nodes;
+}
+
+export function cmsBlocksToTree(blocks: CmsBlock[]): CmsNode[] {
+  const nodes: CmsNode[] = [];
+  const visit = (
+    id: string,
+    componentId: string,
+    blockType: string,
+    props: Record<string, unknown>,
+    styles: Record<string, string>,
+    variantId: string | undefined,
+    parentId: string | null,
+    slot: string | null,
+    children: CmsComponentInstance[],
+  ) => {
+    const childIds: string[] = [];
+    const node: CmsNode = { id, componentId, blockType, parentId, slot, props, styles, children: childIds, variantId };
+    nodes.push(node);
+    for (const child of children) {
+      childIds.push(child.id);
+      const nestedIds: string[] = [];
+      const childNode: CmsNode = {
+        id: child.id,
+        componentId: child.componentId,
+        parentId: id,
+        slot,
+        props: child.props,
+        styles: child.styleOverrides ?? {},
+        children: nestedIds,
+        variantId: child.variantId,
+        lockedStructure: child.lockedStructure,
+      };
+      nodes.push(childNode);
+      for (const [childSlot, slotItems] of Object.entries(child.slots ?? {})) {
+        for (const nested of slotItems) {
+          nestedIds.push(nested.id);
+          visitInstance(nested, child.id, childSlot);
+        }
+      }
+    }
+  };
+  const visitInstance = (instance: CmsComponentInstance, parentId: string, slot: string) => {
+    const childIds: string[] = [];
+    const node: CmsNode = {
+      id: instance.id,
+      componentId: instance.componentId,
+      parentId,
+      slot,
+      props: instance.props,
+      styles: instance.styleOverrides ?? {},
+      children: childIds,
+      variantId: instance.variantId,
+      lockedStructure: instance.lockedStructure,
+    };
+    nodes.push(node);
+    for (const [childSlot, items] of Object.entries(instance.slots ?? {})) {
+      for (const child of items) {
+        childIds.push(child.id);
+        visitInstance(child, instance.id, childSlot);
+      }
+    }
+  };
+  for (const block of blocks) {
+    visit(block.id, block.componentId ?? block.type, block.type, block.props, block.styleOverrides ?? {}, block.variantId, null, null, []);
+    const root = nodes[nodes.length - 1];
+    for (const [slot, items] of Object.entries(block.slots ?? {})) {
+      for (const child of items) {
+        root.children.push(child.id);
+        visitInstance(child, block.id, slot);
+      }
+    }
+  }
+  return nodes;
+}
+
+export function cmsTreeToBlocks(tree: CmsNode[]): CmsBlock[] {
+  const normalized = normalizeCmsTree(tree);
+  const byId = new Map(normalized.map((node) => [node.id, node]));
+  const buildInstance = (node: CmsNode): CmsComponentInstance => {
+    const slots: Record<string, CmsComponentInstance[]> = {};
+    for (const childId of node.children) {
+      const child = byId.get(childId);
+      if (!child || !child.slot) continue;
+      (slots[child.slot] ??= []).push(buildInstance(child));
+    }
+    return { id: node.id, componentId: node.componentId, variantId: node.variantId, props: node.props, slots, styleOverrides: node.styles, lockedStructure: node.lockedStructure };
+  };
+  return normalized.filter((node) => node.parentId === null).map((node) => ({
+    id: node.id,
+    type: node.blockType ?? node.componentId.replaceAll("-", "_"),
+    componentId: node.componentId,
+    variantId: node.variantId,
+    props: node.props,
+    styleOverrides: node.styles,
+    slots: node.children.map((id) => byId.get(id)).filter((child): child is CmsNode => Boolean(child && child.slot)).reduce<Record<string, CmsComponentInstance[]>>((acc, child) => {
+      (acc[child.slot!] ??= []).push(buildInstance(child));
+      return acc;
+    }, {}),
+  }));
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -92,6 +266,9 @@ function parseBlocks(v: unknown): CmsBlock[] {
 }
 
 function rowToPage(r: Record<string, unknown>): CmsPageRow {
+  const tree = Array.isArray(r.tree)
+    ? normalizeCmsTree(r.tree)
+    : cmsBlocksToTree(parseBlocks(r.blocks));
   return {
     id: String(r.id),
     organization_id: r.organization_id != null ? String(r.organization_id) : null,
@@ -100,7 +277,8 @@ function rowToPage(r: Record<string, unknown>): CmsPageRow {
     page_type: (r.page_type as CmsPageType) ?? "static",
     title: String(r.title ?? ""),
     body: String(r.body ?? ""),
-    blocks: parseBlocks(r.blocks),
+    blocks: tree.length ? cmsTreeToBlocks(tree) : parseBlocks(r.blocks),
+    tree,
     status: (r.status as CmsPublishStatus) ?? "draft",
     published_at: r.published_at != null ? String(r.published_at) : null,
     scheduled_publish_at:
@@ -234,12 +412,14 @@ export async function getCmsPageBySlugAdmin(
 export type UpsertCmsPageInput = {
   organization_id?: string;
   id?: string;
+  expectedVersion?: number;
   slug: string;
   locale?: string;
   page_type?: CmsPageType;
   title?: string;
   body?: string;
   blocks?: CmsBlock[];
+  tree?: CmsNode[];
   status?: CmsPublishStatus;
   published_at?: string | null;
   scheduled_publish_at?: string | null;
@@ -251,6 +431,7 @@ export type UpsertCmsPageInput = {
   json_ld?: unknown | null;
   parent_slug?: string | null;
   breadcrumb_label?: string | null;
+  mutations?: CmsMutationRecord[];
 };
 
 export async function upsertCmsPage(
@@ -271,6 +452,9 @@ export async function upsertCmsPage(
   }
 
   const nextVersion = existing ? existing.version + 1 : 1;
+  const nextTree = normalizeCmsTree(
+    input.tree ?? (input.blocks ? cmsBlocksToTree(input.blocks) : existing?.tree ?? []),
+  );
   const row = {
     organization_id: input.organization_id ?? existing?.organization_id ?? null,
     slug: input.slug,
@@ -278,7 +462,8 @@ export async function upsertCmsPage(
     page_type: input.page_type ?? existing?.page_type ?? "static",
     title: input.title ?? existing?.title ?? "",
     body: input.body ?? existing?.body ?? "",
-    blocks: (input.blocks ?? existing?.blocks ?? []) as unknown as Record<string, unknown>[],
+    blocks: (input.blocks ?? (nextTree.length ? cmsTreeToBlocks(nextTree) : existing?.blocks ?? [])) as unknown as Record<string, unknown>[],
+    tree: nextTree as unknown as Record<string, unknown>[],
     status: input.status ?? existing?.status ?? "draft",
     published_at: input.published_at !== undefined ? input.published_at : existing?.published_at ?? null,
     scheduled_publish_at:
@@ -313,11 +498,15 @@ export async function upsertCmsPage(
       .from("cms_pages")
       .update(row)
       .eq("id", existing.id)
+      .eq("version", input.expectedVersion ?? existing.version)
       .select("*")
       .single();
     if (error) {
       console.error("[cms-pages] upsertCmsPage update", error.message);
       return null;
+    }
+    if (input.mutations?.length) {
+      await appendCmsPageMutations(supabase, existing.id, nextVersion, input.organization_id, input.mutations);
     }
     return rowToPage(data as Record<string, unknown>);
   }
@@ -334,7 +523,56 @@ export async function upsertCmsPage(
     console.error("[cms-pages] upsertCmsPage insert", error.message);
     return null;
   }
+  if (input.mutations?.length) {
+    await appendCmsPageMutations(supabase, data.id as string, nextVersion, input.organization_id, input.mutations);
+  }
   return rowToPage(data as Record<string, unknown>);
+}
+
+export async function appendCmsPageMutations(
+  supabase: SupabaseClient,
+  pageId: string,
+  revision: number,
+  organizationId: string | undefined,
+  mutations: CmsMutationRecord[],
+) {
+  const { error } = await supabase.from("cms_page_mutations").insert(
+    mutations.map((mutation, sequence) => ({
+      page_id: pageId,
+      organization_id: organizationId ?? null,
+      revision,
+      sequence,
+      mutation: mutation as unknown as Record<string, unknown>,
+    })),
+  );
+  if (error && !isMissingTableOrSchemaError(error)) {
+    console.error("[cms-pages] appendCmsPageMutations", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function listCmsPageMutations(
+  supabase: SupabaseClient,
+  pageId: string,
+  organizationId?: string,
+  limit = 500,
+) {
+  let query = supabase
+    .from("cms_page_mutations")
+    .select("id, page_id, organization_id, revision, sequence, mutation, created_at")
+    .eq("page_id", pageId)
+    .order("revision", { ascending: false })
+    .order("sequence", { ascending: true })
+    .limit(Math.min(Math.max(limit, 1), 1000));
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingTableOrSchemaError(error)) return [];
+    console.error("[cms-pages] listCmsPageMutations", error.message);
+    return [];
+  }
+  return data ?? [];
 }
 
 export async function deleteCmsPage(

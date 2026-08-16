@@ -14,7 +14,8 @@ process.env.NODE_ENV = process.env.NODE_ENV ?? "development";
 /** Match `scripts/load-monorepo-root-env.cjs`: `.env.local` only. */
 const rootEnvLocal = resolve(process.cwd(), ".env.local");
 if (existsSync(rootEnvLocal)) {
-  loadEnv({ path: rootEnvLocal, override: true });
+  // Shell-provided CI/E2E values must win over local defaults, especially callback origins.
+  loadEnv({ path: rootEnvLocal, override: false });
 }
 
 /** Shared with storefront webServer so invalidation integration tests match the running app. */
@@ -68,6 +69,7 @@ function adminDevServerEnv(): NodeJS.ProcessEnv {
  * Override with PLAYWRIGHT_BASE_URL when needed.
  */
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const tunnelBypass = process.env.PLAYWRIGHT_TUNNEL_BYPASS?.trim();
 
 /**
  * Playwright treats the server as "already up" only when this URL returns 2xx–3xx (<404).
@@ -106,6 +108,9 @@ export default defineConfig({
   ],
   use: {
     baseURL,
+    ...(tunnelBypass
+      ? { extraHTTPHeaders: { "bypass-tunnel-reminder": tunnelBypass } }
+      : {}),
     trace: e2eTrace,
     screenshot: "only-on-failure",
     video: "off",

@@ -5,7 +5,7 @@ import {
   buildPayPalWebhookDedupId,
   claimPayPalWebhookDedup,
 } from "../../../lib/paypal-webhook-dedup";
-import { verifyPayPalWebhookSignature } from "../../../lib/paypal-sdk-client";
+import { capturePayPalOrder, verifyPayPalWebhookSignature } from "../../../lib/paypal-sdk-client";
 
 jest.mock("../../../lib/paypal-webhook-dedup", () => ({
   buildPayPalWebhookDedupId: jest.fn((body: { event_type?: string; id?: string }) =>
@@ -230,5 +230,23 @@ describe("PayPal webhook service", () => {
     });
 
     expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+  });
+
+  it("uses one capture idempotency key for every retry of an order", async () => {
+    (capturePayPalOrder as jest.Mock).mockResolvedValue({
+      status: "COMPLETED",
+      captureId: "CAP-1",
+      captureAmountMinor: 2000,
+    });
+    const service = createService();
+    const input = { data: { paypal_order_id: "ORDER-1", amount: 2000, currency: "PHP" } } as never;
+
+    await service.capturePayment(input);
+    await service.capturePayment(input);
+
+    expect((capturePayPalOrder as jest.Mock).mock.calls.map(([_, orderId, options]) => [orderId, options.requestId])).toEqual([
+      ["ORDER-1", "uvs-capture-ORDER-1"],
+      ["ORDER-1", "uvs-capture-ORDER-1"],
+    ]);
   });
 });

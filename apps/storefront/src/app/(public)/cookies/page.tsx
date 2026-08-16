@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { PolicyMeta } from "@/lib/policy-content";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Cookies",
@@ -15,6 +16,7 @@ export default function CookiesPage() {
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
         Cookie notice
       </h1>
+      <PolicyMeta policy="Cookie notice" />
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
           We use cookies and similar storage to operate this storefront

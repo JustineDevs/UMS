@@ -16,7 +16,7 @@ test.describe("mandatory payment matrix (CLI)", () => {
       [
         "exec",
         "tsx",
-        path.join(repoRoot, "scripts", "stress-checkout-providers.ts"),
+        path.join(repoRoot, "stress-test", "scripts", "stress-checkout-providers.ts"),
         "--mandatory-core",
       ],
       {

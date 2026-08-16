@@ -99,3 +99,65 @@ test("handleCmsFormSubmissionRequest rejects unknown forms", async () => {
   assert.equal(res.status, 400);
   assert.deepEqual(await res.json(), { error: "Unknown form" });
 });
+
+test("handleCmsFormSubmissionRequest durably records successful webhook delivery", async () => {
+  const events: string[] = [];
+  const res = await handleCmsFormSubmissionRequest(
+    makeRequest({ name: "Customer", email: "customer@example.com", message: "Hello" }),
+    "contact",
+    {
+      getIp: () => "127.0.0.1",
+      rateLimit: async () => ({ ok: true }),
+      createServiceSupabase: () => ({ kind: "service" } as never),
+      createAnonSupabase: () => null,
+      insertSubmission: async () => "submission_webhook",
+      getSettings: async () => ({ webhook_url: "https://example.test/hook" } as never),
+      recordDelivery: async (_client, input) => {
+        events.push(`record:${input.kind}:${input.aggregateId}`);
+        return true;
+      },
+      finishDelivery: async (_client, key, result) => {
+        events.push(`finish:${key}:${result.status}`);
+        return true;
+      },
+      fetchImpl: async () => new Response(null, { status: 204 }),
+    },
+  );
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), {
+    ok: true,
+    id: "submission_webhook",
+    delivery: "recorded",
+  });
+  assert.deepEqual(events, [
+    "record:public_form_webhook:submission_webhook",
+    "finish:public_form_webhook:submission_webhook:sent",
+  ]);
+});
+
+test("handleCmsFormSubmissionRequest records failed webhook delivery without losing submission", async () => {
+  let finished: unknown;
+  const res = await handleCmsFormSubmissionRequest(
+    makeRequest({ name: "Customer", email: "customer@example.com", message: "Hello" }),
+    "contact",
+    {
+      getIp: () => "127.0.0.1",
+      rateLimit: async () => ({ ok: true }),
+      createServiceSupabase: () => ({ kind: "service" } as never),
+      createAnonSupabase: () => null,
+      insertSubmission: async () => "submission_failed",
+      getSettings: async () => ({ webhook_url: "https://example.test/hook" } as never),
+      recordDelivery: async () => true,
+      finishDelivery: async (_client, key, result) => {
+        finished = { key, result };
+        return true;
+      },
+      fetchImpl: async () => new Response(null, { status: 503 }),
+    },
+  );
+
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, id: "submission_failed", delivery: "recorded" });
+  assert.equal((finished as { result: { status: string } }).result.status, "failed");
+});

@@ -12,28 +12,25 @@ import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
 const base = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
 
-const PUBLIC_GET_ROUTES = [
-  "/api/admin/integration-health",
-  "/api/admin/payment-health",
-];
+const PUBLIC_GET_ROUTES: string[] = [];
 
 const AUTH_REQUIRED_GET_ROUTES = [
-  "/api/admin/orders",
-  "/api/admin/analytics",
   "/api/admin/inventory",
   "/api/admin/payments",
   "/api/admin/loyalty",
   "/api/admin/devices",
   "/api/admin/employees",
   "/api/admin/campaigns",
-  "/api/admin/crm",
   "/api/admin/reviews",
   "/api/admin/shifts",
-  "/api/admin/receipts",
   "/api/admin/audit-logs",
-  "/api/admin/catalog/products",
   "/api/admin/reconciliation",
   "/api/admin/segments",
+  "/api/admin/integration-health",
+  "/api/admin/payment-health",
+  "/api/admin/analytics/retention",
+  "/api/admin/analytics/sales-trends",
+  "/api/admin/crm/bridge",
 ];
 
 test.describe("Admin API — unauthenticated requests return 401", () => {

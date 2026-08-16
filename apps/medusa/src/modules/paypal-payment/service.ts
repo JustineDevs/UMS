@@ -255,7 +255,8 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     if (!orderId) throw new MedusaError(MedusaError.Types.INVALID_DATA, "PayPal capturePayment: missing order id.");
     const currency = String(data.currency ?? "PHP").toUpperCase();
     const amount = Number(data.amount);
-    const requestId = `uvs-capture-${orderId}-${Date.now()}`;
+    // Keep the provider idempotency key stable across retries for this order.
+    const requestId = `uvs-capture-${orderId}`;
     const options = await this.sdkOptionsFor(input.data);
     const authorizationId = String(data.paypal_authorization_id ?? "").trim();
     const captureInput = {

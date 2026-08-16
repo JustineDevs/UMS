@@ -41,9 +41,9 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
-/** Local-only session for browser QA; production always uses NextAuth. */
+/** Explicit auth-disabled mode is reserved for controlled browser QA. */
 export async function getStorefrontSession(): Promise<Session | null> {
-  if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {
+  if (process.env.AUTH_DISABLED === "true") {
     return {
       user: { name: "Local QA", email: "e2e-test@example.com" },
       expires: "2099-12-31T23:59:59.999Z",

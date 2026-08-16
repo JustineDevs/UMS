@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { sanitizeSameOriginUrl } from "@universal-music-store/sdk";
 import { useCallback, useEffect, useState } from "react";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type Row = {
   id: string;
@@ -59,7 +60,7 @@ export function CmsRedirectsManager() {
     setError(null);
     const r = await fetch("/api/admin/cms/redirects", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({
         from_path: fromPath.trim(),
         to_path: toPath.trim(),
@@ -78,7 +79,7 @@ export function CmsRedirectsManager() {
 
   const remove = async (id: string) => {
     if (!canWrite || !confirm("Delete redirect?")) return;
-    await fetch(`/api/admin/cms/redirects/${id}`, { method: "DELETE" });
+    await fetch(`/api/admin/cms/redirects/${id}`, { method: "DELETE", headers: cmsMutationHeaders() });
     load();
   };
 
@@ -106,7 +107,7 @@ export function CmsRedirectsManager() {
     const text = await file.text();
     const r = await fetch("/api/admin/cms/redirects/import", {
       method: "POST",
-      headers: { "Content-Type": "text/csv" },
+      headers: cmsMutationHeaders("text/csv"),
       body: text,
     });
     const j = (await r.json()) as {
@@ -131,7 +132,7 @@ export function CmsRedirectsManager() {
     if (!ids.length) return;
     const r = await fetch("/api/admin/cms/redirects/bulk", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({ ids, active }),
     });
     const j = (await r.json()) as { error?: string };

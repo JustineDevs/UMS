@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
+import { sanitizeTrustedPublicUrl, verifyTrackingToken } from "@universal-music-store/sdk";
 import {
   fetchMedusaTrackByOrderId,
   fetchMedusaTrackByCartId,
@@ -67,11 +67,34 @@ async function fetchOrderData(orderId: string): Promise<{ ok: boolean; data: Con
 
 export default async function OrderConfirmationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { orderId: rawId } = await params;
+  const { t } = await searchParams;
   const orderId = decodeURIComponent(rawId.trim());
+  const signedAccess = Boolean(
+    process.env.TRACKING_HMAC_SECRET?.trim() &&
+      t?.trim() &&
+      verifyTrackingToken(orderId, t.trim()),
+  );
+  if (!signedAccess) {
+    return (
+      <main className="storefront-page-shell max-w-2xl">
+        <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-4">
+          Order confirmation unavailable
+        </h1>
+        <p className="font-body text-on-surface-variant mb-6">
+          Open the signed confirmation link from your order email to view this order.
+        </p>
+        <Link href="/shop" className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90">
+          Continue shopping
+        </Link>
+      </main>
+    );
+  }
   const { ok, data } = await fetchOrderData(orderId);
 
   if (!ok || !data?.order) {
@@ -175,7 +198,7 @@ export default async function OrderConfirmationPage({
               <span className="text-on-surface-variant">
                 PHP {total.toLocaleString("en-PH")}
               </span>
-              <span className="ml-1 text-xs text-on-surface-variant/60">VAT incl.</span>
+              <span className="ml-1 text-xs text-on-surface-variant">VAT incl.</span>
             </div>
           )}
           <div>
@@ -222,7 +245,7 @@ export default async function OrderConfirmationPage({
 
       <div className="flex flex-wrap gap-3">
         <Link
-          href={`/track/${orderId}`}
+          href={`/track/${encodeURIComponent(orderId)}?t=${encodeURIComponent(t!.trim())}`}
           className="inline-flex rounded border border-primary px-5 py-2.5 text-sm font-bold text-primary hover:bg-primary hover:text-on-primary transition-colors"
         >
           Track order

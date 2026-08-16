@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries } from "@/lib/catalog-fetch";
-import { shopHref } from "@/lib/shop-url";
 import { buildPageMetadata, SEO_KEYWORDS, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +50,7 @@ export default async function CollectionsPage() {
           return (
             <li key={label}>
               <Link
-                href={shopHref({ category: label })}
+                href={`/collections/${encodeURIComponent(label)}`}
                 className="block rounded-lg border border-outline-variant/20 bg-surface-container-low p-8 transition-colors hover:border-primary/40 hover:bg-surface-container-high"
               >
                 <h2 className="font-headline text-2xl font-bold text-primary mb-2">

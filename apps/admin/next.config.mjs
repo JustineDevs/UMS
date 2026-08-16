@@ -71,6 +71,7 @@ function buildCsp() {
     CSP_NONCE_PLACEHOLDER,
   ].filter(Boolean);
   const storefrontOrigin = (
+    process.env.NEXT_PUBLIC_STOREFRONT_URL ||
     process.env.PUBLIC_STOREFRONT_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     "http://localhost:3000"
@@ -98,6 +99,12 @@ function buildCsp() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_AUTH_DISABLED:
+      process.env.NODE_ENV !== "production" && process.env.AUTH_DISABLED === "true"
+        ? "true"
+        : "false",
+  },
   outputFileTracingRoot: path.join(__dirname, "../.."),
   serverExternalPackages: [],
   experimental: {

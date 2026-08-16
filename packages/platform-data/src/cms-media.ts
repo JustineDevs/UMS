@@ -382,5 +382,25 @@ export async function findCmsMediaReferences(
     }
   }
 
+  let componentsQuery = supabase
+    .from("cms_component_definitions")
+    .select("id, component_key, definition");
+  if (organizationId) componentsQuery = componentsQuery.eq("organization_id", organizationId);
+  const { data: components } = await componentsQuery;
+  for (const component of components ?? []) {
+    const row = component as Record<string, unknown>;
+    if (JSON.stringify(row).includes(needle)) {
+      hits.push({ source: "cms_component_definitions", detail: `${String(row.component_key ?? row.id ?? "component")}` });
+    }
+  }
+
+  const { data: home } = await supabase.from("storefront_home_content").select("id, payload");
+  for (const entry of home ?? []) {
+    const row = entry as Record<string, unknown>;
+    if (JSON.stringify(row).includes(needle)) {
+      hits.push({ source: "storefront_home_content", detail: String(row.id ?? "default") });
+    }
+  }
+
   return hits;
 }

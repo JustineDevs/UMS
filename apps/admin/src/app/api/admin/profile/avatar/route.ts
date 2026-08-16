@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 
 // The source asset is intentionally served through the admin origin so the
 // admin app does not depend on the storefront's public directory.
@@ -13,6 +14,8 @@ function hashSeed(seed: string) {
 }
 
 export async function GET(request: Request) {
+  const auth = await requireStaffApiSession("content:read");
+  if (!auth.ok) return auth.response;
   try {
     const directory = path.join(
       process.cwd(),

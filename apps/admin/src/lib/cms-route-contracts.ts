@@ -2,23 +2,65 @@ import { z } from "zod";
 
 const nullableText = (max: number) => z.string().max(max).nullable().optional();
 
+const cmsComponentInstanceSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.object({
+    id: z.string().min(1).max(120),
+    componentId: z.string().min(1).max(120),
+    variantId: z.string().max(120).optional(),
+    props: z.record(z.string().max(80), z.unknown()).default({}),
+    slots: z.record(z.string().max(80), z.array(cmsComponentInstanceSchema).max(100)).default({}),
+    styleOverrides: z.record(z.string().max(80), z.string().max(500)).optional(),
+    lockedStructure: z.boolean().optional(),
+  }).strict(),
+);
+
+const cmsNodeSchema = z.object({
+  id: z.string().min(1).max(120),
+  componentId: z.string().min(1).max(120),
+  parentId: z.string().max(120).nullable(),
+  slot: z.string().max(80).nullable(),
+  props: z.record(z.string().max(80), z.unknown()).default({}),
+  styles: z.record(z.string().max(80), z.string().max(500)).default({}),
+  children: z.array(z.string().min(1).max(120)).max(200),
+  variantId: z.string().max(120).optional(),
+  blockType: z.string().max(80).optional(),
+  lockedStructure: z.boolean().optional(),
+}).strict();
+
+const cmsMutationSchema = z.object({
+  type: z.string().min(1).max(40),
+  nodeId: z.string().max(120).optional(),
+  parentId: z.string().max(120).nullable().optional(),
+  beforeParentId: z.string().max(120).nullable().optional(),
+  slot: z.string().max(80).optional(),
+  index: z.number().int().min(0).max(1000).optional(),
+  key: z.string().max(120).optional(),
+  before: z.unknown().optional(),
+  after: z.unknown().optional(),
+  node: z.unknown().optional(),
+}).strict();
+
 export const cmsBlockSchema = z.object({
   id: z.string().min(1).max(120),
   type: z.string().min(1).max(80),
   componentId: z.string().max(120).optional(),
   variantId: z.string().max(120).optional(),
   props: z.record(z.string().max(80), z.unknown()).default({}),
-  slots: z.record(z.string().max(80), z.array(z.unknown()).max(100)).optional(),
+  slots: z.record(z.string().max(80), z.array(cmsComponentInstanceSchema).max(100)).optional(),
+  styleOverrides: z.record(z.string().max(80), z.string().max(500)).optional(),
 }).strict();
 
 export const cmsPageSchema = z.object({
   id: z.string().uuid().optional(),
+  expectedVersion: z.number().int().positive().max(100000).optional(),
   slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   locale: z.string().trim().min(2).max(16).default("en"),
   page_type: z.enum(["static", "landing", "legal"]).optional(),
   title: z.string().max(240).optional(),
   body: z.string().max(500_000).optional(),
   blocks: z.array(cmsBlockSchema).max(200).optional(),
+  tree: z.array(cmsNodeSchema).max(1000).optional(),
+  mutations: z.array(cmsMutationSchema).max(500).optional(),
   status: z.enum(["draft", "published", "scheduled"]).optional(),
   published_at: nullableText(64),
   scheduled_publish_at: nullableText(64),

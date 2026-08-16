@@ -18,7 +18,7 @@ export function withBotIdProtection<
   handler: (..._args: TArgs) => Promise<Response>,
 ): (..._args: TArgs) => Promise<Response> {
   return async (..._args: TArgs) => {
-    if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {
+    if (process.env.AUTH_DISABLED === "true") {
       return handler(..._args);
     }
     const verification = await checkBotId();

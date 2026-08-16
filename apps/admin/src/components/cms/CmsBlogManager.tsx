@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type Post = {
   id: string;
@@ -86,7 +87,7 @@ export function CmsBlogManager() {
             if (!confirm(`Delete ${selected.size} post(s)?`)) return;
             const r = await fetch("/api/admin/cms/blog/bulk", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: cmsMutationHeaders(),
               body: JSON.stringify({ ids: Array.from(selected) }),
             });
             if (r.ok) {
@@ -150,7 +151,7 @@ export function CmsBlogManager() {
             const slug = `draft-${Date.now()}`;
             const r = await fetch("/api/admin/cms/blog", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: cmsMutationHeaders(),
               body: JSON.stringify({
                 slug,
                 title: "New draft",

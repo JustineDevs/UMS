@@ -22,7 +22,23 @@ export type FinalizeMedusaCartOptions = {
    * cron/workers pass a higher value. Capped at 20.
    */
   maxCompleteAttempts?: number;
+  publicOrigin?: string;
 };
+
+export function getPublicOriginFromRequest(req: Request): string {
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",", 1)[0]?.trim();
+  const forwardedHost = req.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim();
+  const internal = new URL(req.url);
+  const protocol = forwardedProto === "http" || forwardedProto === "https"
+    ? forwardedProto
+    : internal.protocol.replace(":", "");
+  const host = forwardedHost || req.headers.get("host") || internal.host;
+  try {
+    return new URL(`${protocol}://${host}`).origin;
+  } catch {
+    return internal.origin;
+  }
+}
 
 type CompleteResponse = {
   type?: string;
@@ -81,7 +97,9 @@ export async function finalizeMedusaCartFromServer(
 
   const orderId = completed.order.id;
   const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
+    options?.publicOrigin?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    DEFAULT_PUBLIC_SITE_ORIGIN;
   const redirectUrl = buildTrackingUrl(base, orderId);
   if (!redirectUrl) {
     return {

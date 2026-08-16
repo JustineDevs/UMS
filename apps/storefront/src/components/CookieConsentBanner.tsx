@@ -7,6 +7,11 @@ import {
   ANALYTICS_CONSENT_KEY,
   type AnalyticsConsentValue,
 } from "@/lib/analytics-consent";
+import {
+  POLICY_AUDIT_EVENT,
+  POLICY_EFFECTIVE_DATE,
+  POLICY_VERSION,
+} from "@/lib/policy-content";
 
 export function CookieConsentBanner() {
   const [visible, setVisible] = useState(false);
@@ -31,6 +36,9 @@ export function CookieConsentBanner() {
     }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT));
+      window.dispatchEvent(new CustomEvent(POLICY_AUDIT_EVENT, {
+        detail: { choice: "accepted", policyVersion: POLICY_VERSION, effectiveDate: POLICY_EFFECTIVE_DATE },
+      }));
     }
     setVisible(false);
   }
@@ -46,6 +54,9 @@ export function CookieConsentBanner() {
     }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent(ANALYTICS_CONSENT_EVENT));
+      window.dispatchEvent(new CustomEvent(POLICY_AUDIT_EVENT, {
+        detail: { choice: "essential-only", policyVersion: POLICY_VERSION, effectiveDate: POLICY_EFFECTIVE_DATE },
+      }));
     }
     setVisible(false);
     if (typeof window !== "undefined" && "gtag" in window) {

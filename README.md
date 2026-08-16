@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/Universal Music Store%20Logo%20Design(white).png" alt="UNIVERSAL MUSIC STORE" width="800" />
+  <img src="./public/UVS/UVS_logo_landscape.png" alt="UNIVERSAL MUSIC STORE" width="800" />
 </div>
 
 # Universal Music Store

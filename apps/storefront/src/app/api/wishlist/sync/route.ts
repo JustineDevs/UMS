@@ -2,15 +2,14 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { applyRateLimit } from "@/lib/cart-api-helpers";
+import { fetchProductBySlug } from "@/lib/catalog-medusa-fetch";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
-type WishlistEntry = {
-  slug: string;
-  name: string;
-  medusaProductId?: string;
-  addedAt?: string;
-};
+const syncSchema = z.object({
+  items: z.array(z.object({ slug: z.string().trim().min(1).max(200) }).strict()).max(200),
+}).strict();
 
 /**
  * POST /api/wishlist/sync
@@ -31,34 +30,25 @@ export async function POST(req: Request) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({})) as { items?: unknown[] };
-  const rawItems = Array.isArray(body.items) ? body.items : [];
-  const items: WishlistEntry[] = [];
-  for (const row of rawItems) {
-    if (!row || typeof row !== "object") continue;
-    const o = row as Record<string, unknown>;
-    const slug = typeof o.slug === "string" ? o.slug.trim() : "";
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (!slug || !name) continue;
-    items.push({
-      slug,
-      name,
-      medusaProductId:
-        typeof o.medusaProductId === "string" ? o.medusaProductId.trim() : undefined,
-      addedAt: typeof o.addedAt === "string" ? o.addedAt : undefined,
-    });
-  }
+  const parsed = syncSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Invalid saved items" }, { status: 400 });
+  const products = await Promise.all(
+    parsed.data.items.map(async ({ slug }) => {
+      const product = await fetchProductBySlug(slug);
+      return product.kind === "ok" ? product.product : null;
+    }),
+  );
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) return Response.json({ error: "Database unavailable" }, { status: 503 });
 
-  if (items.length > 0) {
-    const rows = items.slice(0, 200).map((item) => ({
+  if (products.length > 0) {
+    const rows = products.filter((product): product is NonNullable<typeof product> => Boolean(product)).map((product) => ({
       medusa_customer_id: customerId!.trim(),
-      product_slug: item.slug,
-      product_name: item.name,
-      medusa_product_id: item.medusaProductId ?? null,
-      added_at: item.addedAt ?? new Date().toISOString(),
+      product_slug: product.slug,
+      product_name: product.name,
+      medusa_product_id: product.id,
+      added_at: new Date().toISOString(),
     }));
 
     const { error } = await sb

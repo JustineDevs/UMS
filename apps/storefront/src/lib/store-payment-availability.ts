@@ -16,7 +16,11 @@ function matchesProvider(row: ConnectionRow, provider: PaymentProviderKey): bool
 export function filterConnectedPaymentProviders(
   regionKeys: PaymentProviderKey[],
   connections: ConnectionRow[],
-  options: { xenditConfigured: boolean },
+  options: {
+    xenditConfigured: boolean;
+    stripeConfigured?: boolean;
+    paypalConfigured?: boolean;
+  },
 ): PaymentProviderKey[] {
   const keys = new Set(regionKeys);
   const active = connections.filter((row) => row.active === true);
@@ -25,6 +29,8 @@ export function filterConnectedPaymentProviders(
     if (key === "XENDIT") {
       return options.xenditConfigured || active.some((row) => matchesProvider(row, key));
     }
+    if (key === "STRIPE" && options.stripeConfigured) return true;
+    if (key === "PAYPAL" && options.paypalConfigured) return true;
     return active.some((row) => matchesProvider(row, key));
   }).filter((key) => keys.has(key));
 }
@@ -43,8 +49,17 @@ export async function resolveStorePaymentProviders(
     process.env.XENDIT_SECRET_KEY?.trim() &&
       process.env.XENDIT_WEBHOOK_TOKEN?.trim(),
   );
-  if (!supabase) {
-    return filterConnectedPaymentProviders(regionKeys, [], { xenditConfigured });
+  const directCredentialsAllowed =
+    process.env.NODE_ENV !== "production" ||
+    process.env.E2E_ALLOW_DIRECT_PAYMENT_CREDENTIALS === "true";
+  const stripeConfigured = directCredentialsAllowed && Boolean(process.env.STRIPE_API_KEY?.trim());
+  const paypalConfigured = directCredentialsAllowed && Boolean(
+    process.env.PAYPAL_CLIENT_ID?.trim() &&
+      process.env.PAYPAL_CLIENT_SECRET?.trim() &&
+      process.env.PAYPAL_ENVIRONMENT?.trim().toLowerCase() === "sandbox",
+  );
+  if (!supabase || !organizationId) {
+    return regionKeys.includes("COD") ? ["COD"] : [];
   }
 
   let query = supabase
@@ -55,13 +70,9 @@ export async function resolveStorePaymentProviders(
   if (error) return [];
 
   const rows = (data ?? []) as ConnectionRow[];
-  if (!organizationId) {
-    const organizations = new Set(
-      rows
-        .map((row) => (typeof row.organization_id === "string" ? row.organization_id : ""))
-        .filter(Boolean),
-    );
-    if (organizations.size > 1) return regionKeys.includes("COD") ? ["COD"] : [];
-  }
-  return filterConnectedPaymentProviders(regionKeys, rows, { xenditConfigured });
+  return filterConnectedPaymentProviders(regionKeys, rows, {
+    xenditConfigured,
+    stripeConfigured,
+    paypalConfigured,
+  });
 }

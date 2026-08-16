@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { PolicyMeta } from "@/lib/policy-content";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Terms",
@@ -12,10 +13,9 @@ export const metadata: Metadata = buildPageMetadata({
 export default function TermsPage() {
   return (
     <main className="storefront-page-shell max-w-3xl font-body leading-relaxed text-on-surface-variant">
-      <h1 className="font-headline text-4xl font-bold text-primary mb-8">
-        Terms
-      </h1>
-      <p className="mb-6">
+      <h1 className="font-headline text-4xl font-bold text-primary">Terms</h1>
+      <PolicyMeta policy="Terms" />
+      <p className="mb-6 mt-8">
         By using this storefront you agree to purchase goods from{" "}
         <strong>Universal Music Store</strong> under the prices,
         descriptions, and policies shown at checkout. Product images and

@@ -20,14 +20,17 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setBusy(true);
+    const formData = new FormData(e.currentTarget);
+    const submittedEmail = String(formData.get("email") ?? email).trim();
+    const submittedPassword = String(formData.get("password") ?? password);
     try {
       const res = await signIn("e2e-credentials", {
-        email: email.trim(),
-        password,
+        email: submittedEmail,
+        password: submittedPassword,
         callbackUrl,
         redirect: false,
       });
@@ -75,6 +78,7 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
         <Input
           id="e2e-admin-email"
           data-testid="e2e-admin-email"
+          name="email"
           type="email"
           autoComplete="username"
           value={email}
@@ -87,6 +91,7 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
         <Input
           id="e2e-admin-password"
           data-testid="e2e-admin-password"
+          name="password"
           type="password"
           autoComplete="current-password"
           value={password}

@@ -48,6 +48,7 @@ export async function medusaAdminFetch(
 
   const headers = new Headers(init?.headers);
   headers.set("Authorization", secretApiKeyBasicAuthorization(secret));
+  headers.set("User-Agent", "UVS-Storefront-Medusa-Client/1.0");
   if (
     init?.body &&
     init.method !== "GET" &&

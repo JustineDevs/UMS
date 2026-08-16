@@ -9,6 +9,8 @@
     "cleanup:dev": "node scripts/cleanup-dev-runtime.cjs",
     "commit:sh": "bash scripts/commit/parallel-commit.sh",
     "security:check": "node scripts/commit/cli/index.js security",
+    "verify:matrix-evidence": "node scripts/verify-matrix-evidence.cjs",
+    "write:matrix-evidence": "node scripts/write-matrix-evidence.cjs",
     "bruno:generate": "node scripts/generate-bruno-collection.mjs",
     "build": "pnpm exec turbo build",
     "lint": "pnpm exec turbo lint",
@@ -62,6 +64,7 @@
     "version-packages": "changeset version"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@changesets/cli": "^2.30.0",
     "@next/eslint-plugin-next": "^15.0.0",
     "@playwright/test": "^1.49.0",

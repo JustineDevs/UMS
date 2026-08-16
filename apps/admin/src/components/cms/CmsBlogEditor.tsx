@@ -7,6 +7,7 @@ import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { CatalogMediaPickerDialog } from "@/components/catalog/CatalogMediaPickerDialog";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type Post = {
   id: string;
@@ -74,7 +75,7 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
       .filter(Boolean);
     const r = await fetch(`/api/admin/cms/blog/${postId}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({
         ...row,
         tags,
@@ -347,6 +348,7 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
             if (!confirm("Delete this post?")) return;
             const r = await fetch(`/api/admin/cms/blog/${postId}`, {
               method: "DELETE",
+              headers: cmsMutationHeaders(),
             });
             if (r.ok) router.push("/admin/cms/blog");
             else setError("Delete failed");

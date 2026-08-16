@@ -6,6 +6,7 @@ import {
 } from "@universal-music-store/platform-data";
 import { useSession } from "next-auth/react";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type Sub = {
   id: string;
@@ -114,7 +115,7 @@ export function CmsFormsTable() {
   const markRead = async (id: string, read: boolean) => {
     const r = await fetch(`/api/admin/cms/forms/submissions/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({ read_at: read ? new Date().toISOString() : null }),
     });
     if (r.ok) load();
@@ -123,7 +124,7 @@ export function CmsFormsTable() {
   const assign = async (id: string, assigned_to: string) => {
     const r = await fetch(`/api/admin/cms/forms/submissions/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({ assigned_to: assigned_to.trim() || null }),
     });
     if (r.ok) load();
@@ -132,7 +133,7 @@ export function CmsFormsTable() {
   const saveSettings = async () => {
     const r = await fetch("/api/admin/cms/forms/settings", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({
         webhook_url: webhookUrl.trim() || null,
         notify_email: notifyEmail.trim() || null,

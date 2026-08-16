@@ -86,6 +86,10 @@ test.describe("@checkout @cod COD checkout flow", () => {
   });
 
   test("COD order appears in admin with status pending", async ({ page }) => {
+    if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
+      test.skip(true, "Admin auth disabled; run with staff E2E credentials for admin order proof.");
+      return;
+    }
     if (!createdCodOrderId) {
       test.skip(true, "COD order id was not captured from the checkout flow");
       return;

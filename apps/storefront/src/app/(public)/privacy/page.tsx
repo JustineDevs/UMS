@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { PolicyMeta } from "@/lib/policy-content";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Privacy policy",
@@ -16,9 +17,7 @@ export default function PrivacyPage() {
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
         Privacy policy
       </h1>
-      <p className="mt-3 text-sm text-on-surface-variant">
-        Last updated: {new Date().getFullYear()}
-      </p>
+      <PolicyMeta policy="Privacy policy" />
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <section>
           <h2 className="text-xl font-bold">Who we are</h2>

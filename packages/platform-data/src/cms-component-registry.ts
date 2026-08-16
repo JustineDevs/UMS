@@ -36,7 +36,11 @@ export const CMS_COMPONENT_DEFINITIONS: CmsComponentDefinition[] = [
     version: 1,
     structure: "header > brand + navigation + actions",
     styleTokens: tokens,
-    props: [prop("editorHref", "Content settings", "url", "/admin/cms/navigation")],
+    props: [
+      prop("brandLabel", "Brand label", "text", "Storefront"),
+      prop("accountLabel", "Account label", "text", "Account"),
+      prop("bagLabel", "Bag label", "text", "Bag"),
+    ],
     slots: [
       { name: "navigation", label: "Navigation", allowedComponentIds: ["header-navigation"] },
       { name: "actions", label: "Actions", allowedComponentIds: ["header-actions"] },
@@ -58,7 +62,10 @@ export const CMS_COMPONENT_DEFINITIONS: CmsComponentDefinition[] = [
     version: 1,
     structure: "footer > brand + columns + social",
     styleTokens: tokens,
-    props: [prop("editorHref", "Content settings", "url", "/admin/cms/navigation")],
+    props: [
+      prop("brandLabel", "Brand label", "text", "Storefront"),
+      prop("columnsLabel", "Columns label", "text", "Storefront footer columns"),
+    ],
     slots: [{ name: "columns", label: "Footer columns", multiple: true }],
     variants: [
       { id: "default", label: "Default" },
@@ -170,6 +177,34 @@ export function getCmsComponentDefinition(id: string | undefined) {
   return DEFINITION_BY_ID.get(id) ?? DEFINITION_BY_ID.get(id.replaceAll("_", "-"));
 }
 
+/** Resolve persisted inheritance without mutating either definition. */
+export function resolveCmsComponentDefinition(
+  definitions: CmsComponentDefinition[],
+  id: string,
+): CmsComponentDefinition | undefined {
+  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
+  const visiting = new Set<string>();
+  const resolve = (key: string): CmsComponentDefinition | undefined => {
+    const current = byId.get(key);
+    if (!current || visiting.has(key)) return current;
+    visiting.add(key);
+    const parent = current.extendsComponentId ? resolve(current.extendsComponentId) : undefined;
+    visiting.delete(key);
+    if (!parent) return current;
+    const mergeBy = <T>(items: T[], keyOf: (_item: T) => string) =>
+      [...new Map(items.map((item) => [keyOf(item), item])).values()];
+    return {
+      ...parent,
+      ...current,
+      props: mergeBy([...parent.props, ...current.props], (item) => item.key),
+      slots: mergeBy([...parent.slots, ...current.slots], (item) => item.name),
+      variants: mergeBy([...parent.variants, ...current.variants], (item) => item.id),
+      styleTokens: { ...parent.styleTokens, ...current.styleTokens },
+    };
+  };
+  return resolve(id);
+}
+
 export function getCmsVariant(definition: CmsComponentDefinition | undefined, variantId?: string) {
   if (!definition) return undefined;
   return definition.variants.find((variant) => variant.id === (variantId ?? definition.defaultVariantId)) ?? definition.variants[0];
@@ -178,7 +213,12 @@ export function getCmsVariant(definition: CmsComponentDefinition | undefined, va
 export function resolveCmsInstanceProps(instance: Pick<CmsComponentInstance, "componentId" | "variantId" | "props">) {
   const definition = getCmsComponentDefinition(instance.componentId);
   const variant = getCmsVariant(definition, instance.variantId);
-  return { ...(variant?.props ?? {}), ...instance.props };
+  const defaults = Object.fromEntries(
+    (definition?.props ?? [])
+      .filter((item) => item.defaultValue !== undefined)
+      .map((item) => [item.key, item.defaultValue]),
+  );
+  return { ...defaults, ...(variant?.props ?? {}), ...instance.props };
 }
 
 export function componentInstanceFromBlock(block: CmsBlock): CmsComponentInstance {

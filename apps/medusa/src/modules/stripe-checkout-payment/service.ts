@@ -156,7 +156,8 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
 
     const ctxCurrency = (
       input.context as { currency_code?: string } | undefined
-    )?.currency_code?.trim().toLowerCase();
+    )?.currency_code?.trim().toLowerCase() ||
+      (input.data as { currency_code?: string } | undefined)?.currency_code?.trim().toLowerCase();
     const envFallback = process.env.STRIPE_CHECKOUT_FALLBACK_CURRENCY?.trim().toLowerCase();
     const currency =
       ctxCurrency && ctxCurrency.length === 3

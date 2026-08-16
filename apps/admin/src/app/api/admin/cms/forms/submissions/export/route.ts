@@ -43,6 +43,7 @@ export async function GET(req: NextRequest) {
   let query = sup.client
     .from("cms_form_submissions")
     .select("id,form_key,created_at,read_at,assigned_to,spam_score,payload")
+    .eq("organization_id", organization.id)
     .order("created_at", { ascending: false })
     .limit(1000);
   if (formKey) query = query.eq("form_key", formKey);

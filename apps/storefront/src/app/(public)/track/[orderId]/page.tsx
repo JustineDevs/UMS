@@ -49,12 +49,7 @@ export default async function TrackPage({
     (orderId.startsWith("order_") || orderId.startsWith("cart_")) &&
     verifyTrackingToken(orderId, token!);
 
-  const legacyNoTokenOk =
-    !secretSet &&
-    process.env.NODE_ENV !== "production" &&
-    (orderId.startsWith("order_") || orderId.startsWith("cart_"));
-
-  if (!hasValidToken && !legacyNoTokenOk) {
+  if (!secretSet || !hasValidToken) {
     return (
       <main className="storefront-page-shell max-w-2xl text-center">
         <h1 className="font-headline text-2xl font-bold text-primary mb-4">

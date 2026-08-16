@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   componentInstanceFromBlock,
   getCmsComponentDefinition,
+  resolveCmsComponentDefinition,
   resolveCmsInstanceProps,
 } from "./cms-component-registry.js";
 
@@ -42,4 +43,22 @@ test("definitions expose builder matching and editor metadata", () => {
   assert.equal(definition.responsive, true);
   assert.deepEqual(definition.toolbar, ["move", "duplicate", "delete"]);
   assert.equal(definition.props[0]?.section, "content");
+});
+
+test("resolves inherited definitions with child overrides", () => {
+  const parent = getCmsComponentDefinition("hero");
+  assert.ok(parent);
+  const child = {
+    ...parent,
+    id: "hero-child",
+    name: "Child hero",
+    extendsComponentId: "hero",
+    props: [{ key: "title", label: "Child title", type: "text" as const }],
+    styleTokens: { accent: "#111827" },
+  };
+  const resolved = resolveCmsComponentDefinition([parent, child], "hero-child");
+  assert.ok(resolved);
+  assert.equal(resolved.props.find((item) => item.key === "title")?.label, "Child title");
+  assert.equal(resolved.styleTokens.accent, "#111827");
+  assert.ok(resolved.slots.some((slot) => slot.name === "actions"));
 });

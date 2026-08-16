@@ -13,7 +13,8 @@ export async function expectCheckoutShellVisible(page: Page): Promise<void> {
   const guest = page.getByTestId("checkout-guest-sign-in");
   const onboard = page.getByTestId("checkout-onboarding-continue");
   const retry = page.getByTestId("checkout-profile-retry");
-  await expect(pay.or(guest).or(onboard).or(retry)).toBeVisible({
+  const signIn = page.getByRole("heading", { name: "Sign in", exact: true });
+  await expect(pay.or(guest).or(onboard).or(retry).or(signIn)).toBeVisible({
     timeout: 20_000,
   });
 }

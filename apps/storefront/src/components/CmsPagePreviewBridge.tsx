@@ -2,12 +2,16 @@
 
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { sanitizeSafeUrl } from "@universal-music-store/sdk";
+import { z } from "zod";
 import { useEffect } from "react";
 
 type DraftBlock = {
   id: string;
+  componentId?: string;
   props?: Record<string, unknown>;
+  styles?: Record<string, unknown>;
   styleOverrides?: Record<string, unknown>;
+  slots?: Record<string, DraftBlock[]>;
 };
 
 type BuilderMessage = {
@@ -15,6 +19,7 @@ type BuilderMessage = {
   id?: unknown;
   mode?: unknown;
   blocks?: unknown;
+  tree?: unknown;
   prop?: unknown;
   value?: unknown;
 };
@@ -37,10 +42,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function draftBlocks(value: unknown): DraftBlock[] {
+  const result: DraftBlock[] = [];
+  const visit = (item: unknown) => {
+    if (!isRecord(item) || typeof item.id !== "string" || item.id.length > 200) return;
+    result.push({
+      id: item.id,
+      componentId: typeof item.componentId === "string" ? item.componentId : undefined,
+      props: isRecord(item.props) ? item.props : undefined,
+      styles: isRecord(item.styles) ? item.styles : undefined,
+      styleOverrides: isRecord(item.styleOverrides) ? item.styleOverrides : undefined,
+      slots: isRecord(item.slots) ? {} : undefined,
+    });
+    if (isRecord(item.slots)) {
+      Object.values(item.slots).forEach((children) => {
+        if (Array.isArray(children)) children.forEach(visit);
+      });
+    }
+  };
+  if (Array.isArray(value)) value.forEach(visit);
+  return result;
+}
+
+function draftTree(value: unknown): DraftBlock[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is DraftBlock => {
-    return isRecord(item) && typeof item.id === "string" && item.id.length <= 200;
-  });
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const item of value) {
+    if (isRecord(item) && typeof item.id === "string") byId.set(item.id, item);
+  }
+  const result: DraftBlock[] = [];
+  const visit = (id: string) => {
+    const item = byId.get(id);
+    if (!item) return;
+    result.push({
+      id,
+      componentId: typeof item.componentId === "string" ? item.componentId : undefined,
+      props: isRecord(item.props) ? item.props : undefined,
+      styles: isRecord(item.styles) ? item.styles : undefined,
+      slots: {},
+    });
+    if (Array.isArray(item.children)) {
+      for (const child of item.children) if (typeof child === "string") visit(child);
+    }
+  };
+  for (const item of byId.values()) {
+    if (item.parentId === null || item.parentId === undefined) visit(item.id as string);
+  }
+  return result;
 }
 
 function safeText(value: unknown) {
@@ -69,6 +116,55 @@ function setSafeStyle(node: HTMLElement, key: string, value: unknown) {
   node.style.setProperty(key, value);
 }
 
+const semanticTags = new Set([
+  "div",
+  "section",
+  "article",
+  "header",
+  "nav",
+  "main",
+  "aside",
+  "footer",
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "button",
+  "a",
+  "ul",
+  "ol",
+  "li",
+]);
+
+function applyAccessibility(node: HTMLElement, value: unknown): HTMLElement {
+  if (!isRecord(value)) return node;
+  const semanticTag = typeof value.semanticTag === "string" ? value.semanticTag : "";
+  if (semanticTags.has(semanticTag) && node.tagName.toLowerCase() !== semanticTag) {
+    const replacement = document.createElement(semanticTag);
+    for (const attribute of Array.from(node.attributes)) {
+      replacement.setAttribute(attribute.name, attribute.value);
+    }
+    replacement.replaceChildren(...Array.from(node.childNodes));
+    node.replaceWith(replacement);
+    node = replacement;
+  }
+  if (semanticTags.has(semanticTag)) node.dataset.cmsSemanticTag = semanticTag;
+  for (const [key, attribute] of [
+    ["ariaLabel", "aria-label"],
+    ["ariaDescription", "aria-description"],
+    ["role", "role"],
+    ["tabIndex", "tabindex"],
+  ] as const) {
+    const next = value[key];
+    if (next === undefined || next === null || next === "") node.removeAttribute(attribute);
+    else node.setAttribute(attribute, String(next).slice(0, 200));
+  }
+  return node;
+}
+
 const editableDomStyles = new Set([
   "display",
   "position",
@@ -81,7 +177,33 @@ const editableDomStyles = new Set([
   "font-size",
   "font-weight",
   "border-radius",
+  "gap",
+  "align-items",
+  "justify-content",
+  "grid-template-columns",
+  "min-width",
+  "max-width",
+  "min-height",
+  "max-height",
+  "line-height",
+  "letter-spacing",
+  "border",
+  "box-shadow",
+  "object-fit",
+  "object-position",
+  "background-size",
+  "background-position",
 ]);
+
+const builderMessageSchema = z.object({
+  source: z.string().max(64),
+  id: z.string().max(200).optional(),
+  prop: z.string().max(100).optional(),
+  value: z.string().max(100_000).optional(),
+  blocks: z.unknown().optional(),
+  tree: z.unknown().optional(),
+  mode: z.string().max(32).optional(),
+});
 
 function applyDomEdit(node: HTMLElement, property: string, value: string) {
   if (property === "textContent" && node.children.length === 0) {
@@ -107,6 +229,7 @@ function applyDomEdit(node: HTMLElement, property: string, value: string) {
 
 function applyDraft(root: HTMLElement, block: DraftBlock) {
   const props = isRecord(block.props) ? block.props : {};
+  root = applyAccessibility(root, props.accessibility);
   const nodes = [root, ...Array.from(root.querySelectorAll<HTMLElement>("[data-cms-prop], [data-cms-url-prop]"))];
   for (const node of nodes) {
     const prop = node.dataset.cmsProp;
@@ -142,6 +265,9 @@ function applyDraft(root: HTMLElement, block: DraftBlock) {
   }
   if (isRecord(block.styleOverrides)) {
     for (const [key, value] of Object.entries(block.styleOverrides)) setSafeStyle(root, key, value);
+  }
+  if (isRecord(block.styles)) {
+    for (const [key, value] of Object.entries(block.styles)) setSafeStyle(root, `--cms-${key}`, value);
   }
 }
 
@@ -248,6 +374,22 @@ export function CmsPagePreviewBridge() {
                 "font-size",
                 "font-weight",
                 "border-radius",
+                "gap",
+                "align-items",
+                "justify-content",
+                "grid-template-columns",
+                "min-width",
+                "max-width",
+                "min-height",
+                "max-height",
+                "line-height",
+                "letter-spacing",
+                "border",
+                "box-shadow",
+                "object-fit",
+                "object-position",
+                "background-size",
+                "background-position",
               ].reduce<Record<string, string>>((result, property) => {
                 const value = node.style.getPropertyValue(property);
                 if (value) result[property] = value;
@@ -269,19 +411,21 @@ export function CmsPagePreviewBridge() {
       send("cms-builder", node);
     };
     const onMessage = (event: MessageEvent<BuilderMessage>) => {
-      if (event.source !== window.parent || event.origin !== origin || !isRecord(event.data)) return;
-      if (event.data.source === "cms-builder-select") {
-        const id = typeof event.data.id === "string" ? event.data.id : "";
+      if (event.source !== window.parent || event.origin !== origin) return;
+      const message = builderMessageSchema.safeParse(event.data);
+      if (!message.success) return;
+      if (message.data.source === "cms-builder-select") {
+        const id = message.data.id ?? "";
         const node = id ? findNode(id) : null;
         markSelected(node);
         if (node) node.scrollIntoView({ block: "nearest" });
         send("cms-builder", node);
         return;
       }
-      if (event.data.source === "cms-builder-dom-edit") {
-        const id = typeof event.data.id === "string" ? event.data.id : "";
-        const property = typeof event.data.prop === "string" ? event.data.prop : "";
-        const value = typeof event.data.value === "string" ? event.data.value : "";
+      if (message.data.source === "cms-builder-dom-edit") {
+        const id = message.data.id ?? "";
+        const property = message.data.prop ?? "";
+        const value = message.data.value ?? "";
         if (!selectedNode || selectedNode.dataset.cmsId !== id || !property || value.length > 100_000) return;
         if (!applyDomEdit(selectedNode, property, value)) return;
         window.parent.postMessage(
@@ -297,8 +441,11 @@ export function CmsPagePreviewBridge() {
         send("cms-builder", selectedNode);
         return;
       }
-      if (event.data.source !== "cms-builder-draft") return;
-      for (const block of draftBlocks(event.data.blocks)) {
+      if (message.data.source !== "cms-builder-draft") return;
+      const draft = message.data.tree
+        ? draftTree(message.data.tree)
+        : draftBlocks(message.data.blocks);
+      for (const block of draft) {
         const root = findNode(block.id);
         if (root) applyDraft(root, block);
       }

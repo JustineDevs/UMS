@@ -1,6 +1,6 @@
 import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { listCmsPages, upsertCmsPage, type CmsBlock } from "@universal-music-store/platform-data";
+import { getCmsPageBySlugAdmin, listCmsPages, upsertCmsPage, type CmsBlock } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -13,10 +13,15 @@ export async function GET(req: NextRequest) {
   const auth = await requireStaffApiSession("content:read");
   if (!auth.ok) return auth.response;
   const locale = req.nextUrl.searchParams.get("locale") ?? undefined;
+  const slug = req.nextUrl.searchParams.get("slug") ?? undefined;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
   if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
+  if (slug) {
+    const page = await getCmsPageBySlugAdmin(sup.client, slug, locale ?? "en", organization.id);
+    return correlatedJson(cid, { data: page ? [page] : [] });
+  }
   const data = await listCmsPages(sup.client, { locale, organizationId: organization.id });
   return correlatedJson(cid, { data });
 }
@@ -39,7 +44,9 @@ async function post(req: NextRequest) {
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid page payload" }, { status: 400 });
   const merged = await upsertCmsPage(sup.client, {
     ...parsed.data,
+    expectedVersion: parsed.data.expectedVersion,
     blocks: parsed.data.blocks as CmsBlock[] | undefined,
+    mutations: parsed.data.mutations,
     organization_id: organization.id,
   });
   if (!merged) {

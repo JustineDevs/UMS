@@ -13,7 +13,7 @@ describe("mergeStorefrontHomePayload", () => {
     assert.equal(m.hero.style.headlineFont, DEFAULT_STOREFRONT_HOME_PAYLOAD.hero.style.headlineFont);
   });
 
-  it("merges partial hero and tiles", () => {
+  it("merges partial hero and preserves the editable tile collection", () => {
     const m = mergeStorefrontHomePayload({
       hero: { line1: "CUSTOM", style: { headlineSize: "compact", contentWidth: "extra" } },
       tiles: [{ title: "A" }, { href: "/x" }],
@@ -24,7 +24,18 @@ describe("mergeStorefrontHomePayload", () => {
     assert.equal(m.hero.style.contentWidth, "extra");
     assert.equal(m.tiles[0].title, "A");
     assert.equal(m.tiles[1].href, "/x");
-    assert.equal(m.tiles[2].title, DEFAULT_STOREFRONT_HOME_PAYLOAD.tiles[2].title);
+    assert.equal(m.tiles.length, 2);
+  });
+
+  it("preserves additional category tiles beyond the default layout", () => {
+    const m = mergeStorefrontHomePayload({
+      tiles: [
+        ...DEFAULT_STOREFRONT_HOME_PAYLOAD.tiles,
+        { title: "Studio", href: "/shop?category=Studio", imageUrl: "", linkLabel: "Shop", variant: "small" },
+      ],
+    });
+    assert.equal(m.tiles.length, 4);
+    assert.equal(m.tiles[3].title, "Studio");
   });
 
   it("drops stale external image URLs from home payloads", () => {

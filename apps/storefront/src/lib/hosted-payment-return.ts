@@ -1,3 +1,5 @@
+import { sanitizeSafeUrl } from "@universal-music-store/sdk";
+
 export const PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY =
   "payment_checkout_correlation_id";
 
@@ -9,6 +11,28 @@ const PROVIDER_LABELS: Record<HostedReturnProvider, string> = {
   paypal: "PayPal",
   xendit: "Xendit",
 };
+
+const HOSTED_CHECKOUT_ORIGINS: Record<HostedReturnProvider, readonly string[]> = {
+  stripe: ["https://checkout.stripe.com"],
+  paypal: ["https://www.paypal.com", "https://www.sandbox.paypal.com"],
+  xendit: [
+    "https://checkout.xendit.co",
+    "https://checkout-staging.xendit.co",
+    "https://dev.xen.to",
+  ],
+};
+
+export function sanitizeHostedCheckoutUrl(
+  provider: HostedReturnProvider,
+  value: unknown,
+): string | null {
+  return sanitizeSafeUrl(value, {
+    allowedOrigins: HOSTED_CHECKOUT_ORIGINS[provider],
+    requireHttps: true,
+    allowRelative: false,
+    preserveFragment: true,
+  });
+}
 
 export function normalizeHostedReturnProvider(
   raw: string | undefined,
@@ -24,9 +48,8 @@ export function normalizeHostedReturnStatus(
   raw: string | undefined,
 ): HostedReturnStatus {
   const value = raw?.trim().toLowerCase();
-  if (value === "cancel" || value === "failure") {
-    return value;
-  }
+  if (value === "cancel" || value === "canceled" || value === "cancelled") return "cancel";
+  if (value === "failure" || value === "failed" || value === "expired" || value === "error") return "failure";
   return "success";
 }
 

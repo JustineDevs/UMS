@@ -443,6 +443,17 @@ export async function listStalePaymentAttempts(
   return listStuckPaymentAttempts(supabase, limit);
 }
 
+export async function claimPaymentAttemptForFinalization(
+  supabase: SupabaseClient,
+  correlationId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("claim_payment_attempt_for_finalization", {
+    p_correlation_id: correlationId,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function listRecentPaymentAttempts(
   supabase: SupabaseClient,
   limit: number,

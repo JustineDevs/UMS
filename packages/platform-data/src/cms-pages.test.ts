@@ -1,6 +1,71 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getCmsPageById } from "./cms-pages.js";
+import {
+  cmsBlocksToTree,
+  cmsTreeToBlocks,
+  getCmsPageById,
+  normalizeCmsTree,
+} from "./cms-pages.js";
+
+test("normalizes persisted trees without dropping unknown nodes", () => {
+  const tree = normalizeCmsTree([
+    { id: "root", componentId: "future-layout", parentId: null, slot: null, props: { keep: true }, children: ["child", "missing"] },
+    { id: "child", componentId: "future-widget", parentId: "root", slot: "content", props: {}, children: [] },
+    { id: "orphan", componentId: "future-orphan", parentId: "missing", slot: "x", props: {}, children: [] },
+  ]);
+  assert.deepEqual(tree.map((node) => [node.id, node.parentId]), [["root", null], ["child", "root"], ["orphan", null]]);
+  assert.deepEqual(tree[0]?.children, ["child"]);
+  assert.equal(cmsTreeToBlocks(tree)[0]?.componentId, "future-layout");
+  assert.equal(cmsTreeToBlocks(tree)[0]?.slots?.content[0]?.componentId, "future-widget");
+});
+
+test("canonical CMS tree round-trips nested slots without losing block metadata", () => {
+  const blocks = [{
+    id: "hero_1",
+    type: "hero",
+    componentId: "hero",
+    variantId: "split",
+    props: { title: "Launch" },
+    styleOverrides: { "--cms-accent": "var(--color-primary)" },
+    slots: {
+      actions: [{
+        id: "cta_1",
+        componentId: "cta-row",
+        variantId: "outline",
+        props: { label: "Shop" },
+        slots: { icon: [{ id: "icon_1", componentId: "icon", props: {}, slots: {} }] },
+      }],
+    },
+  }];
+  const tree = cmsBlocksToTree(blocks);
+  const roundTrip = cmsTreeToBlocks(tree);
+  assert.equal(roundTrip[0].type, "hero");
+  assert.equal(roundTrip[0].variantId, "split");
+  assert.deepEqual(roundTrip[0].props, { title: "Launch" });
+  assert.equal(roundTrip[0].slots?.actions[0].componentId, "cta-row");
+  assert.equal(roundTrip[0].slots?.actions[0].slots.icon[0].componentId, "icon");
+  assert.equal(tree.find((node) => node.id === "icon_1")?.parentId, "cta_1");
+});
+
+test("unsupported CMS tree nodes stay identifiable instead of becoming rich text", () => {
+  const tree = normalizeCmsTree([
+    {
+      id: "future_1",
+      componentId: "future-component",
+      blockType: "future_block",
+      parentId: null,
+      slot: null,
+      props: { source: "future" },
+      styles: {},
+      children: [],
+    },
+  ]);
+
+  const [block] = cmsTreeToBlocks(tree);
+  assert.equal(block.type, "future_block");
+  assert.equal(block.componentId, "future-component");
+  assert.deepEqual(block.props, { source: "future" });
+});
 
 test("getCmsPageById preserves modular component slots and variants", async () => {
   const supabase = {

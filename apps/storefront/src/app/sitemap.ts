@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { DEFAULT_PUBLIC_SITE_ORIGIN, loadCmsSitemapEntries } from "@universal-music-store/sdk";
-import { fetchProductSlugsForSitemap } from "@/lib/catalog-fetch";
+import { fetchCategorySummaries, fetchProductSlugsForSitemap } from "@/lib/catalog-fetch";
 
 export const revalidate = 3600;
 
@@ -18,6 +18,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/privacy",
     "/terms",
     "/sitemap",
+    "/cookies",
+    "/accessibility",
+    "/shipping",
+    "/returns",
+    "/warranty",
+    "/variant-guide",
+    "/preferences",
   ];
   const out: MetadataRoute.Sitemap = staticPaths.map((path) => ({
     url: `${base}${path}`,
@@ -27,7 +34,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   try {
-    const slugs = await fetchProductSlugsForSitemap(2000);
+    const [slugs, categories] = await Promise.all([
+      fetchProductSlugsForSitemap(),
+      fetchCategorySummaries(),
+    ]);
     for (const slug of slugs) {
       out.push({
         url: `${base}/shop/${encodeURIComponent(slug)}`,
@@ -35,6 +45,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "daily" as const,
         priority: 0.8,
       });
+    }
+    if (categories.kind === "ok") {
+      for (const category of categories.summaries) {
+        out.push({
+          url: `${base}/collections/${encodeURIComponent(category.category)}`,
+          lastModified: new Date(),
+          changeFrequency: "daily",
+          priority: 0.7,
+        });
+      }
     }
   } catch {
     /* Medusa optional at build time */

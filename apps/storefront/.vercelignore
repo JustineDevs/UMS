@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.next-production/
+test-results/
+playwright-report/
+coverage/
+.turbo/

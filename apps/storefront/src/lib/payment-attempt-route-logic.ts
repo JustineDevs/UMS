@@ -11,6 +11,8 @@ type PaymentAttemptRouteRow = {
   provider: string;
   status?: string;
   checkout_state?: string;
+  medusa_order_id?: string | null;
+  order_id?: string | null;
   quote_fingerprint?: string | null;
   stale_reason?: string | null;
 };
@@ -63,6 +65,7 @@ type FinalizeCheckoutIntentInput = {
   row: PaymentAttemptRouteRow | null;
   currentQuoteFingerprint?: string | null;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
+  claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
@@ -78,6 +81,7 @@ type CodPlaceOrderInput = {
   row: PaymentAttemptRouteRow | null;
   currentQuoteFingerprint?: string | null;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
+  claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
@@ -97,6 +101,20 @@ const WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR =
   "This payment session belongs to cash on delivery. Use the COD completion flow instead.";
 const START_QUOTE_CHANGED_ERROR =
   "Your order changed before payment could be started. Review the updated total before continuing.";
+
+function completedOrderResult(row: PaymentAttemptRouteRow): JsonRouteResult | null {
+  const orderId = row.medusa_order_id?.trim() || row.order_id?.trim();
+  if (row.status !== "completed" || !orderId) return null;
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      orderId,
+      redirectUrl: `/track/${encodeURIComponent(orderId)}`,
+      replayed: true,
+    },
+  };
+}
 
 export function reconcileCheckoutIntentQuote(input: {
   submittedQuoteFingerprint?: string;
@@ -286,6 +304,9 @@ export async function finalizeCheckoutIntentRouteLogic(
     return { status: 400, body: { error: WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR } };
   }
 
+  const completed = completedOrderResult(input.row);
+  if (completed) return completed;
+
   const staleMismatchMessage = await expireAttemptForQuoteMismatch({
     correlationId: input.correlationId,
     row: input.row,
@@ -298,12 +319,18 @@ export async function finalizeCheckoutIntentRouteLogic(
   }
 
   try {
-    await input.incrementFinalizeAttempts(input.correlationId);
+    const claimed = input.claimFinalizeAttempt
+      ? await input.claimFinalizeAttempt(input.correlationId)
+      : (await input.incrementFinalizeAttempts(input.correlationId), true);
+    if (!claimed) {
+      const completedAfterClaim = completedOrderResult(input.row);
+      return completedAfterClaim ?? {
+        status: 409,
+        body: { error: "Checkout finalization is already in progress" },
+      };
+    }
   } catch {
-    await input.updatePaymentAttempt(input.correlationId, {
-      status: "finalizing_order",
-      checkout_state: "finalizing_order",
-    });
+    return { status: 503, body: { error: "Payment finalization is temporarily unavailable" } };
   }
 
   try {
@@ -399,6 +426,9 @@ export async function codPlaceOrderRouteLogic(
     return { status: 400, body: { error: "Not a COD attempt" } };
   }
 
+  const completed = completedOrderResult(input.row);
+  if (completed) return completed;
+
   const staleMismatchMessage = await expireAttemptForQuoteMismatch({
     correlationId: input.correlationId,
     row: input.row,
@@ -411,12 +441,18 @@ export async function codPlaceOrderRouteLogic(
   }
 
   try {
-    await input.incrementFinalizeAttempts(input.correlationId);
+    const claimed = input.claimFinalizeAttempt
+      ? await input.claimFinalizeAttempt(input.correlationId)
+      : (await input.incrementFinalizeAttempts(input.correlationId), true);
+    if (!claimed) {
+      const completedAfterClaim = completedOrderResult(input.row);
+      return completedAfterClaim ?? {
+        status: 409,
+        body: { error: "Checkout finalization is already in progress" },
+      };
+    }
   } catch {
-    await input.updatePaymentAttempt(input.correlationId, {
-      status: "finalizing_order",
-      checkout_state: "finalizing_order",
-    });
+    return { status: 503, body: { error: "Order placement is temporarily unavailable" } };
   }
 
   try {

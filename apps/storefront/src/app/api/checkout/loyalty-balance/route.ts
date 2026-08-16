@@ -24,7 +24,10 @@ export async function GET(req: NextRequest): Promise<NextResponse | Response> {
     process.env.SUPABASE_ANON_KEY?.trim();
 
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ balance: 0, currency: "php" });
+    return NextResponse.json(
+      { error: "Loyalty balance is temporarily unavailable", code: "LOYALTY_UNAVAILABLE" },
+      { status: 503 },
+    );
   }
 
   try {
@@ -38,7 +41,10 @@ export async function GET(req: NextRequest): Promise<NextResponse | Response> {
 
     if (error) {
       console.error("[loyalty-balance] Supabase error:", error.message);
-      return NextResponse.json({ balance: 0, currency: "php" });
+      return NextResponse.json(
+        { error: "Loyalty balance is temporarily unavailable", code: "LOYALTY_UNAVAILABLE" },
+        { status: 503 },
+      );
     }
 
     const balance = data ? Number((data as { points_balance?: number }).points_balance ?? 0) : 0;
@@ -48,6 +54,9 @@ export async function GET(req: NextRequest): Promise<NextResponse | Response> {
       "[loyalty-balance] unexpected error:",
       err instanceof Error ? err.message : String(err),
     );
-    return NextResponse.json({ balance: 0, currency: "php" });
+    return NextResponse.json(
+      { error: "Loyalty balance is temporarily unavailable", code: "LOYALTY_UNAVAILABLE" },
+      { status: 503 },
+    );
   }
 }

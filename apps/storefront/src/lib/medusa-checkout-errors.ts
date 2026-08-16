@@ -41,6 +41,12 @@ export function formatMedusaCheckoutError(err: unknown): string {
     return "Checkout is temporarily unavailable. Please try again shortly or contact support if this continues.";
   }
   const raw = extractMedusaErrorText(err);
+  if (
+    (err instanceof Error && err.name === "AbortError") ||
+    /timed out|aborted/i.test(raw)
+  ) {
+    return "Checkout service took too long to respond. Please try again.";
+  }
   if (INTERNAL_ENV_ERROR_SNIPPETS.some((re) => re.test(raw))) {
     return "Checkout is temporarily unavailable. Please try again shortly or contact support if this continues.";
   }
@@ -106,7 +112,10 @@ export async function tryDeleteStoreCart(
   try {
     const res = await fetch(
       `${root}/store/carts/${encodeURIComponent(cartId)}?fields=id,*items`,
-      { headers: { "x-publishable-api-key": publishableKey } },
+      {
+        headers: { "x-publishable-api-key": publishableKey },
+        signal: AbortSignal.timeout(5_000),
+      },
     );
     if (res.status === 404 || !res.ok) return;
     const payload = (await res.json().catch(() => null)) as {
@@ -122,6 +131,7 @@ export async function tryDeleteStoreCart(
             {
               method: "DELETE",
               headers: { "x-publishable-api-key": publishableKey },
+              signal: AbortSignal.timeout(5_000),
             },
           ),
         ),

@@ -1,4 +1,5 @@
 import fs from "fs";
+import path from "path";
 import type { ConsoleMessage, Page, Request, Response } from "@playwright/test";
 import type { TestInfo } from "@playwright/test";
 
@@ -9,6 +10,7 @@ const consoleIssuesKey = Symbol("universal-music-storeConsoleIssuesHandlers");
 const browserRuntimeLogKey = Symbol("universal-music-storeBrowserRuntimeLogCleanup");
 
 function appendLine(filePath: string, line: string): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, `${line}\n`, "utf8");
 }
 

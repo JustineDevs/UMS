@@ -18,13 +18,32 @@ import {
   fillCheckoutShippingInfo,
   selectPaymentProvider,
   clickPayButton,
+  enablePublicTunnelBypass,
 } from "../helpers/checkout";
 import { signInAsAdmin } from "../fixtures/admin-auth";
 
 const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const storefrontBase =
+  process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+
+async function startXenditCheckout(
+  page: Parameters<typeof navigateToCheckout>[0],
+): Promise<void> {
+  await navigateToShopAndAddFirstProduct(page);
+  await navigateToCheckout(page);
+  await fillCheckoutShippingInfo(page);
+  const selected = await selectPaymentProvider(page, "xendit");
+  if (!selected) {
+    throw new Error(
+      `Xendit is configured but not selectable in the browser checkout. URL=${page.url()}`,
+    );
+  }
+  await clickPayButton(page);
+}
 
 test.describe("@checkout @xendit Xendit checkout flow", () => {
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
+    await enablePublicTunnelBypass(page);
     skipUnlessPspConfigured("xendit");
   });
 
@@ -35,28 +54,93 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
 
     const selected = await selectPaymentProvider(page, "xendit");
     if (!selected) {
-      test.skip(true, "Xendit payment option not visible on checkout page");
-      return;
+      throw new Error(
+        `Xendit is configured and visible in Medusa but not selectable in the browser checkout. URL=${page.url()}`,
+      );
     }
 
     await clickPayButton(page);
 
-    const hosted = await page
-      .waitForURL(/xendit|checkout/i, { timeout: 30_000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!hosted) {
-      await expect(page.getByTestId("order-confirmation").or(page.locator("[data-order-id]"))).toBeVisible({
-        timeout: 30_000,
-      });
-    }
+    const continuePayment = page.getByTestId("checkout-continue-payment");
+    await expect(continuePayment).toBeVisible({ timeout: 30_000 });
+    await continuePayment.click();
+    await page.waitForURL(/checkout(?:-staging)?\.xendit\.co|dev\.xen\.to/i, {
+      timeout: 30_000,
+    });
 
     await expect(
-      page.getByText(/xendit|payment|processing|confirm|order/i).first().or(page.locator("[data-testid='order-confirmation']")),
+      page
+        .getByText(/xendit|payment|processing|confirm|order/i)
+        .first()
+        .or(page.locator("[data-testid='order-confirmation']")),
     ).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole("button", { name: /^Cards\b/i }).click();
+    await page.getByLabel("Card Number").fill("4000000000001000");
+    await page.getByLabel("Card Expiry Date").fill("12/30");
+    await page.getByLabel("CVN").fill("123");
+    await page.getByLabel("First Name").fill("UVS");
+    await page.getByLabel("Last Name").fill("Sandbox");
+    await page.getByLabel("Email").fill("e2e@example.com");
+    await page.getByPlaceholder("905 123 4567").fill("9171234567");
+    await page.getByRole("button", { name: "Pay with Cards", exact: true }).click();
+    await page.waitForURL(/\/checkout\/hosted-return\?provider=xendit&status=success/i, {
+      timeout: 90_000,
+    });
+    await expect(page).toHaveURL(/\/track\/order_/i, { timeout: 90_000 });
+  });
+
+  test("Xendit failed payment return does not expose an order", async ({
+    page,
+  }) => {
+    await startXenditCheckout(page);
+    await page.goto(
+      `${storefrontBase}/checkout/hosted-return?provider=xendit&status=failed`,
+      {
+        waitUntil: "domcontentloaded",
+      },
+    );
+
+    await expect(page).not.toHaveURL(/\/track\/order_/i);
+    await expect(
+      page.getByText(/Xendit did not confirm your payment/i),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /back to checkout/i }),
+    ).toBeVisible();
+  });
+
+  test("Xendit expired payment return does not expose an order", async ({
+    page,
+  }) => {
+    await startXenditCheckout(page);
+    await page.goto(
+      `${storefrontBase}/checkout/hosted-return?provider=xendit&status=expired`,
+      {
+        waitUntil: "domcontentloaded",
+      },
+    );
+
+    await expect(page).not.toHaveURL(/\/track\/order_/i);
+    await expect(
+      page.getByText(/Xendit did not confirm your payment/i),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /back to checkout/i }),
+    ).toBeVisible();
   });
 
   test("admin sees Xendit order after successful payment", async ({ page }) => {
+    if (
+      process.env.AUTH_DISABLED === "true" ||
+      process.env.AUTH_DISABLE === "true"
+    ) {
+      test.skip(
+        true,
+        "Admin auth disabled; run with staff E2E credentials for admin order proof.",
+      );
+      return;
+    }
     const result = await signInAsAdmin(page);
     if (result !== "ok") {
       test.skip(true, `Admin sign-in not available: ${result}`);

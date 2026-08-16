@@ -61,11 +61,18 @@ async function put(req: NextRequest, ctx: RouteCtx) {
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid page payload" }, { status: 400 });
   const merged = await upsertCmsPage(sup.client, {
     ...parsed.data,
+    expectedVersion: parsed.data.expectedVersion,
     blocks: parsed.data.blocks as CmsBlock[] | undefined,
+    mutations: parsed.data.mutations,
     organization_id: organization.id,
   });
   if (!merged) {
-    return correlatedJson(cid, { error: "Unable to save" }, { status: 500 });
+    const current = await getCmsPageById(sup.client, id, organization.id);
+    return correlatedJson(
+      cid,
+      { error: current ? "Page changed elsewhere; reload before saving" : "Unable to save" },
+      { status: current ? 409 : 500 },
+    );
   }
   return correlatedJson(cid, { data: merged });
 }

@@ -11,26 +11,39 @@ function jsonRequest(body: unknown): Request {
   });
 }
 
-test("handleMedusaTotalsPreviewRequest requires an authenticated session email", async () => {
+test("handleMedusaTotalsPreviewRequest accepts a validated guest email for card checkout", async () => {
   const res = await handleMedusaTotalsPreviewRequest(
-    jsonRequest({ lines: [{ variantId: "variant_1", quantity: 1 }] }),
+    jsonRequest({
+      lines: [{ variantId: "variant_1", quantity: 1 }],
+      email: "guest@example.com",
+    }),
     {
       getSessionEmail: async () => null,
       loadCustomerProfile: async () => null,
       isProfileComplete: () => false,
       listMissingProfileParts: () => [],
       profileToCodCartAddresses: () => null,
-      executePreview: async () => {
-        throw new Error("should not run");
-      },
+      executePreview: async () => ({
+        subtotal: 100,
+        taxTotal: 0,
+        shippingTotal: 0,
+        discountTotal: 0,
+        total: 100,
+        currencyCode: "PHP",
+        lineSubtotalsByVariantId: { variant_1: 100 },
+        quoteFingerprint: "guest-quote",
+        variantIds: ["variant_1"],
+        productIds: ["product_1"],
+        shippingMethodIds: [],
+        regionId: "region_1",
+        shippingOptions: [],
+        appliedShippingOptionId: null,
+      }),
       logEvent: () => {},
     },
   );
 
-  assert.equal(res.status, 401);
-  assert.deepEqual(await res.json(), {
-    error: "Sign in to load checkout totals.",
-  });
+  assert.equal(res.status, 200);
 });
 
 test("handleMedusaTotalsPreviewRequest rejects requests without valid lines", async () => {
@@ -147,6 +160,8 @@ test("handleMedusaTotalsPreviewRequest normalizes inputs and uses the standard p
 
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), preview);
+  assert.ok(calls[0]?.signal instanceof AbortSignal);
+  delete calls[0]?.signal;
   assert.deepEqual(calls, [
     {
       lines: [{ variantId: "variant_1", quantity: 2 }],
@@ -256,6 +271,8 @@ test("handleMedusaTotalsPreviewRequest uses the COD payload when the profile is 
   );
 
   assert.equal(res.status, 200);
+  assert.ok(calls[0]?.signal instanceof AbortSignal);
+  delete calls[0]?.signal;
   assert.deepEqual(calls, [
     {
       lines: [{ variantId: "variant_1", quantity: 1 }],

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
@@ -21,24 +21,62 @@ export function ProductImageZoom({
 }) {
   const [open, setOpen] = useState(false);
   const [scale, setScale] = useState(1);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  const previousOverflowRef = useRef("");
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), a[href], [tabindex]:not([tabindex=\"-1\"])",
+        ),
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+    function keepFocusInside(e: FocusEvent) {
+      if (open && dialogRef.current && !dialogRef.current.contains(e.target as Node)) {
+        closeRef.current?.focus();
+      }
     }
     if (open) {
+      wasOpenRef.current = true;
+      previousOverflowRef.current = document.body.style.overflow;
       document.addEventListener("keydown", onKey);
+      document.addEventListener("focusin", keepFocusInside);
       document.body.style.overflow = "hidden";
+      requestAnimationFrame(() => closeRef.current?.focus());
+    } else if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      requestAnimationFrame(() => triggerRef.current?.focus());
     }
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.removeEventListener("focusin", keepFocusInside);
+      document.body.style.overflow = previousOverflowRef.current;
     };
   }, [open]);
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => {
           setScale(1);
@@ -68,15 +106,15 @@ export function ProductImageZoom({
       {open && typeof document !== "undefined"
         ? createPortal((
         <div
+          ref={dialogRef}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Enlarged product image"
         >
-          <button
-            type="button"
+          <div
             className="absolute inset-0 cursor-default"
-            aria-label="Close"
+            aria-hidden="true"
             onClick={() => setOpen(false)}
           />
           <div className="relative z-10 flex max-h-[82vh] max-w-[min(88vw,960px)] items-center justify-center overflow-auto rounded-xl bg-black/20 p-2">
@@ -128,6 +166,7 @@ export function ProductImageZoom({
             </div>
           ) : null}
           <button
+            ref={closeRef}
             type="button"
             onClick={() => setOpen(false)}
             className="absolute right-4 top-4 z-20 rounded border border-white/40 bg-black/50 px-4 py-2 text-xs font-bold uppercase tracking-widest text-white hover:bg-white/10"

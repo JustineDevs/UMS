@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  sanitizeStripeCheckoutUrl,
   sanitizeSameOriginUrl,
   sanitizeTrustedPublicUrl,
 } from "./safe-url.js";
@@ -24,4 +25,12 @@ test("requires HTTPS for trusted public assets", () => {
     sanitizeTrustedPublicUrl("https://cdn.example/assets/a.png", ["https://cdn.example"]),
     "https://cdn.example/assets/a.png",
   );
+});
+
+test("preserves Stripe Checkout's provider session fragment", () => {
+  assert.equal(
+    sanitizeStripeCheckoutUrl("https://checkout.stripe.com/c/pay/cs_test_123#fid123"),
+    "https://checkout.stripe.com/c/pay/cs_test_123#fid123",
+  );
+  assert.equal(sanitizeStripeCheckoutUrl("https://evil.example/c/pay/cs_test_123#fid123"), null);
 });

@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
 
 type Row = {
@@ -93,7 +94,7 @@ export function CmsCategoryEditor() {
     setError(null);
     const r = await fetch("/api/admin/cms/category-content", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({
         id: editing.id || undefined,
         collection_handle: editing.collection_handle,

@@ -33,6 +33,9 @@ const inter = Inter({
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN;
 
+const botIdDisabledForLocalAuthBypass =
+  process.env.AUTH_DISABLED === "true";
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -115,7 +118,7 @@ export default function RootLayout({
         <NextAuthSessionProvider>
           <MedusaCartProvider>
             <PostHogAnalytics />
-            <BotIdClient
+            {!botIdDisabledForLocalAuthBypass ? <BotIdClient
               protect={[
                 { path: "/api/checkout", method: "POST" },
                 { path: "/api/checkout/cod-cart-payload", method: "POST" },
@@ -132,7 +135,7 @@ export default function RootLayout({
                 { path: "/api/newsletter", method: "POST" },
                 { path: "/api/back-in-stock", method: "POST" },
               ]}
-            />
+            /> : null}
             <CartSyncOnSignIn />
             <WishlistSyncOnLogin />
             <StorefrontPreferenceSync />

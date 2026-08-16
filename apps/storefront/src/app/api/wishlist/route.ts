@@ -2,8 +2,16 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { applyRateLimit } from "@/lib/cart-api-helpers";
+import { fetchProductBySlug } from "@/lib/catalog-medusa-fetch";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+
+const addSchema = z.object({
+  slug: z.string().trim().min(1).max(200),
+}).strict();
+
+const removeSchema = z.object({ slug: z.string().trim().min(1).max(200) }).strict();
 
 /**
  * GET /api/wishlist
@@ -26,7 +34,17 @@ export async function GET(_req: Request) {
     .order("added_at", { ascending: false })
     .limit(200);
 
-  return Response.json({ items: data ?? [] });
+  const items = await Promise.all((data ?? []).map(async (item) => {
+    const product = await fetchProductBySlug(String(item.product_slug));
+    if (product.kind !== "ok") return null;
+    return {
+      product_slug: product.product.slug,
+      product_name: product.product.name,
+      medusa_product_id: product.product.id,
+      added_at: item.added_at,
+    };
+  }));
+  return Response.json({ items: items.filter(Boolean) });
 }
 
 /**
@@ -44,16 +62,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({})) as {
-    slug?: string;
-    name?: string;
-    medusaProductId?: string;
-  };
-  const slug = body.slug?.trim();
-  const name = body.name?.trim();
-  if (!slug || !name) {
-    return Response.json({ error: "slug and name required" }, { status: 400 });
-  }
+  const parsed = addSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Invalid wishlist item" }, { status: 400 });
+  const { slug } = parsed.data;
+  const product = await fetchProductBySlug(slug);
+  if (product.kind !== "ok") return Response.json({ error: "Product not found" }, { status: 404 });
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) return Response.json({ error: "Database unavailable" }, { status: 503 });
@@ -61,8 +74,8 @@ export async function POST(req: Request) {
   const { error } = await sb.from("wishlists").upsert({
     medusa_customer_id: customerId.trim(),
     product_slug: slug,
-    product_name: name,
-    medusa_product_id: body.medusaProductId?.trim() ?? null,
+    product_name: product.product.name,
+    medusa_product_id: product.product.id,
   }, { onConflict: "medusa_customer_id,product_slug" });
 
   if (error) {
@@ -89,20 +102,20 @@ export async function DELETE(req: Request) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const body = await req.json().catch(() => ({})) as { slug?: string };
-  const slug = body.slug?.trim();
-  if (!slug) {
-    return Response.json({ error: "slug required" }, { status: 400 });
-  }
+  const parsed = removeSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return Response.json({ error: "Invalid wishlist item" }, { status: 400 });
+  const { slug } = parsed.data;
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) return Response.json({ error: "Database unavailable" }, { status: 503 });
 
-  await sb
+  const { error } = await sb
     .from("wishlists")
     .delete()
     .eq("medusa_customer_id", customerId.trim())
     .eq("product_slug", slug);
+
+  if (error) return Response.json({ error: "Unable to update saved items" }, { status: 503 });
 
   return Response.json({ ok: true });
 }

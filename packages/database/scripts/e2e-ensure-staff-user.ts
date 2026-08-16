@@ -36,6 +36,30 @@ async function main(): Promise<void> {
   const email = normalizeEmail(firstFromList);
   const supabase = createClient(url, key);
 
+  async function ensureOrganizationMembership(userId: string): Promise<void> {
+    const organizationId = "e2e-admin";
+    const { error: organizationError } = await supabase
+      .from("organizations")
+      .upsert(
+        { id: organizationId, name: "E2E Admin Organization" },
+        { onConflict: "id" },
+      );
+    if (organizationError) throw organizationError;
+    const { error: membershipError } = await supabase
+      .from("organization_memberships")
+      .upsert(
+        {
+          organization_id: organizationId,
+          user_email: email,
+          auth_user_id: userId,
+          role: "admin",
+          active: true,
+        },
+        { onConflict: "organization_id,user_email" },
+      );
+    if (membershipError) throw membershipError;
+  }
+
   async function ensureWildcardGrants(userId: string): Promise<void> {
     const { error: delErr } = await supabase
       .from("staff_permission_grants")
@@ -66,12 +90,14 @@ async function main(): Promise<void> {
     const role = roleRow?.role as string | undefined;
     if (role === "staff") {
       await ensureWildcardGrants(existingUser.id);
+      await ensureOrganizationMembership(existingUser.id);
       console.log(
         `E2E staff user already present (${email}); refreshed staff_permission_grants (*).`,
       );
       return;
     }
     if (role === "admin") {
+      await ensureOrganizationMembership(existingUser.id);
       console.log(
         `E2E allow-list user already admin (${email}). No database changes (admin uses wildcard in session).`,
       );
@@ -96,6 +122,7 @@ async function main(): Promise<void> {
   if (rErr) throw rErr;
 
   await ensureWildcardGrants(user.id);
+  await ensureOrganizationMembership(user.id);
 
   console.log(`E2E staff user ready: ${email} (role staff, grants *)`);
 }

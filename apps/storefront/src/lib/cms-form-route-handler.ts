@@ -16,6 +16,11 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import {
+  finishPublicDeliveryAttempt,
+  publicDeliveryIdempotencyKey,
+  recordPublicDeliveryAttempt,
+} from "@/lib/public-delivery";
 
 type ContactFormRouteDeps = {
   createAnonSupabase?: () => SupabaseClient | null;
@@ -26,6 +31,8 @@ type ContactFormRouteDeps = {
   getSettings?: typeof getCmsFormSettings;
   fetchImpl?: typeof fetch;
   nowIso?: () => string;
+  recordDelivery?: typeof recordPublicDeliveryAttempt;
+  finishDelivery?: typeof finishPublicDeliveryAttempt;
 };
 
 const defaultDeps: Required<ContactFormRouteDeps> = {
@@ -37,6 +44,8 @@ const defaultDeps: Required<ContactFormRouteDeps> = {
   getSettings: getCmsFormSettings,
   fetchImpl: fetch,
   nowIso: () => new Date().toISOString(),
+  recordDelivery: recordPublicDeliveryAttempt,
+  finishDelivery: finishPublicDeliveryAttempt,
 };
 
 function pickWriteClient(deps: Required<ContactFormRouteDeps>) {
@@ -120,6 +129,17 @@ export async function handleCmsFormSubmissionRequest(
     const settings = await merged.getSettings(svc);
     const wh = settings?.webhook_url?.trim();
     if (wh) {
+      const deliveryKey = publicDeliveryIdempotencyKey(
+        "public_form_webhook",
+        submissionId,
+      );
+      await merged.recordDelivery(svc, {
+        kind: "public_form_webhook",
+        aggregateId: submissionId,
+        recipient: wh,
+        provider: "webhook",
+        idempotencyKey: deliveryKey,
+      });
       const hookBody = JSON.stringify({
         event: "cms_form_submission",
         form_key: formKey,
@@ -127,11 +147,24 @@ export async function handleCmsFormSubmissionRequest(
         payload,
         created_at: merged.nowIso(),
       });
-      void merged.fetchImpl(wh, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: hookBody,
-      }).catch(() => {});
+      try {
+        const response = await merged.fetchImpl(wh, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: hookBody,
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) {
+          throw new Error(`Webhook returned HTTP ${response.status}`);
+        }
+        await merged.finishDelivery(svc, deliveryKey, { status: "sent" });
+      } catch (error) {
+        await merged.finishDelivery(svc, deliveryKey, {
+          status: "failed",
+          error: error instanceof Error ? error.message.slice(0, 500) : "Webhook delivery failed",
+        });
+      }
+      return Response.json({ ok: true, id: submissionId, delivery: "recorded" });
     }
   }
 

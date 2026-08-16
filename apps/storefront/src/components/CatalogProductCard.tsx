@@ -92,6 +92,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
               </Badge>
               <div
                 role="tooltip"
+                aria-label={`Available types: ${types.join(", ")}`}
                 className="pointer-events-none absolute right-0 top-full z-30 mt-2 max-w-[min(240px,70vw)] opacity-0 transition-opacity duration-200 group-hover/sizes:opacity-100"
               >
                 <div className="rounded-md bg-primary px-3 py-2 text-left text-xs font-medium leading-relaxed text-on-primary shadow-lg">
@@ -148,7 +149,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
                 slug={product.slug}
                 initialMinPrice={minPrice}
               />
-              <span className="block text-[9px] text-on-surface-variant/60 uppercase tracking-wider">VAT incl.</span>
+              <span className="block text-[9px] text-on-surface-variant uppercase tracking-wider">VAT incl.</span>
             </div>
           </div>
         </CardContent>

@@ -6,6 +6,7 @@ import { trackingLinkRouteLogic } from "./tracking-link-route-logic";
 test("trackingLinkRouteLogic rejects invalid ids", () => {
   const result = trackingLinkRouteLogic({
     cartId: "bad",
+    ownedCartId: "cart_123",
     rateLimited: false,
     buildTrackingUrl: () => "/track/bad",
   });
@@ -16,6 +17,7 @@ test("trackingLinkRouteLogic rejects invalid ids", () => {
 test("trackingLinkRouteLogic returns 429 when rate limited", () => {
   const result = trackingLinkRouteLogic({
     cartId: "cart_123",
+    ownedCartId: "cart_123",
     rateLimited: true,
     retryAfterSec: 7,
     buildTrackingUrl: () => "/track/cart_123",
@@ -27,7 +29,8 @@ test("trackingLinkRouteLogic returns 429 when rate limited", () => {
 
 test("trackingLinkRouteLogic returns 503 when signed tracking is unavailable", () => {
   const result = trackingLinkRouteLogic({
-    cartId: "order_123",
+    cartId: "cart_123",
+    ownedCartId: "cart_123",
     rateLimited: false,
     buildTrackingUrl: () => null,
   });
@@ -35,20 +38,23 @@ test("trackingLinkRouteLogic returns 503 when signed tracking is unavailable", (
   assert.equal(result.status, 503);
 });
 
-test("trackingLinkRouteLogic returns signed tracking url for carts and orders", () => {
+test("trackingLinkRouteLogic returns a signed tracking url for the owned cart", () => {
   const cartResult = trackingLinkRouteLogic({
     cartId: "cart_123",
+    ownedCartId: "cart_123",
     rateLimited: false,
     buildTrackingUrl: (id) => `/track/${id}?t=signed`,
   });
-  const orderResult = trackingLinkRouteLogic({
-    cartId: "order_123",
-    rateLimited: false,
-    buildTrackingUrl: (id) => `/track/${id}?t=signed`,
-  });
-
   assert.equal(cartResult.status, 200);
   assert.equal(cartResult.body.trackingPageUrl, "/track/cart_123?t=signed");
-  assert.equal(orderResult.status, 200);
-  assert.equal(orderResult.body.trackingPageUrl, "/track/order_123?t=signed");
+});
+
+test("trackingLinkRouteLogic rejects a cart that is not in the request cookie", () => {
+  const result = trackingLinkRouteLogic({
+    cartId: "cart_other",
+    ownedCartId: "cart_123",
+    rateLimited: false,
+    buildTrackingUrl: () => "/track/cart_other?t=signed",
+  });
+  assert.equal(result.status, 403);
 });

@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type MediaRow = {
   id: string;
@@ -168,7 +169,7 @@ export function CmsMediaManager() {
       .filter(Boolean);
     const r = await fetch(`/api/admin/cms/media/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({ alt_text: editAlt || null, tags }),
     });
     if (!r.ok) setError("Update failed");

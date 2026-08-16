@@ -34,6 +34,7 @@ type TotalsPreviewDependencies = {
     loyaltyPointsToRedeem?: number;
     codCartPayload?: CodCartPayload;
     shippingOptionId?: string;
+    signal?: AbortSignal;
   }) => Promise<MedusaCheckoutTotalsPreview>;
   logEvent: (_event: string, _payload: Record<string, unknown>) => void;
 };
@@ -71,9 +72,6 @@ export async function handleMedusaTotalsPreviewRequest(
   deps: TotalsPreviewDependencies,
 ): Promise<Response> {
   const sessionEmail = (await deps.getSessionEmail())?.trim().toLowerCase() ?? "";
-  if (!sessionEmail) {
-    return Response.json({ error: "Sign in to load checkout totals." }, { status: 401 });
-  }
 
   let body: Body;
   try {
@@ -94,9 +92,16 @@ export async function handleMedusaTotalsPreviewRequest(
     typeof body.shippingOptionId === "string" && body.shippingOptionId.trim()
       ? body.shippingOptionId.trim()
       : undefined;
+  const checkoutEmail = emailFromBody || sessionEmail;
+  if (!checkoutEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(checkoutEmail)) {
+    return Response.json({ error: "Enter a valid checkout email." }, { status: 400 });
+  }
 
   try {
     if (isCodPaymentMethod(paymentMethod)) {
+      if (!sessionEmail) {
+        return Response.json({ error: "Sign in before using cash on delivery." }, { status: 401 });
+      }
       const profile = await deps.loadCustomerProfile(sessionEmail);
       if (!profile || !deps.isProfileComplete(profile)) {
         return Response.json(
@@ -120,6 +125,7 @@ export async function handleMedusaTotalsPreviewRequest(
         loyaltyPointsToRedeem,
         codCartPayload,
         shippingOptionId,
+        signal: req.signal,
       });
       deps.logEvent("checkout_quote_generated", {
         quoteFingerprint: preview.quoteFingerprint,
@@ -132,9 +138,10 @@ export async function handleMedusaTotalsPreviewRequest(
 
     const preview = await deps.executePreview({
       lines,
-      email: emailFromBody || sessionEmail,
+      email: checkoutEmail,
       loyaltyPointsToRedeem,
       shippingOptionId,
+      signal: req.signal,
     });
     deps.logEvent("checkout_quote_generated", {
       quoteFingerprint: preview.quoteFingerprint,

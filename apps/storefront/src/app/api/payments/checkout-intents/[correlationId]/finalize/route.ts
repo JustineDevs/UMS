@@ -1,6 +1,7 @@
 import {
   getPaymentAttemptByCorrelationId,
   incrementFinalizeAttempts,
+  claimPaymentAttemptForFinalization,
   updatePaymentAttemptByCorrelationId,
 } from "@universal-music-store/platform-data";
 
@@ -44,14 +45,21 @@ export async function POST(
       }
       return incrementFinalizeAttempts(sb, id);
     },
+    claimFinalizeAttempt: async (id) => {
+      if (!sb) throw new Error("Payment ledger is not configured");
+      return claimPaymentAttemptForFinalization(sb, id);
+    },
     updatePaymentAttempt: async (id, patch) => {
       if (!sb) {
         return;
       }
       await updatePaymentAttemptByCorrelationId(sb, id, patch);
     },
-    finalizeMedusaCart: async (activeCartId) =>
-      finalizeMedusaCartFromServer(activeCartId, { maxCompleteAttempts: 2 }),
+    finalizeMedusaCart: async (activeCartId, publicOrigin) =>
+      finalizeMedusaCartFromServer(activeCartId, {
+        maxCompleteAttempts: 2,
+        publicOrigin,
+      }),
     logEvent: (payload) =>
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
     nowIso: () => new Date().toISOString(),

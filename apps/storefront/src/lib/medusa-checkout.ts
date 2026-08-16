@@ -66,6 +66,8 @@ export type MedusaCheckoutResult = {
   qrImageUrl?: string;
   /** Raw QR payload when action kind is qr. */
   qrPayload?: string;
+  trackingPageUrl?: string;
+  correlationId?: string;
 };
 
 /** Provider IDs from the store payment module (pp_{module}_{id}). */
@@ -98,6 +100,7 @@ export async function previewMedusaCheckoutTotals(input: {
   loyaltyPointsToRedeem?: number;
   paymentMethod: PaymentProviderKey;
   shippingOptionId?: string;
+  signal?: AbortSignal;
 }): Promise<MedusaCheckoutTotalsPreview> {
   if (typeof window === "undefined") {
     throw new Error("Checkout preview must run in the browser.");
@@ -113,6 +116,7 @@ export async function previewMedusaCheckoutTotals(input: {
       paymentMethod: input.paymentMethod,
       shippingOptionId: input.shippingOptionId,
     }),
+    signal: input.signal,
   });
   const data = (await res.json().catch(() => ({}))) as MedusaCheckoutTotalsPreview & {
     error?: string;
@@ -148,9 +152,6 @@ export async function startMedusaCheckout(input: {
   codCartPayload?: CodCartPayload;
   shippingOptionId?: string;
 }): Promise<MedusaCheckoutResult> {
-  if (typeof window === "undefined") {
-    throw new Error("Checkout must run in the browser.");
-  }
   const baseUrl = getMedusaStoreBaseUrl();
   const publishableKey = getMedusaPublishableKey();
   const regionId = getMedusaRegionId();
@@ -172,6 +173,7 @@ export async function startMedusaCheckout(input: {
   }
 
   let cartId: string | undefined;
+  let bindToken: string | undefined;
   try {
     const ctx = await prepareMedusaStoreCart(
       {
@@ -184,17 +186,28 @@ export async function startMedusaCheckout(input: {
       codFlow,
     );
     cartId = ctx.cartId;
-    const { sdk } = ctx;
+    bindToken = ctx.bindToken;
 
-    const bindResponse = await fetch("/api/cart/medusa-bind", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartId }),
-    });
-    if (!bindResponse.ok) {
-      throw new Error("Could not bind the checkout cart. Please try again.");
+    // Browser payment routes authorize against the HttpOnly cart cookie. The
+    // server checkout-start route registers its ledger entry directly and
+    // sends the cookie in its own response, so it must not fetch a relative
+    // browser URL from Node.
+    if (typeof window !== "undefined") {
+      const bindRes = await fetch("/api/cart/medusa-bind", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId, bindToken }),
+      });
+      if (!bindRes.ok) {
+        const bindJson = (await bindRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(bindJson.error || "Could not secure the checkout cart.");
+      }
     }
+
+    const { sdk } = ctx;
 
     const { cart: refreshedForPayment } = await sdk.store.cart.retrieve(cartId, {
       fields: "+payment_collection,*payment_collection.payment_sessions",
@@ -206,6 +219,7 @@ export async function startMedusaCheckout(input: {
         provider_id: providerId,
         data: {
           idempotency_key: cartId,
+          currency_code: String(refreshedForPayment.currency_code ?? "").trim().toLowerCase(),
           ...(process.env.NANGO_PAYMENT_CONNECTION_ID
             ? { nango_connection_id: process.env.NANGO_PAYMENT_CONNECTION_ID }
             : {}),
@@ -336,6 +350,7 @@ export async function startMedusaCheckout(input: {
       });
       const placeJson = (await place.json().catch(() => ({}))) as {
         orderId?: string;
+        redirectUrl?: string;
         error?: string;
       };
       if (!place.ok || typeof placeJson.orderId !== "string" || !placeJson.orderId) {
@@ -349,6 +364,7 @@ export async function startMedusaCheckout(input: {
         checkoutUrl: "",
         cartId,
         orderId: placeJson.orderId,
+        trackingPageUrl: typeof placeJson.redirectUrl === "string" ? placeJson.redirectUrl : undefined,
         providerLabel,
         confirmedTotal,
         currencyCode,

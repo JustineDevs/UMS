@@ -51,34 +51,18 @@ export async function POST(
     customerId = await findOrCreateMedusaCustomerIdByEmail(email).catch(() => null);
   }
 
-  const voteRow: Record<string, string> = {
-    review_id: reviewId,
-    voter_ip: ip,
-  };
-  if (customerId) {
-    voteRow.medusa_customer_id = customerId;
-  }
-
-  const { error: insertErr } = await sb
-    .from("review_helpful_votes")
-    .insert(voteRow);
-
-  if (insertErr) {
-    const code = (insertErr as { code?: string }).code;
-    if (code === "23505") {
-      return Response.json(
-        { error: "Already voted", code: "ALREADY_VOTED" },
-        { status: 409 },
-      );
-    }
+  const { data: voteResult, error: voteError } = await sb.rpc(
+    "record_review_helpful_vote",
+    { review_uuid: reviewId, customer_id: customerId, request_ip: ip },
+  );
+  if (voteError) {
+    console.error("[review-helpful] record error:", voteError);
     return Response.json({ error: "Unable to record vote" }, { status: 503 });
   }
+  const result = Array.isArray(voteResult) ? voteResult[0] : voteResult;
+  if (!result || result.inserted !== true) {
+    return Response.json({ error: "Already voted", code: "ALREADY_VOTED" }, { status: 409 });
+  }
 
-  const newVotes = Number(review.helpful_votes ?? 0) + 1;
-  await sb
-    .from("product_reviews")
-    .update({ helpful_votes: newVotes })
-    .eq("id", reviewId);
-
-  return Response.json({ ok: true, helpful_votes: newVotes });
+  return Response.json({ ok: true, helpful_votes: result.helpful_votes });
 }

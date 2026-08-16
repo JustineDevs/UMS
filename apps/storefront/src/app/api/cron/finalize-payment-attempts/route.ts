@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     });
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 503 });
+    console.error("[finalize-payment-attempts] reconciliation failed", error);
+    return NextResponse.json({ error: "Payment recovery is temporarily unavailable" }, { status: 503 });
   }
 }

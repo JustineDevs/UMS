@@ -58,6 +58,11 @@ export type ProductBySlugResult =
   | CommerceFetchFailure
   | { kind: "not_found" };
 
+export type ProductIdentityBySlugResult =
+  | { kind: "ok"; productId: string; variantIds: string[] }
+  | CommerceFetchFailure
+  | { kind: "not_found" };
+
 export type CategorySummariesResult =
   | { kind: "ok"; summaries: { category: string; count: number }[] }
   | CommerceFetchFailure;
@@ -591,6 +596,49 @@ export async function fetchProductBySlug(
   return fetchMedusaProductBySlug(slug);
 }
 
+/** Resolves identity without filtering out an out-of-stock product. */
+export async function fetchProductIdentityBySlug(
+  slug: string,
+): Promise<ProductIdentityBySlugResult> {
+  const gate = requireMedusaClientConfig();
+  if (!gate.ok) return gate.reason;
+  try {
+    const sdk = createStorefrontMedusaSdk();
+    const params = {
+      region_id: getMedusaRegionId()!,
+      handle: slug,
+      limit: 1,
+      fields: "id,handle,*variants",
+    };
+    const salesChannelId = getMedusaSalesChannelId();
+    const query = (useSalesChannel: boolean) =>
+      sdk.store.product.list(
+        (useSalesChannel && salesChannelId
+          ? withSalesChannelId(params)
+          : params) as Parameters<typeof sdk.store.product.list>[0],
+      );
+    let { products } = await query(true);
+    let raw = products?.[0] as unknown as Record<string, unknown> | undefined;
+    if (!raw && salesChannelId) {
+      ({ products } = await query(false));
+      raw = products?.[0] as unknown as Record<string, unknown> | undefined;
+    }
+    if (!raw || typeof raw.id !== "string") return { kind: "not_found" };
+    const variants = Array.isArray(raw.variants) ? raw.variants : [];
+    return {
+      kind: "ok",
+      productId: raw.id,
+      variantIds: variants
+        .filter((variant): variant is Record<string, unknown> => Boolean(variant && typeof variant === "object"))
+        .filter((variant) => variant.is_active !== false)
+        .map((variant) => (typeof variant.id === "string" ? variant.id : ""))
+        .filter(Boolean),
+    };
+  } catch (e) {
+    return catalogServiceError(e);
+  }
+}
+
 type CategorySummary = { category: string; count: number };
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
@@ -631,7 +679,7 @@ export async function fetchVariantFacets(
 }
 
 export async function fetchProductSlugsForSitemap(
-  maxItems = 1000,
+  maxItems?: number,
 ): Promise<string[]> {
   const gate = requireMedusaClientConfig();
   if (!gate.ok) return [];
@@ -643,7 +691,7 @@ export async function fetchProductSlugsForSitemap(
     let offset = 0;
     const pageSize = 100;
 
-    while (slugs.length < maxItems) {
+    while (maxItems == null || slugs.length < maxItems) {
       const { products } = await sdk.store.product.list(
         withSalesChannelId({
           region_id: regionId,
@@ -662,7 +710,7 @@ export async function fetchProductSlugsForSitemap(
       offset += pageSize;
     }
 
-    return slugs.slice(0, maxItems);
+    return maxItems == null ? slugs : slugs.slice(0, maxItems);
   } catch {
     return [];
   }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { fetchProductSlugsForSitemap } from "@/lib/catalog-fetch";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Site map",
@@ -32,9 +33,14 @@ const links: { href: string; label: string }[] = [
   { href: "/cookies", label: "Cookies" },
   { href: "/accessibility", label: "Accessibility" },
   { href: "/preferences", label: "Region & language" },
+  { href: "/blog", label: "Blog" },
+  { href: "/variant-guide", label: "Variant guide" },
+  { href: "/warranty", label: "Warranty" },
 ];
 
-export default function SitemapPage() {
+export default async function SitemapPage() {
+  const productSlugs = await fetchProductSlugsForSitemap(1000);
+  const productLinks = productSlugs.map((slug) => ({ href: `/shop/${encodeURIComponent(slug)}`, label: slug }));
   return (
     <main className="storefront-page-shell max-w-2xl">
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
@@ -44,7 +50,7 @@ export default function SitemapPage() {
         Structured list of main storefront pages.
       </p>
       <ul className="mt-8 grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
-        {links.map((l) => (
+        {[...links, ...productLinks].map((l) => (
           <li key={l.href}>
             <Link
               href={l.href}

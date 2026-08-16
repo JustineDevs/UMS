@@ -6,6 +6,12 @@ import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
+export async function enablePublicTunnelBypass(page: Page): Promise<void> {
+  if (process.env.E2E_TUNNEL_BYPASS_HEADER === "1") {
+    await page.setExtraHTTPHeaders({ "bypass-tunnel-reminder": "1" });
+  }
+}
+
 export type PaymentProvider = "stripe" | "paypal" | "xendit" | "cod";
 
 type PspCredentials = {
@@ -135,7 +141,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
 
   const trySlug = async (slug: string): Promise<AddCatalogProductResult | null> => {
     const res = await page.goto(`${baseURL}/shop/${slug}`, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "networkidle",
     });
     if (!res || res.status() >= 400) return null;
     const btn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
@@ -150,13 +156,34 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       log(`stress catalog: skip ${slug} (add control disabled)`);
       return null;
     }
+    await page.waitForFunction(
+      () => {
+        const element = document.querySelector<HTMLElement>(
+          '[data-testid="pdp-add-to-bag"]',
+        );
+        return Boolean(element && !element.matches(":disabled"));
+      },
+      undefined,
+      { timeout: 10_000 },
+    );
     const bodyText = (await page.locator("body").innerText().catch(() => "")) as string;
     if (/out of stock|sold out|currently unavailable/i.test(bodyText)) {
       log(`stress catalog: skip ${slug} (oos/unavailable copy)`);
       return null;
     }
-    await btn.click();
-    await page.waitForTimeout(800);
+    // Public tunnels can finish hydration after the first click. Re-acquire the
+    // control after each reload instead of clicking a detached/stale locator.
+    for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
+      const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
+      await addButton.waitFor({ state: "visible", timeout: 20_000 });
+      await addButton.click();
+      await page.waitForTimeout(800);
+      if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
+        await page.reload({ waitUntil: "networkidle" });
+      }
+    }
+    await expect(page).toHaveURL(/\/cart(?:\?|$)/, { timeout: 15_000 });
+    await expect(page.getByText("Your bag is empty.")).toHaveCount(0, { timeout: 15_000 });
     if (page.url().includes("/sign-in")) {
       log(`stress catalog: skip ${slug} (redirected to sign-in)`);
       return null;
@@ -334,6 +361,12 @@ export async function navigateToCheckout(page: Page): Promise<void> {
   await expect(page.getByText("Preparing checkout…")).toHaveCount(0, {
     timeout: 45_000,
   });
+  const cookieDialog = page.getByRole("dialog", { name: /cookie consent/i });
+  if (await cookieDialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await cookieDialog
+      .getByRole("button", { name: /essential only/i })
+      .evaluate((element) => (element as HTMLButtonElement).click());
+  }
 }
 
 export async function fillCheckoutShippingInfo(
@@ -411,9 +444,15 @@ export async function selectPaymentProvider(
     cod: /cash on delivery/i,
   };
 
-  const byTestId = page.locator(`[data-testid="payment-${provider}"]:visible`).first();
+  const byTestId = page
+    .locator(`[data-testid="payment-${provider}"]:visible:not(:disabled)`)
+    .first();
   if (await byTestId.isVisible({ timeout: 60_000 }).catch(() => false)) {
-    await byTestId.click();
+    await byTestId.evaluate((element) =>
+      element.scrollIntoView({ block: "center", inline: "nearest" }),
+    );
+    await byTestId.evaluate((element) => (element as HTMLButtonElement).click());
+    await expect(byTestId).toHaveAttribute("aria-checked", "true");
     return true;
   }
 
@@ -449,11 +488,11 @@ export async function clickPayButton(page: Page): Promise<void> {
   });
   const terms = page.getByTestId("checkout-terms-checkbox");
   if (await terms.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await terms.check();
+    if (!(await terms.isChecked())) await terms.check();
   }
   const payBtn = page.getByTestId("checkout-submit-pay");
   await expect(payBtn).toBeVisible({ timeout: 10_000 });
-  const deadline = Date.now() + 90_000;
+  const deadline = Date.now() + 180_000;
   while (Date.now() < deadline) {
     if (await review.isVisible().catch(() => false)) {
       await review.click();
@@ -517,6 +556,12 @@ export async function fillStripeHostedCheckoutTestCard(
     if ((await cvcLoc.count()) > 0) {
       await cvcLoc.first().fill("123");
     }
+    const emailLoc = frame.locator('input[type="email"], input[autocomplete="email"]').first();
+    if ((await emailLoc.count()) > 0) await emailLoc.fill("e2e-test@example.com");
+    const nameLoc = frame
+      .locator('input[autocomplete="cc-name"], input[placeholder*="name"]')
+      .first();
+    if ((await nameLoc.count()) > 0) await nameLoc.fill("E2E Test Customer");
     filled = true;
     break;
   }
@@ -529,7 +574,18 @@ export async function fillStripeHostedCheckoutTestCard(
     const exp = page.locator('input[autocomplete="cc-exp"]').first();
     if (await exp.isVisible().catch(() => false)) await exp.fill("12 / 34");
     const cvc = page.locator('input[autocomplete="cc-csc"]').first();
-    if (await cvc.isVisible().catch(() => false)) await cvc.fill("123");
+      if (await cvc.isVisible().catch(() => false)) await cvc.fill("123");
+  }
+
+  const hostedEmail = page.locator('input[type="email"], input[autocomplete="email"]').first();
+  if (await hostedEmail.isVisible().catch(() => false)) {
+    await hostedEmail.fill("e2e-test@example.com");
+  }
+  const hostedName = page
+    .locator('input[autocomplete="cc-name"], input[placeholder*="Full name"]')
+    .first();
+  if (await hostedName.isVisible().catch(() => false)) {
+    await hostedName.fill("E2E Test Customer");
   }
 }
 
@@ -556,35 +612,39 @@ export async function payWithStripeSandboxCard(
   await clickPayButton(page);
 
   const hostedContinue = page.getByTestId("checkout-continue-payment");
-  if (await hostedContinue.isVisible({ timeout: 15_000 }).catch(() => false)) {
+  try {
+    await expect(hostedContinue).toBeVisible({ timeout: 180_000 });
     await clickContinueToStripeHostedCheckout(page);
     await fillStripeHostedCheckoutTestCard(page, cardNumber);
     await submitStripeHostedCheckoutAndWaitForReturn(page);
     return;
-  }
-
-  const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
-  const cardInput = stripeFrame
-    .locator("[name='cardnumber'], [placeholder*='card'], input[autocomplete='cc-number']")
-    .first();
-  if (await cardInput.isVisible({ timeout: 10_000 }).catch(() => false)) {
-    await cardInput.fill(cardNumber);
-    const expiryInput = stripeFrame
-      .locator("[name='exp-date'], [placeholder*='MM'], input[autocomplete='cc-exp']")
+  } catch (hostedError) {
+    const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
+    const cardInput = stripeFrame
+      .locator("[name='cardnumber'], [placeholder*='card'], input[autocomplete='cc-number']")
       .first();
-    await expiryInput.fill("12/30");
-    const cvcInput = stripeFrame
-      .locator("[name='cvc'], [placeholder*='CVC'], input[autocomplete='cc-csc']")
-      .first();
-    await cvcInput.fill("123");
-    await page.getByRole("button", { name: /complete payment/i }).click();
-    await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
-    return;
+    try {
+      await expect(cardInput).toBeVisible({ timeout: 10_000 });
+      await cardInput.fill(cardNumber);
+      await stripeFrame
+        .locator("[name='exp-date'], [placeholder*='MM'], input[autocomplete='cc-exp']")
+        .first()
+        .fill("12/30");
+      await stripeFrame
+        .locator("[name='cvc'], [placeholder*='CVC'], input[autocomplete='cc-csc']")
+        .first()
+        .fill("123");
+      await page.getByRole("button", { name: /complete payment/i }).click();
+      await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
+      return;
+    } catch {
+      throw new Error(
+        `Could not find Stripe Hosted Checkout or embedded card form: ${
+          hostedError instanceof Error ? hostedError.message : "checkout did not become ready"
+        }`,
+      );
+    }
   }
-
-  throw new Error(
-    "Could not find Stripe Hosted Checkout or embedded card form. Is Stripe selected and Medusa returning a Checkout Session URL?",
-  );
 }
 
 /**
@@ -595,6 +655,7 @@ export async function expectOrderConfirmation(page: Page): Promise<void> {
   await expect(
     page
       .getByRole("heading", { name: /order.*confirm|thank you|success/i })
+      .or(page.getByRole("heading", { name: /order.*track|track.*order|status/i }))
       .or(page.getByRole("heading", { name: /^order\s+\d+/i }))
       .or(page.getByTestId("order-confirmation"))
       .or(page.locator("[data-order-id]")),

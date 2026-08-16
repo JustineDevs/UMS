@@ -4,6 +4,7 @@ import { staffHasPermission, type CmsAnnouncementRow } from "@universal-music-st
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 const CHAR_WARN = 280;
 
@@ -66,7 +67,7 @@ export function CmsAnnouncementEditor() {
     try {
       const r = await fetch("/api/admin/cms/announcement", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: cmsMutationHeaders(),
         body: JSON.stringify({
           id: editing.id,
           locale: editing.locale,
@@ -102,7 +103,7 @@ export function CmsAnnouncementEditor() {
     setError(null);
     const r = await fetch(
       `/api/admin/cms/announcement?id=${encodeURIComponent(editing.id)}&locale=${encodeURIComponent(editing.locale)}`,
-      { method: "DELETE" },
+      { method: "DELETE", headers: cmsMutationHeaders() },
     );
     const j = (await r.json()) as { error?: string };
     if (!r.ok) {

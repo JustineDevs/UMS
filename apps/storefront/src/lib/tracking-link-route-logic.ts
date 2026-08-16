@@ -5,6 +5,7 @@ export type TrackingLinkRouteResult = {
 
 type TrackingLinkRouteInput = {
   cartId: string;
+  ownedCartId: string | null;
   rateLimited: boolean;
   retryAfterSec?: number;
   buildTrackingUrl: (_cartId: string) => string | null;
@@ -24,11 +25,14 @@ export function trackingLinkRouteLogic(
   }
 
   const cartId = input.cartId.trim();
-  if (!cartId || (!cartId.startsWith("cart_") && !cartId.startsWith("order_"))) {
+  if (!cartId || !cartId.startsWith("cart_")) {
     return {
       status: 400,
-      body: { error: "cartId required (cart_xxx or order_xxx)" },
+      body: { error: "cartId required" },
     };
+  }
+  if (cartId !== input.ownedCartId) {
+    return { status: 403, body: { error: "Cart ownership could not be verified" } };
   }
 
   const url = input.buildTrackingUrl(cartId);

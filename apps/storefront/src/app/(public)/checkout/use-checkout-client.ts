@@ -17,9 +17,10 @@ import {
 } from "@/lib/cart";
 import {
   previewMedusaCheckoutTotals,
-  startMedusaCheckout,
   PAYMENT_PROVIDER_IDS,
+  startMedusaCheckout,
   type CodCartPayload,
+  type MedusaCheckoutResult,
   type MedusaCheckoutTotalsPreview,
   type PaymentProviderKey,
 } from "@/lib/medusa-checkout";
@@ -29,11 +30,14 @@ import {
 } from "@/lib/checkout-availability-codes";
 import { resolveCheckoutPaymentAvailability } from "@/lib/checkout-payment-availability";
 import { minorUnitDivisor } from "@/lib/medusa-money";
-import { CHECKOUT_SITE_ORIGIN } from "./checkout-utils";
 import {
   buildCheckoutReviewItems,
   type CheckoutReviewItem,
 } from "./checkout-review";
+import {
+  sanitizeHostedCheckoutUrl,
+  type HostedReturnProvider,
+} from "@/lib/hosted-payment-return";
 import { createCheckoutLeaseSubscriber } from "@/lib/checkout-tab-lease";
 import { emitCommerceObservabilityClient } from "@/lib/commerce-observability";
 
@@ -44,7 +48,7 @@ export type CheckoutPendingPayment = {
   confirmedTotal: number;
   currencyCode: string;
   priceMismatch: boolean;
-  providerKey: string;
+  providerKey: HostedReturnProvider;
   correlationId?: string;
 };
 
@@ -77,7 +81,9 @@ export function useCheckoutClient({
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
+  const userSelectedPaymentMethodRef = useRef(false);
   const medusaPreviewSeqRef = useRef(0);
+  const medusaPreviewAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -132,11 +138,11 @@ export function useCheckoutClient({
   }, []);
 
   const [payAvailability, setPayAvailability] = useState(() =>
-    resolveCheckoutPaymentAvailability([]),
+    resolveCheckoutPaymentAvailability(undefined),
   );
   const [checkoutAvailabilityStatus, setCheckoutAvailabilityStatus] = useState<
     "loading" | "ready" | "unavailable"
-  >("loading");
+  >("ready");
   const [checkoutUnavailableCode, setCheckoutUnavailableCode] = useState<
     string | null
   >(null);
@@ -145,7 +151,6 @@ export function useCheckoutClient({
   >(null);
 
   const loadCheckoutPaymentMethods = useCallback(async () => {
-    setCheckoutAvailabilityStatus("loading");
     setCheckoutUnavailableCode(null);
     try {
       const res = await fetch("/api/checkout/available-payment-methods", {
@@ -176,13 +181,19 @@ export function useCheckoutClient({
         return;
       }
 
-      setPayAvailability(resolveCheckoutPaymentAvailability([]));
+      const fallback = resolveCheckoutPaymentAvailability(undefined);
+      setPayAvailability(fallback);
+      setCheckoutAvailabilityStatus(
+        Object.values(fallback.available).some(Boolean) ? "ready" : "unavailable",
+      );
       setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
-      setCheckoutAvailabilityStatus("unavailable");
     } catch {
-      setPayAvailability(resolveCheckoutPaymentAvailability([]));
+      const fallback = resolveCheckoutPaymentAvailability(undefined);
+      setPayAvailability(fallback);
+      setCheckoutAvailabilityStatus(
+        Object.values(fallback.available).some(Boolean) ? "ready" : "unavailable",
+      );
       setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
-      setCheckoutAvailabilityStatus("unavailable");
     }
   }, []);
 
@@ -207,7 +218,9 @@ export function useCheckoutClient({
 
   useEffect(() => {
     setPaymentMethod((prev) =>
-      providerAvailable[prev] ? prev : preferredKey,
+      providerAvailable[prev] || userSelectedPaymentMethodRef.current
+        ? prev
+        : preferredKey,
     );
   }, [providerAvailable, preferredKey]);
 
@@ -217,6 +230,8 @@ export function useCheckoutClient({
       paymentMethodChangeSkipRef.current = false;
       return;
     }
+    if (!userSelectedPaymentMethodRef.current) return;
+    userSelectedPaymentMethodRef.current = false;
     setPendingPayment(null);
     setEmbeddedData(null);
     setCopyDone(false);
@@ -259,9 +274,17 @@ export function useCheckoutClient({
   useEffect(() => {
     if (!session?.user?.email) return;
     fetch("/api/checkout/loyalty-balance")
-      .then((r) => (r.ok ? r.json() : { balance: 0 }))
+      .then((r) => {
+        if (!r.ok) {
+          throw new Error("Loyalty balance is temporarily unavailable.");
+        }
+        return r.json();
+      })
       .then((d: { balance?: number }) => setLoyaltyBalance(Number(d.balance ?? 0)))
-      .catch(() => setLoyaltyBalance(0));
+      .catch((reason: unknown) => {
+        setLoyaltyBalance(0);
+        setError(reason instanceof Error ? reason.message : "Loyalty balance is temporarily unavailable.");
+      });
   }, [session?.user?.email]);
 
   useEffect(() => {
@@ -329,6 +352,8 @@ export function useCheckoutClient({
     setMedusaPreviewError(null);
     const seq = ++medusaPreviewSeqRef.current;
     let cancelled = false;
+    const controller = new AbortController();
+    medusaPreviewAbortRef.current = controller;
     const t = setTimeout(() => {
       void (async () => {
         try {
@@ -349,6 +374,7 @@ export function useCheckoutClient({
                 : undefined,
             paymentMethod,
             shippingOptionId: selectedShippingOptionId ?? undefined,
+            signal: controller.signal,
           });
           if (!cancelled && seq === medusaPreviewSeqRef.current) {
             setMedusaPricePreview(preview);
@@ -369,6 +395,10 @@ export function useCheckoutClient({
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (medusaPreviewAbortRef.current === controller) {
+        medusaPreviewAbortRef.current = null;
+      }
       clearTimeout(t);
     };
   }, [
@@ -470,11 +500,23 @@ export function useCheckoutClient({
       return;
     }
     payInFlightRef.current = true;
+    medusaPreviewAbortRef.current?.abort();
+    medusaPreviewAbortRef.current = null;
     setLoading(true);
     setError(null);
 
     const cartTotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
-    trackBeginCheckout({ value: cartTotal, itemCount: lines.reduce((s, l) => s + l.quantity, 0) });
+    // Telemetry must not block payment initiation if a browser analytics SDK stalls.
+    queueMicrotask(() => {
+      try {
+        trackBeginCheckout({
+          value: cartTotal,
+          itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+        });
+      } catch {
+        /* checkout remains authoritative when telemetry is unavailable */
+      }
+    });
 
     try {
       const em = email.trim();
@@ -532,20 +574,55 @@ export function useCheckoutClient({
         codCartPayload = codJson as CodCartPayload;
       }
 
-      const result = await startMedusaCheckout({
-        lines: lines.map((l) => ({
-          variantId: l.variantId,
-          quantity: l.quantity,
-        })),
-        email: paymentMethod === "COD" ? undefined : em || undefined,
-        providerId: PAYMENT_PROVIDER_IDS[paymentMethod],
-        loyaltyPointsToRedeem:
-          parsedLoyalty !== undefined && parsedLoyalty > 0
-            ? parsedLoyalty
-            : undefined,
-        codCartPayload,
-        shippingOptionId: selectedShippingOptionId ?? undefined,
-      });
+      let result: MedusaCheckoutResult;
+      if (paymentMethod === "COD") {
+        result = await startMedusaCheckout({
+          lines,
+          providerId: PAYMENT_PROVIDER_IDS.COD,
+          codCartPayload,
+          loyaltyPointsToRedeem: parsedLoyalty,
+          shippingOptionId: selectedShippingOptionId ?? undefined,
+        });
+      } else {
+        const startController = new AbortController();
+        const startTimeout = window.setTimeout(() => startController.abort(), 90_000);
+        try {
+          const startRes = await fetch("/api/checkout/start", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json" },
+            signal: startController.signal,
+            body: JSON.stringify({
+              lines: lines.map((l) => ({
+                variantId: l.variantId,
+                quantity: l.quantity,
+              })),
+              email: em || undefined,
+              providerId: PAYMENT_PROVIDER_IDS[paymentMethod],
+              loyaltyPointsToRedeem:
+                parsedLoyalty !== undefined && parsedLoyalty > 0
+                  ? parsedLoyalty
+                  : undefined,
+              shippingOptionId: selectedShippingOptionId ?? undefined,
+            }),
+          });
+          const body = (await startRes.json().catch(() => ({}))) as MedusaCheckoutResult & {
+            error?: string;
+          };
+          if (!startRes.ok || typeof body.cartId !== "string") {
+            throw new Error(body.error || "Could not start checkout. Please try again.");
+          }
+          result = body;
+        } catch (error) {
+          if (startController.signal.aborted) {
+            throw new Error("Checkout startup timed out. Please try again.");
+          }
+          throw error;
+        } finally {
+          window.clearTimeout(startTimeout);
+        }
+      }
 
       const {
         cartId,
@@ -563,25 +640,32 @@ export function useCheckoutClient({
         setMedusaPriceStatus("ready");
       }
 
-      await fetch("/api/cart/medusa-bind", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartId }),
-      });
-
-      const trackId =
-        codOrderPlaced && orderId?.trim() ? orderId.trim() : cartId;
-      const res = await fetch("/api/tracking-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cartId: trackId }),
-      });
-      const data = (await res.json()) as { trackingPageUrl?: string };
-      const trackingPageUrl =
-        data.trackingPageUrl ??
-        (CHECKOUT_SITE_ORIGIN
-          ? `${CHECKOUT_SITE_ORIGIN}/track/${encodeURIComponent(trackId)}`
-          : `/track/${encodeURIComponent(trackId)}`);
+      let trackingPageUrl = result.trackingPageUrl;
+      let checkoutCorrelationId = result.correlationId;
+      if (!codOrderPlaced && (typeof trackingPageUrl !== "string" || !checkoutCorrelationId)) {
+        const bindRes = await fetch("/api/cart/medusa-bind", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cartId }),
+        });
+        if (!bindRes.ok) {
+          const bindJson = (await bindRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(bindJson.error || "Could not secure the checkout cart. Please try again.");
+        }
+        const res = await fetch("/api/tracking-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cartId }),
+        });
+        const data = (await res.json()) as { trackingPageUrl?: string };
+        if (!res.ok || typeof data.trackingPageUrl !== "string") {
+          throw new Error("Could not create a secure order-tracking link. Please try again.");
+        }
+        trackingPageUrl = data.trackingPageUrl;
+      }
+      if (typeof trackingPageUrl !== "string" || !trackingPageUrl) {
+        throw new Error("Could not create a secure order-tracking link. Please try again.");
+      }
 
       if (codOrderPlaced && orderId?.trim()) {
         trackPurchase({
@@ -616,12 +700,11 @@ export function useCheckoutClient({
       const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
       const useXenditComponents =
         paymentMethod === "XENDIT" && Boolean(xenditComponentsSdkKey && providerSessionId);
-      const providerKey = paymentMethod.toLowerCase();
+      const providerKey = paymentMethod.toLowerCase() as HostedReturnProvider;
       const amountMinor = Math.round(
         confirmedTotal * minorUnitDivisor(currencyCode),
       );
-      let checkoutCorrelationId: string | undefined;
-      try {
+      if (!checkoutCorrelationId) {
         const regRes = await fetch("/api/payments/checkout-intents", {
           method: "POST",
           credentials: "include",
@@ -638,12 +721,14 @@ export function useCheckoutClient({
         });
         const regJson = (await regRes.json().catch(() => ({}))) as {
           correlationId?: string;
+          error?: string;
         };
-        if (regRes.ok && typeof regJson.correlationId === "string") {
-          checkoutCorrelationId = regJson.correlationId;
+        if (!regRes.ok || typeof regJson.correlationId !== "string") {
+          throw new Error(
+            regJson.error || "Could not register a durable payment attempt. Please try again.",
+          );
         }
-      } catch {
-        checkoutCorrelationId = undefined;
+        checkoutCorrelationId = regJson.correlationId;
       }
 
       if (usePayPalElement || useXenditComponents) {
@@ -712,14 +797,12 @@ export function useCheckoutClient({
         /* ignore */
       }
     }
-    const safeCheckoutUrl = sanitizeTrustedPublicUrl(pendingPayment.checkoutUrl);
+    const safeCheckoutUrl = sanitizeHostedCheckoutUrl(
+      pendingPayment.providerKey,
+      pendingPayment.checkoutUrl,
+    );
     if (!safeCheckoutUrl) {
       setError("The payment provider returned an invalid checkout link. Start checkout again.");
-      return;
-    }
-    const popup = window.open(safeCheckoutUrl, "_blank", "noopener,noreferrer");
-    if (popup) {
-      popup.focus();
       return;
     }
     clearCart();
@@ -900,7 +983,10 @@ export function useCheckoutClient({
     setError,
     loading,
     paymentMethod,
-    setPaymentMethod,
+    setPaymentMethod: (next: PaymentProviderKey) => {
+      userSelectedPaymentMethodRef.current = true;
+      setPaymentMethod(next);
+    },
     pendingPayment,
     setPendingPayment,
     embeddedData,

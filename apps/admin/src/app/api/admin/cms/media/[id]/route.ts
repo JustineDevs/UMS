@@ -128,7 +128,22 @@ async function deleteHandler(_req: NextRequest, ctx: RouteCtx) {
   }
   const ok = await softDeleteCmsMedia(sup.client, id, organization.id);
   if (!ok) return correlatedJson(cid, { error: "Unable to delete" }, { status: 500 });
-  return correlatedJson(cid, { ok: true });
+  const bucket = isCatalog ? "catalog" : "cms";
+  const storageCleanup = existing.storage_path.startsWith("external/")
+    ? { ok: true as const, skipped: true as const }
+    : await sup.client.storage.from(bucket).remove([existing.storage_path]);
+  if ("error" in storageCleanup && storageCleanup.error) {
+    console.error("[cms-media] storage cleanup failed", {
+      correlationId: cid,
+      mediaId: id,
+      bucket,
+      error: storageCleanup.error.message,
+    });
+  }
+  return correlatedJson(cid, {
+    ok: true,
+    storageCleanup: "error" in storageCleanup && storageCleanup.error ? "pending" : "removed",
+  });
 }
 
 export const PATCH = withAdminMutationIdempotency("/admin/cms/media/[id]:PATCH", patch);

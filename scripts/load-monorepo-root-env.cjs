@@ -51,9 +51,24 @@ function loadMonorepoRootEnv(fromConfigDir) {
   // The app launcher owns NEXTAUTH_URL in local development so admin and storefront
   // never generate callbacks or cookies for each other's origin.
   const runtimeNextAuthUrl = process.env.NEXTAUTH_URL?.trim();
-  applyRootEnvFile(envFilePath, true);
+  const runtimeSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const runtimeStorefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL?.trim();
+  const runtimePublicStorefrontUrl = process.env.PUBLIC_STOREFRONT_URL?.trim();
+  // Deployment/runtime variables must win over repository defaults. This is
+  // also required by local multi-service verification, where the same bundle
+  // is pointed at an explicitly selected Medusa port.
+  applyRootEnvFile(envFilePath, false);
   if (runtimeNextAuthUrl) {
     process.env.NEXTAUTH_URL = runtimeNextAuthUrl;
+  }
+  if (runtimeSiteUrl) {
+    process.env.NEXT_PUBLIC_SITE_URL = runtimeSiteUrl;
+  }
+  if (runtimeStorefrontUrl) {
+    process.env.NEXT_PUBLIC_STOREFRONT_URL = runtimeStorefrontUrl;
+  }
+  if (runtimePublicStorefrontUrl) {
+    process.env.PUBLIC_STOREFRONT_URL = runtimePublicStorefrontUrl;
   }
   if (invalidationBefore?.trim() && !process.env[invalidationKey]?.trim()) {
     process.env[invalidationKey] = invalidationBefore;

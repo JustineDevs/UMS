@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   readCart,
+  writeCart,
   updateLineQuantity,
   type CartLine,
 } from "@/lib/cart";
@@ -13,15 +14,71 @@ import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 export function CartPageClient() {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
 
   const refresh = useCallback(() => {
     setLines(readCart());
   }, []);
 
+  const reconcile = useCallback(async () => {
+    const current = readCart();
+    if (!current.length) {
+      setLines([]);
+      return;
+    }
+    setReconciling(true);
+    try {
+      const response = await fetch("/api/cart/reconcile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          lines: current.map(({ variantId, slug, quantity }) => ({ variantId, slug, quantity })),
+        }),
+      });
+      if (!response.ok) return refresh();
+      const payload = (await response.json()) as {
+        lines?: Array<{
+          variantId: string;
+          quantity?: number;
+          slug?: string;
+          name?: string;
+          sku?: string;
+          type?: string;
+          finish?: string;
+          price?: number;
+          thumbnail?: string;
+          status?: string;
+        }>;
+      };
+      const next = (payload.lines ?? [])
+        .filter((line) => line.status !== "unavailable" && line.quantity && line.slug && line.name)
+        .map((line) => ({
+          variantId: line.variantId,
+          quantity: line.quantity!,
+          slug: line.slug!,
+          name: line.name!,
+          sku: line.sku ?? "",
+          type: line.type ?? "",
+          finish: line.finish ?? "",
+          price: line.price ?? 0,
+          ...(line.thumbnail ? { thumbnail: line.thumbnail } : {}),
+        }));
+      writeCart(next);
+      setLines(next);
+    } catch {
+      refresh();
+    } finally {
+      setReconciling(false);
+    }
+  }, [refresh]);
+
   useEffect(() => {
     setMounted(true);
-    refresh();
-  }, [refresh]);
+    void reconcile();
+    const onFocus = () => void reconcile();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [reconcile]);
 
   if (!mounted) {
     return (
@@ -135,10 +192,11 @@ export function CartPageClient() {
           Continue shopping
         </Link>
         <Link
-          href="/checkout"
-          className="inline-flex justify-center rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
+          href={reconciling ? "/cart" : "/checkout"}
+          aria-disabled={reconciling}
+          className={`inline-flex justify-center rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90 ${reconciling ? "pointer-events-none opacity-60" : ""}`}
         >
-          Proceed to checkout
+          {reconciling ? "Refreshing prices…" : "Proceed to checkout"}
         </Link>
       </div>
     </div>

@@ -193,6 +193,7 @@ export const cmsComponentDefinitionSchema = z
       )
       .min(1)
       .max(50),
+    extendsComponentId: z.string().trim().min(1).max(128).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).optional(),
     defaultVariantId: z.string().trim().min(1).max(128).optional(),
     isGlobal: z.boolean().optional(),
   })

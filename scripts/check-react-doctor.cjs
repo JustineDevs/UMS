@@ -33,7 +33,10 @@ const diagnostics = (report.diagnostics || []).filter((item) => {
   // source or runtime secrets. Keep the source tree fully blocking while
   // excluding only generated build artifacts.
   const filePath = String(item.filePath || "");
-  return !filePath.includes("/.next/") && !filePath.startsWith(".next/");
+  return !filePath.includes("/.next/") &&
+    !filePath.startsWith(".next/") &&
+    !filePath.includes("/.next-production/") &&
+    !filePath.startsWith(".next-production/");
 });
 const summary = report.summary || {};
 const errorCount = diagnostics.filter((item) => item.severity === "error").length;

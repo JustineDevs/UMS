@@ -9,6 +9,10 @@ const CMS_SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: sanitizeHtml.defaults.allowedTags,
   allowedAttributes: {
     ...sanitizeHtml.defaults.allowedAttributes,
+    "*": [
+      "id", "class", "role", "aria-label", "aria-labelledby", "aria-describedby",
+      "aria-hidden", "aria-expanded", "data-cms-node", "data-cms-slot", "data-cms-prop",
+    ],
     a: ["href", "name", "target", "rel"],
     img: ["src", "srcset", "alt", "title", "width", "height", "loading"],
   },

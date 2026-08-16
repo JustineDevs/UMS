@@ -38,6 +38,7 @@ export { DEFAULT_PUBLIC_SITE_ORIGIN } from "./public-site-url.js";
 export {
   sanitizeSafeUrl,
   sanitizeSameOriginUrl,
+  sanitizeStripeCheckoutUrl,
   sanitizeTrustedPublicUrl,
 } from "./safe-url.js";
 export { PH_VAT_RATE, PH_VAT_PERCENT, computeDisplayVat } from "./ph-tax.js";

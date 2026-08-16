@@ -37,6 +37,8 @@ export async function GET(
     correlationId: row.correlation_id,
     cartId: row.cart_id,
     provider: row.provider,
+    providerSessionId: row.provider_session_id,
+    providerPaymentId: row.provider_payment_id,
     status: row.status,
     checkoutState: row.checkout_state,
     quoteFingerprint: row.quote_fingerprint,

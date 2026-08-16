@@ -123,6 +123,7 @@ async function post(req: NextRequest) {
     const { data: hit } = await sup.client
       .from("cms_redirects")
       .select("id")
+      .eq("organization_id", organization.id)
       .eq("from_path", normalizedFrom)
       .maybeSingle();
     const existingId = hit ? String((hit as { id?: string }).id ?? "") : "";
@@ -133,6 +134,7 @@ async function post(req: NextRequest) {
       status_code,
       active,
       preserve_query,
+      organization_id: organization.id,
     });
     if (!row) warnings.push(`Row ${r + 1}: could not save ${normalizedFrom}`);
     else imported++;

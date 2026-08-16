@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       error: "missing_region",
       message: PUBLIC_UNAVAILABLE,
     };
-    return NextResponse.json(body, { status: 200 });
+    return NextResponse.json(body, { status: 503 });
   }
 
   if (!getMedusaSecretApiKey()) {
@@ -75,7 +75,7 @@ export async function GET(req: Request) {
       error: "missing_medusa_admin_secret",
       message: PUBLIC_UNAVAILABLE,
     };
-    return NextResponse.json(body, { status: 200 });
+    return NextResponse.json(body, { status: 503 });
   }
 
   try {
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
         error: `admin_${res.status}`,
         message: PUBLIC_UNAVAILABLE,
       };
-      return NextResponse.json(body, { status: 200 });
+      return NextResponse.json(body, { status: 503 });
     }
 
     const j = (await res.json()) as {
@@ -114,7 +114,7 @@ export async function GET(req: Request) {
         error: "no_payment_providers",
         message: PUBLIC_UNAVAILABLE,
       };
-      return NextResponse.json(body, { status: 200 });
+      return NextResponse.json(body, { status: 503 });
     }
 
     const body: AvailabilityJson = {
@@ -134,7 +134,7 @@ export async function GET(req: Request) {
         error: "missing_medusa_admin_secret",
         message: PUBLIC_UNAVAILABLE,
       };
-      return NextResponse.json(body, { status: 200 });
+      return NextResponse.json(body, { status: 503 });
     }
     const body: AvailabilityJson = {
       ok: false,
@@ -143,6 +143,6 @@ export async function GET(req: Request) {
       error: "fetch_failed",
       message: PUBLIC_UNAVAILABLE,
     };
-    return NextResponse.json(body, { status: 200 });
+    return NextResponse.json(body, { status: 503 });
   }
 }

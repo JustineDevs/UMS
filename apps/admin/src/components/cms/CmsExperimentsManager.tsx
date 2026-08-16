@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 type VariantRow = { id: string; weight: string };
 
@@ -148,7 +149,7 @@ export function CmsExperimentsManager() {
     };
     const r = await fetch("/api/admin/cms/experiments", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify(payload),
     });
     const j = (await r.json()) as { error?: string };

@@ -12,12 +12,17 @@ const PRODUCT_PAGE_REVALIDATE_SEC = 120;
  */
 export function getCachedProductBySlug(slug: string): Promise<ProductBySlugResult> {
   const cached = unstable_cache(
-    async () => fetchProductBySlug(slug),
-    ["storefront-product-pdp", slug],
+    async () => {
+      const result = await fetchProductBySlug(slug);
+      return result.kind === "ok" ? result.product : null;
+    },
+    ["storefront-product-pdp-v2", slug],
     {
       revalidate: PRODUCT_PAGE_REVALIDATE_SEC,
       tags: [`product:${slug}`],
     },
   );
-  return cached();
+  return cached().then((product) =>
+    product ? { kind: "ok", product } : fetchProductBySlug(slug),
+  );
 }

@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import crypto from "node:crypto";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
+import { matchesReceiptSignature } from "@/lib/payment-receipt-signature";
 
 export const dynamic = "force-dynamic";
 
@@ -34,9 +36,7 @@ async function handlePOST(req: NextRequest) {
   }
 
   const supabaseUrl = process.env.SUPABASE_URL?.trim();
-  const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.SUPABASE_ANON_KEY?.trim();
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
@@ -45,6 +45,10 @@ async function handlePOST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const userId: string | null =
     ((session?.user as Record<string, unknown> | undefined)?.id as string | undefined) ?? null;
+  const email = session?.user?.email?.trim().toLowerCase();
+  if (!session?.user || !userId || !email) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
 
   let formData: FormData;
   try {
@@ -58,6 +62,11 @@ async function handlePOST(req: NextRequest) {
     : "";
   if (!orderId) {
     return NextResponse.json({ error: "orderId is required" }, { status: 400 });
+  }
+
+  const customerOrders = await fetchCustomerOrders(email);
+  if (!customerOrders.orders.some((order) => order.id === orderId)) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
   const file = formData.get("receipt");
@@ -89,6 +98,9 @@ async function handlePOST(req: NextRequest) {
 
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
+  if (!matchesReceiptSignature(mimeType, buffer)) {
+    return NextResponse.json({ error: "Receipt contents do not match the declared file type" }, { status: 400 });
+  }
 
   const { error: uploadError } = await sb.storage
     .from("payment-receipts")
@@ -102,18 +114,13 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ error: "Upload failed. Try again." }, { status: 503 });
   }
 
-  const { data: urlData } = sb.storage
-    .from("payment-receipts")
-    .getPublicUrl(storagePath);
-  const publicUrl = urlData?.publicUrl ?? "";
-
   const { data: row, error: dbError } = await sb
     .from("payment_receipts")
     .insert({
       order_id: orderId,
       user_id: userId,
       storage_path: storagePath,
-      public_url: publicUrl,
+      public_url: "",
       mime_type: mimeType,
       file_size_bytes: file.size,
       status: "pending_review",
@@ -123,13 +130,22 @@ async function handlePOST(req: NextRequest) {
 
   if (dbError) {
     console.error("[upload-payment-receipt] db insert error:", dbError);
+    await sb.storage.from("payment-receipts").remove([storagePath]);
     return NextResponse.json({ error: "Failed to record receipt. Contact support." }, { status: 503 });
+  }
+
+  const { data: signedUrl, error: signedUrlError } = await sb.storage
+    .from("payment-receipts")
+    .createSignedUrl(storagePath, 300);
+  if (signedUrlError || !signedUrl?.signedUrl) {
+    console.error("[upload-payment-receipt] signed URL error:", signedUrlError);
+    return NextResponse.json({ error: "Receipt uploaded; preview is temporarily unavailable." }, { status: 202 });
   }
 
   return NextResponse.json({
     ok: true,
     receiptId: row?.id ?? fileId,
-    publicUrl,
+    url: signedUrl.signedUrl,
   });
 }
 

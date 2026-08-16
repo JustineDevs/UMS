@@ -11,12 +11,23 @@ services:
       CI: "true"
       HOME: /tmp/medusa-config
       NODE_ENV: ${MEDUSA_DOCKER_ENV:-development}
-      PAYPAL_ENVIRONMENT: production
-      XENDIT_CHECKOUT_SUCCESS_URL: ${XENDIT_CHECKOUT_SUCCESS_URL:-http://localhost:3000/checkout/hosted-return?provider=xendit&status=success}
-      XENDIT_CHECKOUT_CANCEL_URL: ${XENDIT_CHECKOUT_CANCEL_URL:-http://localhost:3000/checkout/hosted-return?provider=xendit&status=cancel}
+      PAYPAL_ENVIRONMENT: ${PAYPAL_ENVIRONMENT:-sandbox}
+      STRIPE_CHECKOUT_SUCCESS_URL: ${STRIPE_CHECKOUT_SUCCESS_URL:?STRIPE_CHECKOUT_SUCCESS_URL must be configured}
+      STRIPE_CHECKOUT_CANCEL_URL: ${STRIPE_CHECKOUT_CANCEL_URL:?STRIPE_CHECKOUT_CANCEL_URL must be configured}
+      PUBLIC_STOREFRONT_URL: ${PUBLIC_STOREFRONT_URL:?PUBLIC_STOREFRONT_URL must be configured}
+      NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:?NEXT_PUBLIC_STOREFRONT_URL must be configured}
+      STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:?STOREFRONT_PUBLIC_URL must be configured}
+      PAYPAL_RETURN_URL: ${PAYPAL_RETURN_URL:?PAYPAL_RETURN_URL must be configured}
+      PAYPAL_CANCEL_URL: ${PAYPAL_CANCEL_URL:?PAYPAL_CANCEL_URL must be configured}
+      XENDIT_CHECKOUT_SUCCESS_URL: ${XENDIT_CHECKOUT_SUCCESS_URL:?XENDIT_CHECKOUT_SUCCESS_URL must be an HTTPS public callback}
+      XENDIT_CHECKOUT_CANCEL_URL: ${XENDIT_CHECKOUT_CANCEL_URL:?XENDIT_CHECKOUT_CANCEL_URL must be an HTTPS public callback}
       XDG_CONFIG_HOME: /tmp/medusa-config
       APPDATA: /tmp/medusa-config
+      ADMIN_CORS: ${ADMIN_CORS:?ADMIN_CORS must be configured}
+      AUTH_CORS: ${AUTH_CORS:?AUTH_CORS must be configured}
       LOCALAPPDATA: /tmp/medusa-config
+      STORE_CORS: ${STORE_CORS:?STORE_CORS must be configured}
+      STOREFRONT_ORIGIN: ${STOREFRONT_ORIGIN:?STOREFRONT_ORIGIN must be configured}
     restart: unless-stopped
     volumes:
       - .:/app

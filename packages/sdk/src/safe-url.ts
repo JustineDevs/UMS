@@ -10,6 +10,7 @@ export function sanitizeSafeUrl(
     allowedOrigins?: readonly string[];
     requireHttps?: boolean;
     allowRelative?: boolean;
+    preserveFragment?: boolean;
   } = {},
 ): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
@@ -43,7 +44,7 @@ export function sanitizeSafeUrl(
   if (allowedOrigins?.length && !allowedOrigins.includes(parsed.origin)) return null;
 
   // Fragments are never sent to the server and can contain untrusted state.
-  parsed.hash = "";
+  if (!options.preserveFragment) parsed.hash = "";
   return parsed.toString();
 }
 
@@ -70,4 +71,13 @@ export function sanitizeTrustedPublicUrl(
   return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1"
     ? safe
     : null;
+}
+
+export function sanitizeStripeCheckoutUrl(value: unknown): string | null {
+  return sanitizeSafeUrl(value, {
+    allowedOrigins: ["https://checkout.stripe.com"],
+    requireHttps: true,
+    allowRelative: false,
+    preserveFragment: true,
+  });
 }

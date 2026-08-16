@@ -310,7 +310,7 @@ export function HomeScrollExperience({
       const tileMatch = componentId.match(/^home-tile-(\d+)$/);
       const anchor = target.closest<HTMLAnchorElement>("a[href]");
       const media = target.closest<HTMLImageElement>("img[src]");
-      const style = ["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius"]
+      const style = ["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius", "gap", "align-items", "justify-content", "grid-template-columns", "min-width", "max-width", "min-height", "max-height", "line-height", "letter-spacing", "border", "box-shadow", "object-fit", "object-position", "background-size", "background-position"]
         .reduce<Record<string, string>>((out, key) => {
           const value = target.style.getPropertyValue(key);
           if (value) out[key] = value;
@@ -357,7 +357,7 @@ export function HomeScrollExperience({
       else if (prop === "src" && target instanceof HTMLImageElement) target.src = value;
       else if (prop.startsWith("style.")) {
         const css = prop.slice(6);
-        if (["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius"].includes(css)) {
+        if (["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius", "gap", "align-items", "justify-content", "grid-template-columns", "min-width", "max-width", "min-height", "max-height", "line-height", "letter-spacing", "border", "box-shadow", "object-fit", "object-position", "background-size", "background-position"].includes(css) && !/[{};]/.test(value) && !/url\s*\(/i.test(value)) {
           target.style.setProperty(css, value);
         }
       } else return;
@@ -468,7 +468,6 @@ export function HomeScrollExperience({
     [newsletterEmail],
   );
 
-  const [t0, t1, t2] = home.tiles;
   const heroStyle = home.hero.style;
   const heroTone = heroToneClass(heroStyle.textTone);
   const heroLeadTone = heroLeadToneClass(heroStyle.textTone);
@@ -744,110 +743,45 @@ export function HomeScrollExperience({
         style={sectionStyle(home.sectionLayout?.tiles)}
         className="bg-surface py-14 sm:py-16 md:py-24 storefront-section-x"
       >
-        <div data-cms-id="home-tiles-grid" data-cms-label="Tile grid" className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 md:h-[min(36rem,70vh)] md:grid-cols-12">
-          <Link
-            data-home-collection-panel
-            data-cms-id="home-tile-0"
-            data-cms-label="Category tile 1"
-            href={t0.href}
-            className="group relative min-h-[14rem] overflow-hidden rounded-lg bg-surface-container-low md:col-span-8 md:min-h-0"
-          >
-            <TileMedia
-              imageUrl={t0.imageUrl}
-              fallbackClass="bg-surface-container-high"
-            />
-            <div className="absolute bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10">
-              <h3
-                className={
-                  t0.variant === "large"
-                    ? "font-headline text-3xl font-extrabold text-white mix-blend-difference sm:text-4xl"
-                    : "font-headline text-2xl font-extrabold text-primary sm:text-3xl"
-                }
+        <div
+          data-cms-id="home-tiles-grid"
+          data-cms-label="Tile grid"
+          className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 md:grid-cols-12"
+        >
+          {home.tiles.map((tile, index) => {
+            const wide = tile.variant === "wide" || index >= 2;
+            const dark = tile.variant !== "small";
+            return (
+              <Link
+                key={`${tile.href}-${index}`}
+                data-home-collection-panel
+                data-cms-id={`home-tile-${index}`}
+                data-cms-label={`Category tile ${index + 1}`}
+                href={tile.href}
+                className={`group relative min-h-[14rem] overflow-hidden rounded-lg bg-surface-container-high ${wide ? "md:col-span-12" : index === 0 ? "md:col-span-8" : "md:col-span-4"}`}
               >
-                {t0.title}
-              </h3>
-              {t0.linkLabel ? (
-                <span
-                  className={
-                    t0.variant === "large"
-                      ? "mt-2 inline-block font-medium text-white underline underline-offset-8 mix-blend-difference"
-                      : "mt-2 inline-block font-medium text-primary transition-all hover:underline hover:underline-offset-8"
-                  }
-                >
-                  {t0.linkLabel}
-                </span>
-              ) : null}
-            </div>
-          </Link>
-          <Link
-            data-home-collection-panel
-            data-cms-id="home-tile-1"
-            data-cms-label="Category tile 2"
-            href={t1.href}
-            className="group relative min-h-[12rem] overflow-hidden rounded-lg bg-surface-container-high md:col-span-4 md:min-h-0"
-          >
-            <TileMedia
-              imageUrl={t1.imageUrl}
-              fallbackClass="bg-surface-container-low"
-            />
-            <div className="absolute bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10">
-              <h3
-                className={
-                  t1.variant === "small"
-                    ? "font-headline text-2xl font-extrabold text-primary sm:text-3xl"
-                    : "font-headline text-3xl font-extrabold text-white mix-blend-difference sm:text-4xl"
-                }
-              >
-                {t1.title}
-              </h3>
-              {t1.linkLabel ? (
-                <span
-                  className={
-                    t1.variant === "small"
-                      ? "mt-2 inline-block font-medium text-primary transition-all hover:underline hover:underline-offset-8"
-                      : "mt-2 inline-block font-medium text-white underline underline-offset-8 mix-blend-difference"
-                  }
-                >
-                  {t1.linkLabel}
-                </span>
-              ) : null}
-            </div>
-          </Link>
-        </div>
-        <div className="mx-auto mt-6 max-w-[1600px] md:h-[min(24rem,45vh)]">
-          <Link
-            data-home-collection-panel
-            data-cms-id="home-tile-2"
-            data-cms-label="Category tile 3"
-            href={t2.href}
-            className="group relative flex min-h-[14rem] items-center justify-center overflow-hidden rounded-lg bg-surface-container-highest md:min-h-full"
-          >
-            <div className="absolute inset-0">
-              <TileMedia
-                imageUrl={t2.imageUrl}
-                fallbackClass="bg-surface-container-high"
-              />
-            </div>
-            <div className="relative z-[1] px-4 text-center">
-              <h3
-                className={
-                  t2.variant === "wide"
-                    ? "font-headline text-4xl font-extrabold text-primary drop-shadow-sm sm:text-5xl"
-                    : "font-headline text-3xl font-extrabold text-white mix-blend-difference sm:text-4xl"
-                }
-              >
-                {t2.title}
-              </h3>
-              {t2.subtitle ? (
-                <p className="mt-3 text-sm font-medium uppercase tracking-widest text-on-surface-variant sm:mt-4">
-                  {t2.subtitle}
-                </p>
-              ) : null}
-              {t2.linkLabel ? (
-                <p className="mt-2 text-sm font-medium text-primary">{t2.linkLabel}</p>
-              ) : null}
-            </div>
-          </Link>
+                <TileMedia
+                  imageUrl={tile.imageUrl}
+                  fallbackClass="bg-surface-container-low"
+                />
+                <div className={`absolute ${wide ? "inset-0 flex flex-col items-center justify-center text-center" : "bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10"}`}>
+                  <h3 className={dark ? "font-headline text-3xl font-extrabold text-white mix-blend-difference sm:text-4xl" : "font-headline text-2xl font-extrabold text-primary sm:text-3xl"}>
+                    {tile.title}
+                  </h3>
+                  {tile.subtitle ? (
+                    <p className={`mt-3 text-sm font-medium uppercase tracking-widest ${dark ? "text-white/80" : "text-on-surface-variant"}`}>
+                      {tile.subtitle}
+                    </p>
+                  ) : null}
+                  {tile.linkLabel ? (
+                    <span className={`mt-2 inline-block font-medium ${dark ? "text-white underline underline-offset-8" : "text-primary transition-all hover:underline hover:underline-offset-8"}`}>
+                      {tile.linkLabel}
+                    </span>
+                  ) : null}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

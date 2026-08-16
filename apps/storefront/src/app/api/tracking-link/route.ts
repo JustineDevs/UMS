@@ -10,6 +10,7 @@ import {
 } from "@/lib/storefront-api-rate-limit";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { trackingLinkRouteLogic } from "@/lib/tracking-link-route-logic";
+import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 60;
@@ -39,6 +40,7 @@ async function handlePOST(req: Request) {
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
   const result = trackingLinkRouteLogic({
     cartId: typeof body?.cartId === "string" ? body.cartId : "",
+    ownedCartId: await readCartIdFromCookie(),
     rateLimited: false,
     retryAfterSec: undefined,
     buildTrackingUrl: (cartId) => buildTrackingUrl(base, cartId),

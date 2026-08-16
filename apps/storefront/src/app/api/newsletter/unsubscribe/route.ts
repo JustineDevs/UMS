@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";
+import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
 const schema = z.object({ email: z.string().trim().email().max(320) }).strict();
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!rate.ok) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
-  const sb = createStorefrontAnonSupabase();
+  const sb = createStorefrontServiceSupabase();
   if (!sb) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
   const now = new Date().toISOString();
   const { error } = await sb.from("marketing_preferences").upsert(

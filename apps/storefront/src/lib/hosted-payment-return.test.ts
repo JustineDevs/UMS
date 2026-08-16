@@ -8,6 +8,7 @@ import {
   normalizeHostedReturnProvider,
   normalizeHostedReturnStatus,
   providerLabelForHostedReturn,
+  sanitizeHostedCheckoutUrl,
 } from "./hosted-payment-return";
 
 test("normalizeHostedReturnProvider falls back to stripe", () => {
@@ -20,6 +21,9 @@ test("normalizeHostedReturnStatus defaults to success", () => {
   assert.equal(normalizeHostedReturnStatus(undefined), "success");
   assert.equal(normalizeHostedReturnStatus("cancel"), "cancel");
   assert.equal(normalizeHostedReturnStatus("failure"), "failure");
+  assert.equal(normalizeHostedReturnStatus("canceled"), "cancel");
+  assert.equal(normalizeHostedReturnStatus("expired"), "failure");
+  assert.equal(normalizeHostedReturnStatus("failed"), "failure");
 });
 
 test("providerLabelForHostedReturn exposes user-facing labels", () => {
@@ -46,5 +50,35 @@ test("checkoutReviewHref encodes the review message", () => {
   assert.equal(
     checkoutReviewHref("Payment failed & retry"),
     "/checkout?review=1&message=Payment%20failed%20%26%20retry",
+  );
+});
+
+test("sanitizeHostedCheckoutUrl allows each provider's hosted checkout origin", () => {
+  assert.match(
+    sanitizeHostedCheckoutUrl("stripe", "https://checkout.stripe.com/c/pay/cs_test") ?? "",
+    /^https:\/\/checkout\.stripe\.com\//,
+  );
+  assert.match(
+    sanitizeHostedCheckoutUrl("paypal", "https://www.sandbox.paypal.com/checkoutnow?token=abc") ?? "",
+    /^https:\/\/www\.sandbox\.paypal\.com\//,
+  );
+  assert.match(
+    sanitizeHostedCheckoutUrl("xendit", "https://checkout.xendit.co/web/abc") ?? "",
+    /^https:\/\/checkout\.xendit\.co\//,
+  );
+  assert.match(
+    sanitizeHostedCheckoutUrl("xendit", "https://checkout-staging.xendit.co/session/abc") ?? "",
+    /^https:\/\/checkout-staging\.xendit\.co\//,
+  );
+  assert.match(
+    sanitizeHostedCheckoutUrl("xendit", "https://dev.xen.to/abc") ?? "",
+    /^https:\/\/dev\.xen\.to\//,
+  );
+});
+
+test("sanitizeHostedCheckoutUrl rejects an untrusted provider link", () => {
+  assert.equal(
+    sanitizeHostedCheckoutUrl("paypal", "https://evil.example/pay"),
+    null,
   );
 });

@@ -219,7 +219,12 @@ const securityHeaders = [
 ];
 
 function previewFrameAncestors() {
-  const configured = (process.env.ADMIN_PREVIEW_ORIGINS ?? "")
+  const configured = (
+    process.env.ADMIN_PREVIEW_ORIGINS ??
+    process.env.NEXT_PUBLIC_ADMIN_URL ??
+    process.env.ADMIN_NEXTAUTH_URL ??
+    ""
+  )
     .split(",")
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter((value) => /^https?:\/\//.test(value));
@@ -248,6 +253,13 @@ const discoveryHeaders = [
 const nextConfig = {
   allowedDevOrigins,
   poweredByHeader: false,
+  // Keep supervised dev servers from mutating a production build in `.next`.
+  distDir:
+    process.env.VERCEL === "1"
+      ? ".next"
+      : process.env.NODE_ENV === "production"
+        ? ".next-production"
+        : ".next",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@universal-music-store/types",

@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState } from "react";
+import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
 const BLOCK_TYPES = [
   { type: "hero", label: "Hero banner" },
@@ -653,7 +654,7 @@ export function CmsPageBlocksEditor({
     setPresetMessage(null);
     const r = await fetch("/api/admin/cms/block-presets", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: cmsMutationHeaders(),
       body: JSON.stringify({ name, blocks }),
     });
     const j = (await r.json()) as { error?: string };

@@ -11,37 +11,41 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "..");
 const rel = process.argv[2] || "apps/storefront";
-const nextDir = path.join(root, rel, ".next");
+const appRoot = path.join(root, rel);
+const nextDirs = [
+  path.join(appRoot, ".next"),
+  path.join(appRoot, ".next-production"),
+];
 
 const ATTEMPTS = 10;
 const BASE_DELAY_MS = 200;
 
 async function removeNextDir() {
-  if (!fs.existsSync(nextDir)) {
-    return;
-  }
+  for (const nextDir of nextDirs) {
+    if (!fs.existsSync(nextDir)) continue;
 
-  let lastErr = null;
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    try {
-      await fs.promises.rm(nextDir, { recursive: true, force: true });
-      return;
-    } catch (err) {
-      lastErr = err;
-      const code = err && typeof err === "object" && "code" in err ? err.code : "";
-      const retryable =
-        code === "ENOTEMPTY" ||
-        code === "EPERM" ||
-        code === "EBUSY" ||
-        code === "EACCES" ||
-        code === "EMFILE";
-      if (!retryable || attempt === ATTEMPTS - 1) {
-        throw err;
+    let lastErr = null;
+    for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+      try {
+        await fs.promises.rm(nextDir, { recursive: true, force: true });
+        break;
+      } catch (err) {
+        lastErr = err;
+        const code = err && typeof err === "object" && "code" in err ? err.code : "";
+        const retryable =
+          code === "ENOTEMPTY" ||
+          code === "EPERM" ||
+          code === "EBUSY" ||
+          code === "EACCES" ||
+          code === "EMFILE";
+        if (!retryable || attempt === ATTEMPTS - 1) {
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, BASE_DELAY_MS * (attempt + 1)));
       }
-      await new Promise((r) => setTimeout(r, BASE_DELAY_MS * (attempt + 1)));
     }
+    if (lastErr && fs.existsSync(nextDir)) throw lastErr;
   }
-  if (lastErr) throw lastErr;
 }
 
 function lockErrorCode(err) {

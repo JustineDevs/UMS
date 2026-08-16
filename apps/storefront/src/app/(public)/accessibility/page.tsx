@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { PolicyMeta } from "@/lib/policy-content";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Accessibility",
@@ -15,13 +16,15 @@ export default function AccessibilityPage() {
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
         Accessibility statement
       </h1>
+      <PolicyMeta policy="Accessibility statement" />
       <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
         <p>
           We aim to make <strong>Universal Music Store</strong> (and related storefront
           domains) perceivable, operable, and understandable for people with
-          disabilities. We use <strong>WCAG 2.1 Level AA</strong> as the
-          reference standard and test with keyboard navigation, screen readers,
-          and responsive zoom up to 200%.
+          disabilities. We use <strong>WCAG 2.2 Level AA</strong> as our target
+          standard. The current tested scope covers keyboard navigation for the
+          search combobox, mobile menu, image zoom, and responsive storefront
+          and checkout shells; this statement does not claim full conformance.
         </p>
         <section>
           <h2 className="font-headline text-lg font-bold text-primary">
@@ -29,11 +32,11 @@ export default function AccessibilityPage() {
           </h2>
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              Semantic headings, landmarks, and labels on primary flows (shop,
-              product, checkout, account).
+            Semantic headings, landmarks, and labels on primary flows (shop,
+            product, checkout, account), with a skip-to-main link.
             </li>
             <li>Visible focus states on interactive elements.</li>
-            <li>Responsive layouts from narrow phones to wide desktops.</li>
+            <li>Responsive layouts from narrow phones to wide desktops, covered by the storefront browser matrix.</li>
             <li>
               Reduced-motion: smooth scrolling is disabled when your OS requests
               it.

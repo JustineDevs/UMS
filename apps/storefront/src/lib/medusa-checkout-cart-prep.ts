@@ -1,4 +1,4 @@
-import Medusa from "@medusajs/js-sdk";
+import type Medusa from "@medusajs/js-sdk";
 import { evaluateWebCheckoutPolicy } from "@universal-music-store/omnichannel-policy";
 import {
   getMedusaPublishableKey,
@@ -53,6 +53,7 @@ type PrepareMedusaCartInput = {
   codCartPayload?: CodCartPayload;
   /** When set, must match a `listCartOptions` id for this cart. */
   shippingOptionId?: string;
+  signal?: AbortSignal;
 };
 
 export type PrepareMedusaCartContext = {
@@ -62,6 +63,7 @@ export type PrepareMedusaCartContext = {
   publishableKey: string;
   shippingOptions: MedusaShippingOptionPreview[];
   appliedShippingOptionId: string;
+  bindToken?: string;
 };
 
 function buildShippingOptionPreviews(
@@ -101,10 +103,9 @@ export async function prepareMedusaStoreCart(
   input: PrepareMedusaCartInput,
   codFlow: boolean,
 ): Promise<PrepareMedusaCartContext> {
-  const stock = await verifyStockServerSide(input.lines);
-  if (!stock.ok) {
-    throw new Error(stock.message);
-  }
+  // Medusa's real cart line insertion below is the authoritative availability
+  // check for checkout. The standalone Admin preflight remains available for
+  // explicit stock checks without creating throwaway carts.
   const webPolicy = evaluateWebCheckoutPolicy({ stockVerified: true });
   if (!webPolicy.allowed) {
     throw new Error(webPolicy.violations.join("; ") || "Checkout policy denied");
@@ -127,10 +128,23 @@ export async function prepareMedusaStoreCart(
     }
   }
 
-  const sdk = new Medusa({ baseUrl, publishableKey });
+  const sdk = createStorefrontMedusaSdk({ signal: input.signal });
+
+  let bindToken: string | undefined;
+  if (typeof window !== "undefined") {
+    const bindResponse = await fetch("/api/cart/bind-token", { credentials: "include" });
+    const bindBody = (await bindResponse.json().catch(() => ({}))) as { token?: unknown };
+    if (!bindResponse.ok || typeof bindBody.token !== "string") {
+      throw new Error("Could not secure the checkout session.");
+    }
+    bindToken = bindBody.token;
+  }
 
   const { cart: created } = await sdk.store.cart.create(
-    withSalesChannelId({ region_id: regionId }) as Parameters<
+    withSalesChannelId({
+      region_id: regionId,
+      ...(bindToken ? { metadata: { uvs_cart_bind_token: bindToken } } : {}),
+    }) as Parameters<
       typeof sdk.store.cart.create
     >[0],
   );
@@ -214,6 +228,7 @@ export async function prepareMedusaStoreCart(
     publishableKey,
     shippingOptions: shippingOptionPreviews,
     appliedShippingOptionId: pickId.trim(),
+    bindToken,
   };
 }
 
@@ -225,21 +240,21 @@ export async function prepareMedusaStoreCart(
 async function verifyStockServerSide(
   lines: MedusaCheckoutLine[],
 ): Promise<StorefrontStockResult> {
-  if (typeof window === "undefined") {
-    const { assertStorefrontLinesStock } = await import("./storefront-inventory-guard");
-    return assertStorefrontLinesStock(lines);
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/checkout/verify-stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lines }),
+      });
+      const data = (await res.json()) as StorefrontStockResult;
+      return data;
+    } catch {
+      return { ok: false, message: "Stock verification failed", code: "INVENTORY_CHECK_FAILED" };
+    }
   }
-  try {
-    const res = await fetch("/api/checkout/verify-stock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lines }),
-    });
-    const data = (await res.json()) as StorefrontStockResult;
-    return data;
-  } catch {
-    return { ok: false, message: "Stock verification failed", code: "INVENTORY_CHECK_FAILED" };
-  }
+  const { assertStorefrontLinesStock } = await import("./storefront-inventory-guard");
+  return assertStorefrontLinesStock(lines);
 }
 
 function readMinorField(record: Record<string, unknown>, key: string): number {
@@ -394,6 +409,7 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
   loyaltyPointsToRedeem?: number;
   codCartPayload?: CodCartPayload;
   shippingOptionId?: string;
+  signal?: AbortSignal;
 }): Promise<MedusaCheckoutTotalsPreview> {
   const codFlow = Boolean(input.codCartPayload?.email?.trim());
   const ctx = await prepareMedusaStoreCart(
@@ -403,6 +419,7 @@ export async function executeMedusaCheckoutTotalsPreview(input: {
       codCartPayload: input.codCartPayload,
       loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
       shippingOptionId: input.shippingOptionId,
+      signal: input.signal,
     },
     codFlow,
   );
