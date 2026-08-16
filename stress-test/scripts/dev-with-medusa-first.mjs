@@ -14,6 +14,7 @@ attach(import.meta.url);
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const isWin = process.platform === "win32";
 const composeFile = join(root, "docker-compose.medusa.yml");
+loadRootEnv();
 const composeProjectName =
   process.env.MEDUSA_DOCKER_PROJECT_NAME?.trim() ||
   "universal-music-store-medusa";
@@ -350,7 +351,6 @@ async function waitForMedusaHealthy() {
   );
 }
 
-loadRootEnv();
 validateRequiredEnv();
 acquireRuntimeLock();
 process.on("exit", releaseRuntimeLock);
