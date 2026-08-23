@@ -36,6 +36,7 @@ import {
   buildXenditWebhookDedupId,
   claimXenditWebhookDedup,
 } from "../../lib/xendit-webhook-dedup";
+import { recordWebhookSecurityEvent } from "../../lib/webhook-security-metrics";
 import {
   createXenditPaymentSession,
   cancelXenditPayment,
@@ -44,7 +45,11 @@ import {
   refundXenditPayment,
   type XenditClientOptions,
 } from "../../lib/xendit-sdk-client";
-import { getNangoPaymentCredentials, nangoContextFrom } from "../../lib/nango-payment-credentials";
+import {
+  getNangoPaymentCredentials,
+  nangoContextFrom,
+  nangoPaymentProviderConfigured,
+} from "../../lib/nango-payment-credentials";
 
 export type XenditPaymentOptions = {
   secretKey: string;
@@ -124,7 +129,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
   static validateOptions(options: Record<string, unknown>): void {
     const secretKey = String(options.secretKey ?? "").trim();
     const webhookToken = String(options.webhookToken ?? "").trim();
-    if (!secretKey || !webhookToken) {
+    if ((!secretKey || !webhookToken) && !nangoPaymentProviderConfigured(["xendit", "xendit-sandbox"])) {
       throw new MedusaError(
         MedusaError.Types.INVALID_DATA,
         'Xendit payment provider: "secretKey" and "webhookToken" are required.',
@@ -486,6 +491,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
       (payload.headers["x-callback-token"] as string | undefined) ??
       (payload.headers["X-Callback-Token"] as string | undefined);
     if (!verifyWebhookToken(tokenHeader, normalizeWebhookToken(this.options_.webhookToken))) {
+      await recordWebhookSecurityEvent("xendit", "signature_failure");
       console.error(
         "[payment-webhook] verification_failed provider=xendit reason=invalid_callback_token",
       );
@@ -505,6 +511,9 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
       );
     }
 
+    const success = this.xenditWebhookSuccessPayload(body);
+    if (!success) return { action: PaymentActions.NOT_SUPPORTED };
+
     const dedupId = buildXenditWebhookDedupId(body);
     if (dedupId) {
       const isFirst = await claimXenditWebhookDedup(dedupId);
@@ -513,8 +522,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
       }
     }
 
-    const success = this.xenditWebhookSuccessPayload(body);
-    return success ?? { action: PaymentActions.NOT_SUPPORTED };
+    return success;
   }
 
   private xenditWebhookSuccessPayload(
@@ -535,6 +543,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
 
     const isCanceled =
       event.includes("cancel") || event.includes("expire") || event.includes("failed");
+    const currency = String(data.currency ?? "").trim().toUpperCase();
     if (isCanceled) {
       return {
         action: PaymentActions.CANCELED,
@@ -559,6 +568,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
     const amountMinor = Number.isFinite(Number(amountRaw))
       ? Math.round(Number(amountRaw))
       : 0;
+    if (amountMinor < 1 || !/^[A-Z]{3}$/.test(currency)) return null;
     const paymentRequestId =
       (data.payment_request_id as string | undefined)?.trim() ||
       (data.id as string | undefined)?.trim();

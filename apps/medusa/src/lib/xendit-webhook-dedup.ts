@@ -1,6 +1,7 @@
 import pg from "pg";
 
 import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics.js";
+import { recordWebhookSecurityEvent } from "./webhook-security-metrics";
 
 let pool: pg.Pool | null = null;
 let tableEnsured = false;
@@ -54,6 +55,7 @@ export async function claimXenditWebhookDedup(dedupId: string): Promise<boolean>
   const first = (res.rowCount ?? 0) >= 1;
   if (!first) {
     logWebhookDedupDuplicate("xendit", dedupId);
+    await recordWebhookSecurityEvent("xendit", "dedup_duplicate");
   }
   return first;
 }

@@ -40,6 +40,7 @@ export async function fetchProductReviews(
     .from("product_reviews")
     .select("id,rating,author_name,body,created_at,image_url,is_verified_buyer,helpful_votes")
     .eq("status", "approved")
+    .eq("shadow_banned", false)
     .order("created_at", { ascending: false })
     .limit(limit);
   if (mid && slug) {

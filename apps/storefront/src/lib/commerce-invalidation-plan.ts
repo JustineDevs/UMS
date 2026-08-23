@@ -9,6 +9,13 @@ export type CommerceInvalidationRevalidationPlan = {
   paths: string[];
 };
 
+export function buildCmsInvalidationRevalidationPlan(): CommerceInvalidationRevalidationPlan {
+  return {
+    tags: ["cms:pages", "cms:navigation", "cms:metadata", "cms:sitemap"],
+    paths: ["/", "/blog", "/contact", "/faq", "/help", "/sitemap.xml"],
+  };
+}
+
 /**
  * Pure plan for Next.js cache revalidation (tags + paths). Used by
  * `POST /api/internal/invalidate-commerce-state` and unit tests (no `next/cache` import).

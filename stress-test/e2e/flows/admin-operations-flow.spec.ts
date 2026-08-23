@@ -89,6 +89,10 @@ test.describe("@admin Admin operations E2E", () => {
     await expect(padding).toBeVisible();
     await padding.fill("24px");
     await padding.blur();
+    const color = page.locator("label").filter({ hasText: /^\\s*color\\s*$/ }).locator("input");
+    await color.fill("rgb(255, 0, 0)");
+    await color.press("Enter");
+    await expect(nested).toHaveCSS("color", "rgb(255, 0, 0)");
     const undo = page.getByRole("button", { name: "Undo" });
     const redo = page.getByRole("button", { name: "Redo" });
     await expect(undo).toBeEnabled();

@@ -8,7 +8,14 @@ const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:900
 
 export async function enablePublicTunnelBypass(page: Page): Promise<void> {
   if (process.env.E2E_TUNNEL_BYPASS_HEADER === "1") {
-    await page.setExtraHTTPHeaders({ "bypass-tunnel-reminder": "1" });
+    await page.route(/https:\/\/[^/]+\.loca\.lt(?:\/|$)/, async (route) => {
+      await route.continue({
+        headers: {
+          ...route.request().headers(),
+          "bypass-tunnel-reminder": "1",
+        },
+      });
+    });
   }
 }
 
@@ -121,11 +128,17 @@ export type AddCatalogProductResult = { slug: string; productTitle?: string };
  */
 export async function navigateToShopAndAddPreferredCatalogProduct(
   page: Page,
-  options?: { maxCandidates?: number; log?: (_message: string) => void },
+  options?: {
+    maxCandidates?: number;
+    log?: (_message: string) => void;
+    shopPath?: string;
+  },
 ): Promise<AddCatalogProductResult | null> {
   const max = options?.maxCandidates ?? 8;
   const log = options?.log ?? (() => {});
-  await page.goto(`${baseURL}/shop`, { waitUntil: "load" });
+  await page.goto(`${baseURL}${options?.shopPath ?? "/shop"}`, {
+    waitUntil: "load",
+  });
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
 
   const cards = page.locator("[data-product-slug]");
@@ -141,7 +154,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
 
   const trySlug = async (slug: string): Promise<AddCatalogProductResult | null> => {
     const res = await page.goto(`${baseURL}/shop/${slug}`, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
     if (!res || res.status() >= 400) return null;
     const btn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
@@ -179,7 +192,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       await addButton.click();
       await page.waitForTimeout(800);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
-        await page.reload({ waitUntil: "networkidle" });
+        await page.reload({ waitUntil: "domcontentloaded" });
       }
     }
     await expect(page).toHaveURL(/\/cart(?:\?|$)/, { timeout: 15_000 });
@@ -258,7 +271,7 @@ export async function verifyPostPaymentSuccess(
 
   if (provider === "stripe" || provider === "cod") {
     await expectOrderConfirmation(page);
-    await expect(page).toHaveURL(/\/(track\/order_|checkout\/stripe-return)/i, {
+    await expect(page).toHaveURL(/\/(track\/(?:order_|cap_)|checkout\/stripe-return)/i, {
       timeout: strict ? 60_000 : 30_000,
     });
     const m = page.url().match(/(order_[a-z0-9]+)/i);
@@ -511,14 +524,36 @@ export const STRIPE_SANDBOX_TEST_CARD_SUCCESS = "4242424242424242";
 export const STRIPE_SANDBOX_TEST_CARD_DECLINE = "4000000000000002";
 
 /**
- * After "Continue to payment", the storefront shows "Continue to Stripe" which sends the
- * browser to Stripe Hosted Checkout. Call this after {@link clickPayButton} when that button appears.
+ * Retry a failed hosted handoff only. Normal checkout navigates in the same tab
+ * without requiring a second confirmation click.
  */
 export async function clickContinueToStripeHostedCheckout(page: Page): Promise<void> {
-  const btn = page.getByTestId("checkout-continue-payment");
+  const btn = page.getByTestId("checkout-retry-payment-handoff");
   await expect(btn).toBeVisible({ timeout: 60_000 });
   await btn.click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 90_000 });
+}
+
+/** Accepts either direct navigation or the optional intermediate handoff UI. */
+export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
+  if (page.url().includes("checkout.stripe.com")) return;
+  const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
+  const winner = await Promise.race([
+    page
+      .waitForURL(/checkout\.stripe\.com/, { timeout: 60_000 })
+      .then(() => "redirect" as const)
+      .catch(() => null),
+    expect(hostedContinue)
+      .toBeVisible({ timeout: 60_000 })
+      .then(() => "handoff" as const)
+      .catch(() => null),
+  ]);
+  if (winner === "redirect" || page.url().includes("checkout.stripe.com")) return;
+  if (winner === "handoff") {
+    await clickContinueToStripeHostedCheckout(page);
+    return;
+  }
+  throw new Error("Stripe checkout did not redirect or expose its handoff control");
 }
 
 /**
@@ -611,10 +646,8 @@ export async function payWithStripeSandboxCard(
 ): Promise<void> {
   await clickPayButton(page);
 
-  const hostedContinue = page.getByTestId("checkout-continue-payment");
   try {
-    await expect(hostedContinue).toBeVisible({ timeout: 180_000 });
-    await clickContinueToStripeHostedCheckout(page);
+    await ensureStripeHostedCheckout(page);
     await fillStripeHostedCheckoutTestCard(page, cardNumber);
     await submitStripeHostedCheckoutAndWaitForReturn(page);
     return;

@@ -22,7 +22,8 @@ export const chatOrderTransitions: Record<string, readonly string[]> = {
   draft_created: ["processing", "completed", "cancelled"],
   processing: ["completed", "failed", "cancelled"],
   failed: ["processing", "cancelled"],
-  pending_payment: ["completed", "cancelled"],
+  // A chat order cannot become completed until the provider reports capture.
+  pending_payment: ["cancelled"],
   completed: [],
   cancelled: [],
 };

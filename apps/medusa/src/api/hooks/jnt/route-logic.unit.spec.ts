@@ -70,6 +70,28 @@ describe("J&T webhook preparation", () => {
     expect(result.body).toEqual({ received: true, skipped: true });
   });
 
+  it("rejects oversized payloads before JSON parsing", () => {
+    const rawBody = Buffer.alloc(64 * 1024 + 1, "x");
+    const result = prepareJntWebhookEvent({
+      secret,
+      rawBody,
+      signatureHeader: sign(rawBody.toString("utf8")),
+    });
+    expect(result.status).toBe(413);
+    expect(result.body.code).toBe("BODY_TOO_LARGE");
+  });
+
+  it("does not pass arbitrary order references to Medusa", () => {
+    const rawBody = Buffer.from(JSON.stringify({ orderNo: "../../other-order", status: "TRANSIT" }));
+    const result = prepareJntWebhookEvent({
+      secret,
+      rawBody,
+      signatureHeader: sign(rawBody.toString("utf8")),
+    });
+    expect(result.body).toEqual({ received: true, skipped: true });
+    expect(result.parsed).toBeUndefined();
+  });
+
   it("maps status and extracts lastCheckpoint from statusDesc and updateTime", () => {
     const payload = {
       orderNo: "order_1",

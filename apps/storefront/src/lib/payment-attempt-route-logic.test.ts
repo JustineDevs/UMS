@@ -131,6 +131,7 @@ test("finalizeCheckoutIntentRouteLogic marks awaiting completion when Medusa is 
       cart_id: "cart_1",
       correlation_id: "corr_1",
       provider: "stripe",
+      status: "paid",
       quote_fingerprint: "qf_live",
     },
     currentQuoteFingerprint: "qf_live",
@@ -146,7 +147,11 @@ test("finalizeCheckoutIntentRouteLogic marks awaiting completion when Medusa is 
   });
 
   assert.equal(result.status, 409);
-  assert.deepEqual(result.body, { error: "Order not ready" });
+  assert.deepEqual(result.body, {
+    error: "Order not ready",
+    code: "ORDER_NOT_READY",
+    correlationId: "corr_1",
+  });
   assert.equal(patches.length, 1);
   assert.equal(patches[0].status, "paid_awaiting_order");
   assert.equal(events[0].outcome, "failure");
@@ -163,6 +168,7 @@ test("finalizeCheckoutIntentRouteLogic marks attempt completed on success", asyn
       cart_id: "cart_1",
       correlation_id: "corr_1",
       provider: "stripe",
+      status: "paid",
       quote_fingerprint: "qf_live",
     },
     currentQuoteFingerprint: "qf_live",
@@ -188,6 +194,72 @@ test("finalizeCheckoutIntentRouteLogic marks attempt completed on success", asyn
   assert.equal(events[0].outcome, "success");
 });
 
+test("finalizeCheckoutIntentRouteLogic rejects an unverified hosted redirect", async () => {
+  let finalized = false;
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_unverified",
+    cartId: "cart_1",
+    row: {
+      cart_id: "cart_1",
+      correlation_id: "corr_unverified",
+      provider: "stripe",
+      status: "initiated",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async () => {},
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 409);
+  assert.deepEqual(result.body, {
+    error:
+      "Payment has not been verified by the provider yet. We will keep checking and will not create an order until confirmation arrives.",
+    code: "PAYMENT_NOT_VERIFIED",
+    correlationId: "corr_unverified",
+  });
+  assert.equal(finalized, false);
+});
+
+test("finalizeCheckoutIntentRouteLogic preserves a provider-pending attempt", async () => {
+  let patch: Record<string, unknown> | undefined;
+  const result = await finalizeCheckoutIntentRouteLogic({
+    correlationId: "corr_pending",
+    cartId: "cart_1",
+    row: {
+      cart_id: "cart_1",
+      correlation_id: "corr_pending",
+      provider: "stripe",
+      status: "processing",
+      quote_fingerprint: "qf_live",
+    },
+    currentQuoteFingerprint: "qf_live",
+    incrementFinalizeAttempts: async () => {},
+    updatePaymentAttempt: async (_id, value) => { patch = value; },
+    finalizeMedusaCart: async () => okResult(),
+    logEvent: () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 409);
+  assert.deepEqual(result.body, {
+    error: "Payment is still processing. We will keep checking and will not create an order until confirmation arrives.",
+    code: "PAYMENT_PENDING",
+    correlationId: "corr_pending",
+  });
+  assert.deepEqual(patch, {
+    status: "pending_payment",
+    checkout_state: "awaiting_provider",
+    last_error: null,
+  });
+});
+
 test("finalizeCheckoutIntentRouteLogic rejects a duplicate finalization claim", async () => {
   let finalized = false;
   const result = await finalizeCheckoutIntentRouteLogic({
@@ -197,6 +269,7 @@ test("finalizeCheckoutIntentRouteLogic rejects a duplicate finalization claim", 
       cart_id: "cart_1",
       correlation_id: "corr_duplicate",
       provider: "stripe",
+      status: "paid",
       quote_fingerprint: "qf_live",
     },
     currentQuoteFingerprint: "qf_live",
@@ -214,45 +287,92 @@ test("finalizeCheckoutIntentRouteLogic rejects a duplicate finalization claim", 
   assert.equal(result.status, 409);
   assert.deepEqual(result.body, {
     error: "Checkout finalization is already in progress",
+    code: "FINALIZE_IN_PROGRESS",
+    correlationId: "corr_duplicate",
   });
   assert.equal(finalized, false);
 });
 
-test("finalizeCheckoutIntentRouteLogic replays a completed order idempotently", async () => {
-  let finalized = false;
-  const result = await finalizeCheckoutIntentRouteLogic({
-    correlationId: "corr_completed",
-    cartId: "cart_1",
-    row: {
-      cart_id: "cart_1",
-      correlation_id: "corr_completed",
-      provider: "stripe",
-      status: "completed",
-      medusa_order_id: "order_existing",
-      quote_fingerprint: "qf_live",
-    },
-    currentQuoteFingerprint: "qf_live",
-    incrementFinalizeAttempts: async () => {},
-    claimFinalizeAttempt: async () => {
-      throw new Error("must not claim a completed attempt");
-    },
-    updatePaymentAttempt: async () => {},
-    finalizeMedusaCart: async () => {
-      finalized = true;
-      return okResult();
-    },
-    logEvent: () => {},
-    nowIso: () => "2026-04-05T00:00:00.000Z",
-  });
+test("concurrent finalization attempts allow only one claimed side effect", async () => {
+  let claimed = false;
+  let finalizeCalls = 0;
 
-  assert.equal(result.status, 200);
-  assert.deepEqual(result.body, {
-    ok: true,
-    orderId: "order_existing",
-    redirectUrl: "/track/order_existing",
-    replayed: true,
-  });
-  assert.equal(finalized, false);
+  const run = () =>
+    finalizeCheckoutIntentRouteLogic({
+      correlationId: "corr_race",
+      cartId: "cart_race",
+      row: {
+        cart_id: "cart_race",
+        correlation_id: "corr_race",
+        provider: "stripe",
+        status: "paid",
+        quote_fingerprint: "qf_race",
+      },
+      currentQuoteFingerprint: "qf_race",
+      incrementFinalizeAttempts: async () => {},
+      claimFinalizeAttempt: async () => {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        if (claimed) return false;
+        claimed = true;
+        return true;
+      },
+      updatePaymentAttempt: async () => {},
+      finalizeMedusaCart: async () => {
+        finalizeCalls += 1;
+        return okResult("order_race");
+      },
+      logEvent: () => {},
+      nowIso: () => "2026-04-05T00:00:00.000Z",
+    });
+
+  const results = await Promise.all([run(), run()]);
+  assert.deepEqual(
+    results.map((result) => result.status).sort(),
+    [200, 409],
+  );
+  assert.equal(finalizeCalls, 1);
+});
+
+test("finalizeCheckoutIntentRouteLogic replays a completed order idempotently", async () => {
+  const previousSecret = process.env.TRACKING_HMAC_SECRET;
+  process.env.TRACKING_HMAC_SECRET = "test-tracking-secret";
+  let finalized = false;
+  try {
+    const result = await finalizeCheckoutIntentRouteLogic({
+      correlationId: "corr_completed",
+      cartId: "cart_1",
+      row: {
+        cart_id: "cart_1",
+        correlation_id: "corr_completed",
+        provider: "stripe",
+        status: "completed",
+        medusa_order_id: "order_existing",
+        quote_fingerprint: "qf_live",
+      },
+      currentQuoteFingerprint: "qf_live",
+      incrementFinalizeAttempts: async () => {},
+      claimFinalizeAttempt: async () => {
+        throw new Error("must not claim a completed attempt");
+      },
+      updatePaymentAttempt: async () => {},
+      finalizeMedusaCart: async () => {
+        finalized = true;
+        return okResult();
+      },
+      logEvent: () => {},
+      nowIso: () => "2026-04-05T00:00:00.000Z",
+    });
+
+    assert.equal(result.status, 200);
+    assert.equal(result.body.ok, true);
+    assert.equal(result.body.orderId, "order_existing");
+    assert.match(String(result.body.redirectUrl), /^https:\/\/[^/]+\/track\/cap_/);
+    assert.equal(result.body.replayed, true);
+    assert.equal(finalized, false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.TRACKING_HMAC_SECRET;
+    else process.env.TRACKING_HMAC_SECRET = previousSecret;
+  }
 });
 
 test("finalizeCheckoutIntentRouteLogic fails closed when the finalization claim is unavailable", async () => {
@@ -264,6 +384,7 @@ test("finalizeCheckoutIntentRouteLogic fails closed when the finalization claim 
       cart_id: "cart_1",
       correlation_id: "corr_claim_error",
       provider: "paypal",
+      status: "paid",
       quote_fingerprint: "qf_live",
     },
     currentQuoteFingerprint: "qf_live",
@@ -283,6 +404,8 @@ test("finalizeCheckoutIntentRouteLogic fails closed when the finalization claim 
   assert.equal(result.status, 503);
   assert.deepEqual(result.body, {
     error: "Payment finalization is temporarily unavailable",
+    code: "FINALIZE_UNAVAILABLE",
+    correlationId: "corr_claim_error",
   });
   assert.equal(finalized, false);
 });
@@ -295,6 +418,7 @@ test("finalizeCheckoutIntentRouteLogic rejects cart mismatch", async () => {
       cart_id: "cart_other",
       correlation_id: "corr_1",
       provider: "stripe",
+      status: "paid",
     },
     currentQuoteFingerprint: "qf_live",
     incrementFinalizeAttempts: async () => {},
@@ -366,6 +490,7 @@ test("finalizeCheckoutIntentRouteLogic expires stale quote mismatches", async ()
       cart_id: "cart_1",
       correlation_id: "corr_1",
       provider: "stripe",
+      status: "paid",
       quote_fingerprint: "qf_old",
     },
     currentQuoteFingerprint: "qf_new",
@@ -512,36 +637,43 @@ test("codPlaceOrderRouteLogic completes order exactly once per correlation", asy
 });
 
 test("codPlaceOrderRouteLogic replays a completed order idempotently", async () => {
+  const previousSecret = process.env.TRACKING_HMAC_SECRET;
+  process.env.TRACKING_HMAC_SECRET = "test-tracking-secret";
   let finalized = false;
-  const result = await codPlaceOrderRouteLogic({
-    correlationId: "corr_cod_completed",
-    cartId: "cart_cod",
-    row: {
-      cart_id: "cart_cod",
-      correlation_id: "corr_cod_completed",
-      provider: "cod",
-      status: "completed",
-      order_id: "order_cod_existing",
-      quote_fingerprint: "qf_live",
-    },
-    currentQuoteFingerprint: "qf_live",
-    incrementFinalizeAttempts: async () => {},
-    claimFinalizeAttempt: async () => {
-      throw new Error("must not claim a completed attempt");
-    },
-    updatePaymentAttempt: async () => {},
-    finalizeMedusaCart: async () => {
-      finalized = true;
-      return okResult();
-    },
-    logEvent: () => {},
-    nowIso: () => "2026-04-05T00:00:00.000Z",
-  });
+  try {
+    const result = await codPlaceOrderRouteLogic({
+      correlationId: "corr_cod_completed",
+      cartId: "cart_cod",
+      row: {
+        cart_id: "cart_cod",
+        correlation_id: "corr_cod_completed",
+        provider: "cod",
+        status: "completed",
+        order_id: "order_cod_existing",
+        quote_fingerprint: "qf_live",
+      },
+      currentQuoteFingerprint: "qf_live",
+      incrementFinalizeAttempts: async () => {},
+      claimFinalizeAttempt: async () => {
+        throw new Error("must not claim a completed attempt");
+      },
+      updatePaymentAttempt: async () => {},
+      finalizeMedusaCart: async () => {
+        finalized = true;
+        return okResult();
+      },
+      logEvent: () => {},
+      nowIso: () => "2026-04-05T00:00:00.000Z",
+    });
 
-  assert.equal(result.status, 200);
-  assert.equal(result.body.orderId, "order_cod_existing");
-  assert.equal(result.body.replayed, true);
-  assert.equal(finalized, false);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.orderId, "order_cod_existing");
+    assert.equal(result.body.replayed, true);
+    assert.equal(finalized, false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.TRACKING_HMAC_SECRET;
+    else process.env.TRACKING_HMAC_SECRET = previousSecret;
+  }
 });
 
 test("codPlaceOrderRouteLogic expires stale quote mismatches", async () => {
@@ -703,4 +835,27 @@ test("finalizePaymentAttemptsCronRouteLogic updates completed and errored rows",
     typeof patches.find((entry) => entry.id === "corr_fail")?.patch.last_error,
     "string",
   );
+});
+
+test("finalizePaymentAttemptsCronRouteLogic skips rows claimed by another worker", async () => {
+  let finalized = false;
+  const result = await finalizePaymentAttemptsCronRouteLogic({
+    configuredSecret: "cron-secret",
+    providedSecret: "cron-secret",
+    supabaseAvailable: true,
+    stuckRows: [{ correlation_id: "corr_claimed", cart_id: "cart_claimed" }],
+    claimFinalizeAttempt: async () => false,
+    finalizeMedusaCart: async () => {
+      finalized = true;
+      return okResult();
+    },
+    updatePaymentAttempt: async () => {},
+    nowIso: () => "2026-04-05T00:00:00.000Z",
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.processed, 1);
+  assert.equal(result.body.completed, 0);
+  assert.deepEqual(result.body.errors, []);
+  assert.equal(finalized, false);
 });

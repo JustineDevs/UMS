@@ -37,6 +37,11 @@
       ]
     },
     "apps/admin": {
+      "ignoreFiles": [
+        "public/guide-demos/demo-mock-data.js",
+        "public/guide-demos/demo-runtime.js",
+        "public/guide-demos/demo-shared.css"
+      ],
       "next": {
         "entry": [
           "src/app/**/*/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}",

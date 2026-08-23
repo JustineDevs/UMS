@@ -1,5 +1,11 @@
 const KEY = "universal_music_store_wishlist_v1";
 const MAX_WISHLIST_SIZE = 200;
+const SYNC_DONE_KEY = "ums_wishlist_synced_v2";
+
+export function wishlistSyncStorageKey(identity: string): string {
+  const normalized = identity.trim().toLowerCase();
+  return `${SYNC_DONE_KEY}:${normalized || "unknown"}`;
+}
 
 export type WishlistEntry = {
   slug: string;
@@ -56,17 +62,7 @@ export async function persistWishlistMutation(
   const response = await fetch("/api/wishlist", {
     method: action === "add" ? "POST" : "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(
-      action === "add"
-        ? {
-            slug: entry.slug,
-            name: entry.name,
-            ...(entry.medusaProductId?.trim()
-              ? { medusaProductId: entry.medusaProductId.trim() }
-              : {}),
-          }
-        : { slug: entry.slug },
-    ),
+    body: JSON.stringify({ medusaProductId: entry.medusaProductId?.trim() ?? "" }),
   });
   if (!response.ok) {
     throw new Error("Saved items could not be synchronized.");

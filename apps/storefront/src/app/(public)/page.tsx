@@ -47,11 +47,15 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ adminPreview?: string | string[] }>;
 }) {
+  const adminPreview = (await searchParams).adminPreview;
+  const isAdminPreview =
+    adminPreview === "1" ||
+    (Array.isArray(adminPreview) && adminPreview.includes("1"));
   const [featured, home] = await Promise.all([
     fetchFeaturedProducts(4),
     loadStorefrontHomeContentForPublic(),
   ]);
-  if (featured.kind !== "ok") {
+  if (featured.kind !== "ok" && !isAdminPreview) {
     return (
       <main className="storefront-page-shell max-w-[1600px] pb-12">
         <div className="mx-auto max-w-2xl space-y-6 pt-8">
@@ -87,11 +91,6 @@ export default async function HomePage({
     contactPhone: publicMeta?.supportPhone ?? null,
   });
   const webJsonLd = buildJsonLdWebSite();
-  const adminPreview = (await searchParams).adminPreview;
-  const isAdminPreview =
-    adminPreview === "1" ||
-    (Array.isArray(adminPreview) && adminPreview.includes("1"));
-
   return (
     <>
       <script
@@ -104,13 +103,13 @@ export default async function HomePage({
       />
       {isAdminPreview ? (
         <StorefrontHomePreviewBridge
-          products={featured.products}
+          products={featured.kind === "ok" ? featured.products : []}
           home={home}
           socialProof={{ customerCount, reviewSummary }}
         />
       ) : (
         <HomeScrollExperience
-          products={featured.products}
+          products={featured.kind === "ok" ? featured.products : []}
           home={home}
           socialProof={{ customerCount, reviewSummary }}
         />

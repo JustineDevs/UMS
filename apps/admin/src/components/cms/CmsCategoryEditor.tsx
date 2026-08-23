@@ -10,10 +10,12 @@ import { CmsPageBlocksEditor } from "./CmsPageBlocksEditor";
 
 type Row = {
   id: string;
+  collection_id: string | null;
   collection_handle: string;
   locale: string;
   intro_html: string;
   banner_url: string | null;
+  banner_alt: string | null;
   blocks: CmsBlock[];
 };
 
@@ -97,10 +99,12 @@ export function CmsCategoryEditor() {
       headers: cmsMutationHeaders(),
       body: JSON.stringify({
         id: editing.id || undefined,
+        collection_id: editing.collection_id || undefined,
         collection_handle: editing.collection_handle,
         locale: editing.locale,
         intro_html: editing.intro_html,
         banner_url: editing.banner_url,
+        banner_alt: editing.banner_alt,
         blocks: editing.blocks,
       }),
     });
@@ -188,10 +192,12 @@ export function CmsCategoryEditor() {
           onClick={() =>
             setEditing({
               id: "",
+              collection_id: categories[0]?.id ?? null,
               collection_handle: categories[0]?.handle ?? "",
               locale: "en",
               intro_html: "",
               banner_url: null,
+              banner_alt: null,
               blocks: [],
             })
           }
@@ -208,7 +214,8 @@ export function CmsCategoryEditor() {
               value={editing.collection_handle}
               onChange={(e) => {
                 const h = e.target.value;
-                setEditing({ ...editing, collection_handle: h });
+                const selected = categories.find((c) => c.handle === h);
+                setEditing({ ...editing, collection_handle: h, collection_id: selected?.id ?? editing.collection_id });
               }}
             >
               {categories.map((c) => (
@@ -285,6 +292,17 @@ export function CmsCategoryEditor() {
               onChange={(e) =>
                 setEditing({ ...editing, banner_url: e.target.value || null })
               }
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            Banner alt text (leave empty when decorative)
+            <input
+              className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+              value={editing.banner_alt ?? ""}
+              onChange={(e) =>
+                setEditing({ ...editing, banner_alt: e.target.value || null })
+              }
+              maxLength={500}
             />
           </label>
           <div>

@@ -6,6 +6,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const MAX_CONCURRENCY = 3;
 
@@ -111,12 +112,12 @@ async function post(req: NextRequest) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
 
-  let body: BulkFulfillBody;
-  try {
-    body = (await req.json()) as BulkFulfillBody;
-  } catch {
+  const parsedBody = await parseBoundedJson(req, 64 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
   }
+  const body = parsedBody.value as BulkFulfillBody;
 
   const { orderIds, trackingNumber, carrierId, notifyCustomer = true } = body;
 

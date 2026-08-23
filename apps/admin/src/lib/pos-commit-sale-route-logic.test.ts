@@ -215,6 +215,7 @@ test("posCommitSaleRouteLogic creates order, patches metadata, and remembers ide
   assert.equal(ok.body.orderId, "order_1");
   assert.deepEqual(patched[0], {
     pos_offline_id: "offline_1",
+    pos_idempotency_key: "idem_1",
     pos_shift_id: "shift_1",
     pos_payment_method: "cash",
     pos_receipt_reference: "receipt_1",
@@ -267,4 +268,53 @@ test("posCommitSaleRouteLogic fails when converted order has no usable identifie
     error.body.error,
     "Converted draft order missing identifiers from the store API",
   );
+});
+
+test("posCommitSaleRouteLogic recovers a pending durable command from the order metadata", async () => {
+  let created = false;
+  let completed = false;
+  const result = await posCommitSaleRouteLogic({
+    body: { items: [{ variantId: "variant_1", quantity: 1 }], offlineSaleId: "offline_1" },
+    correlationId: "req_1",
+    idempotencyKey: "idem_recover",
+    envReady: true,
+    completedReplayOrderNumber: null,
+    claimDurableCommand: async () => "pending",
+    findExistingOrderByOfflineSaleId: async () => ({ id: "order_1", displayId: "1001" }),
+    completeDurableCommand: async () => { completed = true; },
+    assertStock: async () => ({ ok: true }),
+    loadShiftStatus: async () => "open",
+    evaluatePolicy: () => ({ allowed: true, violations: [] }),
+    createDraftOrder: async () => { created = true; return { id: "draft_1" }; },
+    convertDraftToOrder: async () => ({ id: "order_1", display_id: "1001" }),
+    patchOrderMetadata: async () => {},
+    rememberCompletedReplay: () => {},
+  });
+  assert.equal(result.status, 200);
+  assert.equal(created, false);
+  assert.equal(completed, true);
+  assert.equal(result.logPhase, "ok");
+});
+
+test("posCommitSaleRouteLogic does not create a second order for an unresolved pending command", async () => {
+  let created = false;
+  const result = await posCommitSaleRouteLogic({
+    body: { items: [{ variantId: "variant_1", quantity: 1 }] },
+    correlationId: "req_1",
+    idempotencyKey: "idem_pending",
+    envReady: true,
+    completedReplayOrderNumber: null,
+    claimDurableCommand: async () => "pending",
+    findExistingOrderByOfflineSaleId: async () => null,
+    findExistingOrderByIdempotencyKey: async () => null,
+    assertStock: async () => ({ ok: true }),
+    loadShiftStatus: async () => "open",
+    evaluatePolicy: () => ({ allowed: true, violations: [] }),
+    createDraftOrder: async () => { created = true; return { id: "draft_1" }; },
+    convertDraftToOrder: async () => ({ id: "order_1", display_id: "1001" }),
+    patchOrderMetadata: async () => {},
+    rememberCompletedReplay: () => {},
+  });
+  assert.equal(result.status, 409);
+  assert.equal(created, false);
 });

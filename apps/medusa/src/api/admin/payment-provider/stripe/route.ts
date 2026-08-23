@@ -48,7 +48,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
         bucket.gross_minor += transaction.amount;
         bucket.net_minor += transaction.net;
       }
-      return void res.json({ operation: body.operation, data: { provider_api_pull: true, source: "balance_transactions", period_start: body.period_start, period_end: body.period_end, transaction_count: transactions.data.length, has_more: transactions.has_more, by_currency: byCurrency } });
+      return void res.json({ operation: body.operation, data: { provider_api_pull: true, source: "balance_transactions", period_start: body.period_start, period_end: body.period_end, transaction_count: transactions.data.length, has_more: transactions.has_more, by_currency: byCurrency, transactions: transactions.data.map((transaction) => ({ external_id: transaction.id, payment_external_id: typeof transaction.source === "string" ? transaction.source : transaction.source?.id ?? null, amount_minor: transaction.amount, fee_minor: transaction.fee, net_minor: transaction.net, currency: transaction.currency.toUpperCase(), status: transaction.status, provider_occurred_at: new Date(transaction.created * 1000).toISOString() })) } });
     }
     if (body.operation === "setup_intent") {
       const result = await stripe.setupIntents.create({ customer: body.customer, automatic_payment_methods: { enabled: true } }, requestOptions);

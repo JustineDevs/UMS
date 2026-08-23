@@ -80,7 +80,7 @@ module.exports = {
   /** Keep haste-map / Jest cache inside the app (avoids EPERM when Node runs from Cursor’s install dir on Windows). */
   cacheDirectory: path.join(__dirname, ".jest-cache"),
   transform: {
-    "^.+\\.[jt]s$": [
+    "^.+\\.(?:[jt]sx?|mts)$": [
       "@swc/jest",
       {
         jsc: {
@@ -90,9 +90,10 @@ module.exports = {
     ],
   },
   testEnvironment: "node",
-  moduleFileExtensions: ["js", "ts", "json"],
+  moduleFileExtensions: ["js", "ts", "mts", "json"],
   modulePathIgnorePatterns: ["dist/", "<rootDir>/.medusa/"],
   moduleNameMapper: {
+    "^@universal-music-store/sdk/feature-flags$": path.resolve(__dirname, "../../packages/sdk/src/feature-flags.ts"),
     "^@medusajs/framework$": medusaFrameworkRoot,
     "^@medusajs/framework/utils$": medusaFrameworkUtils,
     "^@medusajs/framework/types$": medusaFrameworkTypes,

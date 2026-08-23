@@ -5,6 +5,7 @@ import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 import { requireStaffSessionWithPermission } from "@/lib/requireStaffSession";
+import { buildAdminPagination } from "@/lib/admin-pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -52,8 +53,6 @@ export async function GET(req: Request) {
 
   return correlatedJson(correlationId, {
     rows: result.rows,
-    page,
-    pageSize,
-    total: result.total,
+    ...buildAdminPagination(page, pageSize, result.total),
   });
 }

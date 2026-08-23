@@ -26,7 +26,8 @@
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts src/cms-helpers.test.ts src/env/posthog.test.ts src/posthog.test.ts src/safe-url.test.ts"
+    "test": "node --import tsx/esm --test src/tracking-token.test.ts src/env/medusa-storefront.test.ts src/env/admin-medusa.test.ts src/cms-helpers.test.ts src/env/posthog.test.ts src/posthog.test.ts src/safe-url.test.ts src/analytics-contract.test.ts src/i18n.test.ts src/slo.test.ts src/slo-delivery.test.ts",
+    "test:auth": "node --import tsx/esm --test src/auth-shared.test.ts"
   },
   "dependencies": {
     "@universal-music-store/platform-data": "workspace:*",

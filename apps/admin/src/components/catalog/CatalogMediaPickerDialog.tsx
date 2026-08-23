@@ -14,6 +14,7 @@ type MediaRow = {
   alt_text?: string | null;
   byte_size?: number | null;
 };
+export type PickedMedia = Pick<MediaRow, "id" | "public_url">;
 
 export type CatalogAddPlacement = "main" | "gallery";
 
@@ -22,7 +23,7 @@ type Props = {
   onClose: () => void;
   addPlacement: CatalogAddPlacement;
   onAddPlacementChange: (_placement: CatalogAddPlacement) => void;
-  onPickMany: (_urls: string[]) => void;
+  onPickMany: (_media: PickedMedia[]) => void;
   mediaScope?: "catalog" | "cms";
 };
 
@@ -110,12 +111,12 @@ export function CatalogMediaPickerDialog({
   }, []);
 
   const addSelected = useCallback(() => {
-    const urls = rows
+    const media = rows
       .filter((m) => selectedIds.has(m.id))
-      .map((m) => m.public_url.trim())
-      .filter(Boolean);
-    if (urls.length === 0) return;
-    onPickMany(urls);
+      .filter((m) => m.public_url.trim())
+      .map(({ id, public_url }) => ({ id, public_url }));
+    if (media.length === 0) return;
+    onPickMany(media);
     onClose();
   }, [rows, selectedIds, onPickMany, onClose]);
 

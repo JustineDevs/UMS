@@ -269,3 +269,31 @@ test("storefrontCustomerProfilePatchSchema: rejects invalid phone patch", () => 
   });
   assert.equal(r.success, false);
 });
+
+test("storefrontCustomerProfilePatchSchema: rejects insecure avatar URLs", () => {
+  const r = storefrontCustomerProfilePatchSchema.safeParse({
+    avatarUrl: "http://images.example/avatar.png",
+  });
+  assert.equal(r.success, false);
+});
+
+test("storefrontCustomerProfilePatchSchema: rejects HTTPS avatar hosts outside image allowlist", () => {
+  const r = storefrontCustomerProfilePatchSchema.safeParse({
+    avatarUrl: "https://example.invalid/avatar.png",
+  });
+  assert.equal(r.success, false);
+});
+
+test("storefrontCustomerProfilePatchSchema: accepts configured avatar hosts", () => {
+  const previous = process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES;
+  process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES = "images.example.test";
+  try {
+    const r = storefrontCustomerProfilePatchSchema.safeParse({
+      avatarUrl: "https://images.example.test/avatar.png",
+    });
+    assert.equal(r.success, true);
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES;
+    else process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES = previous;
+  }
+});

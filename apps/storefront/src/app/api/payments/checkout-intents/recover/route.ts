@@ -16,10 +16,15 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const provider =
+  const providerParam =
     typeof searchParams.get("provider") === "string"
       ? searchParams.get("provider")!.trim().toLowerCase()
       : "stripe";
+  const supportedProviders = ["stripe", "paypal", "xendit"] as const;
+  if (!supportedProviders.includes(providerParam as (typeof supportedProviders)[number])) {
+    return NextResponse.json({ error: "Unsupported payment provider" }, { status: 400 });
+  }
+  const provider = providerParam as "stripe" | "paypal" | "xendit";
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
@@ -41,8 +46,7 @@ export async function GET(req: Request) {
       checkoutState: row.checkout_state,
       medusaOrderId: row.medusa_order_id,
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Recover failed";
-    return NextResponse.json({ error: msg }, { status: 503 });
+  } catch {
+    return NextResponse.json({ error: "Unable to recover payment status" }, { status: 503 });
   }
 }

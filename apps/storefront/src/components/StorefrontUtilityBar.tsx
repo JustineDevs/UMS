@@ -27,7 +27,7 @@ export function StorefrontUtilityBar() {
           Sign in
         </Link>
         <Link href="/preferences" className={linkClass}>
-          Region
+          Local preferences
         </Link>
       </div>
     </div>

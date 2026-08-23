@@ -34,6 +34,14 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
 
+## Branch and Deployment Topology
+- `dev` is the only development and integration branch; make all changes there.
+- `dev` deploys to the preview environment at `https://universalmusic-preview.vercel.app`.
+- `main` is production and deploys to `https://universalmusic.vercel.app`.
+- Never make direct production changes or deploy production from a feature branch.
+- Promote changes through a pull request from `dev` to `main` only after reviewing all CI results, PR comments, and findings.
+- Fix every review or CI finding on `dev`, rerun the required checks, and merge only when the PR is verified clean.
+
 <!-- CONTINUAL LEARNING -->
 - Sprint and `/sprint` backlog: Treat the user's listed sprint items as mandatory commitments—they stay under Committed unless Blocked by a concrete, named external blocker; do not downgrade to optional/stretch, silently drop items, narrow acceptance criteria, or replace implementation work with docs or placeholders without explicit Product Owner approval.
 - Payments: The codebase standardizes on Stripe plus PayPal; Lemon Squeezy was removed across Medusa, storefront, admin, and BYOK—do not re-add MoR PSP integration unless product direction explicitly changes again.

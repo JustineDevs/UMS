@@ -96,30 +96,6 @@ export function StorefrontHomePreviewBridge({
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
       if (event.origin !== parentOrigin) return;
-      if (event.data?.source === "cms-builder-select") {
-        const id = typeof event.data.id === "string" ? event.data.id : "";
-        document.querySelectorAll<HTMLElement>("[data-cms-id]").forEach((node) => {
-          const selected = node.dataset.cmsId === id ? "true" : "false";
-          if (node.dataset.selected !== selected) node.dataset.selected = selected;
-        });
-        const node = id
-          ? document.querySelector<HTMLElement>(`[data-cms-id="${CSS.escape(id)}"]`)
-          : null;
-        if (node) {
-          node.scrollIntoView({ block: "nearest" });
-          const rect = node.getBoundingClientRect();
-          window.parent.postMessage(
-            {
-              source: "cms-builder",
-              id,
-              label: node.dataset.cmsLabel ?? id,
-              rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-            },
-            parentOrigin,
-          );
-        }
-        return;
-      }
       if (event.data?.source !== "cms-builder-draft" || event.data.mode !== "home") {
         return;
       }
@@ -132,7 +108,9 @@ export function StorefrontHomePreviewBridge({
     };
     window.addEventListener("message", onMessage);
     window.parent.postMessage({ source: "cms-preview-ready" }, parentOrigin);
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+    };
   }, []);
 
   return (

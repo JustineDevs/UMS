@@ -20,7 +20,7 @@ import {
   expectOrderConfirmation,
   clickPayButton,
   payWithStripeSandboxCard,
-  clickContinueToStripeHostedCheckout,
+  ensureStripeHostedCheckout,
   fillStripeHostedCheckoutTestCard,
   enablePublicTunnelBypass,
   STRIPE_SANDBOX_TEST_CARD_SUCCESS,
@@ -69,9 +69,9 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
     await expectOrderConfirmation(page);
 
     const trackUrl = page.url();
-    expect(trackUrl, "Must redirect to /track/:orderId after Stripe payment").toMatch(
-      /\/track\/order_/i,
-    );
+  expect(trackUrl, "Must redirect to signed order tracking after Stripe payment").toMatch(
+    /\/track\/(?:order_|cap_v3\.)/i,
+  );
 
     await expect(
       page.getByText(/order/i).first(),
@@ -126,7 +126,7 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
     }
 
     await clickPayButton(page);
-    await clickContinueToStripeHostedCheckout(page);
+    await ensureStripeHostedCheckout(page);
     await fillStripeHostedCheckoutTestCard(page, STRIPE_SANDBOX_TEST_CARD_DECLINE ?? STRIPE_DECLINE_CARD);
     const pay = page
       .getByTestId("hosted-payment-submit-button")

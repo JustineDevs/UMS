@@ -20,7 +20,10 @@ import {
 } from "@/lib/parse-catalog-product-body";
 import { parseAdminJson } from "@/lib/admin-api-security";
 import { parseCatalogOptionArray } from "@/lib/parse-catalog-option-array";
-import { collectCatalogMediaUrlsFromBody } from "@/lib/catalog-product-media-db";
+import {
+  collectCatalogMediaUrlsFromBody,
+  resolveCatalogMediaReferences,
+} from "@/lib/catalog-product-media-db";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { ensureExternalCatalogProductMediaRows } from "@universal-music-store/platform-data";
 import {
@@ -330,13 +333,27 @@ async function patch(req: Request, ctx: RouteParams) {
   const variantBarcode = parseVariantBarcodeFromBody(body);
 
   const imageUrlsRaw = body.imageUrls;
-  const imageUrls = Array.isArray(imageUrlsRaw)
+  let imageUrls = Array.isArray(imageUrlsRaw)
     ? imageUrlsRaw
         .filter(
           (x): x is string => typeof x === "string" && x.trim().length > 0,
         )
         .map((s) => s.trim())
     : undefined;
+
+  if (storefrontMetadata?.mediaIds.length) {
+    const mediaSup = adminSupabaseOr503(correlationId);
+    if ("response" in mediaSup) return mediaSup.response;
+    const organization = await resolveStaffOrganization(mediaSup.client, session.user.email);
+    if (!organization) {
+      return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
+    }
+    try {
+      imageUrls = await resolveCatalogMediaReferences(mediaSup.client, storefrontMetadata.mediaIds, organization.id);
+    } catch (error) {
+      return correlatedJson(correlationId, { error: error instanceof Error ? error.message : "Invalid catalog media references" }, { status: 400 });
+    }
+  }
 
   const ops = createMedusaCatalogOperations();
   const result = await ops.updateProduct(productId, {

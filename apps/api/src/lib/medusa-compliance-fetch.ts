@@ -12,6 +12,13 @@ function medusaAdminAuthHeader(secret: string): string {
   return `Basic ${b64}`;
 }
 
+export function medusaComplianceFailure(
+  operation: "orders" | "delete",
+  status: number,
+): string {
+  return `${operation === "orders" ? "medusa_orders" : "medusa_delete"}_${status}`;
+}
+
 export async function fetchMedusaOrdersForComplianceEmail(
   email: string,
 ): Promise<{ orders: unknown[]; error: string | null }> {
@@ -28,8 +35,8 @@ export async function fetchMedusaOrdersForComplianceEmail(
     },
   });
   if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    return { orders: [], error: `medusa_orders_${res.status}:${t.slice(0, 200)}` };
+    await res.body?.cancel().catch(() => undefined);
+    return { orders: [], error: medusaComplianceFailure("orders", res.status) };
   }
   const json = (await res.json()) as { orders?: unknown[] };
   return { orders: Array.isArray(json.orders) ? json.orders : [], error: null };
@@ -50,7 +57,8 @@ export async function deleteMedusaCustomerByEmail(
     },
   );
   if (!listRes.ok) {
-    return { deleted: false, error: `list_${listRes.status}` };
+    await listRes.body?.cancel().catch(() => undefined);
+    return { deleted: false, error: medusaComplianceFailure("orders", listRes.status) };
   }
   const listJson = (await listRes.json()) as {
     customers?: Array<{ id: string }>;
@@ -64,8 +72,8 @@ export async function deleteMedusaCustomerByEmail(
     headers: { Authorization: medusaAdminAuthHeader(secret) },
   });
   if (!del.ok) {
-    const t = await del.text().catch(() => "");
-    return { deleted: false, error: `delete_${del.status}:${t.slice(0, 200)}` };
+    await del.body?.cancel().catch(() => undefined);
+    return { deleted: false, error: medusaComplianceFailure("delete", del.status) };
   }
   return { deleted: true, error: null };
 }

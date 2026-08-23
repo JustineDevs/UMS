@@ -11,6 +11,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { cmsComponentWriteSchema } from "@/lib/cms-component-contract";
 import type { CmsComponentDefinition } from "@universal-music-store/platform-data";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: Request) {
   const requestId = getCorrelationId(req);
@@ -41,7 +42,9 @@ async function post(req: Request) {
   const requestId = getCorrelationId(req);
   const auth = await requireStaffApiSession("content:write");
   if (!auth.ok) return auth.response;
-  const parsed = cmsComponentWriteSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 512 * 1024);
+  if (body.tooLarge) return correlatedError(requestId, 413, "Request body is too large", "BAD_REQUEST");
+  const parsed = cmsComponentWriteSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedError(requestId, 400, "Invalid component definition", "VALIDATION_ERROR");
   const sup = adminSupabaseOr503(requestId);
   if ("response" in sup) return sup.response;

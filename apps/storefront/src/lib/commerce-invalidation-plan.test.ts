@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildCommerceInvalidationRevalidationPlan } from "./commerce-invalidation-plan";
+import { buildCmsInvalidationRevalidationPlan, buildCommerceInvalidationRevalidationPlan } from "./commerce-invalidation-plan";
+
+test("CMS invalidation covers page, metadata, navigation, and sitemap consumers", () => {
+  assert.deepEqual(buildCmsInvalidationRevalidationPlan(), {
+    tags: ["cms:pages", "cms:navigation", "cms:metadata", "cms:sitemap"],
+    paths: ["/", "/blog", "/contact", "/faq", "/help", "/sitemap.xml"],
+  });
+});
 
 test("buildCommerceInvalidationRevalidationPlan includes product, collection, and catalog tags", () => {
   const plan = buildCommerceInvalidationRevalidationPlan({

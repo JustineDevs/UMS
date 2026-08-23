@@ -3,6 +3,8 @@
  */
 
 export type CatalogProductMetadataFields = {
+  /** Canonical private-media references; URLs remain a compatibility projection. */
+  mediaIds: string[];
   brand: string | null;
   videoUrl: string | null;
   /** Extra carousel video URLs (one per line); stored as metadata `gallery_video_urls`. */
@@ -16,9 +18,13 @@ export type CatalogProductMetadataFields = {
   relatedHandlesText: string;
   /** JSON array string for hotspots, same shape as storefront parser. */
   hotspotsJson: string;
+  guitarSpecsJson: string;
+  audioDemosJson: string;
+  trustContentJson: string;
 };
 
 export const EMPTY_CATALOG_METADATA_FIELDS: CatalogProductMetadataFields = {
+  mediaIds: [],
   brand: null,
   videoUrl: null,
   galleryVideoUrlsText: "",
@@ -29,6 +35,9 @@ export const EMPTY_CATALOG_METADATA_FIELDS: CatalogProductMetadataFields = {
   seoDescription: null,
   relatedHandlesText: "",
   hotspotsJson: "",
+  guitarSpecsJson: "",
+  audioDemosJson: "",
+  trustContentJson: "",
 };
 
 function strOrNull(s: unknown): string | null {
@@ -95,6 +104,9 @@ export function catalogMetadataFromMedusa(
     }
   }
   return {
+    mediaIds: Array.isArray(m.media_ids)
+      ? m.media_ids.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((x) => x.trim())
+      : [],
     brand: strOrNull(m.brand ?? m.brand_name),
     videoUrl: strOrNull(m.video_url),
     galleryVideoUrlsText,
@@ -105,6 +117,9 @@ export function catalogMetadataFromMedusa(
     seoDescription: strOrNull(m.seo_description),
     relatedHandlesText: relatedText,
     hotspotsJson,
+    guitarSpecsJson: typeof m.guitar_specs_json === "string" ? m.guitar_specs_json : "",
+    audioDemosJson: typeof m.audio_demos_json === "string" ? m.audio_demos_json : "",
+    trustContentJson: typeof m.trust_content_json === "string" ? m.trust_content_json : "",
   };
 }
 
@@ -115,6 +130,8 @@ export function buildMedusaMetadataPatch(
   fields: CatalogProductMetadataFields,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+
+  if (fields.mediaIds.length > 0) out.media_ids = [...new Set(fields.mediaIds.map((id) => id.trim()).filter(Boolean))];
 
   const setStr = (key: string, val: string | null) => {
     if (val != null && val.trim()) out[key] = val.trim();
@@ -128,6 +145,15 @@ export function buildMedusaMetadataPatch(
   }
   if (fields.weightKg != null && Number.isFinite(fields.weightKg)) {
     out.weight_kg = fields.weightKg;
+  }
+  if (fields.guitarSpecsJson.trim()) {
+    out.guitar_specs_json = fields.guitarSpecsJson.trim();
+  }
+  if (fields.audioDemosJson.trim()) {
+    out.audio_demos_json = fields.audioDemosJson.trim();
+  }
+  if (fields.trustContentJson.trim()) {
+    out.trust_content_json = fields.trustContentJson.trim();
   }
   setStr("dimensions_label", fields.dimensionsLabel);
   setStr("material", fields.material);
@@ -277,6 +303,10 @@ export const CATALOG_METADATA_KEYS = [
   "seo_description",
   "related_handles",
   "hotspots",
+  "guitar_specs_json",
+  "audio_demos_json",
+  "trust_content_json",
+  "media_ids",
 ] as const;
 
 export function metadataKeysToClear(
@@ -303,5 +333,9 @@ export function metadataKeysToClear(
     clear.push("hotspots");
     clear.push("image_hotspots");
   }
+  if (!fields.guitarSpecsJson.trim()) clear.push("guitar_specs_json");
+  if (!fields.audioDemosJson.trim()) clear.push("audio_demos_json");
+  if (!fields.trustContentJson.trim()) clear.push("trust_content_json");
+  if (fields.mediaIds.length === 0) clear.push("media_ids");
   return clear;
 }

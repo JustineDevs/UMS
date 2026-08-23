@@ -62,7 +62,7 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     surfaces: ["storefront"],
     kind: "platform",
     notes:
-      "Optional saved display name, phone, and shipping address book keyed by sign-in email; Medusa remains customer and order SoR.",
+      "Optional saved display name, phone, and shipping address book keyed by canonical Medusa customer ID; legacy sign-in-email rows are read only during migration. Medusa remains customer and order SoR.",
   },
   product_qa_entries: {
     surfaces: ["storefront", "admin"],

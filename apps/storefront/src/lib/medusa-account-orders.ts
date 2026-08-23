@@ -1,5 +1,6 @@
 import { medusaAdminFetch } from "./medusa-admin-fetch";
 import { medusaMinorToMajor } from "./medusa-money";
+import { findMedusaCustomerIdByEmail } from "./medusa-customer-resolve";
 import { getMedusaSecretApiKey } from "./storefront-medusa-env";
 
 export type AccountOrder = {
@@ -12,29 +13,85 @@ export type AccountOrder = {
   itemCount: number;
 };
 
-/** Simple shopper-facing KPIs from Medusa order list (same currency assumed). */
+/** Shopper-facing KPIs from the complete customer-scoped Medusa order scan. */
 export function computeAccountOrderStats(orders: AccountOrder[]): {
   orderCount: number;
-  lifetimeSpend: number;
-  averageOrderValue: number;
+  lifetimeSpend: number | null;
+  averageOrderValue: number | null;
+  currency: string | null;
 } {
   const orderCount = orders.length;
+  const currencies = new Set(orders.map((order) => order.currency));
+  if (currencies.size > 1) {
+    return { orderCount, lifetimeSpend: null, averageOrderValue: null, currency: null };
+  }
   const lifetimeSpend = orders.reduce((s, o) => s + (o.total || 0), 0);
   const averageOrderValue =
     orderCount > 0 ? Math.round((lifetimeSpend / orderCount) * 100) / 100 : 0;
-  return { orderCount, lifetimeSpend, averageOrderValue };
+  return {
+    orderCount,
+    lifetimeSpend,
+    averageOrderValue,
+    currency: orders[0]?.currency ?? null,
+  };
 }
 
 type AdminOrderListRow = {
   id?: string;
   display_id?: string | number;
   email?: string | null;
+  customer_id?: string | null;
   status?: string;
   total?: number;
   currency_code?: string;
   created_at?: string;
-  items?: unknown[];
+  items?: Array<{ quantity?: unknown }>;
 };
+
+export function accountOrderMatchesCustomer(
+  orderCustomerId: string | null | undefined,
+  customerId: string,
+): boolean {
+  const expected = customerId.trim();
+  return expected.length > 0 && orderCustomerId?.trim() === expected;
+}
+
+export function accountOrderMatchesIdentity(
+  orderCustomerId: string | null | undefined,
+  orderEmail: string | null | undefined,
+  customerId: string | null,
+  email: string,
+): boolean {
+  return (customerId !== null && orderCustomerId?.trim() === customerId) ||
+    orderEmail?.trim().toLowerCase() === email.trim().toLowerCase();
+}
+
+export function countAccountOrderItems(items: AdminOrderListRow["items"]): number {
+  return Array.isArray(items)
+    ? items.reduce((count, item) => {
+        const quantity =
+          typeof item.quantity === "number" && Number.isFinite(item.quantity)
+            ? Math.max(0, Math.floor(item.quantity))
+            : 0;
+        return count + quantity;
+      }, 0)
+    : 0;
+}
+
+export function buildAccountOrdersQuery(
+  email: string,
+  customerId: string | null,
+  offset: number,
+): string {
+  const params = new URLSearchParams({
+    fields: "id,email,customer_id,display_id,status,total,currency_code,created_at,*items",
+    limit: "100",
+    offset: String(offset),
+    order: "-created_at",
+  });
+  params.set(customerId ? "customer_id" : "email", customerId ?? email.trim().toLowerCase());
+  return `/admin/orders?${params.toString()}`;
+}
 
 /**
  * Fetches orders for a customer by email using the Medusa Admin API.
@@ -49,37 +106,44 @@ export async function fetchCustomerOrders(
     return { orders: [], error: "Commerce admin key is not configured." };
   }
   try {
-    const params = new URLSearchParams({
-      fields: "id,email,display_id,status,total,currency_code,created_at,*items",
-      limit: "20",
-      offset: "0",
-      order: "-created_at",
-    });
-
-    const res = await medusaAdminFetch(
-      `/admin/orders?${params.toString()}`,
-      { method: "GET" },
-    );
-
-    if (!res.ok) {
-      return { orders: [], error: null };
-    }
-
-    const data = (await res.json()) as { orders?: unknown[] };
-    if (!data.orders || !Array.isArray(data.orders)) {
-      return { orders: [], error: null };
-    }
-
-    const rows = data.orders as AdminOrderListRow[];
     const normalizedEmail = email.toLowerCase();
+    const customerId = await findMedusaCustomerIdByEmail(normalizedEmail);
+    const rows: AdminOrderListRow[] = [];
+    const seenOrderIds = new Set<string>();
+    const ownershipFilters = customerId ? [customerId, normalizedEmail] : [normalizedEmail];
+    for (const ownershipFilter of ownershipFilters) {
+      const filterCustomerId = ownershipFilter === customerId ? customerId : null;
+      const seenPages = new Set<string>();
+      for (let offset = 0; ; offset += 100) {
+        const res = await medusaAdminFetch(
+          buildAccountOrdersQuery(normalizedEmail, filterCustomerId, offset),
+          { method: "GET" },
+        );
+        if (!res.ok) {
+          return { orders: [], error: "Order history is temporarily unavailable." };
+        }
+        const data = (await res.json()) as { orders?: unknown[] };
+        const page = Array.isArray(data.orders) ? (data.orders as AdminOrderListRow[]) : [];
+        const pageKey = page.map((order) => String(order.id ?? "")).join(",");
+        if (seenPages.has(pageKey)) {
+          return { orders: [], error: "Order history is temporarily unavailable." };
+        }
+        seenPages.add(pageKey);
+        for (const order of page) {
+          const id = String(order.id ?? "");
+          if (id && !seenOrderIds.has(id)) {
+            seenOrderIds.add(id);
+            rows.push(order);
+          }
+        }
+        if (page.length < 100) break;
+      }
+    }
 
     const mapped: AccountOrder[] = rows
       .filter((o) => {
         const orderEmail = o.email;
-        return (
-          typeof orderEmail === "string" &&
-          orderEmail.toLowerCase() === normalizedEmail
-        );
+        return accountOrderMatchesIdentity(o.customer_id, orderEmail, customerId, normalizedEmail);
       })
       .map((o) => ({
         id: String(o.id ?? ""),
@@ -95,11 +159,11 @@ export async function fetchCustomerOrders(
             : 0,
         currency: String(o.currency_code ?? "PHP").toUpperCase(),
         createdAt: String(o.created_at ?? ""),
-        itemCount: Array.isArray(o.items) ? o.items.length : 0,
+        itemCount: countAccountOrderItems(o.items),
       }));
 
     return { orders: mapped, error: null };
   } catch {
-    return { orders: [], error: null };
+    return { orders: [], error: "Order history is temporarily unavailable." };
   }
 }

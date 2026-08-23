@@ -6,10 +6,12 @@ import {
   insertPaymentRefundAudit,
   PAYMENT_OUTBOX_EVENT_TYPES,
   tryCreateSupabaseClient,
+  recordCommerceAttributionRefund,
 } from "@universal-music-store/platform-data";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import {
   fetchMedusaOrderPaymentsForAdmin,
+  fetchMedusaOrderDetailForAdmin,
   refundMedusaPayment,
 } from "@/lib/medusa-order-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -195,6 +197,16 @@ export async function POST(
 
   if (sb && refundAuditId) {
     await completePaymentRefundAudit(sb, refundAuditId, true, null).catch(() => {});
+  }
+  if (sb) {
+    const order = await fetchMedusaOrderDetailForAdmin(orderId).catch(() => null);
+    await recordCommerceAttributionRefund(sb, {
+      organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
+      orderId,
+      refundId: `${paymentId}:${idempotencyKey}`,
+      amountMinor,
+      currency: order?.order.currency ?? "PHP",
+    }).catch(() => {});
   }
 
   await completeAdminIdempotency(sb, claim.id, 200, {

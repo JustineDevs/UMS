@@ -12,7 +12,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useLayoutEffect, useRef, useState, useCallback, useEffect, type CSSProperties } from "react";
 import { batchScrollRevealChildren } from "@/lib/gsap-scroll-system";
-import { getRecaptchaToken } from "@/components/RecaptchaScript";
+import { getRecaptchaToken, RecaptchaScript } from "@/components/RecaptchaScript";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
@@ -274,6 +274,7 @@ export function HomeScrollExperience({
         if (rootIds.has(node.dataset.cmsId ?? "")) {
           node.dataset.cmsBlockId = node.dataset.cmsId;
         }
+        node.dataset.uvsId ??= node.dataset.cmsId;
       });
       const nodes = Array.from(document.body.querySelectorAll<HTMLElement>("*:not(script):not(style)"));
       nodes.forEach((node) => {
@@ -287,13 +288,71 @@ export function HomeScrollExperience({
         node.dataset.cmsId = `cms-dom-${path.join("-")}`;
         node.dataset.cmsLabel = node.tagName.toLowerCase();
         node.dataset.cmsGenerated = "true";
+        node.dataset.uvsId = node.dataset.cmsId;
         const owner = node.closest<HTMLElement>("[data-cms-block-id]");
         if (owner?.dataset.cmsBlockId) node.dataset.cmsBlockId = owner.dataset.cmsBlockId;
       });
     };
     decorateEditorNodes();
+    document.body.dataset.uvsEditor = "true";
     const observer = new MutationObserver(decorateEditorNodes);
     observer.observe(document.body, { childList: true, subtree: true });
+
+    let selectionOverlay: HTMLElement | null = null;
+    const paintSelectionOverlay = (target: HTMLElement | null) => {
+      selectionOverlay?.remove();
+      selectionOverlay = null;
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      const overlay = document.createElement("div");
+      overlay.dataset.uvsOverlay = "true";
+      Object.assign(overlay.style, {
+        position: "fixed", left: `${rect.left}px`, top: `${rect.top}px`,
+        width: `${rect.width}px`, height: `${rect.height}px`,
+        minWidth: "2px", minHeight: "2px",
+        pointerEvents: "none", outline: "2px solid #2563eb", zIndex: "2147483647",
+      });
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.dataset.uvsHandle = "bottom-right";
+      handle.setAttribute("aria-label", "Resize selected element");
+      Object.assign(handle.style, {
+        position: "absolute", right: "-5px", bottom: "-5px", width: "10px", height: "10px",
+        padding: "0", border: "1px solid white", borderRadius: "2px", background: "#2563eb",
+        cursor: "nwse-resize", pointerEvents: "auto",
+      });
+      let startX = 0;
+      let startY = 0;
+      let startWidth = 0;
+      let startHeight = 0;
+      const onPointerMove = (event: PointerEvent) => {
+        target.style.width = `${Math.max(0, startWidth + event.clientX - startX)}px`;
+        target.style.height = `${Math.max(0, startHeight + event.clientY - startY)}px`;
+        overlay.style.width = target.style.width;
+        overlay.style.height = target.style.height;
+      };
+      const onPointerUp = () => {
+        window.parent.postMessage({ source: "cms-builder-dom-mutation", id: target.dataset.cmsId, blockId: target.closest<HTMLElement>("[data-cms-block-id]")?.dataset.cmsBlockId ?? null, prop: "style.width", value: target.style.width }, parentOrigin);
+        window.parent.postMessage({ source: "cms-builder-dom-mutation", id: target.dataset.cmsId, blockId: target.closest<HTMLElement>("[data-cms-block-id]")?.dataset.cmsBlockId ?? null, prop: "style.height", value: target.style.height }, parentOrigin);
+        handle.removeEventListener("pointermove", onPointerMove);
+        handle.removeEventListener("pointerup", onPointerUp);
+      };
+      handle.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const current = target.getBoundingClientRect();
+        startX = event.clientX;
+        startY = event.clientY;
+        startWidth = current.width;
+        startHeight = current.height;
+        handle.setPointerCapture?.(event.pointerId);
+        handle.addEventListener("pointermove", onPointerMove);
+        handle.addEventListener("pointerup", onPointerUp, { once: true });
+      });
+      overlay.append(handle);
+      document.body.append(overlay);
+      selectionOverlay = overlay;
+    };
 
     const sendTarget = (source: "cms-builder-hover" | "cms-builder", target: HTMLElement | null) => {
       if (source === "cms-builder") selectedTargetRef.current = target;
@@ -366,6 +425,25 @@ export function HomeScrollExperience({
       sendTarget("cms-builder", target);
     };
 
+    const onBuilderSelect = (event: MessageEvent<{ source?: string; id?: string | null }>) => {
+      if (
+        event.source !== window.parent ||
+        event.origin !== parentOrigin ||
+        event.data?.source !== "cms-builder-select"
+      ) return;
+      const id = event.data.id;
+      const target = id
+        ? Array.from(document.querySelectorAll<HTMLElement>("[data-cms-id]"))
+            .find((node) => node.dataset.cmsId === id) ?? null
+        : null;
+      document.querySelectorAll<HTMLElement>("[data-cms-id]").forEach((node) => {
+        node.dataset.selected = node === target ? "true" : "false";
+      });
+      selectedTargetRef.current = target;
+      paintSelectionOverlay(target);
+      sendTarget("cms-builder", target);
+    };
+
     const onPointerOver = (event: PointerEvent) => {
       const target = getCmsTarget(event.target);
       const related = event.relatedTarget;
@@ -380,6 +458,19 @@ export function HomeScrollExperience({
       if (!getCmsTarget(related)) sendTarget("cms-builder-hover", null);
     };
 
+    const onInput = (event: Event) => {
+      const target = getCmsTarget(event.target);
+      if (!target || target.children.length > 0 || target !== selectedTargetRef.current) return;
+      const block = target.closest<HTMLElement>("[data-cms-block-id]");
+      window.parent.postMessage({
+        source: "cms-builder-dom-mutation",
+        id: target.dataset.cmsId,
+        blockId: block?.dataset.cmsBlockId ?? null,
+        prop: "textContent",
+        value: target.textContent ?? "",
+      }, parentOrigin);
+    };
+
     const onClick = (event: MouseEvent) => {
       const target = getCmsTarget(event.target);
       if (!target) return;
@@ -388,19 +479,49 @@ export function HomeScrollExperience({
       document.querySelectorAll<HTMLElement>("[data-cms-id]").forEach((node) => {
         node.dataset.selected = node === target ? "true" : "false";
       });
+      if (target.children.length === 0 && !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
+        target.contentEditable = "true";
+        target.dataset.cmsEditableText = "true";
+      }
+      paintSelectionOverlay(target);
       sendTarget("cms-builder", target);
+    };
+
+    const onDragOver = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes("application/x-uvs-component")) event.preventDefault();
+    };
+
+    const onDrop = (event: DragEvent) => {
+      const componentId = event.dataTransfer?.getData("application/x-uvs-component");
+      const target = getCmsTarget(event.target);
+      if (!componentId || !target) return;
+      event.preventDefault();
+      const slot = target.closest<HTMLElement>("[data-cms-slot]")?.dataset.cmsSlot;
+      window.parent.postMessage({
+        source: "cms-builder-dom-drop",
+        parentId: slot ? `slot:${slot}` : target.dataset.cmsId,
+        index: target.parentElement ? Array.prototype.indexOf.call(target.parentElement.children, target) : 0,
+        componentId,
+      }, parentOrigin);
     };
 
     document.addEventListener("pointerover", onPointerOver, true);
     document.addEventListener("pointerout", onPointerOut, true);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("input", onInput, true);
+    document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("drop", onDrop, true);
     window.addEventListener("message", onMutation);
+    window.addEventListener("message", onBuilderSelect);
     const refreshSelected = () => {
       if (selectionRefreshFrameRef.current !== null) return;
       selectionRefreshFrameRef.current = window.requestAnimationFrame(() => {
         selectionRefreshFrameRef.current = null;
         const target = selectedTargetRef.current;
-        if (target) sendTarget("cms-builder", target);
+        if (target) {
+          paintSelectionOverlay(target);
+          sendTarget("cms-builder", target);
+        }
       });
     };
     window.addEventListener("scroll", refreshSelected, true);
@@ -409,7 +530,11 @@ export function HomeScrollExperience({
       document.removeEventListener("pointerover", onPointerOver, true);
       document.removeEventListener("pointerout", onPointerOut, true);
       document.removeEventListener("click", onClick, true);
+      document.removeEventListener("input", onInput, true);
+      document.removeEventListener("dragover", onDragOver, true);
+      document.removeEventListener("drop", onDrop, true);
       window.removeEventListener("message", onMutation);
+      window.removeEventListener("message", onBuilderSelect);
       window.removeEventListener("scroll", refreshSelected, true);
       window.removeEventListener("resize", refreshSelected);
       if (selectionRefreshFrameRef.current !== null) {
@@ -417,6 +542,12 @@ export function HomeScrollExperience({
         selectionRefreshFrameRef.current = null;
       }
       observer.disconnect();
+      selectionOverlay?.remove();
+      document.querySelectorAll<HTMLElement>("[data-cms-editable-text]").forEach((node) => {
+        node.contentEditable = "false";
+        delete node.dataset.cmsEditableText;
+      });
+      delete document.body.dataset.uvsEditor;
       selectedTargetRef.current = null;
     };
   }, [selectionMode]);
@@ -486,7 +617,6 @@ export function HomeScrollExperience({
       if (line1Ref.current) {
         heroTl.from(line1Ref.current, {
           x: 100,
-          opacity: 0,
           duration: 0.8,
           ease,
         });
@@ -494,35 +624,35 @@ export function HomeScrollExperience({
       if (line2Ref.current) {
         heroTl.from(
           line2Ref.current,
-          { y: 30, opacity: 0, duration: 0.8, ease },
+          { y: 30, duration: 0.8, ease },
           "-=0.5",
         );
       }
       if (leadRef.current) {
         heroTl.from(
           leadRef.current,
-          { y: 30, opacity: 0, duration: 0.8, ease },
+          { y: 30, duration: 0.8, ease },
           "-=0.55",
         );
       }
       if (ctaRef.current) {
         heroTl.from(
           ctaRef.current,
-          { y: 30, opacity: 0, duration: 0.8, ease },
+          { y: 30, duration: 0.8, ease },
           "-=0.55",
         );
       }
       if (partnersRef.current) {
         heroTl.from(
           partnersRef.current,
-          { y: 24, opacity: 0, duration: 0.75, ease },
+          { y: 24, duration: 0.75, ease },
           "-=0.48",
         );
       }
       if (asideRef.current) {
         heroTl.from(
           asideRef.current,
-          { opacity: 0, scale: 1.04, duration: 1, ease: "power2.out" },
+          { scale: 1.04, duration: 1, ease: "power2.out" },
           "-=0.9",
         );
       }
@@ -604,6 +734,7 @@ export function HomeScrollExperience({
     <div
       ref={rootRef}
     >
+      <RecaptchaScript />
       <section
         data-cms-id="home-hero"
         data-cms-label="Hero"
@@ -741,7 +872,7 @@ export function HomeScrollExperience({
         data-cms-id="home-tiles"
         data-cms-label="Homepage category tiles"
         style={sectionStyle(home.sectionLayout?.tiles)}
-        className="bg-surface py-14 sm:py-16 md:py-24 storefront-section-x"
+        className="scroll-mt-[5.5rem] bg-surface py-14 sm:py-16 md:py-24 storefront-section-x"
       >
         <div
           data-cms-id="home-tiles-grid"
@@ -750,7 +881,6 @@ export function HomeScrollExperience({
         >
           {home.tiles.map((tile, index) => {
             const wide = tile.variant === "wide" || index >= 2;
-            const dark = tile.variant !== "small";
             return (
               <Link
                 key={`${tile.href}-${index}`}
@@ -765,16 +895,16 @@ export function HomeScrollExperience({
                   fallbackClass="bg-surface-container-low"
                 />
                 <div className={`absolute ${wide ? "inset-0 flex flex-col items-center justify-center text-center" : "bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10"}`}>
-                  <h3 className={dark ? "font-headline text-3xl font-extrabold text-white mix-blend-difference sm:text-4xl" : "font-headline text-2xl font-extrabold text-primary sm:text-3xl"}>
+                  <h3 className="font-headline text-3xl font-extrabold text-primary sm:text-4xl">
                     {tile.title}
                   </h3>
                   {tile.subtitle ? (
-                    <p className={`mt-3 text-sm font-medium uppercase tracking-widest ${dark ? "text-white/80" : "text-on-surface-variant"}`}>
+                    <p className="mt-3 text-sm font-medium uppercase tracking-widest text-on-surface-variant">
                       {tile.subtitle}
                     </p>
                   ) : null}
                   {tile.linkLabel ? (
-                    <span className={`mt-2 inline-block font-medium ${dark ? "text-white underline underline-offset-8" : "text-primary transition-all hover:underline hover:underline-offset-8"}`}>
+                    <span className="mt-2 inline-block font-medium text-primary transition-all hover:underline hover:underline-offset-8">
                       {tile.linkLabel}
                     </span>
                   ) : null}
@@ -789,7 +919,7 @@ export function HomeScrollExperience({
         data-cms-id="home-latest"
         data-cms-label="Latest products"
         style={sectionStyle(home.sectionLayout?.latest)}
-        className="bg-surface-container-low py-14 sm:py-16 md:py-24 storefront-section-x"
+        className="scroll-mt-[5.5rem] bg-surface-container-low py-14 sm:py-16 md:py-24 storefront-section-x"
       >
         <div className="mx-auto max-w-[1600px]">
           <div

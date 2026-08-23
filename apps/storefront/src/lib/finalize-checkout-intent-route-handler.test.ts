@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { handleFinalizeCheckoutIntentRequest } from "./finalize-checkout-intent-route-handler";
+import { secureTrackingRedirectUrl } from "./finalize-medusa-cart-server";
 
 test("handleFinalizeCheckoutIntentRequest returns 429 from rate limit guard", async () => {
   const res = await handleFinalizeCheckoutIntentRequest(
@@ -49,6 +50,7 @@ test("handleFinalizeCheckoutIntentRequest returns order redirect on success", as
         cart_id: "cart_1",
         correlation_id: "corr_1",
         provider: "stripe",
+        status: "paid",
         quote_fingerprint: "qf_live",
       }),
       readCurrentQuoteFingerprint: async () => "qf_live",
@@ -59,7 +61,7 @@ test("handleFinalizeCheckoutIntentRequest returns order redirect on success", as
       finalizeMedusaCart: async () => ({
         ok: true,
         orderId: "order_1",
-        redirectUrl: "/track/order_1?t=test",
+        redirectUrl: "/track/cap_v3.opaque",
         attempts: 2,
       }),
       logEvent: () => {},
@@ -71,7 +73,7 @@ test("handleFinalizeCheckoutIntentRequest returns order redirect on success", as
   assert.deepEqual(await res.json(), {
     ok: true,
     orderId: "order_1",
-    redirectUrl: "/track/order_1?t=test",
+    redirectUrl: "/track/cap_v3.opaque",
   });
   assert.equal(patches[0]?.status, "completed");
 });
@@ -135,4 +137,31 @@ test("handleFinalizeCheckoutIntentRequest rejects missing cart before finalizati
   assert.equal(res.status, 400);
   assert.deepEqual(await res.json(), { error: "No active cart" });
   assert.equal(events[0]?.errorCode, "no_cart");
+});
+
+test("secureTrackingRedirectUrl rejects external tracking-looking URLs", () => {
+  assert.equal(
+    secureTrackingRedirectUrl(
+      "https://evil.example/track/order_1?t=attacker",
+      undefined,
+      "https://store.example",
+    ),
+    null,
+  );
+  assert.equal(
+    secureTrackingRedirectUrl(
+      "https://store.example/track/order_1?t=legacy",
+      undefined,
+      "https://store.example",
+    ),
+    null,
+  );
+  assert.equal(
+    secureTrackingRedirectUrl(
+      "https://store.example/track/cap_v3.opaque",
+      undefined,
+      "https://store.example",
+    ),
+    "https://store.example/track/cap_v3.opaque",
+  );
 });

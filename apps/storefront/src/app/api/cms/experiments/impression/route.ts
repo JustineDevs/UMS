@@ -5,6 +5,7 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function POST(req: NextRequest) {
   const ip = getRequestIp(req);
@@ -16,12 +17,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsedBody = await parseBoundedJson(req, 8 * 1024);
+  if (parsedBody.tooLarge) return Response.json({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const body: unknown = parsedBody.value;
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }

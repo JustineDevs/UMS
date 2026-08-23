@@ -5,12 +5,53 @@ export interface ProductImage {
   productId: string;
   imageUrl: string;
   sortOrder: number;
+  /** Merchandiser-authored alt text; falls back to the product name in the PDP. */
+  altText?: string;
 }
 
 /** Ordered hero media for PDP carousel (images from Medusa + videos from metadata). */
 export type ProductGallerySlide =
-  | { kind: "image"; url: string }
+  | { kind: "image"; url: string; altText?: string }
   | { kind: "video"; url: string };
+
+export type GuitarProductSpecs = {
+  instrumentType?: string;
+  bodyShape?: string;
+  bodyTop?: string;
+  bodyBackAndSides?: string;
+  neckMaterial?: string;
+  neckProfile?: string;
+  scaleLengthMm?: number;
+  nutWidthMm?: number;
+  fretCount?: number;
+  fingerboardMaterial?: string;
+  bridge?: string;
+  tuners?: string;
+  electronics?: string;
+  controls?: string;
+  strings?: string;
+  caseIncluded?: boolean;
+  setupIncluded?: boolean;
+  warranty?: string;
+  includedAccessories?: string[];
+};
+
+export type ProductAudioDemo = {
+  url: string;
+  title: string;
+  description?: string;
+  durationSeconds?: number;
+};
+
+export type ProductTrustContent = {
+  warranty?: string;
+  conditionGrade?: string;
+  authenticity?: string;
+  setupAndInspection?: string;
+  includedAccessories?: string[];
+  shippingEligibility?: string;
+  returnNotes?: string;
+};
 
 export interface ProductVariant {
   id: string;
@@ -25,6 +66,8 @@ export interface ProductVariant {
   skillLevel: string;
   shippingSpeed: string;
   price: number;
+  /** ISO currency code for the calculated price. */
+  currencyCode?: string;
   compareAtPrice: number | null;
   cost: number | null;
   /** Medusa `manage_inventory !== false` (undefined treated as tracked). */
@@ -69,6 +112,9 @@ export interface Product {
   relatedHandles: string[];
   /** SEO helper stored in metadata; storefront can prefer over auto-truncated description. */
   seoDescription: string | null;
+  guitarSpecs: GuitarProductSpecs | null;
+  audioDemos: ProductAudioDemo[];
+  trustContent: ProductTrustContent | null;
 }
 
 export { inferReviewProofMedia, type ReviewProofMedia, type ReviewProofMediaKind } from "./review-proof-media";

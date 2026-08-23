@@ -8,6 +8,7 @@ import { correlatedJson } from "@/lib/staff-api-response";
 import { geocodeAddress, optimizeRouteWithProvider } from "@/lib/logistics-provider-client";
 import { z } from "zod";
 import { assertDeliveryGeofence, calculateDriverEarnings, verifyDeliveryProof } from "@universal-music-store/platform-data";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 function text(value: unknown): string | null { return typeof value === "string" && value.trim() ? value.trim() : null; }
 const geoPointSchema = z.object({ latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180) }).strict();
@@ -42,8 +43,9 @@ async function post(req: NextRequest) {
   const cid = getCorrelationId(req); const session = await getStaffSession();
   if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   if (!staffSessionAllows(session, "orders:write")) return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  let body: unknown; try { body = await req.json(); } catch { return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 }); }
-  const parsed = operationSchema.safeParse(body);
+  const body = await parseBoundedJson(req, 256 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = operationSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid delivery operation payload" }, { status: 400 });
   const rec = parsed.data; const kind = rec.kind; const actor = session.user.email?.trim().toLowerCase() ?? "system";
   if (kind === "geocode") {

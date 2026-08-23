@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { isStaleCheckoutMessage } from "@/lib/medusa-checkout-errors";
 
 /**
@@ -22,15 +23,7 @@ export function StaleSessionNotice({
         <p className="text-sm text-red-600 font-medium" role="alert">
           {trimmed}
         </p>
-        {onDismiss ? (
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="text-xs font-semibold uppercase tracking-wider text-red-700 underline"
-          >
-            Dismiss
-          </button>
-        ) : null}
+        <RecoveryActions onDismiss={onDismiss} />
       </div>
     );
   }
@@ -44,11 +37,31 @@ export function StaleSessionNotice({
         Session needs review
       </p>
       <p className="mt-1 font-medium leading-relaxed">{trimmed}</p>
+      <RecoveryActions onDismiss={onDismiss} />
+    </div>
+  );
+}
+
+function RecoveryActions({ onDismiss }: { onDismiss?: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Link
+        href="/cart"
+        className="inline-flex min-h-11 items-center rounded-md border border-red-300 px-3 text-xs font-semibold uppercase tracking-wider text-red-800 underline"
+      >
+        Review bag
+      </Link>
+      <Link
+        href="/contact?topic=checkout"
+        className="inline-flex min-h-11 items-center rounded-md border border-red-300 px-3 text-xs font-semibold uppercase tracking-wider text-red-800 underline"
+      >
+        Contact support
+      </Link>
       {onDismiss ? (
         <button
           type="button"
           onClick={onDismiss}
-          className="mt-3 text-xs font-bold uppercase tracking-widest text-red-800 underline"
+          className="inline-flex min-h-11 items-center px-3 text-xs font-semibold uppercase tracking-wider text-red-700 underline"
         >
           Dismiss
         </button>

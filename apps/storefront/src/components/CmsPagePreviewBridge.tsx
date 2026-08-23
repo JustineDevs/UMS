@@ -227,6 +227,21 @@ function applyDomEdit(node: HTMLElement, property: string, value: string) {
   return false;
 }
 
+function applyDomOverrides(root: HTMLElement, value: unknown) {
+  if (!isRecord(value)) return;
+  for (const [nodeId, properties] of Object.entries(value)) {
+    if (!isRecord(properties) || nodeId.length > 200) continue;
+    const node = [
+      root,
+      ...Array.from(root.querySelectorAll<HTMLElement>("[data-cms-id]")),
+    ].find((candidate) => candidate.dataset.cmsId === nodeId);
+    if (!node) continue;
+    for (const [property, next] of Object.entries(properties)) {
+      if (typeof next === "string") applyDomEdit(node, property, next);
+    }
+  }
+}
+
 function applyDraft(root: HTMLElement, block: DraftBlock) {
   const props = isRecord(block.props) ? block.props : {};
   root = applyAccessibility(root, props.accessibility);
@@ -269,6 +284,7 @@ function applyDraft(root: HTMLElement, block: DraftBlock) {
   if (isRecord(block.styles)) {
     for (const [key, value] of Object.entries(block.styles)) setSafeStyle(root, `--cms-${key}`, value);
   }
+  applyDomOverrides(root, props.domOverrides);
 }
 
 function enableInlineEditing() {
@@ -290,8 +306,9 @@ function decorateEditorNodes() {
       "*:not(script):not(style):not(noscript)",
     ),
   );
-  nodes.forEach((node) => {
-    if (!node.dataset.cmsId) {
+    nodes.forEach((node) => {
+      node.dataset.uvsId ??= node.dataset.cmsId;
+      if (!node.dataset.cmsId) {
       const path: number[] = [];
       let current: Element | null = node;
       while (current && current !== document.body) {
@@ -303,7 +320,8 @@ function decorateEditorNodes() {
         );
         current = current.parentElement;
       }
-      node.dataset.cmsId = `cms-dom-${path.join("-")}`;
+        node.dataset.cmsId = `cms-dom-${path.join("-")}`;
+        node.dataset.uvsId = node.dataset.cmsId;
       node.dataset.cmsGenerated = "true";
       node.dataset.cmsLabel =
         node.getAttribute("aria-label") ||

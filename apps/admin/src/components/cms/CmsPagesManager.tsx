@@ -16,6 +16,7 @@ import { cmsPagePreviewUrl } from "@/lib/cms-preview-url";
 import { StorefrontPublicMetadataEditor } from "@/components/StorefrontPublicMetadataEditor";
 import { CmsPageBuilder } from "./CmsPageBuilder";
 import { StorefrontHomeVisualEditor } from "./StorefrontHomeVisualEditor";
+import { UvsCmsClient } from "@/lib/visual-builder/cms-rest-client";
 
 type CmsPageRow = {
   id: string;
@@ -198,27 +199,13 @@ export function CmsPagesManager() {
     };
     if (editing.id) payload.id = editing.id;
     try {
-      const response = await fetch(
-        editing.id
-          ? `/api/admin/cms/pages/${editing.id}`
-          : "/api/admin/cms/pages",
-        {
-          method: editing.id ? "PUT" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Idempotency-Key": idempotencyKey(`cms-page-${editing.id ?? "new"}`),
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-      const json = (await response.json()) as {
-        data?: CmsPageRow;
-        error?: string;
-      };
-      if (!response.ok) throw new Error(json.error ?? response.statusText);
-      if (json.data) {
-        setEditing(json.data);
-        setSlugWhenOpened(json.data.slug);
+      const client = new UvsCmsClient(fetch, window.location.origin);
+      const saved = editing.id
+        ? await client.savePage(editing.id, payload, editing.version ?? 1, idempotencyKey(`cms-page-${editing.id}`))
+        : await client.createPage(payload, idempotencyKey("cms-page-new"));
+      if (saved.data) {
+        setEditing(saved.data as CmsPageRow);
+        setSlugWhenOpened(saved.data.slug);
         setMutations([]);
       }
       load();

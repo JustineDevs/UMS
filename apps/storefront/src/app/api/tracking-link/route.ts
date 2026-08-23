@@ -11,11 +11,16 @@ import {
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { trackingLinkRouteLogic } from "@/lib/tracking-link-route-logic";
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 60;
 
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(
     `tracking-link:${ip}`,
@@ -29,12 +34,14 @@ async function handlePOST(req: Request) {
     );
   }
 
-  let body: { cartId?: string };
-  try {
-    body = (await req.json()) as { cartId?: string };
-  } catch {
+  const bounded = await parseBoundedJson(req, 4 * 1024);
+  if (bounded.tooLarge) {
+    return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
+  }
+  if (!bounded.valid) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+  const body = bounded.value as { cartId?: string };
 
   const base =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
@@ -43,7 +50,9 @@ async function handlePOST(req: Request) {
     ownedCartId: await readCartIdFromCookie(),
     rateLimited: false,
     retryAfterSec: undefined,
-    buildTrackingUrl: (cartId) => buildTrackingUrl(base, cartId),
+    buildTrackingUrl: (cartId) => buildTrackingUrl(base, cartId, {
+      storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+    }),
   });
 
   return NextResponse.json(result.body, {

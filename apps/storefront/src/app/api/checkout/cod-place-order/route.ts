@@ -3,6 +3,7 @@ import {
   incrementFinalizeAttempts,
   claimPaymentAttemptForFinalization,
   updatePaymentAttemptByCorrelationId,
+  linkCommerceAttributionOrder,
 } from "@universal-music-store/platform-data";
 
 import { getStorefrontSession } from "@/lib/auth";
@@ -14,6 +15,7 @@ import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
 import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,9 @@ export const dynamic = "force-dynamic";
  * Server-owned COD order placement: browser must not call Medusa `cart.complete` directly.
  */
 export async function POST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const session = await getStorefrontSession();
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) {
@@ -34,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   const sb = createStorefrontServiceSupabase();
-  return handleCodPlaceOrderRequest(req, {
+  const response = await handleCodPlaceOrderRequest(req, {
     applyRateLimit: async (request) =>
       applyRateLimit(request, "cod-place-order", 30, 60_000),
     readCartIdFromCookie,
@@ -73,4 +78,16 @@ export async function POST(req: Request) {
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),
     nowIso: () => new Date().toISOString(),
   });
+  if (sb && response.status === 200) {
+    const body = (await response.clone().json().catch(() => null)) as { orderId?: unknown } | null;
+    const cartId = await readCartIdFromCookie();
+    if (cartId && typeof body?.orderId === "string") {
+      await linkCommerceAttributionOrder(sb, {
+        cartId,
+        orderId: body.orderId,
+        organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
+      }).catch(() => {});
+    }
+  }
+  return response;
 }

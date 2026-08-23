@@ -25,6 +25,11 @@ import {
   getMedusaSalesChannelId,
   withSalesChannelId,
 } from "./storefront-medusa-env";
+import {
+  fetchMedusaPages,
+} from "./medusa-pagination";
+import { normalizeCatalogFacetValue } from "./catalog-facet-quality";
+import { logCommerceObservabilityServer } from "./commerce-observability";
 
 export type CatalogQuery = {
   limit?: number;
@@ -64,7 +69,11 @@ export type ProductIdentityBySlugResult =
   | { kind: "not_found" };
 
 export type CategorySummariesResult =
-  | { kind: "ok"; summaries: { category: string; count: number }[] }
+  | {
+      kind: "ok";
+      summaries: CategorySummary[];
+      fetchedAt?: string;
+    }
   | CommerceFetchFailure;
 
 export type VariantFacetsResult =
@@ -80,6 +89,12 @@ export type VariantFacetsResult =
         skillLevels: string[];
         shippingSpeeds: string[];
       };
+      quality: {
+        rawProducts: number;
+        mappedProducts: number;
+        facetValuesSeen: number;
+        invalidFacetValues: number;
+      };
     }
   | CommerceFetchFailure;
 
@@ -92,7 +107,10 @@ function normalizedCategoryTag(category: string | undefined): string | null {
   return value ? `collection:${value}` : null;
 }
 
-function catalogCacheTags(options: CatalogQuery, extra: string[] = []): string[] {
+function catalogCacheTags(
+  options: CatalogQuery,
+  extra: string[] = [],
+): string[] {
   const tags = new Set<string>(["catalog:list", ...extra]);
   const collectionTag = normalizedCategoryTag(options.category);
   if (collectionTag) tags.add(collectionTag);
@@ -143,8 +161,7 @@ function catalogServiceError(err: unknown): CommerceFetchFailure {
   }
   if (isLikelyUnreachableMedusaError(message)) {
     const base = getMedusaStoreBaseUrl();
-    const loopback =
-      base.includes("localhost") || base.includes("127.0.0.1");
+    const loopback = base.includes("localhost") || base.includes("127.0.0.1");
     return {
       kind: "misconfigured",
       detail: loopback
@@ -157,6 +174,20 @@ function catalogServiceError(err: unknown): CommerceFetchFailure {
 
 const MEDUSA_LIST_FIELDS =
   "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
+
+// Coalesce concurrent cold-cache requests in one server instance. Next's
+// persistent cache still owns freshness; this only prevents a request burst
+// from starting the same upstream scan multiple times.
+const productPageInFlight = new Map<string, Promise<ProductsPageResult>>();
+const categorySummariesInFlight = new Map<string, Promise<CategorySummariesResult>>();
+const variantFacetsInFlight = new Map<string, Promise<VariantFacetsResult>>();
+
+type MedusaCategoryRow = {
+  id?: string;
+  name?: string;
+  handle?: string;
+  parent_category_id?: string | null;
+};
 
 function requireMedusaClientConfig():
   | { ok: true }
@@ -182,17 +213,32 @@ function requireMedusaClientConfig():
   return { ok: true };
 }
 
+async function listMedusaCategories(
+  sdk: ReturnType<typeof createStorefrontMedusaSdk>,
+): Promise<MedusaCategoryRow[]> {
+  const { pages } = await fetchMedusaPages(100, async (offset) => {
+    const result = await sdk.store.category.list({
+      limit: 100,
+      offset,
+      fields: "id,name,handle,parent_category_id",
+    } as Parameters<typeof sdk.store.category.list>[0]);
+    const rows = (result.product_categories ?? []) as MedusaCategoryRow[];
+    return {
+      rows,
+      total: typeof result.count === "number" ? result.count : undefined,
+    };
+  });
+  return pages.flat();
+}
+
 async function resolveMedusaCategoryId(
   sdk: ReturnType<typeof createStorefrontMedusaSdk>,
   categoryName: string | undefined,
 ): Promise<string | undefined> {
   if (!categoryName?.trim()) return undefined;
   const want = categoryName.trim().toLowerCase();
-  const { product_categories } = await sdk.store.category.list({
-    limit: 200,
-    fields: "id,name,handle",
-  } as Parameters<typeof sdk.store.category.list>[0]);
-  const row = (product_categories ?? []).find((c) => {
+  const productCategories = await listMedusaCategories(sdk);
+  const row = productCategories.find((c) => {
     const name = (c.name ?? "").trim().toLowerCase();
     const handle = (c.handle ?? "").trim().toLowerCase();
     return name === want || handle === want;
@@ -218,38 +264,49 @@ async function fetchMedusaProductsPage(
     const priceSort =
       options.sort === "price_asc" || options.sort === "price_desc";
 
-    async function scanProducts(allowSalesChannel: boolean): Promise<Product[]> {
+    async function scanProducts(
+      allowSalesChannel: boolean,
+    ): Promise<Product[]> {
+      const startedAt = Date.now();
       const collected: Product[] = [];
-      let apiOffset = 0;
+      let rowsScanned = 0;
       const pageSize = 80;
-      const targetEnd = offset + limit;
-      const maxScan = 4000;
       const salesChannelId =
-        allowSalesChannel && useSalesChannelId ? getMedusaSalesChannelId() : undefined;
+        allowSalesChannel && useSalesChannelId
+          ? getMedusaSalesChannelId()
+          : undefined;
 
-      while (collected.length < targetEnd && apiOffset < maxScan) {
-        const listParams: Record<string, unknown> = {
-          region_id: regionId,
-          limit: pageSize,
-          offset: apiOffset,
-          fields: MEDUSA_LIST_FIELDS,
-          order:
-            options.sort === "name_asc"
-              ? "title"
-              : options.sort === "newest"
-                ? "-created_at"
-                : "-created_at",
-        };
-        if (categoryId) listParams.category_id = categoryId;
-        if (options.q?.trim()) listParams.q = options.q.trim();
+      const { pages, requestCount } = await fetchMedusaPages(
+        pageSize,
+        async (offset) => {
+          const listParams: Record<string, unknown> = {
+            region_id: regionId,
+            limit: pageSize,
+            offset,
+            fields: MEDUSA_LIST_FIELDS,
+            order:
+              options.sort === "name_asc"
+                ? "title"
+                : options.sort === "newest"
+                  ? "-created_at"
+                  : "-created_at",
+          };
+          if (categoryId) listParams.category_id = categoryId;
+          if (options.q?.trim()) listParams.q = options.q.trim();
 
-        const { products: rawList } = await sdk.store.product.list(
-          (salesChannelId ? withSalesChannelId(listParams) : listParams) as Parameters<
-            typeof sdk.store.product.list
-          >[0],
-        );
+          const { products: rawList, count } = await sdk.store.product.list(
+            (salesChannelId
+              ? withSalesChannelId(listParams)
+              : listParams) as Parameters<typeof sdk.store.product.list>[0],
+          );
+          return { rows: rawList ?? [], total: count };
+        },
+      );
 
-        for (const raw of rawList ?? []) {
+      for (const rawList of pages) {
+        rowsScanned += rawList.length;
+
+        for (const raw of rawList) {
           const p = catalogProductFromMedusaRaw(raw as never);
           if (!p) continue;
           if (
@@ -266,17 +323,23 @@ async function fetchMedusaProductsPage(
             continue;
           }
           if (!productMatchesBrand(p, options.brand)) continue;
-          if (!productMatchesPriceRange(p, options.minPrice, options.maxPrice)) {
+          if (
+            !productMatchesPriceRange(p, options.minPrice, options.maxPrice)
+          ) {
             continue;
           }
           collected.push(p);
         }
-
-        apiOffset += pageSize;
-        if (!rawList?.length || rawList.length < pageSize) {
-          break;
-        }
       }
+
+      logCommerceObservabilityServer("catalog_scan_completed", {
+        source: "storefront_catalog",
+        requestCount,
+        rowsScanned,
+        matchedRows: collected.length,
+        durationMs: Date.now() - startedAt,
+        salesChannelScoped: Boolean(salesChannelId),
+      });
 
       return collected;
     }
@@ -312,7 +375,9 @@ async function fetchMedusaProductsPage(
   }
 }
 
-async function fetchMedusaProductBySlug(slug: string): Promise<ProductBySlugResult> {
+async function fetchMedusaProductBySlug(
+  slug: string,
+): Promise<ProductBySlugResult> {
   const gate = requireMedusaClientConfig();
   if (!gate.ok) {
     return gate.reason;
@@ -353,6 +418,40 @@ async function fetchMedusaProductBySlug(slug: string): Promise<ProductBySlugResu
   }
 }
 
+async function fetchMedusaProductById(
+  productId: string,
+): Promise<ProductBySlugResult> {
+  const gate = requireMedusaClientConfig();
+  if (!gate.ok) return gate.reason;
+  try {
+    const sdk = createStorefrontMedusaSdk();
+    const params = {
+      region_id: getMedusaRegionId()!,
+      id: productId,
+      limit: 1,
+      fields: MEDUSA_LIST_FIELDS,
+    };
+    const salesChannelId = getMedusaSalesChannelId();
+    const query = (useSalesChannelId: boolean) =>
+      sdk.store.product.list(
+        (useSalesChannelId && salesChannelId
+          ? withSalesChannelId({ ...params })
+          : params) as Parameters<typeof sdk.store.product.list>[0],
+      );
+    let { products } = await query(true);
+    let raw = products?.[0];
+    let product = raw ? catalogProductFromMedusaRaw(raw as never) : null;
+    if (!product && salesChannelId) {
+      ({ products } = await query(false));
+      raw = products?.[0];
+      product = raw ? catalogProductFromMedusaRaw(raw as never) : null;
+    }
+    return product ? { kind: "ok", product } : { kind: "not_found" };
+  } catch (e) {
+    return catalogServiceError(e);
+  }
+}
+
 async function fetchMedusaCategorySummaries(): Promise<CategorySummariesResult> {
   const gate = requireMedusaClientConfig();
   if (!gate.ok) {
@@ -361,21 +460,39 @@ async function fetchMedusaCategorySummaries(): Promise<CategorySummariesResult> 
   try {
     const sdk = createStorefrontMedusaSdk();
     const regionId = getMedusaRegionId()!;
-    const { product_categories } = await sdk.store.category.list({
-      limit: 200,
-      fields: "id,name,handle",
-    } as Parameters<typeof sdk.store.category.list>[0]);
-    const rows = product_categories ?? [];
-    const summaries: { category: string; count: number }[] = [];
-    for (const c of rows) {
-      const id = typeof c.id === "string" ? c.id : "";
-      const label = (c.name ?? c.handle ?? id ?? "").trim();
-      if (!label || !id) continue;
-      const count = await countSellableProductsInStoreList(sdk, regionId, {
-        categoryId: id,
-        maxScan: 5000,
-      });
-      summaries.push({ category: label, count });
+    const rows = await listMedusaCategories(sdk);
+    const summaries: CategorySummary[] = [];
+    // Keep catalog pressure bounded while avoiding one network round-trip per
+    // category. Four concurrent count scans preserve predictable Medusa load.
+    for (let offset = 0; offset < rows.length; offset += 4) {
+      const batch = await Promise.all(
+        rows.slice(offset, offset + 4).map(async (c) => {
+          const id = typeof c.id === "string" ? c.id : "";
+          const handle = typeof c.handle === "string" ? c.handle.trim() : "";
+          const label = (c.name ?? handle ?? id ?? "").trim();
+          if (!label || !id || !handle) return null;
+          const parentId =
+            typeof (c as { parent_category_id?: unknown })
+              .parent_category_id === "string"
+              ? (c as { parent_category_id: string }).parent_category_id
+              : null;
+          const count = await countSellableProductsInStoreList(sdk, regionId, {
+            categoryId: id,
+          });
+          return {
+            id,
+            handle,
+            category: label,
+            count,
+            parentId,
+          } satisfies CategorySummary;
+        }),
+      );
+      summaries.push(
+        ...batch.filter(
+          (summary): summary is CategorySummary => summary !== null,
+        ),
+      );
     }
     return {
       kind: "ok",
@@ -406,48 +523,65 @@ async function fetchMedusaVariantFacets(
       const conditions = new Set<string>();
       const skillLevels = new Set<string>();
       const shippingSpeeds = new Set<string>();
-      let facetOffset = 0;
       const facetPageSize = 100;
-      const facetMaxScan = 4000;
       const salesChannelId =
-        allowSalesChannel && getMedusaSalesChannelId() ? getMedusaSalesChannelId() : undefined;
+        allowSalesChannel && getMedusaSalesChannelId()
+          ? getMedusaSalesChannelId()
+          : undefined;
       let sawRawRows = false;
-      while (facetOffset < facetMaxScan) {
-        const { products } = await sdk.store.product.list(
-          (salesChannelId
-            ? withSalesChannelId({
-                region_id: regionId,
-                ...(categoryId ? { category_id: categoryId } : {}),
-                limit: facetPageSize,
-                offset: facetOffset,
-                fields: MEDUSA_LIST_FIELDS,
-              })
-            : {
-                region_id: regionId,
-                ...(categoryId ? { category_id: categoryId } : {}),
-                limit: facetPageSize,
-                offset: facetOffset,
-                fields: MEDUSA_LIST_FIELDS,
-              }) as Parameters<typeof sdk.store.product.list>[0],
+      let rawProducts = 0;
+      let mappedProducts = 0;
+      let facetValuesSeen = 0;
+      let invalidFacetValues = 0;
+      const addFacetValue = (set: Set<string>, value: unknown) => {
+        facetValuesSeen += 1;
+        const normalized = normalizeCatalogFacetValue(value);
+        if (!normalized) {
+          invalidFacetValues += 1;
+          return;
+        }
+        set.add(normalized);
+      };
+      const { pages } = await fetchMedusaPages(facetPageSize, async (offset) => {
+        const params = {
+          region_id: regionId,
+          ...(categoryId ? { category_id: categoryId } : {}),
+          limit: facetPageSize,
+          offset,
+          fields: MEDUSA_LIST_FIELDS,
+        };
+        const result = await sdk.store.product.list(
+          (salesChannelId ? withSalesChannelId(params) : params) as Parameters<
+            typeof sdk.store.product.list
+          >[0],
         );
-        if ((products?.length ?? 0) > 0) sawRawRows = true;
-        for (const pr of products ?? []) {
+        return {
+          rows: result.products ?? [],
+          total: result.count,
+        };
+      });
+      for (const products of pages) {
+        if (products.length > 0) sawRawRows = true;
+        rawProducts += products.length;
+        for (const pr of products) {
           const p = catalogProductFromMedusaRaw(pr as never);
           if (!p) continue;
-          if (p.brand?.trim()) brands.add(p.brand.trim());
+          mappedProducts += 1;
+          addFacetValue(brands, p.brand);
           for (const v of p.variants) {
-            if (v.type) types.add(v.type);
-            if (v.finish) finishes.add(v.finish);
-            if (v.pickupConfig) pickupConfigs.add(v.pickupConfig);
-            if (v.bodyWood) bodyWoods.add(v.bodyWood);
-            if (v.condition) conditions.add(v.condition);
-            if (v.skillLevel) skillLevels.add(v.skillLevel);
-            if (v.shippingSpeed) shippingSpeeds.add(v.shippingSpeed);
+            const values = [
+              [types, v.type],
+              [finishes, v.finish],
+              [pickupConfigs, v.pickupConfig],
+              [bodyWoods, v.bodyWood],
+              [conditions, v.condition],
+              [skillLevels, v.skillLevel],
+              [shippingSpeeds, v.shippingSpeed],
+            ] as const;
+            for (const [set, value] of values) {
+              addFacetValue(set, value);
+            }
           }
-        }
-        facetOffset += facetPageSize;
-        if (!products?.length || products.length < facetPageSize) {
-          break;
         }
       }
       return {
@@ -460,6 +594,10 @@ async function fetchMedusaVariantFacets(
         skillLevels,
         shippingSpeeds,
         sawRawRows,
+        rawProducts,
+        mappedProducts,
+        facetValuesSeen,
+        invalidFacetValues,
       };
     }
 
@@ -473,11 +611,23 @@ async function fetchMedusaVariantFacets(
         types: [...primary.types].sort(),
         finishes: [...primary.finishes].sort((a, b) => a.localeCompare(b)),
         brands: [...primary.brands].sort((a, b) => a.localeCompare(b)),
-        pickupConfigs: [...primary.pickupConfigs].sort((a, b) => a.localeCompare(b)),
+        pickupConfigs: [...primary.pickupConfigs].sort((a, b) =>
+          a.localeCompare(b),
+        ),
         bodyWoods: [...primary.bodyWoods].sort((a, b) => a.localeCompare(b)),
         conditions: [...primary.conditions].sort((a, b) => a.localeCompare(b)),
-        skillLevels: [...primary.skillLevels].sort((a, b) => a.localeCompare(b)),
-        shippingSpeeds: [...primary.shippingSpeeds].sort((a, b) => a.localeCompare(b)),
+        skillLevels: [...primary.skillLevels].sort((a, b) =>
+          a.localeCompare(b),
+        ),
+        shippingSpeeds: [...primary.shippingSpeeds].sort((a, b) =>
+          a.localeCompare(b),
+        ),
+      },
+      quality: {
+        rawProducts: primary.rawProducts,
+        mappedProducts: primary.mappedProducts,
+        facetValuesSeen: primary.facetValuesSeen,
+        invalidFacetValues: primary.invalidFacetValues,
       },
     };
   } catch (e) {
@@ -515,7 +665,12 @@ export async function fetchProductsPage(
       tags: catalogCacheTags(normalizedOptions),
     },
   );
-  return cached();
+  const key = JSON.stringify([limit, normalizedOptions]);
+  const inFlight = productPageInFlight.get(key);
+  if (inFlight) return inFlight;
+  const request = cached().finally(() => productPageInFlight.delete(key));
+  productPageInFlight.set(key, request);
+  return request;
 }
 
 export async function fetchFeaturedProducts(
@@ -523,7 +678,11 @@ export async function fetchFeaturedProducts(
 ): Promise<FeaturedProductsResult> {
   const cached = unstable_cache(
     async () => {
-      const primary = await fetchMedusaProductsPage(limit, { sort: "newest" }, true);
+      const primary = await fetchMedusaProductsPage(
+        limit,
+        { sort: "newest" },
+        true,
+      );
       if (primary.kind !== "ok") {
         return primary;
       }
@@ -596,6 +755,12 @@ export async function fetchProductBySlug(
   return fetchMedusaProductBySlug(slug);
 }
 
+export async function fetchProductById(
+  productId: string,
+): Promise<ProductBySlugResult> {
+  return fetchMedusaProductById(productId);
+}
+
 /** Resolves identity without filtering out an out-of-stock product. */
 export async function fetchProductIdentityBySlug(
   slug: string,
@@ -629,7 +794,9 @@ export async function fetchProductIdentityBySlug(
       kind: "ok",
       productId: raw.id,
       variantIds: variants
-        .filter((variant): variant is Record<string, unknown> => Boolean(variant && typeof variant === "object"))
+        .filter((variant): variant is Record<string, unknown> =>
+          Boolean(variant && typeof variant === "object"),
+        )
         .filter((variant) => variant.is_active !== false)
         .map((variant) => (typeof variant.id === "string" ? variant.id : ""))
         .filter(Boolean),
@@ -639,18 +806,34 @@ export async function fetchProductIdentityBySlug(
   }
 }
 
-type CategorySummary = { category: string; count: number };
+type CategorySummary = {
+  id: string;
+  handle: string;
+  category: string;
+  count: number;
+  parentId: string | null;
+};
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
+  const key = catalogEnvCacheFingerprint();
+  const inFlight = categorySummariesInFlight.get(key);
+  if (inFlight) return inFlight;
   const cached = unstable_cache(
-    async () => fetchMedusaCategorySummaries(),
+    async () => {
+      const result = await fetchMedusaCategorySummaries();
+      return result.kind === "ok"
+        ? { ...result, fetchedAt: new Date().toISOString() }
+        : result;
+    },
     ["storefront-category-summaries", catalogEnvCacheFingerprint()],
     {
       revalidate: 60,
       tags: ["catalog:list", "collections:index"],
     },
   );
-  return cached();
+  const request = cached().finally(() => categorySummariesInFlight.delete(key));
+  categorySummariesInFlight.set(key, request);
+  return request;
 }
 
 type VariantFacets = {
@@ -663,6 +846,9 @@ export async function fetchVariantFacets(
   category: string | undefined,
 ): Promise<VariantFacetsResult> {
   const normalizedCategory = category?.trim() || undefined;
+  const key = `${catalogEnvCacheFingerprint()}:${normalizedCategory ?? "__all__"}`;
+  const inFlight = variantFacetsInFlight.get(key);
+  if (inFlight) return inFlight;
   const cached = unstable_cache(
     async () => fetchMedusaVariantFacets(normalizedCategory),
     [
@@ -675,7 +861,9 @@ export async function fetchVariantFacets(
       tags: catalogCacheTags({ category: normalizedCategory }),
     },
   );
-  return cached();
+  const request = cached().finally(() => variantFacetsInFlight.delete(key));
+  variantFacetsInFlight.set(key, request);
+  return request;
 }
 
 export async function fetchProductSlugsForSitemap(

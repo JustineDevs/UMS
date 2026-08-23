@@ -48,6 +48,15 @@ export function tryCreateSupabaseClient(): SupabaseClient | null {
 
 export { isMissingTableOrSchemaError } from "./supabase-errors.js";
 export {
+  assertPaymentCheckoutTransition,
+  isPaymentCheckoutState,
+} from "./payment-state-machine.js";
+export {
+  recordCommerceAttribution,
+  linkCommerceAttributionOrder,
+  recordCommerceAttributionRefund,
+} from "./commerce-attribution.js";
+export {
   archiveCmsComponentDefinition,
   getCmsComponentDefinitionForOrganization,
   listCmsComponentDefinitionsForOrganization,
@@ -71,10 +80,16 @@ export {
   commitInventoryReservation,
   releaseInventoryReservation,
   reserveInventory,
+  expireDueInventoryReservations,
+  expireInventoryReservation,
+  setInventoryReservationExpiry,
   type FinalizeInventoryReservationInput,
   type InventoryReservationRow,
   type InventoryReservationStatus,
+  type InventoryReservationReconciliationStatus,
   type ReserveInventoryInput,
+  deriveInventoryQuantitySemantics,
+  type InventoryQuantitySemantics,
 } from "./inventory-reservations.js";
 
 /** Anon client for public reads (e.g. storefront home CMS). Requires SUPABASE_ANON_KEY. */
@@ -104,10 +119,28 @@ export {
   type StaffSessionLike,
 } from "./permissions.js";
 export {
+  authorizeResourceContext,
+  normalizeResourceContext,
+  resourceContextAllows,
+  type ResourceContext,
+  type ResourceContextGrant,
+} from "./resource-context.js";
+export { reportDateKey, toUtcStorageTimestamp, utcDateRange } from "./utc-time.js";
+export {
   exportDataSubjectByEmail,
+  deleteDataSubjectByEmail,
+  purgeExpiredPrivacyData,
   anonymizeStaleOrderAddresses,
   type DataSubjectExport,
 } from "./compliance.js";
+export {
+  PRIVACY_DATA_INVENTORY,
+  canSendMarketingEmail,
+  privacyAsset,
+  retentionCutoff,
+  type PrivacyDataAction,
+  type PrivacyDataAsset,
+} from "./privacy-inventory.js";
 
 export {
   listEmployees,
@@ -253,7 +286,28 @@ export {
   type DeliveryLogisticsSettlementStatus,
   type DeliveryLogisticsShipmentRow,
   type DeliveryLogisticsShipmentStatus,
+  projectDeliveryStatus,
 } from "./delivery-logistics-ledger.js";
+export {
+  appendCanonicalOrderState,
+  assertCanonicalOrderTransition,
+  type CanonicalOrderStatus,
+  canonicalOrderStatusFor,
+} from "./order-delivery-ledger.js";
+export {
+  reconcileSettlement,
+  recordSettlementReconciliation,
+  type SettlementMatchInput,
+  type SettlementReconciliationStatus,
+} from "./payment-settlement-reconciliation.js";
+export { assertRefundTransition, recordRefundLifecycle, type RefundLifecycleRow, type RefundLifecycleStatus } from "./refund-lifecycle.js";
+export {
+  assertInvoiceTransition,
+  recordInvoiceLifecycle,
+  type InvoiceLifecycleStatus,
+  type InvoiceLifecycleEvent,
+  type InvoiceStatus,
+} from "./invoice-lifecycle.js";
 
 export {
   calculatePosReconciliation,
@@ -472,6 +526,7 @@ export {
   cmsBlocksToTree,
   cmsTreeToBlocks,
   normalizeCmsTree,
+  validateCmsPublishTree,
   listCmsPages,
   getCmsPageById,
   getCmsPageBySlugLocalePublic,
@@ -531,6 +586,7 @@ export {
 
 export {
   CMS_MEDIA_TAG_CATALOG_PRODUCT,
+  applyCmsMediaUrls,
   cmsMediaRowIsCatalogProduct,
   ensureExternalCatalogProductMediaRows,
   findCmsMediaCatalogProductByPublicUrl,
@@ -538,8 +594,12 @@ export {
   getCmsMediaById,
   insertCmsMedia,
   listCmsMedia,
+  mediaIdPropKey,
+  mediaUrlPropKey,
   normalizeCatalogMediaUrlForDb,
+  resolveCmsMediaUrls,
   softDeleteCmsMedia,
+  stripResolvedCmsMediaUrls,
   updateCmsMedia,
   type CmsMediaRow,
   type ListCmsMediaOptions,
@@ -603,6 +663,7 @@ export {
   loadCmsAnnouncementsPublic,
   loadCmsAnnouncementPublic,
   loadCmsCategoryContentPublic,
+  loadCmsCategoryContentListPublic,
   loadCmsBlogListPublic,
   loadCmsBlogPostPublic,
   loadCmsAbExperimentsActivePublic,
@@ -679,3 +740,4 @@ export {
   failOutboxEventWithBackoff,
   type OutboxEvent,
 } from "./outbox.js";
+export { claimPosSaleCommand, completePosSaleCommand, getPosSaleCommand, type PosSaleCommand } from "./pos-sale-commands.js";

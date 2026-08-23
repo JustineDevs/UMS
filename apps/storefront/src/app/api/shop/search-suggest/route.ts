@@ -14,6 +14,7 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { rankSearchSuggestions } from "@/lib/search-suggestion-ranking";
 
 const FIELDS =
   "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
@@ -37,7 +38,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ suggestions: [] });
   }
   if (!getMedusaPublishableKey()?.trim() || !getMedusaRegionId()?.trim()) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json(
+      { suggestions: [], error: "catalog_unavailable" },
+      { status: 503 },
+    );
   }
   try {
     const sdk = createStorefrontMedusaSdk();
@@ -45,7 +49,7 @@ export async function GET(req: Request) {
     const baseParams = {
       region_id: regionId,
       q,
-      limit: 8,
+      limit: 24,
       fields: FIELDS,
     };
     const { products: primary } = await sdk.store.product.list(
@@ -72,8 +76,11 @@ export async function GET(req: Request) {
         };
       })
       .filter((s): s is NonNullable<typeof s> => s != null);
-    return NextResponse.json({ suggestions });
+    return NextResponse.json({ suggestions: rankSearchSuggestions(suggestions, q).slice(0, 8) });
   } catch {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json(
+      { suggestions: [], error: "catalog_unavailable" },
+      { status: 503 },
+    );
   }
 }

@@ -15,6 +15,7 @@ export default async function CheckoutPage({
 }: {
   searchParams: Promise<{
     resume?: string;
+    token?: string;
     stripe_cancel?: string;
     review?: string;
     message?: string;
@@ -23,6 +24,7 @@ export default async function CheckoutPage({
 }) {
   const sp = await searchParams;
   const resume = sp.resume?.trim();
+  const token = sp.token?.trim();
   const stripeCancel =
     sp.stripe_cancel === "1" ||
     sp.stripe_cancel === "true" ||
@@ -37,6 +39,7 @@ export default async function CheckoutPage({
   return (
     <CheckoutClient
       initialResumeCartId={resume}
+      initialResumeToken={token}
       initialStripeCheckoutCancel={stripeCancel}
       initialReviewMessage={initialReviewMessage}
       guestMode={guestMode}

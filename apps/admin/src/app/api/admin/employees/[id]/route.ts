@@ -10,6 +10,7 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -37,11 +38,15 @@ async function patch(req: NextRequest, ctx: Ctx) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
   const { id } = await ctx.params;
-  const body = await req.json();
+  const parsedBody = await parseBoundedJson(req, 32 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
+    ? parsedBody.value
+    : {};
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
-  const emp = await updateEmployee(sb, id, body);
+  const emp = await updateEmployee(sb, id, body as Parameters<typeof updateEmployee>[2]);
   return correlatedJson(cid, { data: emp });
 }
 

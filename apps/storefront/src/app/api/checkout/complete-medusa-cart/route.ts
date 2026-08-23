@@ -13,6 +13,7 @@ import {
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 function jsonNoStore(
   body: unknown,
@@ -68,17 +69,13 @@ async function handlePOST(req: Request) {
 
   const cartSuffix = cartId.length > 8 ? cartId.slice(-8) : cartId;
 
-  let correlationId: string | undefined;
-  try {
-    const body = (await req.json().catch(() => ({}))) as {
-      correlationId?: string;
-    };
-    if (typeof body.correlationId === "string" && body.correlationId.trim()) {
-      correlationId = body.correlationId.trim();
-    }
-  } catch {
-    correlationId = undefined;
-  }
+  const parsedBody = await parseBoundedJson(req, 8 * 1024);
+  if (parsedBody.tooLarge) return jsonNoStore({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid) return jsonNoStore({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsedBody.value as { correlationId?: string };
+  const correlationId = typeof body.correlationId === "string" && body.correlationId.trim()
+    ? body.correlationId.trim()
+    : undefined;
 
   const sb = createStorefrontServiceSupabase();
 

@@ -4,6 +4,7 @@ import {
   finishPublicDeliveryAttempt,
   publicDeliveryIdempotencyKey,
   recordPublicDeliveryAttempt,
+  isEmailUnsubscribed,
 } from "@/lib/public-delivery";
 
 export type BackInStockSubscription = {
@@ -36,6 +37,16 @@ export async function dispatchBackInStockNotifications(
       provider: "resend",
       idempotencyKey: key,
     });
+    if (await isEmailUnsubscribed(supabase, subscription.email)) {
+      await finishPublicDeliveryAttempt(supabase, key, {
+        status: "suppressed",
+        error: "Recipient unsubscribed",
+      });
+      await supabase.from("back_in_stock_notifications")
+        .update({ notified: true, notified_at: deps.nowIso?.() ?? new Date().toISOString() })
+        .eq("id", subscription.id);
+      continue;
+    }
     const productUrl = `${deps.siteOrigin.replace(/\/$/, "")}/shop/${encodeURIComponent(subscription.product_slug)}`;
     const result = await send({
       apiKey: deps.apiKey,

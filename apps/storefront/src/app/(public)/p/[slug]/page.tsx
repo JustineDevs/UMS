@@ -61,14 +61,21 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
   if (!page) notFound();
 
   const sb = createStorefrontAnonSupabase();
+  const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined;
   let crumbs: { label: string; href: string }[] = [];
   if (sb) {
     if (preview) {
-      const ancestors = await getCmsPageAncestorTrail(sb, page.parent_slug, locale);
+      const ancestors = await getCmsPageAncestorTrail(
+        sb,
+        page.parent_slug,
+        locale,
+        8,
+        organizationId,
+      );
       const lab = page.breadcrumb_label?.trim() || page.title?.trim() || page.slug;
       crumbs = [...ancestors, { label: lab, href: `/p/${page.slug}` }];
     } else {
-      crumbs = await getCmsPageBreadcrumbTrail(sb, slug, locale);
+      crumbs = await getCmsPageBreadcrumbTrail(sb, slug, locale, 8, organizationId);
     }
   }
 

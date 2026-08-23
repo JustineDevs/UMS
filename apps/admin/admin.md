@@ -426,7 +426,7 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 
 - **`/admin/chat-orders`:** **Chat intake** list plus **`ChatIntakeForm`** for manual or internal intake posts. `chat_orders:manage`.
 
-- **`/admin/settings/payments`:** Regions and **payment providers** from Medusa, with **`PaymentProviderLabel`**. Read-focused; `settings:read`.
+- **`/admin/settings/payments`:** Regions and **payment providers** from Medusa with provider labels rendered by the settings page. Read-focused; `settings:read`.
 
 - **`/admin/settings/storefront`:** **`StorefrontHomeEditor`** — JSON or structured editor for homepage payload persisted via `/api/admin/storefront-home` (Supabase). `settings:read`.
 
@@ -603,7 +603,6 @@ receipts:send
 | `LenisProvider.tsx`             | Smooth scroll                                                                                                                                                            |
 | `VercelWebAnalytics.tsx`        | Vercel analytics                                                                                                                                                         |
 | `StorefrontHomeEditor.tsx`      | Client: homepage CMS JSON editor; calls `/api/admin/storefront-home`                                                                                                     |
-| `PaymentProviderLabel.tsx`      | Friendly label for payment provider id                                                                                                                                   |
 | `ChatIntakeForm.tsx`            | Chat intake form posting to integrations API                                                                                                                             |
 | `InventoryTableWithRefresh.tsx` | Client inventory table + refresh via `/api/admin/inventory`                                                                                                              |
 | `FulfillmentPanel.tsx`          | Order fulfillment; `fetch` to `/api/medusa/shipments`, `/api/integrations/couriers`                                                                                      |
@@ -657,7 +656,7 @@ Legend: **Perm** = `requirePagePermission`. **Data** = primary backend. **Medusa
 | `/admin/devices`             | Client | —                     | Device registry                                                 | `/api/admin/devices`                                   | Supabase                                                    |
 | `/admin/channels`            | RSC    | `channels:manage`     | Channel events table                                            | `fetchRecentChannelEvents`                             | Supabase                                                    |
 | `/admin/chat-orders`         | RSC    | `chat_orders:manage`  | `ChatIntakeForm` + list                                         | `fetchRecentChatIntake`                                | Supabase                                                    |
-| `/admin/settings/payments`   | RSC    | `settings:read`       | Payment tables, `PaymentProviderLabel`                          | `fetchMedusaPaymentProvidersBundle`                    | Admin API regions/products                                  |
+| `/admin/settings/payments`   | RSC    | `settings:read`       | Payment tables and provider labels                              | `fetchMedusaPaymentProvidersBundle`                    | Admin API regions/products                                  |
 | `/admin/settings/storefront` | RSC    | `settings:read`       | `StorefrontHomeEditor`                                          | `/api/admin/storefront-home`                           | Supabase                                                    |
 | `/admin/cms`                 | RSC    | `content:read`        | Hub grid of CMS sections                                        | —                                                      | —                                                           |
 | `/admin/cms/pages`           | RSC    | `content:read`        | `CmsPagesManager`                                               | `/api/admin/cms/pages`                                 | Supabase                                                    |
@@ -1205,7 +1204,7 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 |                  |                                                                                                                                                             |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Architecture** | Read-only view of **regions** and **payment providers** configured in Medusa (which providers are enabled per region).                                      |
-| **Codebase**     | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `components/PaymentProviderLabel.tsx`, `api/admin/medusa/payment-providers/route.ts` |
+| **Codebase**     | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `api/admin/medusa/payment-providers/route.ts` |
 | **Medusa**       | **`medusaAdminFetch`** to list regions and payment collections / providers (see bridge).                                                                    |
 
 **Layout ASCII**
@@ -1213,7 +1212,7 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 ```
 +-----------------------------------------------------------+
 | HEADER: Payments (settings)                               |
-| TABLES: regions x providers, <PaymentProviderLabel />     |
+| TABLES: regions x providers, provider labels                |
 +-----------------------------------------------------------+
 ```
 
@@ -1581,7 +1580,7 @@ Surfaces **which payment providers Medusa exposes per region** so staff can conf
 
 **Key components / features**
 
-- `fetchMedusaPaymentProvidersBundle`, `PaymentProviderLabel`, `/api/admin/medusa/payment-providers`.
+- `fetchMedusaPaymentProvidersBundle`, `/api/admin/medusa/payment-providers`.
 
 **MoSCoW**
 

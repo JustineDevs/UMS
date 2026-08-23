@@ -1,4 +1,5 @@
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 export type JsonRouteResult<T extends Record<string, unknown> = Record<string, unknown>> = {
   status: number;
@@ -9,7 +10,10 @@ type PaymentAttemptRouteRow = {
   cart_id: string;
   correlation_id: string;
   provider: string;
+  provider_session_id?: string | null;
+  provider_payment_id?: string | null;
   status?: string;
+  webhook_last_status?: string | null;
   checkout_state?: string;
   medusa_order_id?: string | null;
   order_id?: string | null;
@@ -42,6 +46,7 @@ type RegisterCheckoutIntentInput = {
   productIds?: string[];
   medusaPaymentSessionId?: string;
   providerSessionId?: string;
+  providerPaymentId?: string;
   idempotencyKey?: string;
   supabaseAvailable: boolean;
   registerPaymentAttempt: (_input: {
@@ -55,6 +60,7 @@ type RegisterCheckoutIntentInput = {
       productIds?: string[];
       medusaPaymentSessionId?: string;
       providerSessionId?: string;
+      providerPaymentId?: string;
       idempotencyKey?: string;
   }) => Promise<{ correlationId: string; reused: boolean }>;
 };
@@ -66,6 +72,7 @@ type FinalizeCheckoutIntentInput = {
   currentQuoteFingerprint?: string | null;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
   claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
+  verifyProviderPayment?: () => Promise<boolean>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
@@ -101,16 +108,63 @@ const WRONG_CHECKOUT_ATTEMPT_PROVIDER_ERROR =
   "This payment session belongs to cash on delivery. Use the COD completion flow instead.";
 const START_QUOTE_CHANGED_ERROR =
   "Your order changed before payment could be started. Review the updated total before continuing.";
+const PAYMENT_NOT_VERIFIED_ERROR =
+  "Payment has not been verified by the provider yet. We will keep checking and will not create an order until confirmation arrives.";
+const PAYMENT_PENDING_ERROR =
+  "Payment is still processing. We will keep checking and will not create an order until confirmation arrives.";
+
+function paymentFailureBody(
+  correlationId: string,
+  error: string,
+  code?: string,
+): Record<string, unknown> {
+  return {
+    error,
+    ...(code ? { code } : {}),
+    correlationId: correlationId.trim() || null,
+  };
+}
+
+const PROVIDER_AUTHORIZED_STATUSES = new Set([
+  "authorized",
+  "captured",
+  "paid",
+  "paid_awaiting_order",
+]);
+const PROVIDER_PENDING_STATUSES = new Set([
+  "pending",
+  "processing",
+  "requires_action",
+  "requires_capture",
+]);
+
+function providerPaymentIsAuthorized(row: PaymentAttemptRouteRow): boolean {
+  return [row.status, row.webhook_last_status]
+    .filter((value): value is string => typeof value === "string")
+    .some((value) => PROVIDER_AUTHORIZED_STATUSES.has(value.trim().toLowerCase()));
+}
+
+function providerPaymentIsPending(row: PaymentAttemptRouteRow): boolean {
+  return [row.status, row.webhook_last_status]
+    .filter((value): value is string => typeof value === "string")
+    .some((value) => PROVIDER_PENDING_STATUSES.has(value.trim().toLowerCase()));
+}
 
 function completedOrderResult(row: PaymentAttemptRouteRow): JsonRouteResult | null {
   const orderId = row.medusa_order_id?.trim() || row.order_id?.trim();
   if (row.status !== "completed" || !orderId) return null;
+  const trackingUrl = buildTrackingUrl(
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN,
+    orderId,
+    { storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim() },
+  );
+  if (!trackingUrl) return null;
   return {
     status: 200,
     body: {
       ok: true,
       orderId,
-      redirectUrl: `/track/${encodeURIComponent(orderId)}`,
+      redirectUrl: trackingUrl,
       replayed: true,
     },
   };
@@ -203,6 +257,7 @@ type FinalizePaymentAttemptsCronInput = {
   providedSecret: string;
   supabaseAvailable: boolean;
   stuckRows: Array<{ correlation_id: string; cart_id: string }>;
+  claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
   finalizeMedusaCart: (_cartId: string) => Promise<FinalizeMedusaCartResult>;
   updatePaymentAttempt: (
     _correlationId: string,
@@ -245,6 +300,7 @@ export async function registerCheckoutIntentRouteLogic(
       productIds: input.productIds,
       medusaPaymentSessionId: input.medusaPaymentSessionId,
       providerSessionId: input.providerSessionId,
+      providerPaymentId: input.providerPaymentId,
       idempotencyKey: input.idempotencyKey,
     });
 
@@ -318,6 +374,48 @@ export async function finalizeCheckoutIntentRouteLogic(
     return { status: 409, body: { error: staleMismatchMessage } };
   }
 
+  let providerVerified = providerPaymentIsAuthorized(input.row);
+  if (!providerVerified && input.verifyProviderPayment) {
+    try {
+      providerVerified = await input.verifyProviderPayment();
+    } catch {
+      providerVerified = false;
+    }
+  }
+  if (!providerVerified) {
+    const pending = providerPaymentIsPending(input.row);
+    if (pending) {
+      await input.updatePaymentAttempt(input.correlationId, {
+        status: "pending_payment",
+        checkout_state: "awaiting_provider",
+        last_error: null,
+      });
+    }
+    input.logEvent({
+      stage: "complete_medusa_cart",
+      outcome: "failure",
+      httpStatus: 409,
+      errorCode: pending ? "provider_payment_pending" : "provider_payment_not_verified",
+      message: pending ? PAYMENT_PENDING_ERROR : PAYMENT_NOT_VERIFIED_ERROR,
+    });
+    return {
+      status: 409,
+      body: paymentFailureBody(
+        input.correlationId,
+        pending ? PAYMENT_PENDING_ERROR : PAYMENT_NOT_VERIFIED_ERROR,
+        pending ? "PAYMENT_PENDING" : "PAYMENT_NOT_VERIFIED",
+      ),
+    };
+  }
+
+  if (!providerPaymentIsAuthorized(input.row)) {
+    await input.updatePaymentAttempt(input.correlationId, {
+      status: "paid",
+      checkout_state: "provider_verified",
+      webhook_last_status: "paid",
+    });
+  }
+
   try {
     const claimed = input.claimFinalizeAttempt
       ? await input.claimFinalizeAttempt(input.correlationId)
@@ -326,11 +424,22 @@ export async function finalizeCheckoutIntentRouteLogic(
       const completedAfterClaim = completedOrderResult(input.row);
       return completedAfterClaim ?? {
         status: 409,
-        body: { error: "Checkout finalization is already in progress" },
+        body: paymentFailureBody(
+          input.correlationId,
+          "Checkout finalization is already in progress",
+          "FINALIZE_IN_PROGRESS",
+        ),
       };
     }
   } catch {
-    return { status: 503, body: { error: "Payment finalization is temporarily unavailable" } };
+    return {
+      status: 503,
+      body: paymentFailureBody(
+        input.correlationId,
+        "Payment finalization is temporarily unavailable",
+        "FINALIZE_UNAVAILABLE",
+      ),
+    };
   }
 
   try {
@@ -349,7 +458,10 @@ export async function finalizeCheckoutIntentRouteLogic(
         errorCode: "order_not_ready",
         message: result.error.slice(0, 500),
       });
-      return { status: result.status, body: { error: result.error } };
+      return {
+        status: result.status,
+        body: paymentFailureBody(input.correlationId, result.error, "ORDER_NOT_READY"),
+      };
     }
 
     await input.updatePaymentAttempt(input.correlationId, {
@@ -399,7 +511,10 @@ export async function finalizeCheckoutIntentRouteLogic(
       errorCode: "exception",
       message: message.slice(0, 500),
     });
-    return { status: 503, body: { error: message } };
+    return {
+      status: 503,
+      body: paymentFailureBody(input.correlationId, message, "FINALIZE_EXCEPTION"),
+    };
   }
 }
 
@@ -591,6 +706,10 @@ export async function finalizePaymentAttemptsCronRouteLogic(
 
   for (const row of input.stuckRows) {
     processed += 1;
+    const claimed = input.claimFinalizeAttempt
+      ? await input.claimFinalizeAttempt(row.correlation_id)
+      : true;
+    if (!claimed) continue;
     const result = await input.finalizeMedusaCart(row.cart_id);
     if (result.ok) {
       completed += 1;

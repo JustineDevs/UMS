@@ -15,10 +15,13 @@ export type CheckoutCompletionPayload = {
 };
 
 export function logCheckoutCompletionEvent(payload: CheckoutCompletionPayload): void {
+  const { cartIdSuffix, orderId, ...safePayload } = payload;
   const line = JSON.stringify({
     event: "checkout_completion",
     ts: new Date().toISOString(),
-    ...payload,
+    cart_id_present: Boolean(cartIdSuffix),
+    order_id_present: Boolean(orderId),
+    ...safePayload,
   });
   console.info(line);
 }

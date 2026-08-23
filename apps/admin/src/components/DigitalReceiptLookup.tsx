@@ -7,6 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+type ReceiptOrder = {
+  id: string;
+  order_number: string;
+  email: string | null;
+  status: string;
+  currency: string;
+  grand_total: number;
+  created_at: string;
+};
+
 type ReceiptPayload = {
   id: string;
   order_id: string;
@@ -19,10 +29,12 @@ type ReceiptPayload = {
 type DigitalReceiptLookupProps = {
   /** From server `searchParams` so the page avoids `useSearchParams()` and long SSR stalls. */
   initialOrderId?: string;
+  orders?: ReceiptOrder[];
 };
 
 export function DigitalReceiptLookup({
   initialOrderId: initialFromServer = "",
+  orders = [],
 }: DigitalReceiptLookupProps) {
   const [orderId, setOrderId] = useState(initialFromServer);
   const [loading, setLoading] = useState(false);
@@ -73,6 +85,36 @@ export function DigitalReceiptLookup({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <AdminSection title="Orders" description="Select an order to view or create its digital receipt.">
+        <div className="overflow-x-auto rounded-xl border">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Order</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Total</th>
+                <th className="px-4 py-3 text-right">Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.length ? orders.map((order) => (
+                <tr key={order.id} className="border-b last:border-0">
+                  <td className="px-4 py-3 font-medium">{order.order_number}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{order.email ?? "Guest"}</td>
+                  <td className="px-4 py-3 capitalize text-muted-foreground">{order.status.replaceAll("_", " ")}</td>
+                  <td className="px-4 py-3">{order.currency} {order.grand_total.toLocaleString("en-PH")}</td>
+                  <td className="px-4 py-3 text-right">
+                    <Button type="button" size="sm" variant="outline" onClick={() => void load(order.id)}>Load</Button>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">No orders returned from commerce.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </AdminSection>
       <AdminSection title="Receipt lookup" description="Find a stored receipt by its order number.">
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-end"

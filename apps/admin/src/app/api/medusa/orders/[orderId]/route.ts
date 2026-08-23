@@ -15,10 +15,11 @@ import {
   patchMedusaOrderMetadata,
 } from "@/lib/medusa-order-bridge";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { appendCanonicalOrderState, type CanonicalOrderStatus } from "@universal-music-store/platform-data";
 import { z } from "zod";
 
 const orderStatusSchema = z.object({
-  status: z.string().trim().min(1).max(64),
+  status: z.enum(["pending", "paid", "processing", "packed", "shipped", "delivered", "cancelled", "returned", "refunded", "failed"]),
 }).strict();
 
 export async function PATCH(
@@ -54,7 +55,7 @@ export async function PATCH(
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, staff.session.user?.email);
   if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
-  const status = parsed.data.status;
+  const status: CanonicalOrderStatus = parsed.data.status;
 
   const order = await fetchMedusaOrderJson(orderId);
   if (!order) {
@@ -84,6 +85,23 @@ export async function PATCH(
       detail: { orderId, error: result.error },
     });
     const body = { error: "Unable to update order" };
+    await completeAdminIdempotency(sup.client, claim.id, 502, body);
+    return correlatedJson(correlationId, body, { status: 502 });
+  }
+
+  try {
+    await appendCanonicalOrderState(sup.client, {
+      organizationId: organization.id,
+      medusaOrderId: orderId,
+      status,
+      idempotencyKey,
+      eventType: "status_changed",
+      source: staff.session.user?.email ?? "admin",
+      metadata: { source: "medusa-order-status" },
+    });
+  } catch {
+    await patchMedusaOrderMetadata(orderId, currentMetadata);
+    const body = { error: "Unable to record canonical order state" };
     await completeAdminIdempotency(sup.client, claim.id, 502, body);
     return correlatedJson(correlationId, body, { status: 502 });
   }

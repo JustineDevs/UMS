@@ -47,7 +47,19 @@ type PosCommitSaleLogicInput = {
   completedReplayOrderNumber: string | null;
   findExistingOrderByOfflineSaleId: (
     _offlineSaleId: string,
-  ) => Promise<{ id: string; displayId: string } | null>;
+  ) => Promise<{ id: string; displayId: string; totalMinor?: number } | null>;
+  findExistingOrderByIdempotencyKey?: (
+    _idempotencyKey: string,
+  ) => Promise<{ id: string; displayId: string; totalMinor?: number } | null>;
+  claimDurableCommand?: (_input: {
+    idempotencyKey: string;
+    offlineSaleId?: string;
+  }) => Promise<"claimed" | "pending" | "committed">;
+  completeDurableCommand?: (_input: {
+    idempotencyKey: string;
+    orderId: string;
+    orderNumber: string;
+  }) => Promise<void>;
   assertStock: (
     _items: Array<{ variantId: string; quantity: number }>,
   ) => Promise<
@@ -77,6 +89,7 @@ type PosCommitSaleLogicInput = {
     orderNumber: string;
     shiftId?: string;
     terminalId?: string;
+    paymentMethod: "cash" | "card" | "wallet";
     totalMinor: number;
     idempotencyKey?: string;
   }) => Promise<boolean>;
@@ -89,22 +102,6 @@ type PosCommitSaleLogicInput = {
 export async function posCommitSaleRouteLogic(
   input: PosCommitSaleLogicInput,
 ): Promise<PosCommitSaleRouteResult> {
-  if (!input.envReady) {
-    return {
-      status: 503,
-      body: {
-        error:
-          "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)",
-        code: "MEDUSA_UNAVAILABLE",
-      },
-      logPhase: "error",
-      logDetail: {
-        message:
-          "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)",
-      },
-    };
-  }
-
   if (input.idempotencyKey?.trim() && input.completedReplayOrderNumber) {
     return {
       status: 200,
@@ -135,10 +132,21 @@ export async function posCommitSaleRouteLogic(
     typeof input.body.offlineSaleId === "string"
       ? input.body.offlineSaleId.trim()
       : "";
+  if (!input.envReady) {
+    return {
+      status: 503,
+      body: { error: "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)", code: "MEDUSA_UNAVAILABLE" },
+      logPhase: "error",
+      logDetail: { message: "POS environment incomplete (MEDUSA_SECRET_API_KEY, MEDUSA_REGION_ID, MEDUSA_SALES_CHANNEL_ID)" },
+    };
+  }
   if (offlineSaleId) {
     const existing =
       await input.findExistingOrderByOfflineSaleId(offlineSaleId);
     if (existing) {
+      if (input.idempotencyKey?.trim() && input.completeDurableCommand) {
+        await input.completeDurableCommand({ idempotencyKey: input.idempotencyKey.trim(), orderId: existing.id, orderNumber: existing.displayId });
+      }
       return {
         status: 200,
         body: { orderNumber: existing.displayId, idempotent: true },
@@ -217,8 +225,32 @@ export async function posCommitSaleRouteLogic(
     };
   }
 
+  if (input.idempotencyKey?.trim() && input.claimDurableCommand) {
+    const command = await input.claimDurableCommand({ idempotencyKey: input.idempotencyKey.trim(), offlineSaleId: offlineSaleId || undefined });
+    const findExisting = offlineSaleId
+      ? () => input.findExistingOrderByOfflineSaleId(offlineSaleId)
+      : input.findExistingOrderByIdempotencyKey
+        ? () => input.findExistingOrderByIdempotencyKey!(input.idempotencyKey!.trim())
+        : null;
+    if (command === "committed") {
+      const existing = findExisting ? await findExisting() : null;
+      if (existing) return { status: 200, body: { orderNumber: existing.displayId, orderId: existing.id, idempotent: true }, logPhase: "ok", logDetail: { orderNumber: existing.displayId, idempotent: true } };
+      return { status: 409, body: { error: "Committed POS sale could not be recovered", code: "CONFLICT" }, logPhase: "error", logDetail: { message: "Committed POS sale could not be recovered" } };
+    }
+    if (command === "pending") {
+      const existing = findExisting ? await findExisting() : null;
+      if (existing) {
+        if (input.recordSaleLedger) await input.recordSaleLedger({ orderId: existing.id, orderNumber: existing.displayId, shiftId: shiftId || undefined, terminalId: terminalId || undefined, paymentMethod, totalMinor: existing.totalMinor ?? 0, idempotencyKey: input.idempotencyKey });
+        if (input.completeDurableCommand) await input.completeDurableCommand({ idempotencyKey: input.idempotencyKey.trim(), orderId: existing.id, orderNumber: existing.displayId });
+        return { status: 200, body: { orderNumber: existing.displayId, orderId: existing.id, idempotent: true }, logPhase: "ok", logDetail: { orderNumber: existing.displayId, idempotent: true, recovered: true } };
+      }
+      return { status: 409, body: { error: "Sale commit is already in progress", code: "CONFLICT" }, logPhase: "error", logDetail: { message: "Sale commit is already in progress" } };
+    }
+  }
+
   const metadata: Record<string, unknown> = {};
   if (offlineSaleId) metadata.pos_offline_id = offlineSaleId;
+  if (input.idempotencyKey?.trim()) metadata.pos_idempotency_key = input.idempotencyKey.trim();
   if (shiftId) metadata.pos_shift_id = shiftId;
   if (terminalId) metadata.pos_payment_terminal_id = terminalId;
   if (input.body.paymentMethod)
@@ -291,6 +323,7 @@ export async function posCommitSaleRouteLogic(
         orderNumber,
         shiftId: shiftId || undefined,
         terminalId: terminalId || undefined,
+        paymentMethod,
         totalMinor:
           typeof order.total === "number" && Number.isFinite(order.total)
             ? Math.round(order.total)
@@ -309,6 +342,9 @@ export async function posCommitSaleRouteLogic(
         };
       }
     }
+    if (input.completeDurableCommand && orderId) {
+      await input.completeDurableCommand({ idempotencyKey: input.idempotencyKey, orderId, orderNumber });
+    }
     input.rememberCompletedReplay(input.idempotencyKey, orderNumber);
   } else if (input.recordSaleLedger && orderId) {
     await input.recordSaleLedger({
@@ -316,6 +352,7 @@ export async function posCommitSaleRouteLogic(
       orderNumber,
       shiftId: shiftId || undefined,
       terminalId: terminalId || undefined,
+      paymentMethod,
       totalMinor:
         typeof order.total === "number" && Number.isFinite(order.total)
           ? Math.round(order.total)

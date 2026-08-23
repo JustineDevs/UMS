@@ -5,15 +5,43 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Props = {
   slug: string;
   initialMinPrice: number;
+  initialInventorySignature: string;
 };
+
+export function buildFreshnessSignature(
+  variants: Array<{
+    id?: string;
+    inventoryQuantity?: number | null;
+    manageInventory?: boolean;
+    isActive?: boolean;
+  }>,
+): string {
+  return variants
+    .map((variant) =>
+      [
+        variant.id ?? "",
+        variant.manageInventory === false
+          ? "unmanaged"
+          : String(variant.inventoryQuantity ?? "unknown"),
+        variant.isActive === false ? "inactive" : "active",
+      ].join(":"),
+    )
+    .sort()
+    .join("|");
+}
 
 /**
  * After tab focus or on an interval, refetches the product and shows a quiet cue when
  * the minimum variant price changed (browse merchandising refresh; PRD matrix).
  */
-export function BrowsePriceFreshnessCue({ slug, initialMinPrice }: Props) {
+export function BrowsePriceFreshnessCue({
+  slug,
+  initialMinPrice,
+  initialInventorySignature,
+}: Props) {
   const [showUpdate, setShowUpdate] = useState(false);
   const lastRef = useRef(initialMinPrice);
+  const inventoryRef = useRef(initialInventorySignature);
 
   const check = useCallback(async () => {
     try {
@@ -23,13 +51,23 @@ export function BrowsePriceFreshnessCue({ slug, initialMinPrice }: Props) {
       );
       if (!res.ok) return;
       const data = (await res.json()) as {
-        product?: { variants?: { price: number }[] };
+        product?: {
+          variants?: Array<{
+            price: number;
+            id?: string;
+            inventoryQuantity?: number | null;
+            manageInventory?: boolean;
+            isActive?: boolean;
+          }>;
+        };
       };
       const variants = data.product?.variants ?? [];
       if (variants.length === 0) return;
       const min = Math.min(...variants.map((v) => v.price));
-      if (min !== lastRef.current) {
+      const inventory = buildFreshnessSignature(variants);
+      if (min !== lastRef.current || inventory !== inventoryRef.current) {
         lastRef.current = min;
+        inventoryRef.current = inventory;
         setShowUpdate(true);
       }
     } catch {
@@ -39,7 +77,8 @@ export function BrowsePriceFreshnessCue({ slug, initialMinPrice }: Props) {
 
   useEffect(() => {
     lastRef.current = initialMinPrice;
-  }, [initialMinPrice]);
+    inventoryRef.current = initialInventorySignature;
+  }, [initialInventorySignature, initialMinPrice]);
 
   useEffect(() => {
     const onVis = () => {

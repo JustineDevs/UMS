@@ -27,6 +27,7 @@ const CATALOG_PRODUCT_KEYS = new Set([
 ]);
 
 const STOREFRONT_METADATA_KEYS = new Set([
+  "mediaIds",
   "brand",
   "videoUrl",
   "galleryVideoUrlsText",
@@ -37,9 +38,95 @@ const STOREFRONT_METADATA_KEYS = new Set([
   "seoDescription",
   "relatedHandlesText",
   "hotspotsJson",
+  "guitarSpecsJson",
+  "audioDemosJson",
+  "trustContentJson",
 ]);
 
 const URL_FIELDS = new Set(["thumbnail", "lifestyleImageUrl", "videoUrl"]);
+
+const GUITAR_SPEC_KEYS = new Set([
+  "instrumentType", "bodyShape", "bodyTop", "bodyBackAndSides",
+  "neckMaterial", "neckProfile", "scaleLengthMm", "nutWidthMm", "fretCount",
+  "fingerboardMaterial", "bridge", "tuners", "electronics", "controls",
+  "strings", "caseIncluded", "setupIncluded", "warranty", "includedAccessories",
+]);
+
+function validateStructuredMetadata(
+  ctx: z.RefinementCtx,
+  record: Record<string, unknown>,
+  key: "guitarSpecsJson" | "audioDemosJson" | "trustContentJson",
+) {
+  const raw = record[key];
+  if (raw == null || raw === "") return;
+  if (typeof raw !== "string") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key], message: `${key} must be JSON text.` });
+    return;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key], message: `${key} must contain valid JSON.` });
+    return;
+  }
+  if (key === "trustContentJson") {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key], message: "Trust content must be a JSON object." });
+      return;
+    }
+    const allowed = new Set(["warranty", "conditionGrade", "authenticity", "setupAndInspection", "includedAccessories", "shippingEligibility", "returnNotes"]);
+    for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!allowed.has(name)) ctx.addIssue({ code: z.ZodIssueCode.unrecognized_keys, path: ["storefrontMetadata", key], keys: [name] });
+      if (["warranty", "conditionGrade", "authenticity", "setupAndInspection", "shippingEligibility", "returnNotes"].includes(name) && (typeof value !== "string" || value.length > 1_000)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Trust content text is invalid or too long." });
+      }
+      if (name === "includedAccessories" && (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length > 200))) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Included accessories must be short text values." });
+      }
+    }
+  } else if (key === "guitarSpecsJson") {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key], message: "Guitar specs must be a JSON object." });
+      return;
+    }
+    for (const [name, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!GUITAR_SPEC_KEYS.has(name)) {
+        ctx.addIssue({ code: z.ZodIssueCode.unrecognized_keys, path: ["storefrontMetadata", key], keys: [name] });
+      }
+      if (typeof value === "string" && value.length > 500) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Specification text is too long." });
+      }
+      if (["scaleLengthMm", "nutWidthMm", "fretCount"].includes(name) && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 10_000)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Specification measurement is invalid." });
+      }
+      if (name === "includedAccessories" && (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length > 200))) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Included accessories must be short text values." });
+      }
+    }
+  } else {
+    if (!Array.isArray(parsed) || parsed.length > 20) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key], message: "Audio demos must be an array of at most 20 items." });
+      return;
+    }
+    parsed.forEach((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, index], message: "Audio demo must be an object." });
+        return;
+      }
+      const demo = item as Record<string, unknown>;
+      if (typeof demo.url !== "string" || !isSafeAssetUrl(demo.url) || demo.url.length > 2_000) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, index, "url"], message: "Audio demo URL must be safe." });
+      }
+      if (typeof demo.title !== "string" || demo.title.trim().length === 0 || demo.title.length > 160) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, index, "title"], message: "Audio demo title is required." });
+      }
+      if (demo.durationSeconds !== undefined && (typeof demo.durationSeconds !== "number" || !Number.isFinite(demo.durationSeconds) || demo.durationSeconds < 0 || demo.durationSeconds > 86_400)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, index, "durationSeconds"], message: "Audio demo duration is invalid." });
+      }
+    });
+  }
+}
 
 function isSafeAssetUrl(value: string): boolean {
   if (value.startsWith("/")) return true;
@@ -127,6 +214,43 @@ export const catalogProductRequestSchema = z
         path: ["status"],
         message: "status must be draft or published.",
       });
+    }
+
+  if (body.status === "published") {
+    const publishedPrice =
+      typeof body.pricePhp === "number" ? body.pricePhp : Number(body.pricePhp);
+    for (const [key, valid] of [
+      ["title", typeof body.title === "string" && body.title.trim().length > 0],
+      ["handle", typeof body.handle === "string" && body.handle.trim().length > 0],
+      ["pricePhp", Number.isFinite(publishedPrice) && publishedPrice > 0],
+        ["imageUrls", Array.isArray(body.imageUrls) && body.imageUrls.length > 0],
+      ] as const) {
+        if (!valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `Published products require ${key}.`,
+          });
+        }
+      }
+      const metadata = body.storefrontMetadata;
+      if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+        const guitarJson = (metadata as Record<string, unknown>).guitarSpecsJson;
+        if (typeof guitarJson === "string" && guitarJson.trim()) {
+          try {
+            const guitar = JSON.parse(guitarJson) as Record<string, unknown>;
+            if (typeof guitar.instrumentType !== "string" || !guitar.instrumentType.trim()) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["storefrontMetadata", "guitarSpecsJson", "instrumentType"],
+                message: "Published guitar products require instrumentType.",
+              });
+            }
+          } catch {
+            // The structured validator below reports the parse error.
+          }
+        }
+      }
     }
 
     for (const key of [
@@ -229,6 +353,9 @@ export const catalogProductRequestSchema = z
           "seoDescription",
           "relatedHandlesText",
           "hotspotsJson",
+          "guitarSpecsJson",
+          "audioDemosJson",
+          "trustContentJson",
         ] as const) {
           const value = record[key];
           if (
@@ -260,6 +387,9 @@ export const catalogProductRequestSchema = z
           }
         }
         addNumericIssue(ctx, record, "weightKg", 10_000);
+        validateStructuredMetadata(ctx, record, "guitarSpecsJson");
+        validateStructuredMetadata(ctx, record, "audioDemosJson");
+        validateStructuredMetadata(ctx, record, "trustContentJson");
       }
     }
   });
@@ -289,6 +419,9 @@ export function parseStorefrontMetadataFromBody(
   }
   const o = raw as Record<string, unknown>;
   return {
+    mediaIds: Array.isArray(o.mediaIds)
+      ? o.mediaIds.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((x) => x.trim())
+      : [],
     brand: strOrUndef(o.brand) ?? null,
     videoUrl: strOrUndef(o.videoUrl) ?? null,
     galleryVideoUrlsText: strOrUndef(o.galleryVideoUrlsText) ?? "",
@@ -299,6 +432,9 @@ export function parseStorefrontMetadataFromBody(
     seoDescription: strOrUndef(o.seoDescription) ?? null,
     relatedHandlesText: strOrUndef(o.relatedHandlesText) ?? "",
     hotspotsJson: strOrUndef(o.hotspotsJson) ?? "",
+    guitarSpecsJson: strOrUndef(o.guitarSpecsJson) ?? "",
+    audioDemosJson: strOrUndef(o.audioDemosJson) ?? "",
+    trustContentJson: strOrUndef(o.trustContentJson) ?? "",
   };
 }
 

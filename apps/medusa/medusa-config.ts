@@ -72,16 +72,21 @@ const paypalProvider =
       ]
     : [];
 
-const xenditProvider =
+const xenditDirectConfigured =
+  directSandboxCredentialsAllowed &&
   process.env.XENDIT_SECRET_KEY?.trim() &&
-  process.env.XENDIT_WEBHOOK_TOKEN?.trim()
+  process.env.XENDIT_WEBHOOK_TOKEN?.trim();
+const xenditManagedByNango =
+  !xenditDirectConfigured && nangoPaymentProviderConfigured(["xendit", "xendit-sandbox"]);
+const xenditProvider =
+  xenditDirectConfigured || xenditManagedByNango
     ? [
         {
           resolve: "./src/modules/xendit-payment",
           id: "xendit",
           options: {
-            secretKey: process.env.XENDIT_SECRET_KEY!,
-            webhookToken: process.env.XENDIT_WEBHOOK_TOKEN!,
+            secretKey: xenditManagedByNango ? "" : process.env.XENDIT_SECRET_KEY,
+            webhookToken: xenditManagedByNango ? "" : process.env.XENDIT_WEBHOOK_TOKEN,
             successUrl: process.env.XENDIT_CHECKOUT_SUCCESS_URL?.trim(),
             cancelUrl: process.env.XENDIT_CHECKOUT_CANCEL_URL?.trim(),
           },

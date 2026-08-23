@@ -7,6 +7,7 @@ import {
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
 import { internalReconcilePaymentAttemptRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +19,13 @@ export async function POST(req: Request) {
   const secret = process.env.STOREFRONT_INTERNAL_RECONCILE_SECRET?.trim();
   const header = req.headers.get("x-internal-secret")?.trim();
 
-  let correlationId = "";
-  try {
-    const body = (await req.json()) as { correlationId?: string };
-    if (typeof body.correlationId === "string" && body.correlationId.trim()) {
-      correlationId = body.correlationId.trim();
-    }
-  } catch {
+  const parsedBody = await parseBoundedJson(req, 8 * 1024);
+  if (parsedBody.tooLarge) return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  const body = parsedBody.value as { correlationId?: string };
+  const correlationId = typeof body.correlationId === "string" ? body.correlationId.trim() : "";
 
   const sb = createStorefrontServiceSupabase();
   const row = sb && correlationId ? await getPaymentAttemptByCorrelationId(sb, correlationId) : null;

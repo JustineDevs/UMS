@@ -85,7 +85,7 @@ test("handleCodPlaceOrderRequest returns order redirect on success", async () =>
     finalizeMedusaCart: async () => ({
       ok: true,
       orderId: "order_cod",
-      redirectUrl: "/track/order_cod?t=test",
+      redirectUrl: "/track/cap_v3.opaque",
       attempts: 2,
     }),
     logEvent: () => {},
@@ -96,7 +96,7 @@ test("handleCodPlaceOrderRequest returns order redirect on success", async () =>
   assert.deepEqual(await res.json(), {
     ok: true,
     orderId: "order_cod",
-    redirectUrl: "/track/order_cod?t=test",
+    redirectUrl: "/track/cap_v3.opaque",
   });
 });
 

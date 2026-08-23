@@ -28,13 +28,32 @@ export async function GET(req: Request) {
   const slug = slugParsed.data;
   const res = await fetchProductBySlug(slug);
   if (res.kind === "not_found") {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: { "Cache-Control": "no-store" } },
+    );
   }
   if (res.kind !== "ok") {
     return NextResponse.json(
       { error: "Service unavailable" },
-      { status: 503 },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
-  return NextResponse.json({ product: res.product });
+  const product = {
+    ...res.product,
+    variants: res.product.variants.map((variant) => ({
+      ...variant,
+      barcode: null,
+      cost: null,
+    })),
+  };
+  return NextResponse.json(
+    { product },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=60",
+        "Vary": "Accept-Encoding",
+      },
+    },
+  );
 }

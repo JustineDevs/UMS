@@ -4,6 +4,7 @@ import {
   AuditTimeline,
 } from "@/components/admin-console";
 import { DigitalReceiptLookup } from "@/components/DigitalReceiptLookup";
+import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function ReceiptsPage({
   const sp = await searchParams;
   const initialOrderId =
     typeof sp.order_id === "string" ? sp.order_id.trim() : "";
+  const { orders } = await fetchMedusaOrdersForAdmin(100);
 
   return (
     <AdminPageShell
@@ -29,7 +31,7 @@ export default async function ReceiptsPage({
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
-      <DigitalReceiptLookup initialOrderId={initialOrderId} />
+      <DigitalReceiptLookup initialOrderId={initialOrderId} orders={orders} />
     </AdminPageShell>
   );
 }

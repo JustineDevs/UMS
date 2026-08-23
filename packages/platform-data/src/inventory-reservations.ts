@@ -1,6 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type InventoryReservationStatus = "active" | "released" | "committed";
+export type InventoryReservationReconciliationStatus =
+  | "pending"
+  | "matched"
+  | "discrepancy"
+  | "needs_review"
+  | "resolved";
+
+export type InventoryQuantitySemantics = { stocked: number; reserved: number; available: number; sellable: number };
+export function deriveInventoryQuantitySemantics(input: { stocked: number; reserved: number }): InventoryQuantitySemantics {
+  const stocked = Math.max(0, Math.trunc(input.stocked));
+  const reserved = Math.min(stocked, Math.max(0, Math.trunc(input.reserved)));
+  return { stocked, reserved, available: stocked - reserved, sellable: stocked - reserved };
+}
 
 export type InventoryReservationRow = {
   id: string;
@@ -20,6 +33,9 @@ export type InventoryReservationRow = {
   committed_at: string | null;
   created_at: string;
   updated_at: string;
+  expires_at: string | null;
+  expired_at: string | null;
+  reconciliation_status: InventoryReservationReconciliationStatus;
 };
 
 export type ReserveInventoryInput = {
@@ -104,6 +120,15 @@ function rowToReservation(row: Record<string, unknown>): InventoryReservationRow
     committed_at: row.committed_at != null ? String(row.committed_at) : null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
+    expires_at: row.expires_at != null ? String(row.expires_at) : null,
+    expired_at: row.expired_at != null ? String(row.expired_at) : null,
+    reconciliation_status:
+      row.reconciliation_status === "matched" ||
+      row.reconciliation_status === "discrepancy" ||
+      row.reconciliation_status === "needs_review" ||
+      row.reconciliation_status === "resolved"
+        ? row.reconciliation_status
+        : "pending",
   };
 }
 
@@ -186,4 +211,48 @@ export function closeMedusaInventoryReservation(
     p_reservation_id: normalized.reservation_id,
     p_idempotency_key: normalized.idempotency_key,
   });
+}
+
+export async function setInventoryReservationExpiry(
+  supabase: SupabaseClient,
+  input: { tenantId: string; reservationId: string; expiresAt: string },
+): Promise<InventoryReservationRow> {
+  const tenantId = clean(input.tenantId, "tenantId");
+  const reservationId = clean(input.reservationId, "reservationId");
+  const expiresAt = new Date(input.expiresAt);
+  if (Number.isNaN(expiresAt.getTime()) || expiresAt <= new Date()) {
+    throw new Error("expiresAt must be a future timestamp");
+  }
+  const { data, error } = await supabase.rpc("inventory_reservation_set_expiry", {
+    p_tenant_id: tenantId,
+    p_reservation_id: reservationId,
+    p_expires_at: expiresAt.toISOString(),
+  });
+  if (error) throw error;
+  return rowToReservation(data as Record<string, unknown>);
+}
+
+export async function expireInventoryReservation(
+  supabase: SupabaseClient,
+  input: { tenantId: string; reservationId: string; idempotencyKey: string },
+): Promise<InventoryReservationRow> {
+  const { data, error } = await supabase.rpc("inventory_reservation_expire", {
+    p_tenant_id: clean(input.tenantId, "tenantId"),
+    p_reservation_id: clean(input.reservationId, "reservationId"),
+    p_idempotency_key: clean(input.idempotencyKey, "idempotencyKey"),
+  });
+  if (error) throw error;
+  return rowToReservation(data as Record<string, unknown>);
+}
+
+export async function expireDueInventoryReservations(
+  supabase: SupabaseClient,
+  input: { tenantId: string; limit?: number },
+): Promise<number> {
+  const { data, error } = await supabase.rpc("inventory_reservation_expire_due", {
+    p_tenant_id: clean(input.tenantId, "tenantId"),
+    p_limit: Math.min(5000, Math.max(1, Math.trunc(input.limit ?? 500))),
+  });
+  if (error) throw error;
+  return Number(data ?? 0);
 }

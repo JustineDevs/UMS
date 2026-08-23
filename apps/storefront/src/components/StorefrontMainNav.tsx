@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
@@ -15,7 +16,7 @@ type FlatItem = { href: string; label: string; badge?: string };
 const DEFAULT_ITEMS: FlatItem[] = [
   { href: "/shop", label: "Shop" },
   { href: "/collections", label: "Collections" },
-  { href: "/", label: "About" },
+  { href: "/about", label: "About" },
 ];
 
 const ICON_MAP: Record<string, string> = {
@@ -28,6 +29,17 @@ const ICON_MAP: Record<string, string> = {
 function linkActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
+
+function scrollToSamePageHash(event: MouseEvent<HTMLAnchorElement>, href: string) {
+  if (typeof window === "undefined" || !href.includes("#")) return;
+  const url = new URL(href, window.location.href);
+  if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || !url.hash) return;
+  const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.history.replaceState(null, "", url.hash);
 }
 
 function flatForMobile(nav: CmsNavigationPayload | undefined): FlatItem[] {
@@ -63,6 +75,7 @@ function MegaTrigger({
     return (
       <Link
         href={link.href}
+        onClick={(event) => scrollToSamePageHash(event, link.href)}
         data-testid="nav-link"
         className={
           active
@@ -89,6 +102,7 @@ function MegaTrigger({
     <div className="group relative shrink-0">
       <Link
         href={link.href}
+        onClick={(event) => scrollToSamePageHash(event, link.href)}
         className={
           active
             ? "inline-flex items-center border-b-2 border-primary pb-0.5 text-[11px] font-semibold text-primary outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary xs:text-xs sm:text-sm"
@@ -115,13 +129,14 @@ function MegaTrigger({
         role="region"
         aria-label={`${link.label} submenu`}
       >
-        <div className="rounded-xl border border-outline-variant/30 bg-white p-4 shadow-xl">
+        <div className="max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-outline-variant/30 bg-white p-4 shadow-xl">
           <div className="flex gap-6">
             <div className="min-w-0 flex-1 space-y-2">
               {link.children?.map((c) => (
                 <Link
                   key={`${c.href}-${c.label}`}
                   href={c.href}
+                  onClick={(event) => scrollToSamePageHash(event, c.href)}
                   className="block rounded-md px-2 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low hover:text-primary"
                 >
                   {c.label}
@@ -132,6 +147,7 @@ function MegaTrigger({
             {link.featured?.href ? (
               <Link
                 href={link.featured.href}
+                onClick={(event) => scrollToSamePageHash(event, link.featured?.href ?? "")}
                 className="hidden w-40 shrink-0 sm:block"
               >
                 {link.featured.imageUrl ? (
@@ -175,6 +191,7 @@ export function StorefrontMainNav({
   const mobileTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileCloseRef = useRef<HTMLButtonElement>(null);
   const mobileWasOpenRef = useRef(false);
+  const [hydrated, setHydrated] = useState(false);
 
   const mobileItems =
     navigation && navigation.headerLinks.length > 0
@@ -185,6 +202,10 @@ export function StorefrontMainNav({
     navigation && navigation.headerLinks.length > 0
       ? navigation.headerLinks
       : null;
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (!mobileOpen) {
@@ -234,6 +255,7 @@ export function StorefrontMainNav({
           type="button"
           aria-expanded={mobileOpen}
           aria-controls="mobile-site-menu"
+          data-hydrated={hydrated ? "true" : "false"}
           data-testid="mobile-menu-trigger"
           className="inline-flex items-center gap-1 rounded px-2 py-2 text-xs font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
           onClick={() => setMobileOpen(true)}
@@ -261,7 +283,7 @@ export function StorefrontMainNav({
             if (event.target === event.currentTarget) setMobileOpen(false);
           }}
         >
-          <div className="ml-auto flex h-full w-[min(21rem,88vw)] flex-col bg-white p-6 shadow-2xl">
+          <div className="ml-auto flex h-full w-[min(21rem,88vw)] flex-col overflow-y-auto overscroll-contain bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
               <h2 id="mobile-site-menu-title" className="font-headline text-lg font-bold text-primary">Menu</h2>
               <button
@@ -284,7 +306,10 @@ export function StorefrontMainNav({
                     aria-current={active ? "page" : undefined}
                     data-testid={item.href === "/shop" ? "nav-shop" : undefined}
                     className="rounded px-3 py-3 text-sm font-semibold text-on-surface-variant outline-none hover:bg-surface-container-low hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
-                    onClick={() => setMobileOpen(false)}
+                    onClick={(event) => {
+                      scrollToSamePageHash(event, item.href);
+                      setMobileOpen(false);
+                    }}
                   >
                     {item.label}
                     {item.badge ? <NavBadge text={item.badge} /> : null}
@@ -307,6 +332,7 @@ export function StorefrontMainNav({
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={(event) => scrollToSamePageHash(event, item.href)}
                   data-testid={item.href === "/shop" ? "nav-shop" : undefined}
                   className={
                     active

@@ -3,6 +3,7 @@ import { getStaffSession } from "@/lib/requireStaffSession";
 import { z } from "zod";
 import {
   applyVariantStockedQuantity,
+  fetchVariantAvailableQuantity,
   fetchVariantStockedQuantity,
 } from "@/lib/medusa-catalog-inventory-stock";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
@@ -145,6 +146,7 @@ export async function POST(req: Request) {
     await completeAdminIdempotency(sup.client, claim.id, 502, body);
     return correlatedJson(correlationId, body, { status: 502 });
   }
+  const availableQuantity = await fetchVariantAvailableQuantity(parsed.data.variantId);
   await recordInventoryMovementAudit(sup.client, {
     actorEmail: session.user.email,
     reason: parsed.data.reason ?? "correction",
@@ -178,6 +180,7 @@ export async function POST(req: Request) {
     data: {
       variantId: parsed.data.variantId,
       stockedQuantity,
+      availableQuantity,
       delta: stockedQuantity - before,
       reason: parsed.data.reason,
     },

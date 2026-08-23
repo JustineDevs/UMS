@@ -14,12 +14,14 @@ export type PaymentPlatformMetrics = {
 };
 
 const STALE_STATUSES = ["paid_awaiting_order", "finalizing_order", "paid"];
+const RECENT_FAILURE_WINDOW_MS = 24 * 60 * 60 * 1_000;
 
 export async function getPaymentPlatformMetrics(
   supabase: SupabaseClient,
   organizationId?: string,
 ): Promise<PaymentPlatformMetrics | null> {
   try {
+    const recentFailureSince = new Date(Date.now() - RECENT_FAILURE_WINDOW_MS).toISOString();
     const scoped = (query: any) =>
       organizationId?.trim() ? query.eq("organization_id", organizationId.trim()) : query;
     const [
@@ -51,7 +53,8 @@ export async function getPaymentPlatformMetrics(
       supabase
         .from("background_jobs")
         .select("*", { count: "exact", head: true })
-        .eq("status", "failed"),
+        .eq("status", "failed")
+        .gte("updated_at", recentFailureSince),
       supabase
         .from("payment_webhook_events")
         .select("*", { count: "exact", head: true })

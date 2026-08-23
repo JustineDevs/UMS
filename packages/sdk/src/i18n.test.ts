@@ -13,6 +13,7 @@ import {
   detectLocale,
   registerTranslations,
 } from "./i18n.js";
+import { formatPrice, majorToMinor, minorToMajor, minorUnitDivisor } from "./multi-region.js";
 
 const CORE_KEYS = [
   "cart.empty",
@@ -74,6 +75,17 @@ describe("i18n — t()", () => {
       const val = t(key, "fil-PH");
       assert.notStrictEqual(val, key, `fil-PH is missing key: ${key}`);
     }
+  });
+});
+
+describe("money contract", () => {
+  it("uses ISO minor-unit precision consistently", () => {
+    assert.equal(minorUnitDivisor("PHP"), 100);
+    assert.equal(minorUnitDivisor("BHD"), 1000);
+    assert.equal(minorUnitDivisor("JPY"), 1);
+    assert.equal(minorToMajor(1234, "BHD"), 1.234);
+    assert.equal(majorToMinor(1.234, "BHD"), 1234);
+    assert.equal(formatPrice(1234, "BHD", "en-US").includes("1.234"), true);
   });
 });
 

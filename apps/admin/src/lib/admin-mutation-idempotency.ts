@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { checkStaffRole } from "@universal-music-store/database";
 import { adminSupabaseOr503 } from "./require-admin-supabase";
 import { getStaffSession } from "./requireStaffSession";
@@ -10,10 +9,9 @@ import {
   getIdempotencyKey,
   getRequestHash,
 } from "./admin-api-security";
-
-function errorResponse(error: string, code: string, status: number): Response {
-  return NextResponse.json({ error, code }, { status });
-}
+import { getCorrelationId } from "./request-correlation";
+import { correlatedError, correlatedJson } from "./staff-api-response";
+import { notifyStorefrontCmsInvalidation } from "./storefront-commerce-invalidation";
 
 async function auditMutation(
   client: Parameters<typeof insertStaffAuditLog>[0],
@@ -41,34 +39,36 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
   handler: T,
 ): T {
   const wrapped = async (request: Request, context?: unknown) => {
+    const correlationId = getCorrelationId(request);
     const idempotencyKey = getIdempotencyKey(request);
     if (!idempotencyKey) {
-      return errorResponse("Idempotency-Key is required", "IDEMPOTENCY_KEY_REQUIRED", 400);
+      return correlatedError(correlationId, 400, "Idempotency-Key is required", "BAD_REQUEST");
     }
 
     const session = await getStaffSession();
     if (!session) {
-      return errorResponse("Unauthorized", "NO_SESSION", 401);
+      return correlatedError(correlationId, 401, "Unauthorized", "UNAUTHORIZED");
     }
     const roleCheck = checkStaffRole(session);
     if (!roleCheck.ok) {
-      return errorResponse(
-        roleCheck.status === 401 ? "Unauthorized" : "Forbidden",
-        roleCheck.code,
+      return correlatedError(
+        correlationId,
         roleCheck.status,
+        roleCheck.status === 401 ? "Unauthorized" : "Forbidden",
+        roleCheck.status === 401 ? "UNAUTHORIZED" : "FORBIDDEN",
       );
     }
 
     const supabase = adminSupabaseOr503("admin-mutation-idempotency");
     if ("response" in supabase) {
-      return errorResponse("Admin data service unavailable", "ADMIN_DATA_UNAVAILABLE", 503);
+      return correlatedError(correlationId, 503, "Admin data service unavailable", "SERVICE_UNAVAILABLE");
     }
     const organization = await resolveStaffOrganization(
       supabase.client,
       session.user?.email,
     );
     if (!organization) {
-      return errorResponse("Organization membership is required", "ORGANIZATION_REQUIRED", 403);
+      return correlatedError(correlationId, 403, "Organization membership is required", "FORBIDDEN");
     }
 
     const rawBody = await request.clone().text();
@@ -82,13 +82,13 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
     });
 
     if (claim.kind === "replay") {
-      return NextResponse.json(claim.body, { status: claim.status });
+      return correlatedJson(correlationId, { ...claim.body, requestId: correlationId }, { status: claim.status });
     }
     if (claim.kind === "conflict") {
-      return errorResponse("Idempotency key was already used", "IDEMPOTENCY_CONFLICT", 409);
+      return correlatedError(correlationId, 409, "Idempotency key was already used", "CONFLICT");
     }
     if (claim.kind === "unavailable") {
-      return errorResponse("Admin data service unavailable", "ADMIN_DATA_UNAVAILABLE", 503);
+      return correlatedError(correlationId, 503, "Admin data service unavailable", "SERVICE_UNAVAILABLE");
     }
 
     let response: Response | undefined;
@@ -98,13 +98,13 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
         context as Parameters<T>[1],
       );
     } catch {
-      const failure = errorResponse("Mutation failed", "MUTATION_FAILED", 500);
+      const failure = correlatedError(correlationId, 500, "Mutation failed", "INTERNAL_ERROR");
       await completeAdminIdempotency(supabase.client, claim.id, failure.status, { error: "MUTATION_FAILED" });
       await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, failure.status, "failed");
       return failure;
     }
     if (!response) {
-      const failure = errorResponse("Mutation did not return a response", "MUTATION_NO_RESPONSE", 500);
+      const failure = correlatedError(correlationId, 500, "Mutation did not return a response", "INTERNAL_ERROR");
       await completeAdminIdempotency(supabase.client, claim.id, failure.status, { error: "MUTATION_NO_RESPONSE" });
       await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, failure.status, "failed");
       return failure;
@@ -120,6 +120,10 @@ export function withAdminMutationIdempotency<T extends (...args: any[]) => Promi
     }
     await completeAdminIdempotency(supabase.client, claim.id, response.status, body);
     await auditMutation(supabase.client, session.user?.email ?? "unknown", actionKey, organization.id, response.status, "completed");
+    if (actionKey.startsWith("/admin/cms/") && response.ok) {
+      await notifyStorefrontCmsInvalidation({ actorEmail: session.user?.email, reason: actionKey });
+    }
+    response.headers.set("x-request-id", correlationId);
     return response;
   };
   return wrapped as T;

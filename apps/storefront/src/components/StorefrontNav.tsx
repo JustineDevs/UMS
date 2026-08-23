@@ -25,7 +25,7 @@ export function StorefrontNav({
         aria-label="Universal Music Store, home"
       >
         <Image
-          src="/UVS/UVS_Logo(transparent).png"
+          src="/brand/universal-music-store-logo-abstract.png"
           alt="Universal Music Store"
           width={1080}
           height={1080}

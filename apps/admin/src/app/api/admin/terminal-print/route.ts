@@ -5,6 +5,7 @@ import { staffSessionAllows } from "@universal-music-store/database";
 import { terminalPrintBodySchema } from "@/lib/terminal-print-schemas";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -16,7 +17,9 @@ async function post(req: NextRequest) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
 
-  const raw = await req.json().catch(() => null);
+  const parsedBody = await parseBoundedJson(req, 128 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const raw = parsedBody.valid ? parsedBody.value : null;
   const parsed = terminalPrintBodySchema.safeParse(raw);
   if (!parsed.success) {
     return correlatedJson(

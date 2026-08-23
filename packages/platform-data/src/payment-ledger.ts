@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
+import { assertPaymentCheckoutTransition } from "./payment-state-machine.js";
 
 export type PaymentAttemptRow = {
   id: string;
@@ -86,6 +87,7 @@ export type RegisterPaymentAttemptInput = {
   productIds?: string[];
   medusaPaymentSessionId?: string;
   providerSessionId?: string;
+  providerPaymentId?: string;
   idempotencyKey?: string;
 };
 
@@ -228,6 +230,9 @@ export async function registerPaymentAttempt(
       if (input.providerSessionId) {
         patch.provider_session_id = input.providerSessionId;
       }
+      if (input.providerPaymentId) {
+        patch.provider_payment_id = input.providerPaymentId;
+      }
       if (input.idempotencyKey) {
         patch.idempotency_key = input.idempotencyKey;
       }
@@ -271,6 +276,7 @@ export async function registerPaymentAttempt(
     quote_version: 1,
     medusa_payment_session_id: input.medusaPaymentSessionId ?? null,
     provider_session_id: input.providerSessionId ?? null,
+    provider_payment_id: input.providerPaymentId ?? null,
     idempotency_key: input.idempotencyKey ?? null,
     provider_payload: quotePayload,
     updated_at: new Date().toISOString(),
@@ -338,6 +344,10 @@ export async function updatePaymentAttemptByCorrelationId(
   > & { finalized_at?: string | null },
 ): Promise<void> {
   let merged: Record<string, unknown> = { ...patch };
+  if (typeof patch.checkout_state === "string") {
+    const current = await getPaymentAttemptByCorrelationId(supabase, correlationId);
+    assertPaymentCheckoutTransition(current?.checkout_state, patch.checkout_state);
+  }
   if (patch.quote_fingerprint !== undefined && patch.quote_version === undefined) {
     const row = await getPaymentAttemptByCorrelationId(supabase, correlationId);
     if (row) {

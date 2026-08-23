@@ -13,6 +13,7 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   async function handleCancel() {
     setLoading(true);
@@ -22,13 +23,15 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
         setError(body.error ?? "Could not cancel order. Contact support.");
         setLoading(false);
         setConfirming(false);
         return;
       }
       setConfirming(false);
+      setLoading(false);
+      setSuccess(true);
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -40,13 +43,15 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
   if (confirming) {
     return (
       <div className="flex flex-col items-end gap-1.5">
-        <p className="text-xs text-on-surface-variant text-right">Cancel order #{orderDisplayId}?</p>
+        <p className="text-xs text-on-surface-variant text-right">
+          Cancel order #{orderDisplayId}?
+        </p>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setConfirming(false)}
             disabled={loading}
-            className="rounded border border-outline-variant px-3 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-container disabled:opacity-40"
+            className="min-h-11 rounded border border-outline-variant px-3 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-container disabled:opacity-40"
           >
             Keep
           </button>
@@ -54,13 +59,25 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
             type="button"
             onClick={handleCancel}
             disabled={loading}
-            className="rounded bg-error px-3 py-1 text-xs font-bold text-on-error hover:opacity-90 disabled:opacity-40"
+            className="min-h-11 rounded bg-error px-3 py-1 text-xs font-bold text-on-error hover:opacity-90 disabled:opacity-40"
           >
             {loading ? "Cancelling..." : "Cancel order"}
           </button>
         </div>
-        {error && <p className="text-xs text-error">{error}</p>}
+        {error && (
+          <p className="text-xs text-error" role="alert">
+            {error}
+          </p>
+        )}
       </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <p className="text-xs font-medium text-success" role="status">
+        Order cancellation requested.
+      </p>
     );
   }
 
@@ -68,7 +85,7 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
     <button
       type="button"
       onClick={() => setConfirming(true)}
-      className="text-xs text-error hover:underline"
+      className="inline-flex min-h-11 items-center text-xs text-error hover:underline"
     >
       Cancel
     </button>

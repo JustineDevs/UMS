@@ -113,21 +113,8 @@ function deriveOmsStatus(order: Record<string, unknown>): string {
   if (typeof fromMeta === "string" && fromMeta.trim()) {
     return fromMeta.trim();
   }
-  if (
-    meta?.payment_provider === "cod" &&
-    meta?.cod_payment_status !== "captured" &&
-    meta?.cod_capture_complete !== true
-  ) {
-    return "pending";
-  }
-  const ps = String(order.payment_status ?? "");
-  const fs = String(order.fulfillment_status ?? "");
-  if (fs === "fulfilled" || fs === "shipped") {
-    return "shipped";
-  }
-  if (ps === "captured" || ps === "authorized") {
-    return "paid";
-  }
+  // Canonical state is written by the order ledger. Never infer OMS state from
+  // payment or fulfillment projections; legacy rows remain explicitly pending.
   return "pending";
 }
 

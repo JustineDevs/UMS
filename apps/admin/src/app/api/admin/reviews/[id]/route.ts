@@ -12,6 +12,7 @@ const moderationSchema = z
   .object({
     status: z.enum(["approved", "rejected", "hidden", "pending"]),
     moderation_note: z.string().trim().max(2000).optional().default(""),
+    shadow_banned: z.boolean().optional(),
     expected_updated_at: z.string().datetime().optional(),
   })
   .strict();
@@ -48,6 +49,7 @@ async function patch(
       moderated_by_staff_email: staffEmail,
       moderated_at: new Date().toISOString(),
       moderation_note: parsed.data.moderation_note || null,
+      ...(parsed.data.shadow_banned === undefined ? {} : { shadow_banned: parsed.data.shadow_banned }),
     })
     .eq("id", reviewId);
   if (parsed.data.expected_updated_at)

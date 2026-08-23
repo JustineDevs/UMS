@@ -6,6 +6,8 @@ export type FeatureFlagDef = {
   killSwitch: boolean;
 };
 
+export const FEATURE_FLAG_CONTRACT_VERSION = 1;
+
 const FLAG_REGISTRY: FeatureFlagDef[] = [
   { key: "stripe", envVar: "FEATURE_FLAG_STRIPE", defaultEnabled: true, description: "Stripe payment provider", killSwitch: true },
   { key: "paypal", envVar: "FEATURE_FLAG_PAYPAL", defaultEnabled: true, description: "PayPal payment provider", killSwitch: true },

@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { handleStorefrontProfilePatchRequest } from "./profile-handler";
+import type { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 const VALID_PH_PHONE = "+639171234567";
 
@@ -21,12 +22,40 @@ function makeRequest(body: unknown, contentType = "application/json"): Request {
   });
 }
 
-function testDeps(session: { user?: { email?: string } } | null) {
+function testDeps(session: { user?: { email?: string }; authenticatedAt?: number } | null) {
   return {
-    getSession: async () => session,
+    getSession: async () =>
+      session && session.authenticatedAt === undefined
+        ? { ...session, authenticatedAt: Math.floor(Date.now() / 1000) }
+        : session,
     createStorefrontServiceSupabase: () => null,
   };
 }
+
+function staleProfileSupabase(): ReturnType<typeof createStorefrontServiceSupabase> {
+  const chain = {
+    select: () => chain,
+    eq: () => chain,
+    maybeSingle: async () => ({ data: null, error: null }),
+  };
+  return {
+    from: () => chain,
+  } as unknown as ReturnType<typeof createStorefrontServiceSupabase>;
+}
+
+test("PATCH /api/account/profile requires recent authentication", async () => {
+  const res = await handleStorefrontProfilePatchRequest(
+    makeRequest({ displayName: "Test" }),
+    testDeps({
+      user: { email: "shopper@example.com" },
+      authenticatedAt: Math.floor((Date.now() - 31 * 60_000) / 1000),
+    }),
+  );
+  assert.equal(res.status, 401);
+  const body = await res.json();
+  assert.equal(body.code, "RECENT_AUTH_REQUIRED");
+  assert.equal(body.reauthUrl, "/sign-in?callbackUrl=%2Faccount&reauth=1");
+});
 
 test("PATCH /api/account/profile returns 401 when not authenticated", async () => {
   const res = await handleStorefrontProfilePatchRequest(
@@ -38,6 +67,56 @@ test("PATCH /api/account/profile returns 401 when not authenticated", async () =
   assert.equal(typeof body, "object");
   assert.ok(body);
   assert.ok("error" in body);
+});
+
+test("PATCH /api/account/profile rejects stale versions before Medusa sync", async () => {
+  let syncCalled = false;
+  const res = await handleStorefrontProfilePatchRequest(
+    makeRequest({ displayName: "New name", updatedAt: "2026-08-23T00:00:00.000Z" }),
+    {
+      getSession: async () => ({
+        authenticatedAt: Math.floor(Date.now() / 1000),
+        user: { email: "shopper@example.com", medusaCustomerId: "cus_123" },
+      }),
+      createStorefrontServiceSupabase: () => staleProfileSupabase(),
+      findMedusaCustomerIdByEmail: async () => "cus_123",
+      syncMedusaCustomerProfile: async () => {
+        syncCalled = true;
+        return true;
+      },
+    },
+  );
+  assert.equal(res.status, 409);
+  assert.equal(syncCalled, false);
+});
+
+test("PATCH /api/account/profile upserts existing email rows when Medusa identity is resolved", async () => {
+  let conflictTarget: string | undefined;
+  let persisted: Record<string, unknown> | undefined;
+  const chain = {
+    upsert: async (row: Record<string, unknown>, options: { onConflict?: string }) => {
+      persisted = row;
+      conflictTarget = options.onConflict;
+      return { error: null };
+    },
+  };
+  const res = await handleStorefrontProfilePatchRequest(
+    makeRequest({ displayName: "E2E Tester", phone: VALID_PH_PHONE }),
+    {
+      getSession: async () => ({
+        authenticatedAt: Math.floor(Date.now() / 1000),
+        user: { email: "e2e-test@example.com" },
+      }),
+      createStorefrontServiceSupabase: () =>
+        ({ from: () => chain }) as unknown as ReturnType<typeof createStorefrontServiceSupabase>,
+      findMedusaCustomerIdByEmail: async () => "cus_123",
+      syncMedusaCustomerProfile: async () => true,
+    },
+  );
+  assert.equal(res.status, 200);
+  assert.equal(conflictTarget, "email");
+  assert.equal(persisted?.email, "e2e-test@example.com");
+  assert.equal(persisted?.medusa_customer_id, "cus_123");
 });
 
 test("PATCH /api/account/profile returns 400 for invalid JSON body", async () => {

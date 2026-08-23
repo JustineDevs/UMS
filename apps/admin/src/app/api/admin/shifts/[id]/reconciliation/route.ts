@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { listVoids, getShiftById } from "@universal-music-store/platform-data";
 import { staffSessionAllows } from "@universal-music-store/database";
-import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
@@ -42,40 +41,10 @@ export async function GET(req: NextRequest, ctx: Ctx) {
   const voids = await listVoids(sup.client, { shiftId: shiftId.trim(), limit: 200, organizationId: organization.id });
   const voidAmountMinor = voids.reduce((s, v) => s + (v.amount != null ? Math.round(v.amount) : 0), 0);
 
-  let ordersMatched = 0;
-  let salesTotalMinor = 0;
-  const pageSize = 50;
-  for (let offset = 0; offset < 5000; offset += pageSize) {
-    const qs = new URLSearchParams();
-    qs.set("limit", String(pageSize));
-    qs.set("offset", String(offset));
-    qs.set("fields", "id,total,metadata");
-    qs.set("order", "-created_at");
-    const res = await medusaAdminFetch(`/admin/orders?${qs.toString()}`, {
-      method: "GET",
-    });
-    if (!res.ok) break;
-    const json = (await res.json()) as {
-      orders?: Array<{ total?: unknown; metadata?: Record<string, unknown> | null }>;
-    };
-    const orders = json.orders ?? [];
-    if (orders.length === 0) break;
-    for (const o of orders) {
-      const sid = o.metadata?.pos_shift_id;
-      if (sid != null && String(sid) === shiftId.trim()) {
-        ordersMatched += 1;
-        const t = o.total;
-        const n =
-          typeof t === "bigint"
-            ? Number(t)
-            : typeof t === "number"
-              ? t
-              : Number(t ?? 0);
-        if (Number.isFinite(n)) salesTotalMinor += Math.round(n);
-      }
-    }
-    if (orders.length < pageSize) break;
-  }
+  const sales = await sup.client.from("pos_sale_ledger").select("order_id,total_minor,payment_method").eq("organization_id", organization.id).eq("shift_id", shiftId.trim());
+  if (sales.error) return correlatedJson(correlationId, { error: "Unable to load shift sales" }, { status: 503 });
+  const ordersMatched = sales.data?.length ?? 0;
+  const salesTotalMinor = (sales.data ?? []).reduce((sum, sale) => sale.payment_method === "cash" ? sum + Math.max(0, Number(sale.total_minor ?? 0)) : sum, 0);
 
   const openingCash = shift.opening_cash;
   const closingCash = shift.closing_cash;

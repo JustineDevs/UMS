@@ -19,23 +19,26 @@ export async function fetchPosVariantAvailability(
     return { ok: false, error: "Missing variant id" };
   }
   try {
-    const res = await medusaAdminFetch(
-      `/admin/product-variants/${encodeURIComponent(id)}?fields=${encodeURIComponent(VARIANT_FIELDS)}`,
-      { method: "GET" },
-    );
+    const params = new URLSearchParams({
+      id,
+      limit: "1",
+      fields: VARIANT_FIELDS,
+    });
+    const res = await medusaAdminFetch(`/admin/product-variants?${params}`, {
+      method: "GET",
+    });
     if (!res.ok) {
       return {
         ok: false,
         error: `Variant lookup failed (${res.status})`,
       };
     }
-    const json = (await res.json()) as {
-      variant?: Record<string, unknown>;
-    };
-    const v = json.variant;
-    if (!v || typeof v !== "object") {
+    const json = (await res.json()) as { variants?: unknown[] };
+    const rawVariant = json.variants?.[0];
+    if (!rawVariant || typeof rawVariant !== "object") {
       return { ok: false, error: "Variant not found" };
     }
+    const v = rawVariant as Record<string, unknown>;
     const manage = Boolean(v.manage_inventory);
     if (!manage) {
       return { ok: true, manageInventory: false };

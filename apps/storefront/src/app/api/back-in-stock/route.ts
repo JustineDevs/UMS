@@ -3,10 +3,12 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { fetchProductIdentityBySlug } from "@/lib/catalog-medusa-fetch";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const runtime = "nodejs";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_BACK_IN_STOCK_BODY_BYTES = 8 * 1024;
 
 type BackInStockPayload = {
   email: string;
@@ -76,12 +78,14 @@ async function handlePOST(req: NextRequest) {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
+  const bounded = await parseBoundedJson(req, MAX_BACK_IN_STOCK_BODY_BYTES);
+  if (bounded.tooLarge) {
+    return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
+  }
+  if (!bounded.valid) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  const body = bounded.value;
 
   const parsed = parseBackInStockPayload(body);
   if (!parsed.success) {

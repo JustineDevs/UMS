@@ -3,6 +3,7 @@
 import { ArrowUpRight, Banknote, PackageCheck, ReceiptText, RotateCcw, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ function formatCurrencyTooltipValue(value: unknown) {
 }
 
 export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
+  const [mounted, setMounted] = useState(false);
   const totalSales = data?.totalSales ?? 0;
   const totalOrders = data?.totalOrders ?? 0;
   const customerGrowth = data?.customerGrowth ?? 0;
@@ -38,6 +40,8 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
   const maxRevenue = Math.max(1, ...salesOverviewData.map((row) => row.revenue));
   const maxOrders = Math.max(1, ...salesOverviewData.map((row) => row.orders));
   const metricNote = data?.commerceUnavailable ? "Commerce unavailable" : "From live Medusa data";
+
+  useEffect(() => setMounted(true), []);
 
   return (
     <div className="h-full overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 xl:col-span-12">
@@ -148,7 +152,7 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
             </CardHeader>
 
             <CardContent>
-              {hasSalesOverview ? (
+              {hasSalesOverview && mounted ? (
                 <ChartContainer config={revenueOverviewConfig} className="h-74 w-full">
                   <ComposedChart accessibilityLayer data={salesOverviewData} margin={{ bottom: 0, left: 0, right: 0, top: 0 }}>
                   <defs>
@@ -234,7 +238,7 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
               ) : (
                 <div className="flex h-74 items-center justify-center rounded-lg border border-dashed text-center">
                   <div className="max-w-xs px-6">
-                    <div className="font-medium text-sm">No sales chart yet</div>
+                    <div className="font-medium text-sm">{mounted ? "No sales chart yet" : "Loading sales chart…"}</div>
                     <div className="mt-1 text-muted-foreground text-sm">
                       Revenue history will appear after Medusa returns dated orders.
                     </div>

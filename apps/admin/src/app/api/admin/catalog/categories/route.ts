@@ -7,6 +7,7 @@ import {
 } from "@/lib/medusa-product-categories";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,9 @@ async function post(req: Request) {
   if (!staffSessionAllows(session, "catalog:write")) {
     return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
   }
-  const body = (await req.json().catch(() => ({}))) as {
+  const parsedBody = await parseBoundedJson(req, 16 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const body = (parsedBody.valid ? parsedBody.value : {}) as {
     name?: string;
     handle?: string;
   };

@@ -237,7 +237,7 @@ test.describe("@workflow @checkout @stress @recovery checkout recovery stress", 
         }
 
         await clickPayButton(page);
-        const hostedContinue = page.getByTestId("checkout-continue-payment");
+        const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
         if (await hostedContinue.isVisible({ timeout: 15_000 }).catch(() => false)) {
           await clickContinueToStripeHostedCheckout(page);
           await fillStripeHostedCheckoutTestCard(page, STRIPE_SANDBOX_TEST_CARD_DECLINE);

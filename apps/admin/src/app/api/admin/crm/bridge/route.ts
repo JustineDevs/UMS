@@ -18,6 +18,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 function cleanText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -81,14 +82,11 @@ async function post(req: NextRequest) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const rec = body as Record<string, unknown>;
+  const body = await parseBoundedJson(req, 256 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const rec = body.valid && body.value && typeof body.value === "object" && !Array.isArray(body.value)
+    ? body.value as Record<string, unknown>
+    : {};
   const kind = cleanText(rec.kind);
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;

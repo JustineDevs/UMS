@@ -1,4 +1,5 @@
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { findMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
 import type { StorefrontShippingAddress } from "@universal-music-store/validation";
 
 export type ServerCustomerProfile = {
@@ -6,21 +7,39 @@ export type ServerCustomerProfile = {
   phone: string | null;
   avatarUrl: string | null;
   shippingAddresses: StorefrontShippingAddress[];
+  updatedAt?: string | null;
 };
 
-export async function loadCustomerProfile(
+export type CustomerProfileLoadResult = {
+  profile: ServerCustomerProfile | null;
+  unavailable: boolean;
+};
+
+export async function loadCustomerProfileResult(
   email: string,
-): Promise<ServerCustomerProfile | null> {
+): Promise<CustomerProfileLoadResult> {
   const normalized = email.trim().toLowerCase();
-  if (!normalized) return null;
+  if (!normalized) return { profile: null, unavailable: false };
   const sb = createStorefrontServiceSupabase();
-  if (!sb) return null;
-  const { data, error } = await sb
-    .from("storefront_customer_profiles")
-    .select("display_name,phone,avatar_url,shipping_addresses")
-    .eq("email", normalized)
-    .maybeSingle();
-  if (error || !data) return null;
+  if (!sb) return { profile: null, unavailable: true };
+  const customerId = await findMedusaCustomerIdByEmail(normalized);
+  const select = "display_name,phone,avatar_url,shipping_addresses,updated_at";
+  const { data: byCustomer, error: customerError } = customerId
+    ? await sb
+        .from("storefront_customer_profiles")
+        .select(select)
+        .eq("medusa_customer_id", customerId)
+        .maybeSingle()
+    : { data: null, error: null };
+  const { data, error } = byCustomer
+    ? { data: byCustomer, error: customerError }
+    : await sb
+        .from("storefront_customer_profiles")
+        .select(select)
+        .eq("email", normalized)
+        .maybeSingle();
+  if (error) return { profile: null, unavailable: true };
+  if (!data) return { profile: null, unavailable: false };
   const raw = data as {
     display_name?: string | null;
     phone?: string | null;
@@ -37,10 +56,20 @@ export async function loadCustomerProfile(
     );
   }
   return {
-    displayName:
-      typeof raw.display_name === "string" ? raw.display_name : null,
-    phone: typeof raw.phone === "string" ? raw.phone : null,
-    avatarUrl: typeof raw.avatar_url === "string" ? raw.avatar_url : null,
-    shippingAddresses,
+    unavailable: false,
+    profile: {
+      displayName:
+        typeof raw.display_name === "string" ? raw.display_name : null,
+      phone: typeof raw.phone === "string" ? raw.phone : null,
+      avatarUrl: typeof raw.avatar_url === "string" ? raw.avatar_url : null,
+      shippingAddresses,
+      updatedAt: typeof (raw as { updated_at?: unknown }).updated_at === "string" ? (raw as { updated_at: string }).updated_at : null,
+    },
   };
+}
+
+export async function loadCustomerProfile(
+  email: string,
+): Promise<ServerCustomerProfile | null> {
+  return (await loadCustomerProfileResult(email)).profile;
 }

@@ -9,6 +9,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { getStaffSession } from "@/lib/requireStaffSession";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: Request) {
   const cid = getCorrelationId(req);
@@ -35,13 +36,9 @@ async function put(req: Request) {
   if (!staffSessionAllows(session, "settings:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-  const merged = mergeStorefrontHomePayload(body);
+  const body = await parseBoundedJson(req, 512 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const merged = mergeStorefrontHomePayload(body.valid ? body.value : null);
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;

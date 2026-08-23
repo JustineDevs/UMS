@@ -21,7 +21,7 @@ import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { createPortal } from "react-dom";
-import { CatalogMediaPickerDialog } from "@/components/catalog/CatalogMediaPickerDialog";
+import { CatalogMediaPickerDialog, type PickedMedia } from "@/components/catalog/CatalogMediaPickerDialog";
 import { CmsPagesManager } from "./CmsPagesManager";
 import { CmsSiteMapPanel } from "./CmsSiteMapPanel";
 import { CmsNavigationEditor } from "./CmsNavigationEditor";
@@ -63,6 +63,8 @@ import {
   moveCmsInstance,
   type CmsHistory,
 } from "@/lib/cms-tree-commands";
+import { LiveCanvasEditor } from "@/lib/visual-builder/live-canvas-editor";
+import { UvsCmsClient } from "@/lib/visual-builder/cms-rest-client";
 
 const BLOCK_TYPES = [
   {
@@ -1302,9 +1304,11 @@ export function CmsPageBuilder({
   const remeasureFrameRef = useRef<number | null>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const liveCanvasRef = useRef<LiveCanvasEditor | null>(null);
   const canvasScrollRef = useRef<HTMLElement>(null);
   const canvasVisualRef = useRef<HTMLIFrameElement>(null);
   const addInstanceToSlotRef = useRef<((_slot: string, _componentId: string) => void) | null>(null);
+  const addBlockRef = useRef<((_type: string) => void) | null>(null);
   const blocksRef = useRef(blocks);
   const componentNodesRef = useRef<ComponentNode[]>([]);
   const commitRef = useRef<((..._args: [CmsBlock[], string?, CmsMutationShape?]) => void) | null>(null);
@@ -1523,28 +1527,12 @@ export function CmsPageBuilder({
     }
     setCanvasSavePending(true);
     try {
-      const response = await fetch("/api/admin/cms/components", {
-        method: "POST",
-        headers: cmsMutationHeaders(),
-        body: JSON.stringify({
-          definition: parsed.data,
-          ...(componentVersions[parsed.data.id]
-            ? { expectedVersion: componentVersions[parsed.data.id] }
-            : {}),
-        }),
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        data?: {
-          definition?: CmsComponentDefinition;
-          component_key?: string;
-          version?: number;
-        };
-      } | null;
-      if (!response.ok || !payload?.data?.definition) {
-        setMessage(response.status === 409 ? "Definition changed elsewhere. Reload before saving." : "Unable to save component definition.");
-        return;
-      }
-      const saved = payload.data.definition;
+      const payload = await new UvsCmsClient(fetch, window.location.origin).saveComponentDefinition(
+        parsed.data,
+        componentVersions[parsed.data.id],
+        `cms-component-${parsed.data.id}-${Date.now()}`,
+      );
+      const saved = cmsComponentDefinitionSchema.parse(payload.definition) as CmsComponentDefinition;
       setComponentDefinitions((current) =>
         current.some((item) => item.id === saved.id)
           ? current.map((item) => (item.id === saved.id ? saved : item))
@@ -1552,7 +1540,7 @@ export function CmsPageBuilder({
       );
       setComponentVersions((current) => ({
         ...current,
-        [saved.id]: payload.data?.version ?? (current[saved.id] ?? 0) + 1,
+        [saved.id]: payload.version ?? (current[saved.id] ?? 0) + 1,
       }));
       setCanvasDraft(JSON.stringify(saved, null, 2));
       setMessage("Main component saved.");
@@ -1569,21 +1557,15 @@ export function CmsPageBuilder({
     }
     setCanvasSavePending(true);
     try {
-      const response = await fetch(`/api/admin/cms/components/${encodeURIComponent(canvasDefinition.id)}`, {
-        method: "POST",
-        headers: cmsMutationHeaders(),
-        body: JSON.stringify({ action: "publish", expectedVersion: version }),
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        data?: { version?: number; definition?: CmsComponentDefinition };
-      } | null;
-      if (!response.ok || !payload?.data) {
-        setMessage(response.status === 409 ? "Definition changed elsewhere. Reload before publishing." : "Unable to publish component definition.");
-        return;
-      }
-      const published = payload.data.definition ?? canvasDefinition;
+      const payload = await new UvsCmsClient(fetch, window.location.origin).publishComponent(
+        canvasDefinition.id,
+        version,
+        `cms-component-publish-${canvasDefinition.id}-${Date.now()}`,
+      );
+      const data = payload && typeof payload === "object" ? payload as { definition?: unknown; version?: number } : {};
+      const published = data.definition ? cmsComponentDefinitionSchema.parse(data.definition) as CmsComponentDefinition : canvasDefinition;
       setComponentDefinitions((current) => current.map((item) => (item.id === published.id ? published : item)));
-      setComponentVersions((current) => ({ ...current, [published.id]: payload.data?.version ?? version }));
+      setComponentVersions((current) => ({ ...current, [published.id]: data.version ?? version }));
       setComponentStatuses((current) => ({ ...current, [published.id]: "published" }));
       setCanvasDraft(JSON.stringify(published, null, 2));
       setMessage("Component definition published.");
@@ -1652,12 +1634,65 @@ export function CmsPageBuilder({
   }, [previewOrigin]);
   const sendDomMutation = (property: string, value: string) => {
     const target = selectedPreview;
-    if (!target || (!target.id.startsWith("cms-dom-") && !target.id.includes("::"))) return;
+    if (!target?.id) return;
     iframeRef.current?.contentWindow?.postMessage(
       { source: "cms-builder-dom-edit", id: target.id, prop: property, value },
       previewOrigin,
     );
   };
+  const attachLiveCanvas = useCallback(() => {
+    const frame = iframeRef.current;
+    const document = frame?.contentDocument;
+    if (!document) return;
+    liveCanvasRef.current?.detach();
+    const editor = new LiveCanvasEditor(document, {
+      onSelection: (selection) => {
+        if (!selection || selection.source !== "click") return;
+        const id = selection.element.dataset.cmsId;
+        if (!id) return;
+        const blockId = id.split("::", 1)[0];
+        const rect = {
+          x: selection.rect.left,
+          y: selection.rect.top,
+          width: selection.rect.width,
+          height: selection.rect.height,
+        };
+        setSelectedPreview((current) => ({
+          id,
+          blockId,
+          label: selection.element.tagName.toLowerCase(),
+          rect,
+          tagName: selection.element.tagName.toLowerCase(),
+          text: selection.element.textContent ?? undefined,
+          parentId: selection.element.parentElement?.dataset.cmsId ?? null,
+          propertyKey: current?.propertyKey ?? null,
+          arrayIndex: current?.arrayIndex ?? null,
+        }));
+        setSelectedId(blockId);
+        setSelectedComponentId(id);
+        setRightOpen(true);
+      },
+      onDrop: (parent, _index, componentId) => {
+        const slot = parent.dataset.cmsSlot;
+        if (slot) addInstanceToSlotRef.current?.(slot, componentId);
+        else addBlockRef.current?.(componentId.replaceAll("-", "_"));
+      },
+    });
+    editor.attach();
+    liveCanvasRef.current = editor;
+  }, []);
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!frame) return;
+    const onLoad = () => attachLiveCanvas();
+    frame.addEventListener("load", onLoad);
+    if (frame.contentDocument?.readyState === "complete") attachLiveCanvas();
+    return () => {
+      frame.removeEventListener("load", onLoad);
+      liveCanvasRef.current?.detach();
+      liveCanvasRef.current = null;
+    };
+  }, [attachLiveCanvas, previewUrl]);
   useEffect(() => {
     // Ignore fractional layout churn while iframe and host scrollbars settle.
     const EPSILON = 1;
@@ -1734,6 +1769,8 @@ export function CmsPageBuilder({
         parentId?: string | null;
         propertyKey?: string | null;
         arrayIndex?: number | null;
+        index?: number;
+        componentId?: string;
       }>,
     ) => {
       const frame = iframeRef.current;
@@ -1757,6 +1794,8 @@ export function CmsPageBuilder({
         parentId?: string | null;
         propertyKey?: string | null;
         arrayIndex?: number | null;
+        index?: number;
+        componentId?: string;
       };
       const { source, id, blockId, rect, label } = data;
       if (source === "cms-preview-ready") {
@@ -1786,7 +1825,9 @@ export function CmsPageBuilder({
         if (!id || !blockId || !property || value.length > 100_000) return;
         const next = applyDomMutation(blocksRef.current, blockId, id, property, value);
         if (next !== blocksRef.current) {
-          commitRef.current?.(next, blockId, {
+          // Keep the live DOM selection; selecting the owning block here makes
+          // the inspector jump away from the element that was just edited.
+          commitRef.current?.(next, undefined, {
             type: "set-style",
             nodeId: id,
             key: property,
@@ -1794,6 +1835,12 @@ export function CmsPageBuilder({
           });
           setMessage("Live element change recorded.");
         }
+        return;
+      }
+      if (source === "cms-builder-dom-drop") {
+        if (!data.componentId || !data.parentId) return;
+        if (data.parentId.startsWith("slot:")) addInstanceToSlotRef.current?.(data.parentId.slice(5), data.componentId);
+        else addBlockRef.current?.(data.componentId.replaceAll("-", "_"));
         return;
       }
       if (source === "cms-builder-hover") {
@@ -1911,6 +1958,7 @@ export function CmsPageBuilder({
     previewReadyRef.current = false;
     const onLoad = () => {
       previewReadyRef.current = true;
+      attachLiveCanvas();
       sendDraft();
     };
     frame.addEventListener("load", onLoad);
@@ -1928,8 +1976,9 @@ export function CmsPageBuilder({
     previewUrl,
     selectedComponentId,
     selectedId,
+    attachLiveCanvas,
   ]);
-  const addBlock = (type: string) => {
+  const addBlock = useCallback((type: string) => {
     if (FIXED_COMPONENT_TYPES.has(type)) return;
     const definition = componentDefinitions.find(
       (item) => item.id === type.replaceAll("_", "-"),
@@ -1956,7 +2005,13 @@ export function CmsPageBuilder({
       slots: definition?.slots.length ? {} : undefined,
     } satisfies CmsBlock;
     commit([...blocks, block], block.id);
-  };
+  }, [blocks, commit, componentDefinitions]);
+  useEffect(() => {
+    addBlockRef.current = addBlock;
+    return () => {
+      if (addBlockRef.current === addBlock) addBlockRef.current = null;
+    };
+  }, [addBlock]);
   const addComponentVariant = (
     definition: CmsComponentDefinition,
     variantId: string,
@@ -2217,20 +2272,24 @@ export function CmsPageBuilder({
     setMediaPickerTarget(target);
   }, []);
 
-  const applyPickedMedia = useCallback((urls: string[]) => {
-    const url = urls[0]?.trim();
+  const applyPickedMedia = useCallback((media: PickedMedia[]) => {
+    const picked = media[0];
     const block = selectedEditorBlock;
-    if (!url || !block || mediaPickerTarget === null) return;
+    if (!picked || !block || mediaPickerTarget === null) return;
     if (mediaPickerTarget.startsWith("tiles:")) {
       const index = Number(mediaPickerTarget.slice("tiles:".length));
       const tiles = Array.isArray(block.props.tiles) ? [...block.props.tiles] : [];
       const tile = tiles[index];
       if (tile && typeof tile === "object" && !Array.isArray(tile)) {
-        tiles[index] = { ...(tile as Record<string, unknown>), imageUrl: url };
+        const nextTile: Record<string, unknown> = { ...(tile as Record<string, unknown>), imageMediaId: picked.id };
+        delete nextTile.imageUrl;
+        tiles[index] = nextTile;
         updateSelected({ ...block.props, tiles });
       }
     } else {
-      updateSelected({ ...block.props, [mediaPickerTarget]: url });
+      const nextProps = { ...block.props, [`${mediaPickerTarget.replace(/Url$/, "")}MediaId`]: picked.id };
+      delete nextProps[mediaPickerTarget];
+      updateSelected(nextProps);
     }
     setMediaPickerTarget(null);
     setMessage("Media selected from the shared catalog library.");
@@ -2454,16 +2513,6 @@ export function CmsPageBuilder({
           >
             In context
           </button>
-          <button
-            type="button"
-            className={`rounded px-2 py-1 text-[10px] ${builderMode === "canvas" ? "bg-white font-medium text-slate-900 shadow-sm" : "text-slate-500"}`}
-            onClick={() => {
-              setBuilderMode("canvas");
-              setLeftTab("components");
-            }}
-          >
-            Component canvas
-          </button>
         </div>
         <div className="ml-auto flex items-center gap-1 border-l border-slate-200 pl-2">
           {(
@@ -2686,11 +2735,11 @@ export function CmsPageBuilder({
                               (() => {
                                 event.dataTransfer.setData("application/x-cms-component", definition.id);
                                 event.dataTransfer.setData("application/x-cms-component-id", definition.id);
+                                event.dataTransfer.setData("application/x-uvs-component", definition.id);
                               })()
                             }
                             onClick={() => {
-                              setComponentCanvasId(definition.id);
-                              setBuilderMode("canvas");
+                              setMessage("Component Canvas is disabled for now.");
                             }}
                           >
                             <span className="block truncate text-[11px] font-medium text-slate-700">
@@ -2733,12 +2782,10 @@ export function CmsPageBuilder({
                               disabled={disabled}
                               onClick={() => addBlock(item.type)}
                               draggable={!disabled}
-                              onDragStart={(event) =>
-                                event.dataTransfer.setData(
-                                  "application/x-cms-block",
-                                  item.type,
-                                )
-                              }
+                              onDragStart={(event) => {
+                                event.dataTransfer.setData("application/x-cms-block", item.type);
+                                event.dataTransfer.setData("application/x-uvs-component", item.type);
+                              }}
                               className="rounded border border-slate-200 bg-white px-2 py-2.5 text-left text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-40"
                             >
                               <Plus className="mb-1 size-3 text-slate-400" />
@@ -3175,6 +3222,7 @@ export function CmsPageBuilder({
                     ref={iframeRef}
                     title="Storefront canvas"
                     src={previewUrl}
+                    onLoad={attachLiveCanvas}
                     className="block min-h-[720px] w-full border-0 bg-white"
                     style={{ pointerEvents: "auto" }}
                   />
@@ -3324,7 +3372,7 @@ export function CmsPageBuilder({
               </div>
             ) : selected ? (
               <div className="space-y-4 p-4">
-                {selectedPreview?.id.startsWith("cms-dom-") ? (
+                {selectedPreview?.id ? (
                   <div
                     key={selectedPreview.id}
                     className="space-y-3 rounded border border-blue-200 bg-blue-50/60 p-3"
@@ -3358,6 +3406,12 @@ export function CmsPageBuilder({
                           defaultValue={selectedPreview.href}
                           className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
                           disabled={disabled}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }
+                          }}
                           onBlur={(event) => sendDomMutation("href", event.target.value)}
                         />
                       </label>
@@ -3369,6 +3423,12 @@ export function CmsPageBuilder({
                           defaultValue={selectedPreview.src}
                           className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
                           disabled={disabled}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }
+                          }}
                           onBlur={(event) => sendDomMutation("src", event.target.value)}
                         />
                       </label>
@@ -3381,6 +3441,12 @@ export function CmsPageBuilder({
                             defaultValue={selectedPreview.style?.[property] ?? ""}
                             className="mt-1 h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
                             disabled={disabled}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.currentTarget.blur();
+                              }
+                            }}
                             onBlur={(event) => sendDomMutation(`style.${property}`, event.target.value)}
                           />
                         </label>
@@ -3419,12 +3485,10 @@ export function CmsPageBuilder({
                       <button
                         type="button"
                         className="h-7 rounded border border-slate-200 bg-white px-2 text-[10px] font-medium text-slate-600 hover:bg-slate-50"
-                        onClick={() => {
-                          setComponentCanvasId(selectedDefinition.id);
-                          setBuilderMode("canvas");
-                        }}
+                        disabled
+                        title="Component Canvas is disabled for now"
                       >
-                        Edit main
+                        Canvas disabled
                       </button>
                     </div>
                     <label className="block text-[10px] text-slate-500">

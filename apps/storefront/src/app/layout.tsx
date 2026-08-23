@@ -14,7 +14,6 @@ import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { PostHogAnalytics } from "@/components/PostHogAnalytics";
 import { MedusaCartProvider } from "@/context/MedusaCartContext";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
-import { RecaptchaScript } from "@/components/RecaptchaScript";
 import { WishlistSyncOnLogin } from "@/components/WishlistSyncOnLogin";
 import "./globals.css";
 
@@ -34,7 +33,7 @@ const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN;
 
 const botIdDisabledForLocalAuthBypass =
-  process.env.AUTH_DISABLED === "true";
+  process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -147,7 +146,6 @@ export default function RootLayout({
             </Suspense>
           </MedusaCartProvider>
         </NextAuthSessionProvider>
-        <RecaptchaScript />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
         <CookieConsentBanner />
       </body>

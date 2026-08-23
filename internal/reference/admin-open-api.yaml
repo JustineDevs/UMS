@@ -4760,6 +4760,58 @@ paths:
           description: Authentication or permission required.
         "500":
           description: Internal operation failure.
+  /admin/invoices/{id}/lifecycle:
+    post:
+      operationId: post_admin_invoices_id_lifecycle
+      summary: "Execute Admin / Invoices / Id / Lifecycle"
+      description: "Tenant-scoped invoice lifecycle transition."
+      tags: ["Admin / Invoices"]
+      x-source: "apps/admin/src/app/api/admin/invoices/[id]/lifecycle/route.ts"
+      x-permission: "receipts:send"
+      x-tenant-scoped: true
+      x-idempotency-required: true
+      x-idempotency-persisted: true
+      security:
+        - AdminSession: []
+        - StaffApiKey: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [retry, void, refund]
+      responses:
+        "200":
+          description: Operation completed successfully.
+        "400":
+          description: Invalid request.
+        "401":
+          description: Authentication or permission required.
+        "404":
+          description: Invoice not found.
+        "409":
+          description: Invalid lifecycle transition or replay conflict.
+        "500":
+          description: Internal operation failure.
   /admin/invoices/{id}/provider:
     post:
       operationId: post_admin_invoices_id_provider
@@ -7374,6 +7426,67 @@ paths:
           description: Authentication or permission required.
         "500":
           description: Internal operation failure.
+  /admin/tracking-capabilities/revoke:
+    post:
+      operationId: post_admin_tracking_capabilities_revoke
+      summary: "Revoke Admin / Tracking Capabilities"
+      description: "Revokes an opaque tracking capability for its resolved order resource."
+      tags: ["Admin / Orders"]
+      x-source: "apps/admin/src/app/api/admin/tracking-capabilities/revoke/route.ts"
+      x-permission: "orders:write"
+      x-tenant-scoped: true
+      x-idempotency-required: true
+      x-idempotency-persisted: true
+      security:
+        - AdminSession: []
+        - StaffApiKey: []
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, resourceId]
+              properties:
+                token:
+                  type: string
+                  minLength: 8
+                  maxLength: 4096
+                resourceId:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        "200":
+          description: Tracking capability revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [ok, revoked]
+                properties:
+                  ok:
+                    type: boolean
+                  revoked:
+                    type: boolean
+        "400":
+          description: Invalid capability request.
+        "401":
+          description: Authentication or permission required.
+        "503":
+          description: Revocation service unavailable.
   /webhooks/nango:
     post:
       operationId: post_webhooks_nango

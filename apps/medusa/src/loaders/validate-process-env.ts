@@ -41,6 +41,8 @@ function productionXenditSchema() {
     .object({
       XENDIT_SECRET_KEY: z.string().optional(),
       XENDIT_WEBHOOK_TOKEN: z.string().optional(),
+      XENDIT_CHECKOUT_SUCCESS_URL: z.string().optional(),
+      XENDIT_CHECKOUT_CANCEL_URL: z.string().optional(),
     })
     .refine(
       (d) => {
@@ -51,7 +53,33 @@ function productionXenditSchema() {
         message:
           "XENDIT_WEBHOOK_TOKEN is required in production when XENDIT_SECRET_KEY is set",
       },
-    );
+    )
+    .superRefine((d, ctx) => {
+      if (!d.XENDIT_SECRET_KEY?.trim()) return;
+      for (const name of [
+        "XENDIT_CHECKOUT_SUCCESS_URL",
+        "XENDIT_CHECKOUT_CANCEL_URL",
+      ] as const) {
+        const value = d[name]?.trim();
+        if (!value) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [name],
+            message: `${name} is required when XENDIT_SECRET_KEY is set`,
+          });
+          continue;
+        }
+        try {
+          if (new URL(value).protocol !== "https:") throw new Error("scheme");
+        } catch {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [name],
+            message: `${name} must be an absolute HTTPS URL`,
+          });
+        }
+      }
+    });
 }
 
 function productionPancakePosSchema() {

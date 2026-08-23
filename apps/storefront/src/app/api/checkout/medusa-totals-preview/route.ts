@@ -11,6 +11,7 @@ import {
 } from "@/lib/medusa-totals-preview-route-handler";
 import { executeMedusaCheckoutTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,9 @@ export const dynamic = "force-dynamic";
  * Uses the same env resolution as other server routes (MEDUSA_BACKEND_URL vs public URL).
  */
 export async function POST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`medusa-totals-preview:${ip}`, 30, 60_000);
   if (!rl.ok) {

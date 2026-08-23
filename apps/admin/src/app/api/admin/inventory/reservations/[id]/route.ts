@@ -5,18 +5,20 @@ import {
   closeMedusaInventoryReservation,
   commitInventoryReservation,
   releaseInventoryReservation,
+  expireInventoryReservation,
 } from "@universal-music-store/platform-data";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z
   .object({
-    operation: z.enum(["release", "commit", "attach_medusa", "close_medusa"]),
+    operation: z.enum(["release", "commit", "attach_medusa", "close_medusa", "expire"]),
     medusaReservationId: z.string().trim().min(1).max(200).optional(),
   })
   .strict()
@@ -34,7 +36,9 @@ async function post(request: Request, context: Params) {
   if (!staff.ok) return tagResponse(staff.response, correlationId);
   const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
   if (!idempotencyKey) return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  const body = await parseBoundedJson(request, 16 * 1024);
+  if (body.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const parsed = bodySchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(correlationId, { error: "Invalid reservation operation" }, { status: 400 });
   const { id } = await context.params;
   if (!id?.trim()) return correlatedJson(correlationId, { error: "Reservation not found" }, { status: 404 });
@@ -49,8 +53,10 @@ async function post(request: Request, context: Params) {
       : parsed.data.operation === "commit"
         ? await commitInventoryReservation(sup.client, input)
         : parsed.data.operation === "attach_medusa"
-          ? await attachMedusaInventoryReservation(sup.client, { ...input, medusaReservationId: parsed.data.medusaReservationId! })
-          : await closeMedusaInventoryReservation(sup.client, input);
+        ? await attachMedusaInventoryReservation(sup.client, { ...input, medusaReservationId: parsed.data.medusaReservationId! })
+          : parsed.data.operation === "expire"
+            ? await expireInventoryReservation(sup.client, input)
+            : await closeMedusaInventoryReservation(sup.client, input);
     return correlatedJson(correlationId, { data: reservation }, { status: 200 });
   } catch {
     return correlatedJson(correlationId, { error: "Unable to update inventory reservation", code: "INVENTORY_RESERVATION_OPERATION_FAILED" }, { status: 409 });

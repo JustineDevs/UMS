@@ -11,7 +11,7 @@ import {
   listCmsBlogPostsPublic,
   listCmsBlogPostsForSitemapPublic,
 } from "./cms-blog.js";
-import { getCmsCategoryContentPublic } from "./cms-category.js";
+import { getCmsCategoryContentPublic, listCmsCategoryContent } from "./cms-category.js";
 import { listCmsAbExperiments } from "./cms-experiments.js";
 import type {
   CmsPageRow,
@@ -87,11 +87,23 @@ export async function loadCmsAnnouncementPublic(): Promise<CmsAnnouncementRow | 
 export async function loadCmsCategoryContentPublic(
   collectionHandle: string,
   locale = "en",
+  collectionId?: string,
 ): Promise<CmsCategoryContentRow | null> {
   const sb = anonClient();
   const organizationId = publicOrganizationId();
   if (!sb || !organizationId) return null;
-  return getCmsCategoryContentPublic(sb, collectionHandle, locale, organizationId);
+  return getCmsCategoryContentPublic(sb, collectionHandle, locale, organizationId, collectionId);
+}
+
+export async function loadCmsCategoryContentListPublic(
+  locale = DEFAULT_CMS_LOCALE,
+): Promise<CmsCategoryContentRow[]> {
+  const sb = anonClient();
+  const organizationId = publicOrganizationId();
+  if (!sb || !organizationId) return [];
+  return (await listCmsCategoryContent(sb, organizationId)).filter(
+    (row) => row.locale === locale,
+  );
 }
 
 export async function loadCmsBlogListPublic(locale = "en"): Promise<CmsBlogPostRow[]> {

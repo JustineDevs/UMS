@@ -28,6 +28,8 @@ type PrepareInput = {
   signatureHeader: string | undefined;
 };
 
+const MAX_JNT_WEBHOOK_BODY_BYTES = 64 * 1024;
+
 type ApplyInput = {
   parsed: JntParsedEvent;
   claimDedup: (_dedupId: string) => Promise<boolean>;
@@ -93,7 +95,8 @@ export function verifyJntHmac(
 
 export function pickMedusaOrderId(payload: JntWebhookPayload): string | undefined {
   if (typeof payload.orderNo === "string" && payload.orderNo.trim()) {
-    return payload.orderNo.trim();
+    const orderId = payload.orderNo.trim();
+    return /^order_[A-Za-z0-9_-]+$/.test(orderId) ? orderId : undefined;
   }
   return undefined;
 }
@@ -112,6 +115,13 @@ export function prepareJntWebhookEvent(
     return {
       status: 400,
       body: { error: "Invalid body", code: "INVALID_BODY" },
+    };
+  }
+
+  if (input.rawBody.length > MAX_JNT_WEBHOOK_BODY_BYTES) {
+    return {
+      status: 413,
+      body: { error: "Webhook body is too large", code: "BODY_TOO_LARGE" },
     };
   }
 

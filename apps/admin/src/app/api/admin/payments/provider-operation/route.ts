@@ -9,7 +9,9 @@ import { resolveStaffOrganization } from "@/lib/staff-organization";
 import {
   requestProviderReconciliationJob,
   upsertPaymentProviderArtifact,
+  recordSettlementReconciliation,
 } from "@universal-music-store/platform-data";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const xenditSchema = z.discriminatedUnion("operation", [
   z
@@ -241,10 +243,9 @@ async function post(req: Request) {
   const correlationId = getCorrelationId(req);
   const staff = await requireStaffApiSession("settings:write");
   if (!staff.ok) return staff.response;
-  const raw = (await req.json().catch(() => null)) as Record<
-    string,
-    unknown
-  > | null;
+  const parsedBody = await parseBoundedJson(req, 512 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const raw = (parsedBody.valid ? parsedBody.value : null) as Record<string, unknown> | null;
   const parsed = paymentOperationSchema.safeParse(raw);
   if (!parsed.success)
     return correlatedJson(
@@ -337,6 +338,36 @@ async function post(req: Request) {
       if (providerResponse.ok) {
         const report = providerBody && typeof providerBody === "object" && "data" in providerBody ? (providerBody as { data: unknown }).data : providerBody;
         const externalId = `reconcile:${parsed.data.provider}:${start.toISOString()}:${end.toISOString()}`;
+        const reportRows = report && typeof report === "object"
+          ? (Array.isArray((report as { transactions?: unknown[] }).transactions)
+              ? (report as { transactions: unknown[] }).transactions
+              : Array.isArray((report as { requests?: unknown[] }).requests)
+                ? (report as { requests: unknown[] }).requests
+                : [])
+          : [];
+        for (const raw of reportRows) {
+          if (!raw || typeof raw !== "object") continue;
+          const item = raw as Record<string, unknown>;
+          const rowExternalId = String(item.external_id ?? item.payment_request_id ?? "").trim();
+          if (!rowExternalId) continue;
+          await recordSettlementReconciliation(supabase.client, {
+            organizationId: organization.id,
+            provider: parsed.data.provider,
+            merchantIdentity: connection?.nango_connection_id ?? organization.id,
+            externalId: rowExternalId,
+            artifactType: "settlement",
+            paymentExternalId: typeof item.payment_external_id === "string" ? item.payment_external_id : typeof item.payment_id === "string" ? item.payment_id : null,
+            amountMinor: typeof item.amount_minor === "number" ? item.amount_minor : null,
+            feeMinor: typeof item.fee_minor === "number" ? item.fee_minor : 0,
+            netMinor: typeof item.net_minor === "number" ? item.net_minor : null,
+            currency: typeof item.currency === "string" ? item.currency : null,
+            status: "needs_review",
+            providerOccurredAt: typeof item.provider_occurred_at === "string" ? item.provider_occurred_at : null,
+            idempotencyKey: `${parsed.data.idempotency_key}:${rowExternalId}`,
+            mismatchReason: "provider_operation_report_requires_attempt_match",
+            metadata: { source: "admin-provider-operation", period_start: start.toISOString(), period_end: end.toISOString() },
+          });
+        }
         await upsertPaymentProviderArtifact(supabase.client, {
           organization_id: organization.id,
           merchant_identity: connection?.nango_connection_id ?? organization.id,
@@ -400,11 +431,11 @@ async function post(req: Request) {
       ),
     },
   );
-  const body = await response
+  const providerBody = await response
     .json()
     .catch(() => ({ error: "Payment operation failed" }));
-  if (response.ok && body && typeof body === "object") {
-    const data = (body as { data?: unknown }).data;
+  if (response.ok && providerBody && typeof providerBody === "object") {
+    const data = (providerBody as { data?: unknown }).data;
     const externalId =
       data &&
       typeof data === "object" &&
@@ -466,7 +497,7 @@ async function post(req: Request) {
       });
     }
   }
-  return correlatedJson(correlationId, body, { status: response.status });
+  return correlatedJson(correlationId, providerBody, { status: response.status });
 }
 
 export const POST = withAdminMutationIdempotency("/admin/payments/provider-operation:POST", post);

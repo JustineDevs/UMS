@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { inferReviewProofMedia } from "@universal-music-store/types";
 import type { ProductReviewRow } from "@/lib/product-reviews";
+import { encodeReviewCursor } from "@/lib/review-api-contract";
 import { StarRatingDisplay } from "@/components/ReviewStarRatingDisplay";
 
 type SortKey = "newest" | "oldest" | "highest" | "lowest" | "helpful";
@@ -66,16 +67,133 @@ function HelpfulButton({
   );
 }
 
+function ReportButton({ reviewId }: { reviewId: string }) {
+  const [reason, setReason] = useState("spam");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  async function report() {
+    setState("sending");
+    try {
+      const csrfResponse = await fetch("/api/reviews/csrf", { credentials: "same-origin" });
+      const csrfBody = (await csrfResponse.json()) as { token?: string };
+      if (!csrfResponse.ok || !csrfBody.token) {
+        setState("error");
+        return;
+      }
+      const res = await fetch(`/api/reviews/report/${encodeURIComponent(reviewId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ reason, csrfToken: csrfBody.token }),
+      });
+      setState(res.ok || res.status === 409 ? "sent" : "error");
+    } catch {
+      setState("error");
+    }
+  }
+
+  if (state === "sent") {
+    return <span className="text-xs text-on-surface-variant">Report received</span>;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <label className="sr-only" htmlFor={`report-reason-${reviewId}`}>Report reason</label>
+      <select
+        id={`report-reason-${reviewId}`}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        disabled={state === "sending"}
+        className="min-h-11 rounded-lg border border-outline-variant/30 bg-transparent px-2 py-1.5 text-xs text-on-surface-variant"
+      >
+        <option value="spam">Spam</option>
+        <option value="harassment">Harassment</option>
+        <option value="hate">Hate speech</option>
+        <option value="personal_data">Personal data</option>
+        <option value="other">Other</option>
+      </select>
+      <button
+        type="button"
+        onClick={() => void report()}
+        disabled={state === "sending"}
+        className="min-h-11 rounded-lg px-2 text-xs text-on-surface-variant underline-offset-2 hover:underline disabled:opacity-50"
+      >
+        {state === "sending" ? "Reporting…" : "Report"}
+      </button>
+      {state === "error" ? (
+        <span className="text-xs text-red-700 dark:text-red-300" role="alert">
+          Sign in and try again, or contact support if reporting remains unavailable.
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProductReviewsFeedClient({
   reviews,
+  productSlug,
+  medusaProductId,
+  onReviewsChange,
 }: {
   reviews: ProductReviewRow[];
+  productSlug: string;
+  medusaProductId: string;
+  onReviewsChange?: (reviews: ProductReviewRow[]) => void;
 }) {
+  const [allReviews, setAllReviews] = useState(reviews);
+  const [nextCursor, setNextCursor] = useState(
+    reviews.length >= 50
+      ? (() => {
+          const last = reviews.at(-1);
+          return last ? encodeReviewCursor(last.created_at, last.id) : null;
+        })()
+      : null,
+  );
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [ratingFilter, setRatingFilter] = useState<number | "all">("all");
   const [sort, setSort] = useState<SortKey>("newest");
 
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setLoadError(false);
+    try {
+      const params = new URLSearchParams({
+        productSlug,
+        medusaProductId,
+        cursor: nextCursor,
+        limit: "50",
+      });
+      const response = await fetch(`/api/reviews?${params.toString()}`, {
+        // The API supplies a short public cache window for anonymous review reads.
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        setLoadError(true);
+        return;
+      }
+      const body = (await response.json()) as {
+        reviews?: ProductReviewRow[];
+        nextCursor?: string | null;
+      };
+      const existing = new Set(allReviews.map((review) => review.id));
+      const additions = (body.reviews ?? []).filter((review) => {
+        if (!review.id || existing.has(review.id)) return false;
+        existing.add(review.id);
+        return true;
+      });
+      setAllReviews((current) => [...current, ...additions]);
+      onReviewsChange?.([...allReviews, ...additions]);
+      setNextCursor(body.nextCursor ?? null);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   const filtered = useMemo(() => {
-    let r = [...reviews];
+    let r = [...allReviews];
     if (ratingFilter !== "all") {
       r = r.filter((x) => x.rating === ratingFilter);
     }
@@ -91,9 +209,9 @@ export function ProductReviewsFeedClient({
       return a.rating - b.rating;
     });
     return r;
-  }, [reviews, ratingFilter, sort]);
+  }, [allReviews, ratingFilter, sort]);
 
-  if (reviews.length === 0) return null;
+  if (allReviews.length === 0) return null;
 
   return (
     <>
@@ -218,17 +336,36 @@ export function ProductReviewsFeedClient({
                     </a>
                   );
                 })() : null}
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   <HelpfulButton
                     reviewId={r.id}
                     initialVotes={r.helpful_votes ?? 0}
                   />
+                  <ReportButton reviewId={r.id} />
                 </div>
               </article>
             </li>
           ))}
         </ul>
       )}
+
+      {nextCursor ? (
+        <div className="mb-10 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+            className="min-h-11 rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:cursor-wait disabled:opacity-60"
+          >
+            {loadingMore ? "Loading reviews..." : "Load more reviews"}
+          </button>
+          {loadError ? (
+            <span role="status" className="text-sm text-error">
+              Reviews could not be loaded. Try again.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </>
   );
 }

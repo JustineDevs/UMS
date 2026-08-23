@@ -1,24 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import type { Product } from "@universal-music-store/types";
+import { useProductVariant } from "@/components/ProductVariantProvider";
 
 type Props = {
   product: Product;
   typeRun: string[];
 };
-
-function uniqueVariantValues(
-  product: Product,
-  key: "type" | "finish" | "pickupConfig" | "bodyWood" | "condition" | "skillLevel" | "shippingSpeed",
-): string[] {
-  return [...new Set(product.variants.map((v) => v[key]).filter(Boolean))]
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-}
-
-function renderJoined(values: string[], fallback = "Not listed") {
-  return values.length > 0 ? values.join(" · ") : fallback;
-}
 
 function compareHref(product: Product): string {
   const params = new URLSearchParams();
@@ -33,6 +22,7 @@ function compareHref(product: Product): string {
  * PDP collapsible sections for instrument details, specs, build notes, and support.
  */
 export function ProductDetailsAccordions({ product, typeRun }: Props) {
+  const { variant } = useProductVariant();
   const compareHrefValue = compareHref(product);
 
   return (
@@ -49,7 +39,7 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
         <div className="space-y-3 pt-4 font-body text-sm leading-relaxed text-on-surface-variant">
           <p>
             <strong>In-stock types:</strong>{" "}
-            {typeRun.length ? typeRun.join(" · ") : "See variants above."}
+            {variant?.type || (typeRun.length ? typeRun.join(" · ") : "See variants above.")}
           </p>
           <p>
             Use the compare link to check nearby models in the same brand or
@@ -145,13 +135,34 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
 
 /** Renders specifications separately without duplicating the details stack. */
 export function ProductSpecifications({ product }: Pick<Props, "product">) {
-  const pickupConfigs = uniqueVariantValues(product, "pickupConfig");
-  const bodyWoods = uniqueVariantValues(product, "bodyWood");
-  const conditions = uniqueVariantValues(product, "condition");
-  const skillLevels = uniqueVariantValues(product, "skillLevel");
-  const shippingSpeeds = uniqueVariantValues(product, "shippingSpeed");
-  const finishes = uniqueVariantValues(product, "finish");
+  const { variant } = useProductVariant();
+  const selected = variant ?? product.variants[0];
+  const value = (key: keyof NonNullable<typeof selected>) =>
+    typeof selected?.[key] === "string" ? selected[key].trim() : "";
   const compareHrefValue = compareHref(product);
+  const guitarSpecs = product.guitarSpecs;
+  const guitarRows: Array<[string, string]> = guitarSpecs
+    ? [
+        ["Body shape", guitarSpecs.bodyShape],
+        ["Body top", guitarSpecs.bodyTop],
+        ["Back and sides", guitarSpecs.bodyBackAndSides],
+        ["Neck", guitarSpecs.neckMaterial],
+        ["Neck profile", guitarSpecs.neckProfile],
+        ["Scale length", guitarSpecs.scaleLengthMm != null ? `${guitarSpecs.scaleLengthMm} mm` : ""],
+        ["Nut width", guitarSpecs.nutWidthMm != null ? `${guitarSpecs.nutWidthMm} mm` : ""],
+        ["Frets", guitarSpecs.fretCount != null ? String(guitarSpecs.fretCount) : ""],
+        ["Fingerboard", guitarSpecs.fingerboardMaterial],
+        ["Bridge", guitarSpecs.bridge],
+        ["Tuners", guitarSpecs.tuners],
+        ["Electronics", guitarSpecs.electronics],
+        ["Controls", guitarSpecs.controls],
+        ["Strings", guitarSpecs.strings],
+        ["Case included", guitarSpecs.caseIncluded == null ? "" : guitarSpecs.caseIncluded ? "Yes" : "No"],
+        ["Setup included", guitarSpecs.setupIncluded == null ? "" : guitarSpecs.setupIncluded ? "Yes" : "No"],
+        ["Warranty", guitarSpecs.warranty],
+        ["Included accessories", guitarSpecs.includedAccessories?.join(" · ") ?? ""],
+      ].filter(([, value]) => Boolean(value)) as Array<[string, string]>
+    : [];
 
   return (
     <details className="group py-5" data-pdp-section="specifications" open>
@@ -167,17 +178,18 @@ export function ProductSpecifications({ product }: Pick<Props, "product">) {
             <tbody className="divide-y divide-outline-variant/10">
               {[
                 ["Brand", product.brand?.trim() || "Not listed"],
-                ["Instrument type", renderJoined(uniqueVariantValues(product, "type"))],
-                ["Finish", renderJoined(finishes)],
-                ["Pickup config", renderJoined(pickupConfigs)],
-                ["Body wood", renderJoined(bodyWoods)],
-                ["Condition", renderJoined(conditions)],
-                ["Skill level", renderJoined(skillLevels)],
-                ["Shipping speed", renderJoined(shippingSpeeds)],
+                ["Instrument type", value("type") || "Not listed"],
+                ["Finish", value("finish") || "Not listed"],
+                ["Pickup config", value("pickupConfig") || "Not listed"],
+                ["Body wood", value("bodyWood") || "Not listed"],
+                ["Condition", value("condition") || "Not listed"],
+                ["Skill level", value("skillLevel") || "Not listed"],
+                ["Shipping speed", value("shippingSpeed") || "Not listed"],
                 ...(product.weightKg != null ? [["Weight", `${product.weightKg} kg`]] : []),
                 ...(product.dimensionsLabel?.trim()
                   ? [["Dimensions", product.dimensionsLabel.trim()]]
                   : []),
+                ...guitarRows,
               ].map(([label, value]) => (
                 <tr key={label}>
                   <th className="w-44 px-4 py-3 text-xs font-bold uppercase tracking-wider text-on-surface-variant">

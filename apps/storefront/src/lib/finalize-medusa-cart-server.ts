@@ -40,6 +40,33 @@ export function getPublicOriginFromRequest(req: Request): string {
   }
 }
 
+export function secureTrackingRedirectUrl(
+  redirectUrl: string | undefined,
+  orderId: string | undefined,
+  baseUrl: string,
+): string | null {
+  if (typeof redirectUrl === "string") {
+    try {
+      const parsed = new URL(redirectUrl, baseUrl);
+      const origin = new URL(baseUrl).origin;
+      if (
+        parsed.origin === origin &&
+        parsed.pathname.startsWith("/track/") &&
+        parsed.pathname.split("/").at(-1)?.startsWith("cap_") &&
+        !parsed.searchParams.has("t")
+      ) {
+        return redirectUrl;
+      }
+    } catch {
+      return null;
+    }
+  }
+  if (!orderId) return null;
+  return buildTrackingUrl(baseUrl, orderId, {
+    storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+  });
+}
+
 type CompleteResponse = {
   type?: string;
   order?: { id?: string };
@@ -100,15 +127,21 @@ export async function finalizeMedusaCartFromServer(
     options?.publicOrigin?.trim() ||
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     DEFAULT_PUBLIC_SITE_ORIGIN;
-  const redirectUrl = buildTrackingUrl(base, orderId);
+  const redirectUrl = buildTrackingUrl(base, orderId, {
+    storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+  });
   if (!redirectUrl) {
     return {
       ok: false,
       status: 503,
-      error: "Tracking URL is not configured",
+      error: "Secure order tracking is temporarily unavailable",
       attempts,
     };
   }
-
-  return { ok: true, orderId, redirectUrl, attempts };
+  return {
+    ok: true,
+    orderId,
+    redirectUrl,
+    attempts,
+  };
 }

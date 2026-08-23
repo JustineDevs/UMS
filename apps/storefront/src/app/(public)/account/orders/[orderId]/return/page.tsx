@@ -1,16 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
 
 import { OrderReturnForm, type ReturnLine } from "@/components/OrderReturnForm";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 
 export const metadata: Metadata = {
   title: "Request a return",
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 type OrderRow = {
   id?: string;
@@ -29,7 +32,7 @@ export default async function OrderReturnPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!userEmail) {
     redirect(`/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`);

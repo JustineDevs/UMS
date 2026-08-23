@@ -17,8 +17,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@react-email/render": "1.1.2",
-    "html-to-text": "9.0.5",
     "resend": "^4.8.0"
   },
   "devDependencies": {

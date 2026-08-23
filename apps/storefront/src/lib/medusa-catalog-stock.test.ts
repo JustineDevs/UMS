@@ -68,6 +68,17 @@ describe("medusaVariantRawIsSellable", () => {
       true,
     );
   });
+
+  it("uses numeric quantity when manage_inventory is null", () => {
+    assert.equal(
+      medusaVariantRawIsSellable({ manage_inventory: null, inventory_quantity: 2 }),
+      true,
+    );
+    assert.equal(
+      medusaVariantRawIsSellable({ manage_inventory: null, inventory_quantity: 0 }),
+      false,
+    );
+  });
 });
 
 describe("medusaProductRawHasSellableVariant", () => {
@@ -97,6 +108,44 @@ describe("medusaProductRawHasSellableVariant", () => {
 });
 
 describe("catalogProductFromMedusaRaw", () => {
+  it("preserves catalog image alt text in the PDP gallery", () => {
+    const p = catalogProductFromMedusaRaw({
+      id: "prod_gallery",
+      title: "Studio Guitar",
+      images: [{ id: "img_1", url: "https://cdn.example.test/guitar.jpg", alt_text: "Natural finish guitar front" }],
+      variants: [{ id: "var_gallery", manage_inventory: false }],
+    });
+    assert.ok(p);
+    assert.equal(p!.images[0]?.altText, "Natural finish guitar front");
+    assert.deepEqual(p!.gallerySlides[0], {
+      kind: "image",
+      url: "https://cdn.example.test/guitar.jpg",
+      altText: "Natural finish guitar front",
+    });
+  });
+
+  it("maps typed product metadata without inventing missing fields", () => {
+    const p = catalogProductFromMedusaRaw({
+      id: "prod_audio",
+      title: "Studio Guitar",
+      handle: "studio-guitar",
+      metadata: {
+        guitar_specs_json: JSON.stringify({ bodyShape: "Dreadnought", fretCount: 20 }),
+        audio_demos_json: JSON.stringify([{ url: "/media/clean.mp3", title: "Clean tone" }]),
+        trust_content_json: JSON.stringify({ conditionGrade: "New", includedAccessories: ["Gig bag"] }),
+      },
+      variants: [{
+        id: "var_audio",
+        manage_inventory: false,
+        calculated_price: { calculated_amount: 10000 },
+      }],
+    });
+    assert.ok(p);
+    assert.deepEqual(p!.guitarSpecs, { bodyShape: "Dreadnought", fretCount: 20 });
+    assert.deepEqual(p!.audioDemos, [{ url: "/media/clean.mp3", title: "Clean tone" }]);
+    assert.deepEqual(p!.trustContent, { conditionGrade: "New", includedAccessories: ["Gig bag"] });
+  });
+
   it("returns null when every variant is out of stock", () => {
     const raw = {
       id: "prod_1",

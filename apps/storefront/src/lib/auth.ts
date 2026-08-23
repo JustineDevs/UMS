@@ -43,9 +43,10 @@ export const authOptions: NextAuthOptions = {
 
 /** Explicit auth-disabled mode is reserved for controlled browser QA. */
 export async function getStorefrontSession(): Promise<Session | null> {
-  if (process.env.AUTH_DISABLED === "true") {
+  if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
     return {
       user: { name: "Local QA", email: "e2e-test@example.com" },
+      authenticatedAt: Math.floor(Date.now() / 1000),
       expires: "2099-12-31T23:59:59.999Z",
     } as Session;
   }

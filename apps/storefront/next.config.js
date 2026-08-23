@@ -228,10 +228,8 @@ function previewFrameAncestors() {
     .split(",")
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter((value) => /^https?:\/\//.test(value));
-  if (configured.length) return configured;
-  return process.env.NODE_ENV === "production"
-    ? []
-    : ["http://localhost:3001", "http://127.0.0.1:3001"];
+  if (process.env.NODE_ENV === "production") return configured;
+  return [...new Set([...configured, "http://localhost:3001", "http://127.0.0.1:3001"])];
 }
 
 const siteOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
@@ -295,6 +293,38 @@ const nextConfig = {
         headers: [
           { key: "Cache-Control", value: "no-store, max-age=0" },
           { key: "Pragma", value: "no-cache" },
+        ],
+      },
+      {
+        source: "/track/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/order-confirmation/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/account/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/checkout/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
         ],
       },
       { source: "/((?!api|_next).*)", headers: discoveryHeaders },

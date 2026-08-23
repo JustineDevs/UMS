@@ -125,6 +125,27 @@ test("validateMedusaProcessEnv: throws when Xendit secret is set without webhook
   );
 });
 
+test("validateMedusaProcessEnv: rejects Xendit HTTP checkout callbacks in production", () => {
+  setupValidProd();
+  process.env.XENDIT_SECRET_KEY = "xendit-secret";
+  process.env.XENDIT_WEBHOOK_TOKEN = "xendit-webhook";
+  process.env.XENDIT_CHECKOUT_SUCCESS_URL = "http://localhost:3000/success";
+  process.env.XENDIT_CHECKOUT_CANCEL_URL = "https://store.example.com/cancel";
+  assert.throws(
+    () => validateMedusaProcessEnv(),
+    /XENDIT_CHECKOUT_SUCCESS_URL must be an absolute HTTPS URL/,
+  );
+});
+
+test("validateMedusaProcessEnv: accepts complete Xendit HTTPS callbacks in production", () => {
+  setupValidProd();
+  process.env.XENDIT_SECRET_KEY = "xendit-secret";
+  process.env.XENDIT_WEBHOOK_TOKEN = "xendit-webhook";
+  process.env.XENDIT_CHECKOUT_SUCCESS_URL = "https://store.example.com/success";
+  process.env.XENDIT_CHECKOUT_CANCEL_URL = "https://store.example.com/cancel";
+  assert.doesNotThrow(() => validateMedusaProcessEnv());
+});
+
 test("validateMedusaProcessEnv: passes when PayPal client ID, secret, and webhook ID all set", () => {
   setupValidProd();
   process.env.PAYPAL_CLIENT_ID = "AZDxjDScFpQ";

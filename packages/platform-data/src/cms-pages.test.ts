@@ -4,8 +4,29 @@ import {
   cmsBlocksToTree,
   cmsTreeToBlocks,
   getCmsPageById,
+  getCmsPageBySlugLocalePublic,
   normalizeCmsTree,
+  validateCmsPublishTree,
 } from "./cms-pages.js";
+
+test("public CMS lookup fails closed without an organization scope", async () => {
+  const supabase = {
+    from() {
+      throw new Error("unscoped query should not execute");
+    },
+  } as never;
+  assert.equal(
+    await getCmsPageBySlugLocalePublic(supabase, "home", "en"),
+    null,
+  );
+});
+
+test("publish validation rejects orphan and inconsistent child links", () => {
+  const result = validateCmsPublishTree([
+    { id: "root", componentId: "layout", parentId: null, children: ["missing"], props: {}, styles: {} },
+  ]);
+  assert.equal(result.ok, false);
+});
 
 test("normalizes persisted trees without dropping unknown nodes", () => {
   const tree = normalizeCmsTree([

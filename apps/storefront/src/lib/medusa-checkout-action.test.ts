@@ -66,12 +66,24 @@ test("resolveCheckoutAction: Stripe prefers hosted checkout_url over client_secr
     data: {
       client_secret: "sec_xxx",
       checkout_url: "https://checkout.stripe.com/c/pay/cs_test",
+      stripe_checkout_session_id: "cs_test",
     },
   });
   assert.equal(a.kind, "redirect");
   if (a.kind === "redirect") {
     assert.ok(a.url.includes("checkout.stripe.com"));
+    assert.equal(a.providerPaymentId, "cs_test");
   }
+});
+
+test("resolveCheckoutAction: Stripe extracts hosted session id when metadata is omitted", () => {
+  const a = resolveCheckoutAction("pp_stripe_stripe", {
+    id: "ps_s",
+    provider_id: "pp_stripe_stripe",
+    data: { checkout_url: "https://checkout.stripe.com/c/pay/cs_from_url" },
+  });
+  assert.equal(a.kind, "redirect");
+  if (a.kind === "redirect") assert.equal(a.providerPaymentId, "cs_from_url");
 });
 
 test("resolveCheckoutAction: PayPal embedded", () => {

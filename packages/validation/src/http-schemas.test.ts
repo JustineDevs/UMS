@@ -60,6 +60,19 @@ describe("http-schemas", () => {
         medusaProductId: "prod_01HZ",
       }).success,
     );
+    assert.ok(
+      storefrontReviewsListQuerySchema.safeParse({
+        productSlug: "guitar",
+        cursor: "2026-08-22T08:00:00.000Z",
+        limit: 20,
+      }).success,
+    );
+    assert.ok(
+      !storefrontReviewsListQuerySchema.safeParse({
+        productSlug: "guitar",
+        limit: 51,
+      }).success,
+    );
     assert.ok(!storefrontReviewsListQuerySchema.safeParse({}).success);
   });
 
@@ -69,6 +82,8 @@ describe("http-schemas", () => {
       medusaProductId: "prod_01HZABC",
       body: "Great",
       rating: 5,
+      csrfToken: "csrf-token-that-is-long-enough",
+      formStartedAt: Date.now(),
       proofMediaUrl: "https://example.com/proof.jpg",
     });
     assert.ok(ok.success);
@@ -78,6 +93,8 @@ describe("http-schemas", () => {
         medusaProductId: "prod_01HZABC",
         body: "Great",
         rating: 5,
+        csrfToken: "csrf-token-that-is-long-enough",
+        formStartedAt: Date.now(),
         proofMediaUrl: "",
       }).success,
     );
@@ -87,6 +104,8 @@ describe("http-schemas", () => {
         medusaProductId: "prod_01HZABC",
         body: "Great",
         rating: 5,
+        csrfToken: "csrf-token-that-is-long-enough",
+        formStartedAt: Date.now(),
         imageUrl: "https://example.com/proof.mp4",
       }).success,
     );
@@ -119,6 +138,15 @@ describe("http-schemas", () => {
       !storefrontReturnRequestBodySchema.safeParse({
         orderId: "",
         items: [],
+      }).success,
+    );
+    assert.ok(
+      !storefrontReturnRequestBodySchema.safeParse({
+        orderId: "order_01HZABC",
+        items: [
+          { item_id: "item_01HZABC", quantity: 1 },
+          { item_id: "item_01HZABC", quantity: 1 },
+        ],
       }).success,
     );
   });

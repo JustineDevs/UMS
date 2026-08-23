@@ -200,7 +200,7 @@ export function ProductGalleryCarousel({
             ) : (
               <ProductImageZoom
                 src={slide.url}
-                alt={productName}
+                alt={"altText" in slide && slide.altText ? slide.altText : productName}
                 sizes="(max-width: 1024px) 100vw, (max-width: 1536px) 50vw, 46vw"
                 priority={safe === 0}
               />

@@ -9,7 +9,7 @@
     "build": "node ../../scripts/clean-next-dir.cjs apps/admin && ../../node_modules/.bin/next build",
     "start": "../../node_modules/.bin/next start -p 3001",
   "lint": "../../node_modules/.bin/next lint",
-  "test": "node --import tsx/esm --test src/lib/request-correlation.test.ts src/lib/staff-json-response.test.ts src/lib/analytics-chart.test.ts src/lib/channel-webhook-policy.test.ts src/lib/channel-webhook-signature.test.ts src/lib/payment-provider-display-name.test.ts src/lib/admin-operation-result.test.ts src/lib/admin-workflow.test.ts src/lib/merge-sales-channels.test.ts src/lib/catalog-product-metadata-patch.test.ts src/lib/medusa-catalog-inventory-stock.test.ts src/lib/inventory-movement-audit.test.ts src/lib/medusa-sdk-error.test.ts src/lib/catalog-stock-validation.test.ts src/lib/parse-catalog-product-body.test.ts src/lib/admin-api-log-redact.test.ts src/lib/admin-api-security.test.ts src/lib/negative-api-security.test.ts src/lib/commerce-product-lookup.test.ts src/lib/pos-commit-sale-route-logic.test.ts src/lib/pos-commit-sale-route-handler.test.ts src/lib/storefront-commerce-invalidation.test.ts src/components/catalog/catalog-preview-model.test.ts src/lib/cms-route-contracts.test.ts src/lib/cms-api-hardening.test.ts"
+  "test": "node --import tsx/esm --test src/lib/request-correlation.test.ts src/lib/staff-json-response.test.ts src/lib/analytics-chart.test.ts src/lib/channel-webhook-policy.test.ts src/lib/channel-webhook-signature.test.ts src/lib/payment-provider-display-name.test.ts src/lib/admin-operation-result.test.ts src/lib/admin-workflow.test.ts src/lib/merge-sales-channels.test.ts src/lib/catalog-product-metadata-patch.test.ts src/lib/medusa-catalog-inventory-stock.test.ts src/lib/inventory-movement-audit.test.ts src/lib/medusa-sdk-error.test.ts src/lib/catalog-stock-validation.test.ts src/lib/parse-catalog-product-body.test.ts src/lib/admin-api-log-redact.test.ts src/lib/admin-api-security.test.ts src/lib/negative-api-security.test.ts src/lib/commerce-product-lookup.test.ts src/lib/pos-commit-sale-route-logic.test.ts src/lib/pos-commit-sale-route-handler.test.ts src/lib/storefront-commerce-invalidation.test.ts src/components/catalog/catalog-preview-model.test.ts src/lib/cms-route-contracts.test.ts src/lib/cms-api-hardening.test.ts src/lib/reconciliation-params.test.ts src/lib/bounded-request-body.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -33,7 +33,6 @@
     "@universal-music-store/validation": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "date-fns": "^4.4.0",
-    "dotenv": "^16.4.5",
     "flags": "^4.3.0",
     "lenis": "^1.3.19",
     "lucide-react": "^1.28.0",
@@ -46,7 +45,6 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.62.0",
     "recharts": "^2.15.0",
-    "simple-icons": "^16.28.0",
     "swr": "^2.5.0",
     "zod": "^3.23.0"
   },

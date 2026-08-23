@@ -1,5 +1,8 @@
 import type {
+  GuitarProductSpecs,
   Product,
+  ProductAudioDemo,
+  ProductTrustContent,
   ProductGallerySlide,
   ProductImage,
   ProductImageHotspot,
@@ -20,7 +23,7 @@ type MedusaVariantRaw = {
   id?: string;
   sku?: string | null;
   barcode?: string | null;
-  manage_inventory?: boolean;
+  manage_inventory?: boolean | null;
   inventory_quantity?: number | null;
   calculated_price?: {
     calculated_amount?: number | null;
@@ -39,7 +42,7 @@ type MedusaProductRaw = {
   status?: string;
   created_at?: string | null;
   metadata?: Record<string, unknown> | null;
-  images?: Array<{ id?: string; url?: string } | null> | null;
+  images?: Array<{ id?: string; url?: string; alt?: string | null; alt_text?: string | null } | null> | null;
   categories?: Array<{
     id?: string;
     name?: string;
@@ -167,6 +170,71 @@ function parseGalleryVideoUrls(meta: Record<string, unknown> | null | undefined)
   return [];
 }
 
+function parseGuitarSpecs(meta: Record<string, unknown> | null | undefined): GuitarProductSpecs | null {
+  const raw = meta?.guitar_specs_json ?? meta?.guitarSpecsJson;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    return value as GuitarProductSpecs;
+  } catch {
+    return null;
+  }
+}
+
+function parseAudioDemos(meta: Record<string, unknown> | null | undefined): ProductAudioDemo[] {
+  const raw = meta?.audio_demos_json ?? meta?.audioDemosJson;
+  if (typeof raw !== "string" || !raw.trim()) return [];
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is ProductAudioDemo => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const row = item as Record<string, unknown>;
+      return typeof row.url === "string" && row.url.trim().length > 0 &&
+        typeof row.title === "string" && row.title.trim().length > 0;
+    }).map((item) => ({
+      url: item.url.trim(),
+      title: item.title.trim(),
+      ...(item.description?.trim() ? { description: item.description.trim() } : {}),
+      ...(typeof item.durationSeconds === "number" && Number.isFinite(item.durationSeconds)
+        ? { durationSeconds: item.durationSeconds }
+        : {}),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function parseTrustContent(meta: Record<string, unknown> | null | undefined): ProductTrustContent | null {
+  const raw = meta?.trust_content_json ?? meta?.trustContentJson;
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const value = JSON.parse(raw) as unknown;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const row = value as Record<string, unknown>;
+    const text = (key: string): string | undefined => {
+      const value = row[key];
+      return typeof value === "string" && value.trim() ? value.trim() : undefined;
+    };
+    const list = Array.isArray(row.includedAccessories)
+      ? row.includedAccessories.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim())
+      : undefined;
+    const out: ProductTrustContent = {
+      ...(text("warranty") ? { warranty: text("warranty") } : {}),
+      ...(text("conditionGrade") ? { conditionGrade: text("conditionGrade") } : {}),
+      ...(text("authenticity") ? { authenticity: text("authenticity") } : {}),
+      ...(text("setupAndInspection") ? { setupAndInspection: text("setupAndInspection") } : {}),
+      ...(list?.length ? { includedAccessories: list } : {}),
+      ...(text("shippingEligibility") ? { shippingEligibility: text("shippingEligibility") } : {}),
+      ...(text("returnNotes") ? { returnNotes: text("returnNotes") } : {}),
+    };
+    return Object.keys(out).length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildGallerySlides(
   images: ProductImage[],
   videoUrl: string | null,
@@ -175,7 +243,10 @@ function buildGallerySlides(
   const slides: ProductGallerySlide[] = [];
   for (const img of images) {
     const u = img.imageUrl?.trim();
-    if (u) slides.push({ kind: "image", url: u });
+    if (u) {
+      const altText = img.altText?.trim();
+      slides.push({ kind: "image", url: u, ...(altText ? { altText } : {}) });
+    }
   }
   const videos: string[] = [];
   if (videoUrl?.trim()) videos.push(videoUrl.trim());
@@ -334,6 +405,10 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
       productId: id,
       imageUrl: img?.url ?? raw.thumbnail ?? "",
       sortOrder: i,
+      altText:
+        typeof (img?.alt_text ?? img?.alt) === "string" && (img?.alt_text ?? img?.alt)?.trim()
+          ? (img?.alt_text ?? img?.alt)!.trim()
+          : undefined,
     }))
     .filter((img) => !isKnownUnavailableExternalImage(img.imageUrl));
 
@@ -373,6 +448,7 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
         skillLevel: attrs.skillLevel,
         shippingSpeed: attrs.shippingSpeed,
         price: variantPriceMajor(v),
+        currencyCode: (v.calculated_price?.currency_code ?? "PHP").toUpperCase(),
         compareAtPrice: variantCompareAtPriceMajor(v),
         cost: null,
         manageInventory,
@@ -398,6 +474,9 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
   const relatedHandles = parseRelatedHandles(meta);
   const seoDescription = strMeta(meta, "seo_description");
   const galleryVideoUrlsExtra = parseGalleryVideoUrls(meta);
+  const guitarSpecs = parseGuitarSpecs(meta);
+  const audioDemos = parseAudioDemos(meta);
+  const trustContent = parseTrustContent(meta);
 
   const createdAt =
     typeof raw.created_at === "string" && raw.created_at ? raw.created_at : null;
@@ -428,6 +507,9 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
     hotspots,
     relatedHandles,
     seoDescription,
+    guitarSpecs,
+    audioDemos,
+    trustContent,
   };
 }
 

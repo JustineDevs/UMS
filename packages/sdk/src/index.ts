@@ -12,7 +12,17 @@ export {
 export {
   generateTrackingToken,
   verifyTrackingToken,
+  generateTrackingCapability,
+  verifyTrackingCapability,
+  generateOpaqueTrackingCapability,
+  resolveOpaqueTrackingCapability,
+  resolveOpaqueTrackingCapabilityDetails,
   buildTrackingUrl,
+  buildOrderConfirmationUrl,
+} from "./tracking-token.js";
+export type {
+  TrackingCapabilityScope,
+  ResolvedTrackingCapability,
 } from "./tracking-token.js";
 export {
   ensurePostHogClient,
@@ -35,6 +45,11 @@ export {
   assertPostHogEnvProduction,
 } from "./env/posthog.js";
 export { DEFAULT_PUBLIC_SITE_ORIGIN } from "./public-site-url.js";
+export {
+  FEATURE_FLAG_CONTRACT_VERSION,
+  getAllFlagDefs,
+  isFeatureEnabled,
+} from "./feature-flags.js";
 export {
   sanitizeSafeUrl,
   sanitizeSameOriginUrl,
@@ -112,3 +127,20 @@ export {
 } from "./store-taxonomy.js";
 
 export { capturePostHogEvent, type PostHogCaptureInput } from "./posthog.js";
+export {
+  normalizeCommerceAttribution,
+  createCanonicalMetricContract,
+  type CanonicalMetricContract,
+  type CommerceAttribution,
+  type MetricWindow,
+} from "./analytics-contract.js";
+export {
+  SLO_DEFINITIONS,
+  evaluateSlo,
+  evaluateSloAlert,
+  deliverSloAlert,
+  formatSloValue,
+  type SloAlert,
+  type SloDefinition,
+  type SloStatus,
+} from "./slo.js";

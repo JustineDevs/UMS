@@ -41,3 +41,53 @@ test("catalog product schema rejects oversized money and unknown fields", () => 
   });
   assert.equal(result.success, false);
 });
+
+test("catalog product schema accepts typed guitar specs and audio demos", () => {
+  const result = catalogProductRequestSchema.safeParse({
+    title: "Studio Guitar",
+    pricePhp: 1999,
+    storefrontMetadata: {
+      guitarSpecsJson: JSON.stringify({ bodyShape: "Dreadnought", fretCount: 20 }),
+      audioDemosJson: JSON.stringify([{ url: "/media/clean.mp3", title: "Clean tone" }]),
+    },
+  });
+  assert.equal(result.success, true);
+});
+
+test("catalog product schema rejects fabricated or unsafe structured metadata", () => {
+  const result = catalogProductRequestSchema.safeParse({
+    title: "Studio Guitar",
+    storefrontMetadata: {
+      guitarSpecsJson: JSON.stringify({ madeUpField: "unknown" }),
+      audioDemosJson: JSON.stringify([{ url: "javascript:alert(1)", title: "Bad" }]),
+    },
+  });
+  assert.equal(result.success, false);
+});
+
+test("catalog product schema accepts bounded trust content", () => {
+  const result = catalogProductRequestSchema.safeParse({
+    title: "Studio Guitar",
+    storefrontMetadata: {
+      trustContentJson: JSON.stringify({
+        conditionGrade: "New",
+        setupAndInspection: "Inspected before dispatch",
+        includedAccessories: ["Gig bag"],
+      }),
+    },
+  });
+  assert.equal(result.success, true);
+});
+
+test("catalog product schema blocks incomplete published products", () => {
+  const result = catalogProductRequestSchema.safeParse({
+    status: "published",
+    title: "Studio Guitar",
+    handle: "studio-guitar",
+    pricePhp: 1999,
+    storefrontMetadata: {
+      guitarSpecsJson: JSON.stringify({ bodyShape: "Dreadnought" }),
+    },
+  });
+  assert.equal(result.success, false);
+});

@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Product } from "@universal-music-store/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
 import { WishlistToggle } from "@/components/WishlistToggle";
 import { BackInStockNotify } from "@/components/BackInStockNotify";
 import { trackAddToCart } from "@/lib/analytics";
+import {
+  findSellableVariantForOptions,
+  isVariantSellable,
+  useProductVariant,
+} from "@/components/ProductVariantProvider";
 
 export function AddToCartSection({
   product,
@@ -17,28 +22,20 @@ export function AddToCartSection({
 }) {
   const router = useRouter();
   const types = useMemo(
-    () => [...new Set(product.variants.map((v) => v.type))].sort(),
+    () => [...new Set(product.variants.map((v) => v.type).filter(Boolean))].sort(),
     [product.variants],
   );
   const finishes = useMemo(
-    () => [...new Set(product.variants.map((v) => v.finish))].sort(),
+    () => [...new Set(product.variants.map((v) => v.finish).filter(Boolean))].sort(),
     [product.variants],
   );
-  const defaultPair = useMemo(() => {
-    const v0 = product.variants[0];
-    return { type: v0?.type ?? "", finish: v0?.finish ?? "" };
-  }, [product.variants]);
-  const [type, setType] = useState(defaultPair.type);
-  const [finish, setFinish] = useState(defaultPair.finish);
+  const { variant, selectVariant, isVariantAvailable } = useProductVariant();
+  const type = variant?.type ?? "";
+  const finish = variant?.finish ?? "";
 
-  useEffect(() => {
-    setType(defaultPair.type);
-    setFinish(defaultPair.finish);
-  }, [product.slug, defaultPair.type, defaultPair.finish]);
-
-  const variant = useMemo(
-    () => product.variants.find((v) => v.type === type && v.finish === finish),
-    [product.variants, type, finish],
+  const finishesForType = useMemo(
+    () => new Set(product.variants.filter((v) => v.type === type && isVariantSellable(v) && isVariantAvailable(v.id)).map((v) => v.finish)),
+    [isVariantAvailable, product.variants, type],
   );
 
   const LOW_STOCK_THRESHOLD = 5;
@@ -47,8 +44,8 @@ export function AddToCartSection({
       ? variant.inventoryQuantity
       : null;
   const isLowStock = stockQty !== null && stockQty > 0 && stockQty <= LOW_STOCK_THRESHOLD;
-  const isOutOfStock = variant !== undefined && !variant.isActive;
-  const allVariantsOos = product.variants.length > 0 && product.variants.every((v) => !v.isActive);
+  const isOutOfStock = variant !== undefined && (!isVariantSellable(variant) || !isVariantAvailable(variant.id));
+  const allVariantsOos = product.variants.length > 0 && product.variants.every((v) => !isVariantSellable(v) || !isVariantAvailable(v.id));
 
   function handleAddToBag() {
     if (!variant) return;
@@ -62,6 +59,7 @@ export function AddToCartSection({
       type: variant.type,
       finish: variant.finish,
       price: variant.price,
+      ...(variant.currencyCode ? { currencyCode: variant.currencyCode } : {}),
       ...(thumb ? { thumbnail: thumb } : {}),
     };
     addCartLine(line);
@@ -72,6 +70,7 @@ export function AddToCartSection({
       price: variant.price,
       quantity: 1,
       name: product.name,
+      currencyCode: variant.currencyCode,
     });
     router.push("/cart");
   }
@@ -104,7 +103,11 @@ export function AddToCartSection({
             <button
               key={t}
               type="button"
-              onClick={() => setType(t)}
+              onClick={() => {
+                const next = findSellableVariantForOptions(product, { type: t });
+                if (next && !isVariantAvailable(next.id)) return;
+                if (next) selectVariant(next.id);
+              }}
               className={`py-3 text-sm font-medium transition-all ${
                 type === t
                   ? "bg-primary text-on-primary"
@@ -130,13 +133,19 @@ export function AddToCartSection({
             <button
               key={f}
               type="button"
-              onClick={() => setFinish(f)}
+              onClick={() => {
+                const next = findSellableVariantForOptions(product, { type, finish: f });
+                if (next && !isVariantAvailable(next.id)) return;
+                if (next) selectVariant(next.id);
+              }}
+              disabled={!finishesForType.has(f)}
               className={`py-3 text-sm font-medium transition-all ${
                 finish === f
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-low hover:bg-surface-container-high"
               }`}
               aria-pressed={finish === f}
+              aria-disabled={!finishesForType.has(f)}
             >
               {f}
             </button>
@@ -154,6 +163,33 @@ export function AddToCartSection({
           Out of stock
         </p>
       )}
+
+      {variant ? (
+        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-4 text-sm" data-testid="pdp-selected-variant">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              Selected variant
+            </span>
+            <span className="text-lg font-bold text-primary">
+              PHP {variant.price.toLocaleString("en-PH")}
+            </span>
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-on-surface-variant">
+            {[
+              ["Type", variant.type],
+              ["Finish", variant.finish],
+              ["Pickup", variant.pickupConfig],
+              ["Body wood", variant.bodyWood],
+              ["Condition", variant.condition],
+            ].filter(([, value]) => value.trim()).map(([label, value]) => (
+              <div key={label}>
+                <dt className="font-semibold">{label}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 pt-4 min-[400px]:flex-row min-[400px]:items-stretch">
         <WishlistToggle

@@ -1,28 +1,24 @@
 import { getStorefrontSession } from "@/lib/auth";
 import {
   logCommerceObservabilityServer,
+  isAllowedClientCommerceEvent,
   type CommerceObservabilityEvent,
 } from "@/lib/commerce-observability";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { sanitizeCommerceObservabilityPayload } from "@/lib/commerce-observability";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
-
-const ALLOWED = new Set<CommerceObservabilityEvent>([
-  "checkout_quote_generated",
-  "checkout_quote_changed",
-  "payment_session_created",
-  "payment_session_invalidated",
-  "payment_session_completed",
-  "payment_session_recovered",
-  "checkout_provider_action_resolved",
-  "checkout_tab_lease_conflict",
-]);
 
 /**
  * Client-emitted commerce observability (authenticated shoppers only).
  */
 export async function POST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`commerce-telemetry:${ip}`, 60, 60_000);
   if (!rl.ok) {
@@ -37,35 +33,34 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = (await req.json()) as Record<string, unknown>;
-  } catch {
+  const parsedBody = await parseBoundedJson(req, 16 * 1024);
+  if (parsedBody.tooLarge) return Response.json({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  const body = parsedBody.value as Record<string, unknown>;
 
   const event = body.event;
   if (
     typeof event !== "string" ||
     event.trim().length === 0 ||
     event.trim().length > 80 ||
-    !ALLOWED.has(event as CommerceObservabilityEvent)
+    !isAllowedClientCommerceEvent(event.trim())
   ) {
     return Response.json({ error: "Invalid or disallowed event" }, { status: 400 });
   }
 
   const { event: _e, ...rest } = body;
+  const safeProperties = sanitizeCommerceObservabilityPayload(rest);
   const distinctId = session.user.email?.trim().toLowerCase() ?? getRequestIp(req);
   logCommerceObservabilityServer(event.trim() as CommerceObservabilityEvent, {
-    ...rest,
-    actorEmail: session.user.email?.trim().toLowerCase(),
+    ...safeProperties,
   });
   void capturePostHogEvent({
     event: `commerce_${event.trim()}`,
     distinctId,
     properties: {
-      ...rest,
-      actorEmail: session.user.email?.trim().toLowerCase(),
+      ...safeProperties,
       source: "commerce_telemetry_route",
     },
   });

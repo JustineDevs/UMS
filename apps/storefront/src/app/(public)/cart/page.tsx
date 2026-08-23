@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CartPageClient } from "./cart-client";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import Link from "next/link";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Cart",
@@ -23,6 +24,22 @@ export default function CartPage() {
       <div className="mt-10">
         <CartPageClient />
       </div>
+      <aside className="mt-10 rounded-xl border border-outline-variant/20 bg-surface-container-low/50 p-5" aria-label="Checkout assurances">
+        <div className="grid gap-4 text-sm text-on-surface-variant sm:grid-cols-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-primary">Secure checkout</p>
+            <p className="mt-1 text-xs leading-relaxed">Payment details are handled by the selected payment provider.</p>
+          </div>
+          <div>
+            <p className="font-semibold text-primary">Easy returns</p>
+            <Link href="/returns" className="mt-1 inline-flex min-h-11 items-center text-xs underline underline-offset-2">Review our return policy</Link>
+          </div>
+          <div>
+            <p className="font-semibold text-primary">Need help?</p>
+            <Link href="/contact" className="mt-1 inline-flex min-h-11 items-center text-xs underline underline-offset-2">Contact customer support</Link>
+          </div>
+        </div>
+      </aside>
     </main>
   );
 }

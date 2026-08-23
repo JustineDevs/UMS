@@ -1,6 +1,7 @@
 import pg from "pg";
 
 import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics.js";
+import { recordWebhookSecurityEvent } from "./webhook-security-metrics";
 
 let pool: pg.Pool | null = null;
 let tableEnsured = false;
@@ -51,6 +52,7 @@ export async function claimPayPalWebhookDedup(
   const first = (res.rowCount ?? 0) >= 1;
   if (!first) {
     logWebhookDedupDuplicate("paypal", dedupId);
+    await recordWebhookSecurityEvent("paypal", "dedup_duplicate");
   }
   return first;
 }

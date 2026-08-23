@@ -213,6 +213,65 @@ describe("PayPal webhook service", () => {
     expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
   });
 
+  it("rejects a successful capture without a provider event ID", async () => {
+    const service = createService();
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: JSON.stringify({
+          event_type: "PAYMENT.CAPTURE.COMPLETED",
+          resource: {
+            custom_id: "medusa_ps_missing_event_id",
+            amount: { value: "20.00", currency_code: "PHP" },
+          },
+        }),
+        headers: {},
+      }),
+    ).rejects.toThrow("missing a provider event ID");
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("does not fulfill an approved order before capture completes", async () => {
+    const service = createService();
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-approved",
+        event_type: "CHECKOUT.ORDER.APPROVED",
+        resource: {
+          purchase_units: [{
+            custom_id: "medusa_ps_approved",
+            amount: { value: "20.00", currency_code: "PHP" },
+          }],
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("ignores a capture event with no positive amount or currency", async () => {
+    const service = createService();
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-invalid-capture",
+        event_type: "PAYMENT.CAPTURE.COMPLETED",
+        resource: {
+          custom_id: "medusa_ps_invalid",
+          amount: { value: "0.00" },
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
+  });
+
   it("ignores supported events without session correlation", async () => {
     const service = createService();
     (claimPayPalWebhookDedup as jest.Mock).mockResolvedValue(true);

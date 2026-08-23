@@ -6,30 +6,14 @@
  * checkout amount; they must match after applying minorUnitDivisor(currency).
  */
 
-/** ISO 4217 minor units for common storefront currencies (default 2). */
-const MINOR_UNITS: Record<string, number> = {
-  JPY: 0,
-  KRW: 0,
-  VND: 0,
-  BHD: 3,
-  JOD: 3,
-  KWD: 3,
-  OMR: 3,
-  TND: 3,
-};
+import { minorToMajor, minorUnitDivisor } from "@universal-music-store/sdk/multi-region";
 
-export function minorUnitDivisor(currencyCode: string): number {
-  const n = MINOR_UNITS[currencyCode.trim().toUpperCase()];
-  if (n === 0) return 1;
-  if (typeof n === "number" && n > 0) return 10 ** n;
-  return 100;
-}
+export { minorUnitDivisor };
 
 /**
  * Converts Medusa integer total (smallest currency unit) to major units for UI.
  */
 export function medusaMinorToMajor(totalMinor: number, currencyCode: string): number {
-  const div = minorUnitDivisor(currencyCode);
-  const major = totalMinor / div;
+  const major = minorToMajor(totalMinor, currencyCode);
   return Math.round(major * 1e6) / 1e6;
 }

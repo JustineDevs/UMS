@@ -3,6 +3,7 @@ import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { tryCreateSupabaseClient } from "../lib/payment-supabase-bridge";
 import { buildReceiptHtml, markReceiptSent, saveReceipt } from "../lib/digital-receipt";
 import { sendResendTransactionalEmail } from "../lib/resend-email";
+import { safeLogIdentifier } from "../lib/safe-log";
 
 export default async function orderPlacedDigitalReceipt({
   event: { data },
@@ -72,13 +73,15 @@ export default async function orderPlacedDigitalReceipt({
       });
       if (sent.ok) {
         await markReceiptSent(sb, receipt.id);
-        logger.info?.(`[receipt] sent to ${email} for order ${data.id}`);
+        logger.info?.(
+          `[receipt] sent to ${safeLogIdentifier(email)} for order ${safeLogIdentifier(data.id)}`,
+        );
       } else {
-        logger.warn?.(`[receipt] Resend failed for ${email}: ${sent.message}`);
+        logger.warn?.(`[receipt] Resend failed for ${safeLogIdentifier(email)}: delivery rejected`);
       }
     }
   } catch (err) {
-    logger.warn?.(`[receipt] ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn?.(`[receipt] delivery failed: ${err instanceof Error ? err.name : "unknown"}`);
   }
 }
 

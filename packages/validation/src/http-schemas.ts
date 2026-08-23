@@ -24,6 +24,7 @@ export const complianceEmailParamSchema = z
   .email();
 
 export const cartMergePostBodySchema = z.object({
+  mergeKey: z.string().trim().min(16).max(128).optional(),
   guestLines: z
     .array(
       z.object({
@@ -38,8 +39,11 @@ export const cartMergePostBodySchema = z.object({
 export const storefrontReviewPostBodySchema = z.object({
   productSlug: storefrontProductSlugSchema,
   medusaProductId: medusaResourceIdSchema,
-  body: z.string().trim().min(1).max(2000),
+  body: z.string().trim().min(5).max(2000),
   rating: z.coerce.number().int().min(1).max(5),
+  csrfToken: z.string().trim().min(20).max(500),
+  formStartedAt: z.coerce.number().int().positive(),
+  _hp: z.string().max(200).optional().default(""),
   proofMediaUrl: z.union([z.string().trim().url().max(500), z.literal("")]).optional(),
   imageUrl: z.union([z.string().trim().url().max(500), z.literal("")]).optional(),
 });
@@ -48,6 +52,8 @@ export const storefrontReviewsListQuerySchema = z
   .object({
     productSlug: storefrontProductSlugSchema.optional(),
     medusaProductId: medusaResourceIdSchema.optional(),
+    cursor: z.string().trim().max(256).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
   })
   .refine((q) => Boolean(q.productSlug?.length || q.medusaProductId?.length), {
     message: "Provide productSlug and/or medusaProductId",
@@ -61,9 +67,21 @@ const storefrontReturnRequestItemSchema = z.object({
 });
 
 export const storefrontReturnRequestBodySchema = z.object({
-  orderId: z.string().trim().min(1).max(128),
+  orderId: medusaResourceIdSchema,
   note: z.string().trim().max(1000).optional(),
   items: z.array(storefrontReturnRequestItemSchema).min(1).max(20),
+}).superRefine(({ items }, ctx) => {
+  const seen = new Set<string>();
+  for (const [index, item] of items.entries()) {
+    if (seen.has(item.item_id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["items", index, "item_id"],
+        message: "Duplicate return item ids are not allowed",
+      });
+    }
+    seen.add(item.item_id);
+  }
 });
 
 const CMS_FORM_MAX_KEYS = 200;

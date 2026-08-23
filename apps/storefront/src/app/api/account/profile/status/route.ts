@@ -1,5 +1,5 @@
 import { getStorefrontSession } from "@/lib/auth";
-import { loadCustomerProfile } from "@/lib/server-customer-profile";
+import { loadCustomerProfileResult } from "@/lib/server-customer-profile";
 import {
   isStorefrontProfileComplete,
   listMissingProfileParts,
@@ -17,10 +17,17 @@ export async function GET() {
   if (!email) {
     return Response.json({ authenticated: false, complete: false }, { headers: privateNoStore });
   }
-  const profile = await loadCustomerProfile(email);
+  const { profile, unavailable } = await loadCustomerProfileResult(email);
+  if (unavailable) {
+    return Response.json(
+      { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
+      { status: 503, headers: privateNoStore },
+    );
+  }
   const complete = isStorefrontProfileComplete(profile);
   return Response.json({
     authenticated: true,
+    available: true,
     complete,
     missingFields: complete ? [] : listMissingProfileParts(profile),
     profile: profile

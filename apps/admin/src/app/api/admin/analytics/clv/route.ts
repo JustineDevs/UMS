@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
-import { computeClv } from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { fetchCanonicalCustomerClv } from "@/lib/analytics-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 
@@ -17,10 +16,7 @@ export async function GET(req: NextRequest) {
   if (!email) {
     return correlatedJson(cid, { error: "email query param required" }, { status: 400 });
   }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const clv = await computeClv(sb, email);
+  const clv = await fetchCanonicalCustomerClv(email);
   if (!clv) return correlatedJson(cid, { error: "Not found" }, { status: 404 });
   return correlatedJson(cid, { data: clv });
 }

@@ -53,9 +53,9 @@ async function startPayPalCheckout(
     );
   }
   await clickPayButton(page);
-  const continuePayment = page.getByTestId("checkout-continue-payment");
-  if (await continuePayment.isVisible({ timeout: 30_000 }).catch(() => false)) {
-    await continuePayment.click();
+  const retryHandoff = page.getByTestId("checkout-retry-payment-handoff");
+  if (await retryHandoff.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await retryHandoff.click();
   }
 }
 
@@ -93,16 +93,16 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
 
     await clickPayButton(page);
 
-    // Hosted providers are intentionally two-step: the first action creates
-    // the durable attempt, the second navigates to the provider URL.
-    const continuePayment = page.getByTestId("checkout-continue-payment");
+    // Hosted providers navigate in the same tab. Retry is only a recovery path
+    // if the browser blocks or loses the initial navigation.
+    const retryHandoff = page.getByTestId("checkout-retry-payment-handoff");
     if (
-      await continuePayment
+      await retryHandoff
         .waitFor({ state: "visible", timeout: 30_000 })
         .then(() => true)
         .catch(() => false)
     ) {
-      await continuePayment.click();
+      await retryHandoff.click();
     }
 
     const buyer = getPayPalSandboxBuyer();
@@ -121,7 +121,7 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
     if (paypalRedirect) {
       await expect(page).toHaveURL(/paypal\.com/, { timeout: 10_000 });
 
-      if (/\/track\/order_/i.test(page.url())) {
+      if (/\/track\/(?:order_|cap_v3\.)/i.test(page.url())) {
         return;
       }
 
@@ -218,9 +218,9 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
       }
 
       await page
-        .waitForURL(/\/track\/order_/i, { timeout: 60_000 })
+        .waitForURL(/\/track\/(?:order_|cap_v3\.)/i, { timeout: 60_000 })
         .catch(() => {});
-      expect(page.url()).toMatch(/\/track\/order_/i);
+      expect(page.url()).toMatch(/\/track\/(?:order_|cap_v3\.)/i);
     } else {
       const paypalFrame = page.frameLocator("iframe[name*='paypal']").first();
       const loginBtn = paypalFrame

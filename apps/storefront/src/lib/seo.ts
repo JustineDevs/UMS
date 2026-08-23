@@ -122,6 +122,7 @@ type PageMetadataInput = {
   openGraphType?: "website" | "article";
   image?: string;
   imageAlt?: string;
+  referrer?: Metadata["referrer"];
 };
 
 export function buildPageMetadata({
@@ -133,6 +134,7 @@ export function buildPageMetadata({
   openGraphType = "website",
   image,
   imageAlt,
+  referrer,
 }: PageMetadataInput): Metadata {
   const canonical = path ? canonicalUrl(path) : undefined;
   const mergedKeywords = mergeKeywords([...SEO_KEYWORDS.sitewide], keywords);
@@ -155,6 +157,7 @@ export function buildPageMetadata({
       description,
       images: image ? [image] : undefined,
     },
+    referrer,
     robots: noindex
       ? { index: false, follow: false, googleBot: { index: false, follow: false } }
       : { index: true, follow: true, googleBot: { index: true, follow: true } },

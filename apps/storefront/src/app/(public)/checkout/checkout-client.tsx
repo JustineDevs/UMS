@@ -38,11 +38,13 @@ const XenditComponentsCheckout = dynamic(
 
 export function CheckoutClient({
   initialResumeCartId,
+  initialResumeToken,
   initialStripeCheckoutCancel,
   initialReviewMessage,
   guestMode,
 }: {
   initialResumeCartId?: string;
+  initialResumeToken?: string;
   initialStripeCheckoutCancel?: boolean;
   initialReviewMessage?: string;
   guestMode?: boolean;
@@ -56,6 +58,7 @@ export function CheckoutClient({
     error,
     setError,
     loading,
+    checkoutPhase,
     paymentMethod,
     setPaymentMethod,
     pendingPayment,
@@ -83,7 +86,7 @@ export function CheckoutClient({
     displayCurrency,
     handlePay,
     completeEmbeddedPayment,
-    resumePendingHostedPayment,
+    finalizeCheckoutAttempt,
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate,
@@ -112,6 +115,7 @@ export function CheckoutClient({
     guestMode: isGuestCheckout,
   } = useCheckoutClient({
     initialResumeCartId,
+    initialResumeToken,
     initialStripeCheckoutCancel,
     initialReviewMessage,
     guestMode,
@@ -119,7 +123,7 @@ export function CheckoutClient({
 
   if (authStatus === "loading" && !isGuestCheckout) {
     return (
-        <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-7xl">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -263,7 +267,7 @@ export function CheckoutClient({
             <button
               type="button"
               data-testid="checkout-unavailable-retry"
-              className="inline-flex rounded bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:opacity-90"
+              className="inline-flex min-h-11 items-center rounded bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:opacity-90"
               onClick={() => {
                 void retryCheckoutAvailability();
               }}
@@ -272,13 +276,13 @@ export function CheckoutClient({
             </button>
             <Link
               href="/cart"
-              className="inline-flex rounded border border-outline px-5 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container"
+              className="inline-flex min-h-11 items-center rounded border border-outline px-5 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container"
             >
               Back to bag
             </Link>
             <Link
               href="/account/orders"
-              className="inline-flex rounded border border-outline px-5 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container"
+              className="inline-flex min-h-11 items-center rounded border border-outline px-5 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container"
             >
               View orders
             </Link>
@@ -394,10 +398,10 @@ export function CheckoutClient({
         </span>
         <span className="mt-2 block leading-relaxed">
           Your bag total loads with shipping and taxes included. Card payments
-          continue to hosted Stripe Checkout. Wallet and local payment methods
-          continue through the configured provider. Cash on delivery places your
-          order with no card step. Your saved delivery address is used for
-          fulfillment.
+          continue to hosted Stripe Checkout. PayPal opens its secure approval
+          window, while Xendit may use hosted checkout or an embedded payment
+          component. Cash on delivery places your order with no card step. Your
+          saved delivery address is used for fulfillment.
         </span>
       </p>
 
@@ -558,7 +562,10 @@ export function CheckoutClient({
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Stay in touch
             </h2>
-            <label htmlFor="checkout-email" className="block text-xs font-medium text-on-surface-variant mb-2">
+            <label
+              htmlFor="checkout-email"
+              className="block text-xs font-medium text-on-surface-variant mb-2"
+            >
               Email for your receipt
             </label>
             <input
@@ -646,7 +653,7 @@ export function CheckoutClient({
                       void removePromoCode(medusaPricePreview?.cartId ?? "")
                     }
                     disabled={promoLoading}
-                    className="text-xs text-on-surface-variant underline hover:text-error disabled:opacity-50"
+                    className="inline-flex min-h-11 items-center text-xs text-on-surface-variant underline hover:text-error disabled:opacity-50"
                   >
                     Remove
                   </button>
@@ -677,7 +684,7 @@ export function CheckoutClient({
                       foreignCheckoutActive ||
                       !medusaPricePreview?.cartId
                     }
-                    className="rounded bg-primary px-4 py-2.5 text-xs font-bold text-on-primary hover:opacity-90 disabled:opacity-50"
+                    className="min-h-11 rounded bg-primary px-4 py-2.5 text-xs font-bold text-on-primary hover:opacity-90 disabled:opacity-50"
                   >
                     {promoLoading ? "Applying…" : "Apply"}
                   </button>
@@ -989,6 +996,27 @@ export function CheckoutClient({
               />
             ) : null}
 
+            <p
+              className="sr-only"
+              role="status"
+              aria-live="polite"
+              data-testid="checkout-phase"
+            >
+              {checkoutPhase === "starting"
+                ? "Preparing secure checkout."
+                : checkoutPhase === "redirecting"
+                  ? "Redirecting to your payment provider in this tab."
+                  : checkoutPhase === "awaiting_provider"
+                    ? "Waiting for your payment provider to confirm payment."
+                    : checkoutPhase === "embedded"
+                      ? "Secure payment form ready."
+                      : checkoutPhase === "finalizing"
+                        ? "Confirming your payment and order."
+                        : checkoutPhase === "error"
+                          ? "Checkout could not continue. Review the error and try again."
+                          : "Checkout ready."}
+            </p>
+
             {pendingPayment && (
               <div
                 className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4 text-left"
@@ -1017,12 +1045,38 @@ export function CheckoutClient({
                     </p>
                   </div>
                 ) : null}
-                <p className="text-sm text-on-surface-variant mb-3">
-                  Open {pendingPayment.providerLabel} in a secure tab, complete
-                  payment there, then return here to confirm the result if the
-                  provider does not bring you back automatically. Save your
-                  tracking link to follow your order status.
-                </p>
+                {pendingPayment.actionKind === "qr" ? (
+                  <>
+                    <p className="text-sm text-on-surface-variant mb-3">
+                      Scan this {pendingPayment.providerLabel} QR code with your
+                      banking or wallet app. Your order is created only after
+                      the provider confirms payment.
+                    </p>
+                    {pendingPayment.qrImageUrl ? (
+                      <Image
+                        src={pendingPayment.qrImageUrl}
+                        alt={`${pendingPayment.providerLabel} payment QR code`}
+                        width={240}
+                        height={240}
+                        unoptimized
+                        referrerPolicy="no-referrer"
+                        className="mx-auto mb-3 rounded bg-white p-2"
+                      />
+                    ) : null}
+                    {pendingPayment.qrPayload ? (
+                      <code className="mb-3 block break-all rounded bg-white px-2 py-1.5 text-xs text-on-surface-variant">
+                        {pendingPayment.qrPayload}
+                      </code>
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="text-sm text-on-surface-variant mb-3">
+                    Redirecting to {pendingPayment.providerLabel} in this tab.
+                    Complete payment there; your order is created only after the
+                    provider confirms it. Save your tracking link to follow
+                    status.
+                  </p>
+                )}
                 <p className="font-mono text-[11px] break-all text-on-surface-variant bg-surface-container-lowest rounded px-2 py-1.5 mb-3">
                   {pendingPayment.trackingPageUrl}
                 </p>
@@ -1030,20 +1084,38 @@ export function CheckoutClient({
                   <button
                     type="button"
                     onClick={() => void copyTrackingLink()}
-                    className="flex-1 py-2.5 rounded border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest hover:bg-surface-container transition-colors"
+                    className="flex min-h-11 flex-1 items-center justify-center rounded border border-outline-variant py-2.5 text-on-surface-variant text-xs font-bold uppercase tracking-widest hover:bg-surface-container transition-colors"
                   >
                     {copyDone ? "Copied" : "Copy tracking link"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={!pendingPayment.correlationId || loading}
-                    onClick={() =>
-                      void resumePendingHostedPayment(pendingPayment)
-                    }
-                    className="flex-1 py-2.5 rounded border border-primary text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    I completed payment
-                  </button>
+                  {pendingPayment.actionKind === "qr" ? (
+                    <button
+                      type="button"
+                      data-testid="checkout-check-qr-payment"
+                      autoFocus
+                      disabled={loading || !pendingPayment.correlationId}
+                      onClick={() => {
+                        if (pendingPayment.correlationId) {
+                          void finalizeCheckoutAttempt({
+                            correlationId: pendingPayment.correlationId,
+                          });
+                        }
+                      }}
+                      className="flex min-h-11 flex-1 items-center justify-center rounded border border-primary py-2.5 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {loading ? "Checking payment..." : "Check payment status"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      data-testid="checkout-retry-payment-handoff"
+                      autoFocus
+                      onClick={continueToHostedCheckout}
+                      className="flex min-h-11 flex-1 items-center justify-center rounded border border-primary py-2.5 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary hover:text-on-primary transition-colors"
+                    >
+                      Retry payment handoff
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1051,7 +1123,7 @@ export function CheckoutClient({
                       setCopyDone(false);
                       setError(null);
                     }}
-                    className="flex-1 py-2.5 rounded border border-outline-variant text-on-surface-variant text-xs font-bold uppercase tracking-widest hover:border-error hover:text-error transition-colors"
+                    className="flex min-h-11 flex-1 items-center justify-center rounded border border-outline-variant py-2.5 text-on-surface-variant text-xs font-bold uppercase tracking-widest hover:border-error hover:text-error transition-colors"
                   >
                     Start over
                   </button>
@@ -1076,8 +1148,16 @@ export function CheckoutClient({
                   </p>
                   <PayPalEmbeddedCheckout
                     paypalOrderId={embeddedData.paypalOrderId}
-                    onApprove={() => {
-                      void completeEmbeddedPayment(embeddedData);
+                    onApprove={(paypalOrderId) => {
+                      return completeEmbeddedPayment(
+                        embeddedData,
+                        paypalOrderId,
+                      );
+                    }}
+                    onCancel={() => {
+                      setError(
+                        "PayPal payment was canceled. Your bag is unchanged; you can try again or choose another payment method.",
+                      );
                     }}
                     onError={(msg) => setError(msg)}
                   />
@@ -1157,6 +1237,7 @@ export function CheckoutClient({
             <button
               type="button"
               data-testid="checkout-submit-pay"
+              aria-live="polite"
               disabled={
                 !hydrated ||
                 lines.length === 0 ||
@@ -1189,17 +1270,6 @@ export function CheckoutClient({
                           ? `Pay ${formatCheckoutMoney(medusaPricePreview.total, displayCurrency)}`
                           : "Continue to payment"}
             </button>
-
-            {pendingPayment && (
-              <button
-                type="button"
-                data-testid="checkout-continue-payment"
-                onClick={continueToHostedCheckout}
-                className="w-full mt-3 py-4 border-2 border-primary text-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:bg-primary hover:text-on-primary transition-all"
-              >
-                Continue to {pendingPayment.providerLabel}
-              </button>
-            )}
 
             <p className="text-xs text-on-surface-variant mt-4 text-center">
               {paymentMethod === "COD" && !embeddedData && !pendingPayment ? (

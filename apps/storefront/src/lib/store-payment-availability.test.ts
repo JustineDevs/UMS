@@ -14,6 +14,17 @@ test("wallets require an active organization connection while COD remains region
   );
 });
 
+test("wallets ignore active connections owned by another organization", () => {
+  assert.deepEqual(
+    filterConnectedPaymentProviders(
+      ["STRIPE", "PAYPAL", "COD"],
+      [{ organization_id: "org_other", provider: "stripe", active: true }],
+      { organizationId: "org_store", xenditConfigured: false },
+    ),
+    ["COD"],
+  );
+});
+
 test("Xendit requires both server credentials unless an active connection exists", () => {
   assert.deepEqual(
     filterConnectedPaymentProviders(

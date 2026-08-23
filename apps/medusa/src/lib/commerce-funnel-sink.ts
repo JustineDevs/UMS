@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { tryCreateSupabaseClient } from "./payment-supabase-bridge";
+import { safeLogIdentifier } from "./safe-log";
 
 type LoggerLike = {
   info?: (msg: string) => void;
@@ -21,7 +22,13 @@ export async function emitOrderPlacedFunnelEvent(params: {
     channel: params.channel,
     ts: new Date().toISOString(),
   };
-  params.logger.info?.(JSON.stringify(payload));
+  params.logger.info?.(
+    JSON.stringify({
+      ...payload,
+      order_id: safeLogIdentifier(params.orderId),
+      display_id: safeLogIdentifier(params.displayId),
+    }),
+  );
 
   const sb = tryCreateSupabaseClient();
   if (sb) {

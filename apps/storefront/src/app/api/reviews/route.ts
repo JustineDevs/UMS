@@ -1,6 +1,4 @@
-import { getServerSession } from "next-auth/next";
-
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
 import { findVerifiedProductPurchaseForCustomer } from "@/lib/medusa-review-verification";
 import {
@@ -20,9 +18,21 @@ import {
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
 } from "@universal-music-store/validation";
+import {
+  reviewBodyHash,
+  reviewFormTimingIsValid,
+  validateReviewBody,
+} from "@/lib/review-content";
+import { reviewCsrfCookieName, verifyReviewCsrfToken } from "@/lib/review-csrf";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import {
+  decodeReviewCursor,
+  encodeReviewCursor,
+  PUBLIC_REVIEW_FIELDS,
+} from "@/lib/review-api-contract";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
-const PUBLIC_REVIEW_FIELDS =
-  "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,status";
+const MAX_REVIEW_BODY_BYTES = 16 * 1024;
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
@@ -37,6 +47,8 @@ export async function GET(req: Request) {
   const listParsed = storefrontReviewsListQuerySchema.safeParse({
     productSlug: u.searchParams.get("productSlug")?.trim() || undefined,
     medusaProductId: u.searchParams.get("medusaProductId")?.trim() || undefined,
+    cursor: u.searchParams.get("cursor")?.trim() || undefined,
+    limit: u.searchParams.get("limit") || undefined,
   });
   if (!listParsed.success) {
     return Response.json(
@@ -47,7 +59,11 @@ export async function GET(req: Request) {
       { status: 400 },
     );
   }
-  const { productSlug = "", medusaProductId = "" } = listParsed.data;
+  const { productSlug = "", medusaProductId = "", cursor, limit } = listParsed.data;
+  const decodedCursor = cursor ? decodeReviewCursor(cursor) : null;
+  if (cursor && !decodedCursor) {
+    return Response.json({ error: "Invalid review cursor" }, { status: 400 });
+  }
   const sb = createStorefrontAnonSupabase();
   if (!sb) {
     return Response.json({ error: "Service unavailable" }, { status: 503 });
@@ -56,13 +72,20 @@ export async function GET(req: Request) {
     .from("product_reviews")
     .select(PUBLIC_REVIEW_FIELDS)
     .eq("status", "approved")
+    .eq("shadow_banned", false)
     .order("created_at", { ascending: false })
-    .limit(50);
-  if (medusaProductId && productSlug) {
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (decodedCursor?.id) {
     q = q.or(
-      `medusa_product_id.eq.${medusaProductId},product_slug.eq.${productSlug}`,
+      `created_at.lt.${decodedCursor.createdAt},and(created_at.eq.${decodedCursor.createdAt},id.lt.${decodedCursor.id})`,
     );
-  } else if (medusaProductId) {
+  } else if (decodedCursor) {
+    q = q.lt("created_at", decodedCursor.createdAt);
+  }
+  // The Medusa product ID is the canonical identity. Do not interpolate the
+  // editorial slug into a PostgREST expression; slugs are display metadata.
+  if (medusaProductId) {
     q = q.eq("medusa_product_id", medusaProductId);
   } else {
     q = q.eq("product_slug", productSlug);
@@ -79,7 +102,19 @@ export async function GET(req: Request) {
     seen.add(id);
     return true;
   });
-  return Response.json({ reviews: deduped });
+  const last = rows.at(-1) as { created_at?: unknown; id?: unknown } | undefined;
+  const nextCursor =
+    rows.length === limit && typeof last?.created_at === "string" && typeof last.id === "string"
+      ? encodeReviewCursor(last.created_at, last.id)
+      : null;
+  return Response.json(
+    { reviews: deduped, nextCursor },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300",
+      },
+    },
+  );
 }
 
 function displayNameFromSession(params: {
@@ -93,6 +128,9 @@ function displayNameFromSession(params: {
 }
 
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-post:${ip}`, 15, 60_000);
   if (!rl.ok) {
@@ -102,7 +140,7 @@ async function handlePOST(req: Request) {
     );
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const emailRaw = session?.user?.email?.trim();
   if (!emailRaw) {
     return Response.json(
@@ -111,13 +149,17 @@ async function handlePOST(req: Request) {
     );
   }
   const email = emailRaw.toLowerCase();
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const userRl = await rateLimitFixedWindow(`reviews-post-user:${email}`, 5, 10 * 60_000);
+  if (!userRl.ok) {
+    return Response.json({ error: "You have submitted too many reviews recently.", retryAfter: userRl.retryAfterSec }, { status: 429 });
   }
+
+  const bounded = await parseBoundedJson(req, MAX_REVIEW_BODY_BYTES);
+  if (bounded.tooLarge) {
+    return Response.json({ error: "Request body too large" }, { status: 413 });
+  }
+  const body: unknown = bounded.valid ? bounded.value : null;
+  if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
   if (!isRecaptchaConfigured()) {
     return Response.json({ error: "Security verification unavailable" }, { status: 503 });
   }
@@ -136,10 +178,15 @@ async function handlePOST(req: Request) {
     );
   }
   const o = postParsed.data;
+  if (o._hp.trim()) return Response.json({ error: "Unable to submit review" }, { status: 400 });
+  if (!reviewFormTimingIsValid(o.formStartedAt)) return Response.json({ error: "Please take a moment to complete your review." }, { status: 400 });
+  const csrfCookie = req.headers.get("cookie")?.match(new RegExp(`${reviewCsrfCookieName()}=([^;]+)`))?.[1];
+  if (!verifyReviewCsrfToken(o.csrfToken, csrfCookie)) return Response.json({ error: "Security token expired. Reload and try again." }, { status: 403 });
+  const content = validateReviewBody(o.body);
+  if (!content.ok) return Response.json({ error: content.reason }, { status: 400 });
 
   const productSlug = o.productSlug;
   const medusaProductId = o.medusaProductId;
-  const reviewBody = o.body;
   const rating = o.rating;
 
   const customerId = await findOrCreateMedusaCustomerIdByEmail(email);
@@ -168,6 +215,15 @@ async function handlePOST(req: Request) {
     );
   }
 
+  const { data: duplicate } = await sb
+    .from("product_reviews")
+    .select("id")
+    .eq("body_hash", reviewBodyHash(content.normalized))
+    .in("status", ["pending", "approved", "hidden"])
+    .limit(1)
+    .maybeSingle();
+  if (duplicate) return Response.json({ error: "An identical review has already been submitted.", code: "DUPLICATE_REVIEW" }, { status: 409 });
+
   const insertRow = {
     product_slug: productSlug,
     medusa_product_id: medusaProductId,
@@ -179,7 +235,10 @@ async function handlePOST(req: Request) {
         : typeof o.imageUrl === "string"
           ? o.imageUrl.trim() || null
           : null,
-    body: reviewBody,
+    body: content.cleaned,
+    body_hash: content.hash,
+    risk_score: verified.verified ? 0 : 20,
+    shadow_banned: false,
     status: "pending" as const,
     medusa_customer_id: customerId,
     customer_email: email,

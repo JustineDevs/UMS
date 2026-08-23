@@ -4,6 +4,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 async function patch(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -15,13 +16,11 @@ async function patch(req: NextRequest) {
   if (!session?.user?.email) {
     return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
   }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-  const raw = body as { name?: unknown };
+  const parsedBody = await parseBoundedJson(req, 16 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const raw = (parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
+    ? parsedBody.value
+    : {}) as { name?: unknown };
   const name =
     typeof raw.name === "string" ? raw.name.trim().slice(0, 200) : "";
 

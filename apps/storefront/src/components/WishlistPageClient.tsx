@@ -13,7 +13,7 @@ import {
   onWishlistChange,
   persistWishlistMutation,
 } from "@/lib/wishlist";
-import { readCart, writeCart } from "@/lib/cart";
+import { addCartLine } from "@/lib/cart";
 
 type AddToBagState = "idle" | "loading" | "done" | "error";
 
@@ -110,15 +110,17 @@ export function WishlistPageClient() {
       let variantId: string | undefined;
       let variantPrice: number | null = null;
       let variantSku = "";
+      let variantCurrency: string | undefined;
       if (item.medusaProductId) {
         const res = await fetch(
           `/api/catalog/product-default-variant?productId=${encodeURIComponent(item.medusaProductId)}`,
         );
         if (res.ok) {
-          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null };
+          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null; currency?: string };
           variantId = json.variantId?.trim() || undefined;
           variantPrice = json.price ?? null;
           variantSku = json.sku ?? "";
+          variantCurrency = json.currency?.trim().toUpperCase() || undefined;
         }
       }
       if (!variantId) {
@@ -126,10 +128,11 @@ export function WishlistPageClient() {
           `/api/catalog/product-default-variant?slug=${encodeURIComponent(item.slug)}`,
         );
         if (res.ok) {
-          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null };
+          const json = (await res.json()) as { variantId?: string; sku?: string; price?: number | null; currency?: string };
           variantId = json.variantId?.trim() || undefined;
           variantPrice = json.price ?? null;
           variantSku = json.sku ?? "";
+          variantCurrency = json.currency?.trim().toUpperCase() || variantCurrency;
         }
       }
       if (!variantId) {
@@ -138,30 +141,17 @@ export function WishlistPageClient() {
       if (variantPrice == null) {
         throw new Error("The current price is unavailable. View the product page before adding it to your bag.");
       }
-      const current = readCart();
-      const existing = current.find((l) => l.variantId === variantId);
-      if (existing) {
-        const updated = current.map((l) =>
-          l.variantId === variantId
-            ? { ...l, quantity: l.quantity + 1, price: variantPrice ?? l.price, sku: variantSku || l.sku }
-            : l,
-        );
-        writeCart(updated);
-      } else {
-        writeCart([
-          ...current,
-          {
-            variantId,
-            quantity: 1,
-            price: variantPrice,
-            name: item.name,
-            slug: item.slug ?? "",
-            sku: variantSku,
-            type: "",
-            finish: "",
-          },
-        ]);
-      }
+      addCartLine({
+        variantId,
+        quantity: 1,
+        price: variantPrice,
+        name: item.name,
+        slug: item.slug ?? "",
+        sku: variantSku,
+        type: "",
+        finish: "",
+        ...(variantCurrency ? { currencyCode: variantCurrency } : {}),
+      });
       addingRef.current[key] = "done";
       setAddingStates((p) => ({ ...p, [key]: "done" }));
       setStatusMsg(`"${item.name}" added to bag.`);

@@ -8,7 +8,22 @@ export const PUBLIC_DELIVERY_KINDS = [
 ] as const;
 
 export type PublicDeliveryKind = (typeof PUBLIC_DELIVERY_KINDS)[number];
-export type PublicDeliveryStatus = "pending" | "sent" | "failed";
+export type PublicDeliveryStatus =
+  | "queued" | "sent" | "bounced" | "failed" | "suppressed" | "retry" | "unsubscribe";
+
+const transitions: Record<PublicDeliveryStatus, readonly PublicDeliveryStatus[]> = {
+  queued: ["sent", "bounced", "failed", "suppressed", "retry", "unsubscribe"],
+  retry: ["sent", "bounced", "failed", "suppressed", "retry", "unsubscribe"],
+  sent: ["bounced", "unsubscribe"],
+  bounced: ["retry", "suppressed", "unsubscribe"],
+  failed: ["retry", "suppressed", "unsubscribe"],
+  suppressed: [],
+  unsubscribe: [],
+};
+
+export function canTransitionPublicDelivery(current: PublicDeliveryStatus, next: PublicDeliveryStatus): boolean {
+  return current === next || transitions[current].includes(next);
+}
 
 export function publicDeliveryIdempotencyKey(
   kind: PublicDeliveryKind,
@@ -33,6 +48,7 @@ export async function recordPublicDeliveryAttempt(
       aggregate_id: input.aggregateId,
       recipient: input.recipient ?? null,
       provider: input.provider,
+      status: "queued",
       idempotency_key:
         input.idempotencyKey ?? publicDeliveryIdempotencyKey(input.kind, input.aggregateId),
     },
@@ -45,7 +61,7 @@ export async function finishPublicDeliveryAttempt(
   supabase: SupabaseClient,
   idempotencyKey: string,
   result: {
-    status: Exclude<PublicDeliveryStatus, "pending">;
+    status: Exclude<PublicDeliveryStatus, "queued" | "retry">;
     providerMessageId?: string | null;
     error?: string | null;
     sentAt?: string | null;
@@ -61,4 +77,36 @@ export async function finishPublicDeliveryAttempt(
     })
     .eq("idempotency_key", idempotencyKey);
   return !error;
+}
+
+export async function updatePublicDeliveryStatus(
+  supabase: SupabaseClient,
+  idempotencyKey: string,
+  result: { from: PublicDeliveryStatus; status: PublicDeliveryStatus; error?: string | null; suppressionReason?: string | null; nextAttemptAt?: string | null },
+): Promise<boolean> {
+  if (!canTransitionPublicDelivery(result.from, result.status)) return false;
+  const { error } = await supabase.from("public_delivery_attempts").update({
+    status: result.status,
+    last_error: result.error ?? null,
+    suppression_reason: result.suppressionReason ?? null,
+    next_attempt_at: result.nextAttemptAt ?? null,
+    last_attempt_at: new Date().toISOString(),
+  }).eq("idempotency_key", idempotencyKey);
+  return !error;
+}
+
+export async function isEmailUnsubscribed(
+  supabase: SupabaseClient,
+  email: string,
+  organizationId: string | null = null,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.from("marketing_preferences")
+      .select("consent_status").eq("organization_id", organizationId)
+      .eq("email", email.trim().toLowerCase()).eq("channel", "email").maybeSingle();
+    return !error && data?.consent_status === "unsubscribed";
+  } catch {
+    // A consent lookup failure must not turn into an unsolicited send.
+    return true;
+  }
 }

@@ -1,5 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import {
+  buildPaymentPlatformAlerts,
   getPaymentPlatformMetrics,
   tryCreateSupabaseClient,
 } from "../../../lib/payment-supabase-bridge";
@@ -60,6 +61,7 @@ export async function GET(
   const cronSecretConfigured = Boolean(process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim());
   const storefrontOriginConfigured = Boolean(process.env.STOREFRONT_ORIGIN?.trim());
   const reconciliationConfigured = cronSecretConfigured && storefrontOriginConfigured;
+  const alerts = platformMetrics ? buildPaymentPlatformAlerts(platformMetrics) : [];
 
   res.json({
     configuredCount,
@@ -75,6 +77,20 @@ export async function GET(
       storefrontOriginConfigured,
       reconciliationConfigured,
       ledgerMetrics: platformMetrics,
+      alerts,
+      alerting: {
+        measured: [
+          "stale_finalize_attempts",
+          "needs_review_attempts",
+          "unprocessed_webhook_backlog",
+          "outbox_backlog",
+          "failed_background_jobs",
+          "cod_capture_backlog",
+          "webhook_signature_failures_24h",
+          "webhook_dedup_anomalies_24h",
+        ],
+        pendingInstrumentation: [],
+      },
     },
   });
 }

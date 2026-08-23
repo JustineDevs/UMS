@@ -9,7 +9,6 @@ on:
 jobs:
   pnpm-audit:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -19,7 +18,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Audit (triage check)
         run: node stress-test/scripts/check-audit-triage.js
       - name: Storefront client boundary (no server secrets in client graph)

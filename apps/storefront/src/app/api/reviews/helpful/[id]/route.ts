@@ -1,5 +1,4 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import {
   createStorefrontServiceSupabase,
 } from "@/lib/storefront-supabase";
@@ -8,11 +7,16 @@ import {
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
 import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { isReviewId } from "@/lib/review-api-contract";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`review-helpful:${ip}`, 20, 60_000);
   if (!rl.ok) {
@@ -23,11 +27,11 @@ export async function POST(
   }
 
   const { id: reviewId } = await params;
-  if (!reviewId?.trim()) {
-    return Response.json({ error: "Missing review id" }, { status: 400 });
+  if (!reviewId?.trim() || !isReviewId(reviewId)) {
+    return Response.json({ error: "Invalid review id" }, { status: 400 });
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const email = session?.user?.email?.trim().toLowerCase();
 
   const sb = createStorefrontServiceSupabase();

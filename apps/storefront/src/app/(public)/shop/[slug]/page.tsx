@@ -8,6 +8,8 @@ import {
   ProductDetailsAccordions,
   ProductSpecifications,
 } from "@/components/ProductDetailsAccordions";
+import { ProductAudioHub } from "@/components/ProductAudioHub";
+import { ProductTrustPanel } from "@/components/ProductTrustPanel";
 import { ProductGalleryCarousel } from "@/components/ProductGalleryCarousel";
 import { ProductRatingNearTitle } from "@/components/ProductRatingNearTitle";
 import { ProductQaSection } from "@/components/ProductQaSection";
@@ -17,8 +19,7 @@ import { TrustBadgesStrip } from "@/components/TrustBadgesStrip";
 import { ProductViewTracker } from "@/components/ProductViewTracker";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { ShareProductButton } from "@/components/ShareProductButton";
-import { fetchRelatedProducts } from "@/lib/catalog-fetch";
-import { getCachedProductBySlug } from "@/lib/cached-product";
+import { fetchProductBySlug, fetchRelatedProducts } from "@/lib/catalog-fetch";
 import { fetchProductQaEntries } from "@/lib/product-qa";
 import {
   fetchProductReviews,
@@ -33,9 +34,10 @@ import {
   SITE_NAME,
 } from "@/lib/seo";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
+import { ProductVariantProvider } from "@/components/ProductVariantProvider";
+import { ProductSelectedPrice } from "@/components/ProductSelectedPrice";
 
-/** ISR-style caching; live stock is enforced at Medusa checkout. */
-export const revalidate = 120;
+/** Product detail reads stay live so variant availability does not inherit catalog ISR. */
 export const dynamic = "force-dynamic";
 
 export async function generateStaticParams() {
@@ -54,7 +56,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const res = await getCachedProductBySlug(slug);
+  const res = await fetchProductBySlug(slug);
   if (res.kind !== "ok") {
     return { title: "Product" };
   }
@@ -83,7 +85,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
-  const res = await getCachedProductBySlug(slug);
+  const res = await fetchProductBySlug(slug);
 
   if (res.kind === "misconfigured" || res.kind === "service_error") {
     return (
@@ -162,6 +164,7 @@ export default async function ProductPage({ params }: Props) {
           <span className="text-primary font-medium" aria-current="page">{product.name}</span>
         </nav>
         <ProductViewTracker slug={slug} id={product.id} />
+        <ProductVariantProvider product={product}>
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:gap-14 xl:grid-cols-2 xl:gap-16 2xl:gap-20">
           <div className="min-w-0 space-y-8 xl:max-w-none">
             <ProductGalleryCarousel
@@ -195,10 +198,7 @@ export default async function ProductPage({ params }: Props) {
               average={reviewSummary.average}
               count={reviewSummary.count}
             />
-            <p className="text-xl font-body text-on-surface-variant">
-              PHP {minPrice.toLocaleString("en-PH")}
-              <span className="ml-2 text-xs text-on-surface-variant font-normal uppercase tracking-wider">VAT incl.</span>
-            </p>
+            <ProductSelectedPrice fallback={minPrice} />
             <div className="flex flex-wrap gap-3 pt-1 text-xs">
               <Link
                 href={compareHref}
@@ -235,6 +235,8 @@ export default async function ProductPage({ params }: Props) {
             <TrustBadgesStrip />
             <div className="border-t border-outline-variant/20 pt-8">
               <ProductSpecifications product={product} />
+              <ProductAudioHub product={product} />
+              <ProductTrustPanel product={product} />
             </div>
             <div className="border-t border-outline-variant/20 pt-8 xl:hidden">
               <ProductDetailsAccordions
@@ -245,6 +247,7 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       </div>
+      </ProductVariantProvider>
 
       {product.lifestyleImageUrl?.trim() ? (
         <section

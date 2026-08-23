@@ -11,6 +11,15 @@ type TrackingLinkRouteInput = {
   buildTrackingUrl: (_cartId: string) => string | null;
 };
 
+function isOpaqueTrackingUrl(value: string): boolean {
+  try {
+    const url = new URL(value, "https://tracking.invalid");
+    return url.pathname.startsWith("/track/cap_") && !url.search && !url.hash;
+  } catch {
+    return false;
+  }
+}
+
 export function trackingLinkRouteLogic(
   input: TrackingLinkRouteInput,
 ): TrackingLinkRouteResult {
@@ -36,10 +45,10 @@ export function trackingLinkRouteLogic(
   }
 
   const url = input.buildTrackingUrl(cartId);
-  if (!url) {
+  if (!url || !isOpaqueTrackingUrl(url)) {
     return {
       status: 503,
-      body: { error: "Tracking links require TRACKING_HMAC_SECRET (not configured)" },
+      body: { error: "Tracking links require an opaque capability (not configured)" },
     };
   }
 

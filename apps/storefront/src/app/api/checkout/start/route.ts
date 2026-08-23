@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { registerPaymentAttempt } from "@universal-music-store/platform-data";
-import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
+import {
+  recordCommerceAttribution,
+  registerPaymentAttempt,
+  updatePaymentAttemptByCorrelationId,
+} from "@universal-music-store/platform-data";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN, normalizeCommerceAttribution, type CommerceAttribution } from "@universal-music-store/sdk";
 
 import { getStorefrontSession } from "@/lib/auth";
 import { applyRateLimit, parseJsonBody } from "@/lib/cart-api-helpers";
@@ -13,6 +17,7 @@ import { formatMedusaCheckoutError } from "@/lib/medusa-checkout-errors";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +27,7 @@ type StartBody = {
   providerId?: string;
   loyaltyPointsToRedeem?: number;
   shippingOptionId?: string;
+  attribution?: CommerceAttribution;
 };
 
 const PROVIDER_IDS = new Set<string>(Object.values(PAYMENT_PROVIDER_IDS));
@@ -53,11 +59,14 @@ function normalizeLines(lines: StartBody["lines"]): MedusaCheckoutLine[] {
           ? Math.floor(line.quantity)
           : 0,
     }))
-    .filter((line) => line.variantId.length > 0 && line.quantity > 0 && line.quantity <= 99)
+    .filter((line) => line.variantId.length > 0 && line.quantity > 0 && line.quantity <= 999)
     .slice(0, 50);
 }
 
 export async function POST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const session = await getStorefrontSession();
   const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
 
@@ -107,6 +116,7 @@ export async function POST(req: Request) {
         typeof parsed.data.shippingOptionId === "string" && parsed.data.shippingOptionId.trim()
           ? parsed.data.shippingOptionId.trim()
           : undefined,
+      attribution: normalizeCommerceAttribution(parsed.data.attribution),
     });
     const trackingBase =
       process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
@@ -114,6 +124,11 @@ export async function POST(req: Request) {
     if (!sb) {
       return NextResponse.json({ error: "Payment ledger is not configured." }, { status: 503 });
     }
+    await recordCommerceAttribution(sb, {
+      cartId: result.cartId,
+      organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
+      attribution: normalizeCommerceAttribution(parsed.data.attribution),
+    });
     const registered = await registerCheckoutIntentRouteLogic({
       organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
       cartId: result.cartId,
@@ -127,6 +142,7 @@ export async function POST(req: Request) {
       variantIds: result.variantIds,
       productIds: result.productIds,
       providerSessionId: result.paymentSessionId,
+      providerPaymentId: result.providerPaymentId,
       supabaseAvailable: true,
       registerPaymentAttempt: (input) => registerPaymentAttempt(sb, input),
     });
@@ -137,10 +153,18 @@ export async function POST(req: Request) {
     if (typeof correlationId !== "string" || !correlationId) {
       return NextResponse.json({ error: "Could not register payment attempt." }, { status: 502 });
     }
+    if (result.providerPaymentId) {
+      await updatePaymentAttemptByCorrelationId(sb, correlationId, {
+        provider_payment_id: result.providerPaymentId,
+      });
+    }
     return jsonResponse({
       ...result,
       correlationId,
-      trackingPageUrl: buildTrackingUrl(trackingBase, result.cartId),
+      trackingPageUrl: buildTrackingUrl(trackingBase, result.cartId, {
+        customerEmail: email,
+        storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+      }),
     }, 200, result.cartId);
   } catch (error) {
     const safeError = formatMedusaCheckoutError(error);

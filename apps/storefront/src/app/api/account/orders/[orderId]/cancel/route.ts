@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { accountMutationFailure } from "@/lib/account-mutation-error";
+import {
+  buildOrderCancellationIdempotencyKey,
+  isCancellableOrderStatus,
+} from "@/lib/account-order-mutation";
 
 export const runtime = "nodejs";
-
-const CANCELLABLE_STATUSES = new Set(["pending", "pending_payment", "requires_action"]);
 
 async function handlePOST(
   _req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> },
 ) {
+  if (!isSameOriginMutation(_req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(_req);
   const rl = await rateLimitFixedWindow(`order-cancel:${ip}`, 10, 60_000);
   if (!rl.ok) {
@@ -23,7 +29,7 @@ async function handlePOST(
     );
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const userEmail = session?.user?.email?.trim();
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,36 +38,51 @@ async function handlePOST(
   const { orderId } = await params;
   const trimmedId = orderId.trim();
 
-  const { orders } = await fetchCustomerOrders(userEmail);
+  const { orders, error: ordersError } = await fetchCustomerOrders(userEmail);
+  if (ordersError) {
+    const correlationId = crypto.randomUUID();
+    console.error("cancel order lookup failed", { correlationId });
+    return NextResponse.json(
+      accountMutationFailure("Could not load the order right now.", correlationId),
+      { status: 503 },
+    );
+  }
   const match = orders.find((o) => o.id === trimmedId);
   if (!match) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  if (!CANCELLABLE_STATUSES.has(match.status)) {
+  if (!isCancellableOrderStatus(match.status)) {
     return NextResponse.json(
-      { error: `Order cannot be cancelled in status: ${match.status}` },
+      { error: "This order can no longer be cancelled." },
       { status: 422 },
     );
   }
 
   try {
+    const idempotencyKey = buildOrderCancellationIdempotencyKey(userEmail, trimmedId);
     const res = await medusaAdminFetch(`/admin/orders/${trimmedId}/cancel`, {
       method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify({}),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.error("Medusa cancel order failed:", res.status, text);
+      const correlationId = crypto.randomUUID();
+      console.error("Medusa cancel order failed", { correlationId, status: res.status, detailLength: text.length });
       return NextResponse.json(
-        { error: "Could not cancel order with Medusa" },
-        { status: res.status },
+        accountMutationFailure("Could not cancel the order right now.", correlationId),
+        { status: 502 },
       );
     }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("cancel order error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 503 });
+    const correlationId = crypto.randomUUID();
+    console.error("cancel order error", { correlationId, error: err instanceof Error ? err.message : "unknown" });
+    return NextResponse.json(
+      accountMutationFailure("Could not cancel the order right now.", correlationId),
+      { status: 503 },
+    );
   }
 }
 

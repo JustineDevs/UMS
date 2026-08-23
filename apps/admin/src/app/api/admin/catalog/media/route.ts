@@ -4,6 +4,7 @@ import {
   CMS_MEDIA_TAG_CATALOG_PRODUCT,
   insertCmsMedia,
   listCmsMedia,
+  ensureExternalCatalogProductMediaRows,
   type ListCmsMediaOptions,
 } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
@@ -15,10 +16,12 @@ import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 
 const BUCKET = "catalog";
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+const MAX_CATALOG_MEDIA_BODY_BYTES = MAX_VIDEO_BYTES + 256 * 1024;
 
 function safeSegment(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 128);
@@ -42,6 +45,31 @@ export async function GET(req: NextRequest) {
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
   if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sp = req.nextUrl.searchParams;
+  try {
+    const productsRes = await medusaAdminFetch(
+      "/admin/products?limit=200&fields=id,title,thumbnail,*images",
+      { method: "GET" },
+    );
+    if (productsRes.ok) {
+      const body = (await productsRes.json()) as { products?: unknown[] };
+      const urls = (body.products ?? []).flatMap((raw) => {
+        if (!raw || typeof raw !== "object") return [];
+        const product = raw as Record<string, unknown>;
+        const images = Array.isArray(product.images) ? product.images : [];
+        return [
+          product.thumbnail,
+          ...images.map((image) =>
+            image && typeof image === "object"
+              ? (image as Record<string, unknown>).url
+              : null,
+          ),
+        ].filter((url): url is string => typeof url === "string" && url.trim().length > 0);
+      });
+      await ensureExternalCatalogProductMediaRows(sup.client, urls, organization.id);
+    }
+  } catch {
+    // Commerce media mirroring is best effort; the CMS media list remains available.
+  }
   const opts: ListCmsMediaOptions = {
     limit: Math.min(Number(sp.get("limit")) || 200, 500),
     search: sp.get("q") ?? undefined,
@@ -68,6 +96,11 @@ async function post(req: NextRequest) {
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
   if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sb = sup.client;
+
+  const contentLength = Number(req.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > MAX_CATALOG_MEDIA_BODY_BYTES) {
+    return correlatedJson(cid, { error: "Upload is too large" }, { status: 413 });
+  }
 
   let form: FormData;
   try {

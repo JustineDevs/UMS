@@ -11,7 +11,10 @@ import { medusaCartIdSchema } from "@universal-music-store/validation";
 import { MEDUSA_CART_COOKIE } from "./cart-cookie";
 import { createStorefrontMedusaSdk } from "./medusa-sdk";
 import { medusaCartToCartLines } from "./medusa-cart-to-lines";
-import { getRequestIp, rateLimitFixedWindow } from "./storefront-api-rate-limit";
+import {
+  getRequestIp,
+  rateLimitFixedWindow,
+} from "./storefront-api-rate-limit";
 import type { CartLine } from "./cart";
 
 export type RateLimitResult =
@@ -101,6 +104,11 @@ export async function writeCartCookie(cartId: string): Promise<void> {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+}
+
+export async function clearCartCookie(): Promise<void> {
+  const jar = await cookies();
+  jar.delete(MEDUSA_CART_COOKIE);
 }
 
 /**

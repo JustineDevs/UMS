@@ -35,6 +35,11 @@ export type SharedSessionUser = {
   permissions?: string[];
 };
 
+export type SharedSession = {
+  user?: SharedSessionUser;
+  authenticatedAt?: number;
+};
+
 /**
  * Standard JWT callback that maps user fields into the token.
  * Both apps share the same core fields: email, name, image.
@@ -56,6 +61,7 @@ export function buildSharedJwtCallback() {
     account?: { providerAccountId?: string } | null;
   }): Promise<Record<string, unknown>> {
     if (user) {
+      token.authenticatedAt = Math.floor(Date.now() / 1000);
       if (user.id) token.id = user.id;
       if (user.email) token.email = user.email;
       if (user.name !== undefined) token.name = user.name;
@@ -78,9 +84,12 @@ export function buildSharedSessionCallback() {
     session,
     token,
   }: {
-    session: { user?: SharedSessionUser };
+    session: SharedSession;
     token: Record<string, unknown>;
   }) {
+    if (typeof token.authenticatedAt === "number") {
+      session.authenticatedAt = token.authenticatedAt;
+    }
     if (session.user) {
       session.user.id =
         (token.id as string | undefined) ?? (token.sub as string | undefined) ?? session.user.id;

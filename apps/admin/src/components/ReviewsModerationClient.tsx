@@ -19,6 +19,9 @@ type ReviewRow = {
   moderated_by_staff_email: string | null;
   moderated_at: string | null;
   moderation_note: string | null;
+  risk_score: number;
+  shadow_banned: boolean;
+  open_report_count: number;
 };
 
 export function ReviewsModerationClient() {
@@ -57,14 +60,14 @@ export function ReviewsModerationClient() {
     void load();
   }, [load]);
 
-  async function moderate(id: string, status: "approved" | "rejected" | "hidden") {
+  async function moderate(id: string, status: "approved" | "rejected" | "hidden", shadowBanned?: boolean) {
     setActing(id);
     setError(null);
     try {
       const res = await fetch(`/api/admin/reviews/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(shadowBanned === undefined ? {} : { shadow_banned: shadowBanned }) }),
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -131,6 +134,8 @@ export function ReviewsModerationClient() {
                 <th className="px-3 py-2">Body</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Verified</th>
+                <th className="px-3 py-2">Risk</th>
+                <th className="px-3 py-2">Reports</th>
                 <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
@@ -152,6 +157,14 @@ export function ReviewsModerationClient() {
                   </td>
                   <td className="px-3 py-2 font-medium">{r.status}</td>
                   <td className="px-3 py-2">{r.is_verified_buyer ? "Yes" : "No"}</td>
+                  <td className="px-3 py-2">{r.risk_score ?? 0}{r.shadow_banned ? " (shadow)" : ""}</td>
+                  <td className="px-3 py-2">
+                    {r.open_report_count > 0 ? (
+                      <span className="font-semibold text-red-700">{r.open_report_count} open</span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="space-x-1 whitespace-nowrap px-3 py-2">
                     {r.status !== "approved" ? (
                       <Button
@@ -185,6 +198,15 @@ export function ReviewsModerationClient() {
                         Reject
                       </Button>
                     ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={acting === r.id}
+                      onClick={() => void moderate(r.id, r.status as "approved" | "rejected" | "hidden", !r.shadow_banned)}
+                    >
+                      {r.shadow_banned ? "Unshadow" : "Shadow ban"}
+                    </Button>
                   </td>
                 </tr>
               ))}

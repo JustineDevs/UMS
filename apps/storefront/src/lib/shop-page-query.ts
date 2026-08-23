@@ -50,32 +50,62 @@ function parseDefaultQuery(): ProductListQuery {
   });
 }
 
-export function parseShopPageQuery(
+export type ShopPageQueryDiagnostics = {
+  query: ProductListQuery;
+  invalidKeys: string[];
+};
+
+export function parseShopPageQueryDiagnostics(
   searchParams: ShopPageSearchParams,
-): ProductListQuery {
+): ShopPageQueryDiagnostics {
   const candidate = buildCandidate(searchParams);
   const parsed = productListQuerySchema.safeParse(candidate);
-  if (parsed.success) {
-    return parsed.data;
-  }
+  if (parsed.success) return { query: parsed.data, invalidKeys: [] };
 
   const invalidPaths = new Set(
     parsed.error.issues.map((issue) => String(issue.path[0] ?? "")),
   );
-  const onlyInvalidPrices =
-    invalidPaths.size > 0 &&
-    [...invalidPaths].every((path) => path === "minPrice" || path === "maxPrice");
-
-  if (onlyInvalidPrices) {
-    const retry = productListQuerySchema.safeParse({
-      ...candidate,
-      minPrice: undefined,
-      maxPrice: undefined,
-    });
-    if (retry.success) {
-      return retry.data;
-    }
+  const sanitizedCandidate = Object.fromEntries(
+    Object.entries(candidate).map(([key, value]) => [
+      key,
+      invalidPaths.has(key) ? undefined : value,
+    ]),
+  ) as Record<string, unknown>;
+  sanitizedCandidate.limit = SHOP_PRODUCT_PAGE_SIZE;
+  if (invalidPaths.has("offset") || sanitizedCandidate.offset === undefined) {
+    sanitizedCandidate.offset = 0;
+  }
+  if (invalidPaths.has("sort") || sanitizedCandidate.sort === undefined) {
+    sanitizedCandidate.sort = "newest";
+  }
+  const sanitized = productListQuerySchema.safeParse(sanitizedCandidate);
+  if (sanitized.success) {
+    return { query: sanitized.data, invalidKeys: [...invalidPaths] };
   }
 
-  return parseDefaultQuery();
+  return { query: parseDefaultQuery(), invalidKeys: [...invalidPaths] };
+}
+
+export function parseShopPageQuery(
+  searchParams: ShopPageSearchParams,
+): ProductListQuery {
+  return parseShopPageQueryDiagnostics(searchParams).query;
+}
+
+export function shopPageShouldNoIndex(query: ProductListQuery): boolean {
+  return Boolean(
+    query.q ||
+      query.type ||
+      query.finish ||
+      query.brand ||
+      query.pickupConfig ||
+      query.bodyWood ||
+      query.condition ||
+      query.skillLevel ||
+      query.shippingSpeed ||
+      query.minPrice !== undefined ||
+      query.maxPrice !== undefined ||
+      (query.offset ?? 0) > 0 ||
+      (query.sort ?? "newest") !== "newest",
+  );
 }

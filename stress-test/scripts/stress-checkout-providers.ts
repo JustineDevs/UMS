@@ -434,13 +434,18 @@ async function ensureProductSellableForStore(baseUrl, secret, productId, opts) {
 
 async function getProductIdForVariantAdmin(baseUrl, secret, variantId) {
   const fields = encodeURIComponent("id,product_id,*product");
+  const query = new URLSearchParams({
+    id: variantId,
+    limit: "1",
+    fields,
+  });
   const res = await fetch(
-    `${baseUrl}/admin/product-variants/${encodeURIComponent(variantId)}?fields=${fields}`,
+    `${baseUrl}/admin/product-variants?${query.toString()}`,
     { headers: { Authorization: secretApiKeyBasicAuthorization(secret) } },
   );
   if (!res.ok) return null;
   const j = await res.json();
-  const v = j.variant;
+  const v = Array.isArray(j.variants) ? j.variants[0] : null;
   const pid =
     (typeof v?.product_id === "string" ? v.product_id : null) ??
     (v?.product && typeof v.product.id === "string" ? v.product.id : null);

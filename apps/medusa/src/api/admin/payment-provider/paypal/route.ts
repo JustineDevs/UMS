@@ -1,4 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import { PaymentActions } from "@medusajs/framework/utils";
+import { processPaymentWorkflow } from "@medusajs/medusa/core-flows";
 import { z } from "zod";
 import { getNangoPaymentCredentials, nangoPaymentProxyConfigured } from "../../../../lib/nango-payment-credentials";
 import { payPalRestJson, type PayPalClientOptions } from "../../../../lib/paypal-sdk-client";
@@ -6,7 +8,7 @@ import { payPalRestJson, type PayPalClientOptions } from "../../../../lib/paypal
 const schema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("reconcile"), period_start: z.string().datetime(), period_end: z.string().datetime(), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
   z.object({ operation: z.literal("invoice"), action: z.enum(["create", "send", "remind", "cancel"]), invoice_id: z.string().trim().min(1).max(255).optional(), payload: z.record(z.string(), z.unknown()).default({}), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
-  z.object({ operation: z.literal("payment"), action: z.enum(["retrieve", "authorize", "capture", "void"]), order_id: z.string().trim().min(1).max(255).optional(), authorization_id: z.string().trim().min(1).max(255).optional(), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
+  z.object({ operation: z.literal("payment"), action: z.enum(["retrieve", "authorize", "capture", "void", "confirm"]), order_id: z.string().trim().min(1).max(255).optional(), session_id: z.string().trim().min(1).max(255).optional(), amount: z.number().finite().positive().optional(), authorization_id: z.string().trim().min(1).max(255).optional(), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
   z.object({ operation: z.literal("payment_link"), action: z.enum(["create", "retrieve", "deactivate"]), payment_resource_id: z.string().trim().min(1).max(255).optional(), payload: z.record(z.string(), z.unknown()).default({}), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
   z.object({ operation: z.literal("subscription"), action: z.enum(["create", "suspend", "cancel"]), subscription_id: z.string().trim().min(1).max(255).optional(), payload: z.record(z.string(), z.unknown()).default({}), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
   z.object({ operation: z.literal("dispute"), action: z.enum(["get", "evidence", "accept", "escalate", "deny", "adjudicate"]), dispute_id: z.string().trim().min(1).max(255), payload: z.record(z.string(), z.unknown()).default({}), idempotency_key: z.string().trim().min(8).max(255) }).strict(),
@@ -14,8 +16,13 @@ const schema = z.discriminatedUnion("operation", [
 ]);
 
 function validInternalToken(req: MedusaRequest): boolean {
-  const expected = process.env.MEDUSA_INTERNAL_ADMIN_TOKEN?.trim();
-  return Boolean(expected && req.headers["x-uvs-internal-token"] === expected);
+  const expected = (
+    process.env.MEDUSA_INTERNAL_ADMIN_TOKEN || process.env.MEDUSA_SECRET_API_KEY
+  )?.trim();
+  if (!expected) return false;
+  const internalToken = req.headers["x-uvs-internal-token"];
+  if (internalToken === expected) return true;
+  return req.headers.authorization === `Basic ${Buffer.from(`${expected}:`, "utf8").toString("base64")}`;
 }
 
 export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<void> {
@@ -23,6 +30,24 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
   const parsed = schema.safeParse(req.body ?? {});
   if (!parsed.success) return void res.status(400).json({ error: "Invalid PayPal operation payload" });
   const body = parsed.data;
+  if (body.operation === "payment" && body.action === "confirm") {
+    if (!body.session_id || !body.amount) return void res.status(400).json({ error: "session_id and amount are required" });
+    try {
+      const result = await processPaymentWorkflow(req.scope).run({
+        input: {
+          action: PaymentActions.SUCCESSFUL,
+          data: {
+            session_id: body.session_id,
+            amount: body.amount,
+          },
+        },
+      });
+      return void res.json({ operation: body.operation, data: result });
+    } catch (error) {
+      console.error("PayPal confirmation workflow failed", error);
+      return void res.status(502).json({ error: "PayPal confirmation failed", code: "PAYPAL_CONFIRM_FAILED" });
+    }
+  }
   const nangoConnectionId = typeof req.headers["x-nango-connection-id"] === "string" ? req.headers["x-nango-connection-id"] : undefined;
   const nangoProviderConfigKey = typeof req.headers["x-nango-provider-config-key"] === "string" ? req.headers["x-nango-provider-config-key"] : undefined;
   const nangoContext = {
@@ -51,7 +76,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
       const end = new Date(body.period_end).toISOString();
       if (!(new Date(start) < new Date(end))) return void res.status(400).json({ error: "Invalid reconciliation period" });
       const result = await payPalRestJson(options, `/v1/reporting/transactions?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}&fields=all&page_size=100`, { method: "GET" }) as { transaction_details?: unknown[]; total_items?: number; total_pages?: number };
-      return void res.json({ operation: body.operation, data: { provider_api_pull: true, source: "transaction_reporting", period_start: start, period_end: end, transaction_count: result.transaction_details?.length ?? 0, total_items: result.total_items ?? null, total_pages: result.total_pages ?? null } });
+      return void res.json({ operation: body.operation, data: { provider_api_pull: true, source: "transaction_reporting", period_start: start, period_end: end, transaction_count: result.transaction_details?.length ?? 0, total_items: result.total_items ?? null, total_pages: result.total_pages ?? null, transactions: (result.transaction_details ?? []).map((item) => { const row = item as Record<string, unknown>; const info = (row.transaction_info as Record<string, unknown> | undefined) ?? {}; return { external_id: String(row.transaction_id ?? ""), payment_external_id: typeof info.reference_id === "string" ? info.reference_id : null, amount_minor: Number((info.transaction_amount as Record<string, unknown> | undefined)?.value ?? 0) * 100, fee_minor: Number((info.fee_amount as Record<string, unknown> | undefined)?.value ?? 0) * 100, net_minor: Number((info.transaction_amount as Record<string, unknown> | undefined)?.value ?? 0) * 100, currency: String((info.transaction_amount as Record<string, unknown> | undefined)?.currency_code ?? "").toUpperCase(), status: String(info.transaction_status ?? "unknown"), provider_occurred_at: String(row.transaction_initiation_date ?? new Date().toISOString()) }; }).filter((row) => row.external_id) } });
     }
     let path: string;
     let method = "POST";

@@ -263,8 +263,8 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         addPlacement="main"
         onAddPlacementChange={() => undefined}
         onClose={() => setMediaPickerOpen(false)}
-        onPickMany={(urls) => {
-          const [coverImageUrl] = urls;
+        onPickMany={(media) => {
+          const coverImageUrl = media[0]?.public_url;
           if (coverImageUrl) setRow({ ...row, cover_image_url: coverImageUrl });
         }}
       />

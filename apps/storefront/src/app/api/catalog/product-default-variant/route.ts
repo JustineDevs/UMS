@@ -90,6 +90,9 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to resolve variant";
-    return Response.json({ error: msg }, { status: resolveVariantErrorStatus(msg) });
+    return Response.json(
+      { error: "Unable to resolve product variant" },
+      { status: resolveVariantErrorStatus(msg) },
+    );
   }
 }

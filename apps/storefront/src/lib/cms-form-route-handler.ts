@@ -21,6 +21,9 @@ import {
   publicDeliveryIdempotencyKey,
   recordPublicDeliveryAttempt,
 } from "@/lib/public-delivery";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+
+const MAX_PUBLIC_FORM_BODY_BYTES = 16 * 1024;
 
 type ContactFormRouteDeps = {
   createAnonSupabase?: () => SupabaseClient | null;
@@ -72,12 +75,12 @@ export async function handleCmsFormSubmissionRequest(
     return Response.json({ error: "Unknown form" }, { status: 400 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const bounded = await parseBoundedJson(req, MAX_PUBLIC_FORM_BODY_BYTES);
+  if (bounded.tooLarge) {
+    return Response.json({ error: "Request body too large" }, { status: 413 });
   }
+  if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const body = bounded.value;
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }

@@ -29,7 +29,6 @@
     "test:jnt-map": "tsx src/lib/jnt-status-map.test.mts"
   },
   "dependencies": {
-    "@universal-music-store/resend-mail": "workspace:*",
     "@universal-music-store/sdk": "workspace:*",
     "@universal-music-store/types": "workspace:*",
     "@medusajs/admin-sdk": "2.17.2",
@@ -48,6 +47,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@medusajs/test-utils": "2.17.2",
     "@medusajs/utils": "2.17.2",
     "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",

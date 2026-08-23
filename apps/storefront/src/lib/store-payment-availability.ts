@@ -17,13 +17,19 @@ export function filterConnectedPaymentProviders(
   regionKeys: PaymentProviderKey[],
   connections: ConnectionRow[],
   options: {
+    organizationId?: string;
     xenditConfigured: boolean;
     stripeConfigured?: boolean;
     paypalConfigured?: boolean;
   },
 ): PaymentProviderKey[] {
   const keys = new Set(regionKeys);
-  const active = connections.filter((row) => row.active === true);
+  const organizationId = options.organizationId?.trim();
+  const active = connections.filter(
+    (row) =>
+      row.active === true &&
+      (!organizationId || String(row.organization_id ?? "").trim() === organizationId),
+  );
   return regionKeys.filter((key) => {
     if (key === "COD") return true;
     if (key === "XENDIT") {
@@ -42,16 +48,18 @@ export function filterConnectedPaymentProviders(
  */
 export async function resolveStorePaymentProviders(
   regionKeys: PaymentProviderKey[],
+  context?: { organizationId?: string | null },
 ): Promise<PaymentProviderKey[]> {
   const supabase = createStorefrontServiceSupabase();
-  const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim();
-  const xenditConfigured = Boolean(
-    process.env.XENDIT_SECRET_KEY?.trim() &&
-      process.env.XENDIT_WEBHOOK_TOKEN?.trim(),
-  );
   const directCredentialsAllowed =
     process.env.NODE_ENV !== "production" ||
     process.env.E2E_ALLOW_DIRECT_PAYMENT_CREDENTIALS === "true";
+  const organizationId =
+    context?.organizationId?.trim() || process.env.DEFAULT_ORGANIZATION_ID?.trim();
+  const xenditConfigured = directCredentialsAllowed && Boolean(
+    process.env.XENDIT_SECRET_KEY?.trim() &&
+      process.env.XENDIT_WEBHOOK_TOKEN?.trim(),
+  );
   const stripeConfigured = directCredentialsAllowed && Boolean(process.env.STRIPE_API_KEY?.trim());
   const paypalConfigured = directCredentialsAllowed && Boolean(
     process.env.PAYPAL_CLIENT_ID?.trim() &&
@@ -71,6 +79,7 @@ export async function resolveStorePaymentProviders(
 
   const rows = (data ?? []) as ConnectionRow[];
   return filterConnectedPaymentProviders(regionKeys, rows, {
+    organizationId,
     xenditConfigured,
     stripeConfigured,
     paypalConfigured,

@@ -10,6 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "",
     "/shop",
     "/collections",
+    "/about",
     "/search",
     "/blog",
     "/contact",
@@ -26,12 +27,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/variant-guide",
     "/preferences",
   ];
-  const out: MetadataRoute.Sitemap = staticPaths.map((path) => ({
-    url: `${base}${path}`,
-    lastModified: new Date(),
-    changeFrequency: "weekly" as const,
-    priority: path === "" ? 1.0 : path === "/shop" ? 0.9 : 0.6,
-  }));
+  const out: MetadataRoute.Sitemap = [];
+  const seen = new Set<string>();
+  const add = (entry: MetadataRoute.Sitemap[number]) => {
+    if (seen.has(entry.url)) return;
+    seen.add(entry.url);
+    out.push(entry);
+  };
+  for (const path of staticPaths) {
+    add({
+      url: `${base}${path}`,
+      lastModified: new Date(),
+      changeFrequency: "weekly" as const,
+      priority: path === "" ? 1.0 : path === "/shop" ? 0.9 : 0.6,
+    });
+  }
 
   try {
     const [slugs, categories] = await Promise.all([
@@ -39,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       fetchCategorySummaries(),
     ]);
     for (const slug of slugs) {
-      out.push({
+      add({
         url: `${base}/shop/${encodeURIComponent(slug)}`,
         lastModified: new Date(),
         changeFrequency: "daily" as const,
@@ -48,8 +58,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
     if (categories.kind === "ok") {
       for (const category of categories.summaries) {
-        out.push({
-          url: `${base}/collections/${encodeURIComponent(category.category)}`,
+        add({
+          url: `${base}/collections/${encodeURIComponent(category.handle)}`,
           lastModified: new Date(),
           changeFrequency: "daily",
           priority: 0.7,
@@ -63,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     const { pages, posts } = await loadCmsSitemapEntries();
     for (const p of pages) {
-      out.push({
+      add({
         url: `${base}/p/${encodeURIComponent(p.slug)}`,
         lastModified: new Date(p.updated_at),
         changeFrequency: "monthly" as const,
@@ -71,7 +81,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
     for (const p of posts) {
-      out.push({
+      add({
         url: `${base}/blog/${encodeURIComponent(p.slug)}`,
         lastModified: new Date(p.updated_at),
         changeFrequency: "monthly" as const,

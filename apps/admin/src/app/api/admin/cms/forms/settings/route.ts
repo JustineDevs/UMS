@@ -8,6 +8,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { cmsFormSettingsSchema } from "@/lib/cms-route-contracts";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -35,7 +36,9 @@ async function put(req: NextRequest) {
   if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  const parsed = cmsFormSettingsSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 32 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = cmsFormSettingsSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid form settings payload" }, { status: 400 });
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;

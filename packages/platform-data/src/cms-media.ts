@@ -9,6 +9,83 @@ function randomUuid(): string {
 /** Tag on `cms_media` rows for files in the Supabase `catalog` storage bucket (product PDP assets). */
 export const CMS_MEDIA_TAG_CATALOG_PRODUCT = "catalog-product";
 
+export function mediaIdPropKey(propKey: string): string {
+  return propKey.replace(/Url$/, "").replace(/URL$/, "") + "MediaId";
+}
+
+export function mediaUrlPropKey(mediaIdKey: string): string | null {
+  if (!mediaIdKey.endsWith("MediaId")) return null;
+  const base = mediaIdKey.slice(0, -"MediaId".length);
+  if (!base) return null;
+  return `${base}${base.toLowerCase() === "src" ? "" : "Url"}`;
+}
+
+function visitMediaProps(value: unknown, visit: (props: Record<string, unknown>) => void): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => visitMediaProps(item, visit));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  const object = value as Record<string, unknown>;
+  if (object.props && typeof object.props === "object" && !Array.isArray(object.props)) {
+    visit(object.props as Record<string, unknown>);
+  }
+  Object.values(object).forEach((item) => visitMediaProps(item, visit));
+}
+
+/** Keeps legacy URL props readable while making an asset ID the persisted reference. */
+export function stripResolvedCmsMediaUrls<T>(value: T): T {
+  const copy = structuredClone(value);
+  visitMediaProps(copy, (props) => {
+    for (const key of Object.keys(props)) {
+      const urlKey = mediaUrlPropKey(key);
+      if (urlKey && typeof props[key] === "string") delete props[urlKey];
+    }
+  });
+  return copy;
+}
+
+export function applyCmsMediaUrls<T>(value: T, urls: ReadonlyMap<string, string>): T {
+  const copy = structuredClone(value);
+  visitMediaProps(copy, (props) => {
+    for (const [key, id] of Object.entries(props)) {
+      const urlKey = mediaUrlPropKey(key);
+      const url = urlKey && typeof id === "string" ? urls.get(id) : undefined;
+      if (urlKey && url) props[urlKey] = url;
+    }
+  });
+  return copy;
+}
+
+export async function resolveCmsMediaUrls<T>(
+  supabase: SupabaseClient,
+  value: T,
+  organizationId?: string,
+): Promise<T> {
+  const ids = new Set<string>();
+  visitMediaProps(value, (props) => {
+    for (const [key, id] of Object.entries(props)) {
+      if (mediaUrlPropKey(key) && typeof id === "string" && id.trim()) ids.add(id);
+    }
+  });
+  if (!ids.size) return value;
+  let query = supabase
+    .from("cms_media")
+    .select("id, public_url")
+    .in("id", [...ids])
+    .is("deleted_at", null);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query;
+  if (error) {
+    if (!isMissingTableOrSchemaError(error)) console.error("[cms-media] resolve", error.message);
+    return value;
+  }
+  const urls = new Map(
+    (data ?? []).map((row) => [String(row.id), String(row.public_url ?? "")]),
+  );
+  return applyCmsMediaUrls(value, urls);
+}
+
 export function cmsMediaRowIsCatalogProduct(row: CmsMediaRow): boolean {
   return row.tags.includes(CMS_MEDIA_TAG_CATALOG_PRODUCT);
 }

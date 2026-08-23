@@ -1,18 +1,10 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
+import { safeLogIdentifier } from "../lib/safe-log";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { sendResendTransactionalEmail } from "../lib/resend-email";
-import { createHmac } from "crypto";
 import { emitOrderPlacedFunnelEvent } from "../lib/commerce-funnel-sink";
-
-function buildTrackingUrl(baseUrl: string, id: string): string | null {
-  const secret = process.env.TRACKING_HMAC_SECRET?.trim();
-  if (!secret) return null;
-  const hmac = createHmac("sha256", secret);
-  hmac.update(id);
-  const token = hmac.digest("base64url");
-  const cleanBase = baseUrl.replace(/\/$/, "");
-  return `${cleanBase}/track/${encodeURIComponent(id)}?t=${encodeURIComponent(token)}`;
-}
+import { safeTrackingUrl } from "../lib/semaphore-sms-client";
+import { inngest } from "../lib/inngest/client";
 
 function esc(s: string): string {
   return s
@@ -70,14 +62,13 @@ type OrderForEmail = {
   shipping_address?: ShippingAddress | null;
 };
 
-function buildRichHtml(params: {
+export function buildRichHtml(params: {
   order: OrderForEmail;
-  orderId: string;
   orderDisplayLabel: string;
   trackingUrl: string;
   brandName: string;
 }): string {
-  const { order, orderId, orderDisplayLabel, trackingUrl, brandName } = params;
+  const { order, orderDisplayLabel, trackingUrl, brandName } = params;
   const currency = (order.currency_code ?? "PHP").toUpperCase();
   const items = order.items ?? [];
   const addr = order.shipping_address;
@@ -231,7 +222,7 @@ function buildRichHtml(params: {
           <td style="padding:24px 40px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
             <p style="margin:0 0 8px;font-size:12px;color:#94a3b8;">Questions? Reply to this email or contact us at</p>
             <p style="margin:0 0 16px;font-size:12px;color:#0f766e;font-weight:600;">support@universal-music-store.com</p>
-            <p style="margin:0;font-size:11px;color:#cbd5e1;">Order ID: ${esc(orderId)}</p>
+            <p style="margin:0;font-size:11px;color:#cbd5e1;">Keep this email for your order records.</p>
           </td>
         </tr>
 
@@ -295,34 +286,56 @@ export default async function orderPlacedResendEmail({
     "";
 
   if (!emailRaw) {
-    logger.warn?.(`[resend] order ${data.id} has no email; skip notification.`);
+    logger.warn?.(`[resend] order ${safeLogIdentifier(data.id)} has no email; skip notification.`);
     return;
   }
 
   const orderId = String(order.id ?? data.id);
-  const url = buildTrackingUrl(storefrontBase, orderId);
-  const trackingUrl =
-    url ??
-    `${storefrontBase.replace(/\/$/, "")}/track/${encodeURIComponent(orderId)}`;
+  const { buildTrackingUrl } = await import("@universal-music-store/sdk");
+  const trackingUrl = safeTrackingUrl(buildTrackingUrl(storefrontBase, orderId, {
+    customerEmail: emailRaw,
+    storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+  }) ?? undefined);
+  if (!trackingUrl) {
+    logger.warn?.(
+      `[resend] order ${safeLogIdentifier(orderId)} has no tracking capability secret; skip notification.`,
+    );
+    return;
+  }
+
+  const subject = `Order #${orderDisplayLabel} confirmed — ${brand}`;
+  const html = buildRichHtml({
+    order,
+    orderDisplayLabel,
+    trackingUrl,
+    brandName: brand,
+  });
+
+  if (process.env.INNGEST_EVENT_KEY?.trim()) {
+    try {
+      await inngest.send({
+        name: "universal-music-store/order.confirmation.email",
+        data: { from, to: emailRaw, subject, html, orderId },
+      });
+      return;
+    } catch {
+      logger.warn?.("[resend] email delivery job enqueue rejected");
+      return;
+    }
+  }
 
   const sent = await sendResendTransactionalEmail({
     apiKey: key,
     from,
     to: emailRaw,
-    subject: `Order #${orderDisplayLabel} confirmed — ${brand}`,
-    html: buildRichHtml({
-      order,
-      orderId,
-      orderDisplayLabel,
-      trackingUrl,
-      brandName: brand,
-    }),
+    subject,
+    html,
     tags: [{ name: "type", value: "order_confirmation" }],
     idempotencyKey: `order-confirmation/${orderId}`,
   });
 
   if (!sent.ok) {
-    logger.warn?.(`[resend] ${sent.message}`);
+    logger.warn?.("[resend] delivery rejected");
   }
 }
 

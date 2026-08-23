@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getPublicOriginFromRequest } from "./finalize-medusa-cart-server";
+import {
+  getPublicOriginFromRequest,
+  secureTrackingRedirectUrl,
+} from "./finalize-medusa-cart-server";
 
 import { codPlaceOrderRouteLogic } from "./payment-attempt-route-logic";
 
@@ -87,5 +90,19 @@ export async function handleCodPlaceOrderRequest(
     nowIso: deps.nowIso,
   });
 
+  if (result.status === 200 && "redirectUrl" in result.body) {
+    const redirectUrl = secureTrackingRedirectUrl(
+      typeof result.body.redirectUrl === "string" ? result.body.redirectUrl : undefined,
+      typeof result.body.orderId === "string" ? result.body.orderId : undefined,
+      getPublicOriginFromRequest(req),
+    );
+    if (!redirectUrl) {
+      return NextResponse.json(
+        { error: "Tracking capability is not configured" },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ ...result.body, redirectUrl }, { status: result.status });
+  }
   return NextResponse.json(result.body, { status: result.status });
 }

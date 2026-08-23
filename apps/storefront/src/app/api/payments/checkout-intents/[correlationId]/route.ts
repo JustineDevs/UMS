@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPaymentAttemptByCorrelationId } from "@universal-music-store/platform-data";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { publicPaymentAttemptError } from "@/lib/payment-attempt-public";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +46,14 @@ export async function GET(
     quoteFingerprint: row.quote_fingerprint,
     staleReason: row.stale_reason,
     medusaOrderId: row.medusa_order_id,
-    lastError: row.last_error,
+    trackingPageUrl: row.medusa_order_id
+      ? buildTrackingUrl(
+          process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN,
+          row.medusa_order_id,
+          { storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim() },
+        )
+      : null,
+    lastError: publicPaymentAttemptError(row.last_error),
     finalizeAttempts: row.finalize_attempts,
     updatedAt: row.updated_at,
   });

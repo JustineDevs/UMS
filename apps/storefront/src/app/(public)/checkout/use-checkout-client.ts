@@ -5,16 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PH_VAT_RATE,
   computeDisplayVat,
+  normalizeCommerceAttribution,
   sanitizeSameOriginUrl,
   sanitizeTrustedPublicUrl,
 } from "@universal-music-store/sdk";
 import { trackBeginCheckout, trackPurchase } from "@/lib/analytics";
-import {
-  readCart,
-  clearCart,
-  writeCart,
-  type CartLine,
-} from "@/lib/cart";
+import { readCart, clearCart, writeCart, type CartLine } from "@/lib/cart";
 import {
   previewMedusaCheckoutTotals,
   PAYMENT_PROVIDER_IDS,
@@ -43,6 +39,9 @@ import { emitCommerceObservabilityClient } from "@/lib/commerce-observability";
 
 export type CheckoutPendingPayment = {
   checkoutUrl: string;
+  actionKind: "redirect" | "wallet" | "qr";
+  qrImageUrl?: string;
+  qrPayload?: string;
   trackingPageUrl: string;
   providerLabel: string;
   confirmedTotal: number;
@@ -65,16 +64,29 @@ export type CheckoutEmbeddedData = {
 };
 
 type ProfileGate = "idle" | "loading" | "complete" | "incomplete" | "error";
+export type CheckoutPhase =
+  | "idle"
+  | "starting"
+  | "redirecting"
+  | "awaiting_provider"
+  | "embedded"
+  | "finalizing"
+  | "error";
 const FINALIZE_POLL_MS = 2_000;
 const FINALIZE_POLL_MAX = 20;
+const localAuthBypass =
+  process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+  process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
 
 export function useCheckoutClient({
   initialResumeCartId,
+  initialResumeToken,
   initialStripeCheckoutCancel,
   initialReviewMessage,
   guestMode,
 }: {
   initialResumeCartId?: string;
+  initialResumeToken?: string;
   initialStripeCheckoutCancel?: boolean;
   initialReviewMessage?: string;
   guestMode?: boolean;
@@ -88,9 +100,14 @@ export function useCheckoutClient({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentProviderKey>("STRIPE");
-  const [pendingPayment, setPendingPayment] = useState<CheckoutPendingPayment | null>(null);
-  const [embeddedData, setEmbeddedData] = useState<CheckoutEmbeddedData | null>(null);
+  const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentProviderKey>("STRIPE");
+  const [pendingPayment, setPendingPayment] =
+    useState<CheckoutPendingPayment | null>(null);
+  const [embeddedData, setEmbeddedData] = useState<CheckoutEmbeddedData | null>(
+    null,
+  );
   const [copyDone, setCopyDone] = useState(false);
   const [loyaltyPoints, setLoyaltyPoints] = useState("");
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
@@ -110,7 +127,10 @@ export function useCheckoutClient({
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [promoCode, setPromoCode] = useState("");
-  const [promoApplied, setPromoApplied] = useState<{ code: string; discountAmount?: number } | null>(null);
+  const [promoApplied, setPromoApplied] = useState<{
+    code: string;
+    discountAmount?: number;
+  } | null>(null);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const quoteFingerprintObsRef = useRef<string | null>(null);
@@ -164,9 +184,9 @@ export function useCheckoutClient({
 
       if (j.ok === true && Array.isArray(j.keys) && j.keys.length > 0) {
         const allowed = new Set(j.keys);
-        const valid = (Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]).filter(
-          (k) => allowed.has(k),
-        );
+        const valid = (
+          Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]
+        ).filter((k) => allowed.has(k));
         if (valid.length > 0) {
           setPayAvailability(resolveCheckoutPaymentAvailability(valid));
           setCheckoutAvailabilityStatus("ready");
@@ -184,16 +204,24 @@ export function useCheckoutClient({
       const fallback = resolveCheckoutPaymentAvailability(undefined);
       setPayAvailability(fallback);
       setCheckoutAvailabilityStatus(
-        Object.values(fallback.available).some(Boolean) ? "ready" : "unavailable",
+        Object.values(fallback.available).some(Boolean)
+          ? "ready"
+          : "unavailable",
       );
-      setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
+      setCheckoutUnavailableCode(
+        CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED,
+      );
     } catch {
       const fallback = resolveCheckoutPaymentAvailability(undefined);
       setPayAvailability(fallback);
       setCheckoutAvailabilityStatus(
-        Object.values(fallback.available).some(Boolean) ? "ready" : "unavailable",
+        Object.values(fallback.available).some(Boolean)
+          ? "ready"
+          : "unavailable",
       );
-      setCheckoutUnavailableCode(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
+      setCheckoutUnavailableCode(
+        CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED,
+      );
     }
   }, []);
 
@@ -214,7 +242,10 @@ export function useCheckoutClient({
     setSelectedShippingOptionId((prev) =>
       prev && opts.some((o) => o.id === prev) ? prev : opts[0].id,
     );
-  }, [medusaPricePreview?.quoteFingerprint, medusaPricePreview?.shippingOptions]);
+  }, [
+    medusaPricePreview?.quoteFingerprint,
+    medusaPricePreview?.shippingOptions,
+  ]);
 
   useEffect(() => {
     setPaymentMethod((prev) =>
@@ -236,19 +267,25 @@ export function useCheckoutClient({
     setEmbeddedData(null);
     setCopyDone(false);
     setError(null);
+    setCheckoutPhase("idle");
   }, [paymentMethod]);
 
   useEffect(() => {
+    if (localAuthBypass) {
+      setProfileGate("complete");
+      setProfileMissing([]);
+      return;
+    }
+    if (guestMode) {
+      // Explicit guest mode is card/provider checkout even when a stale authenticated
+      // session exists. COD still validates the saved delivery profile server-side.
+      setProfileGate("complete");
+      setProfileMissing([]);
+      return;
+    }
     if (authStatus !== "authenticated" || !session?.user) {
-      if (guestMode) {
-        // Guest mode: mark profile as complete for non-COD paths.
-        // COD will be blocked at pay time via the COD payload endpoint.
-        setProfileGate("complete");
-        setProfileMissing([]);
-      } else {
-        setProfileGate("idle");
-        setProfileMissing([]);
-      }
+      setProfileGate("idle");
+      setProfileMissing([]);
       return;
     }
     let cancelled = false;
@@ -280,10 +317,16 @@ export function useCheckoutClient({
         }
         return r.json();
       })
-      .then((d: { balance?: number }) => setLoyaltyBalance(Number(d.balance ?? 0)))
+      .then((d: { balance?: number }) =>
+        setLoyaltyBalance(Number(d.balance ?? 0)),
+      )
       .catch((reason: unknown) => {
         setLoyaltyBalance(0);
-        setError(reason instanceof Error ? reason.message : "Loyalty balance is temporarily unavailable.");
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : "Loyalty balance is temporarily unavailable.",
+        );
       });
   }, [session?.user?.email]);
 
@@ -308,9 +351,14 @@ export function useCheckoutClient({
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
-      const qs = initialResumeCartId?.trim()
-        ? `?cartId=${encodeURIComponent(initialResumeCartId.trim())}`
-        : "";
+      const resumeParams = new URLSearchParams();
+      if (initialResumeCartId?.trim()) {
+        resumeParams.set("cartId", initialResumeCartId.trim());
+      }
+      if (initialResumeToken?.trim()) {
+        resumeParams.set("token", initialResumeToken.trim());
+      }
+      const qs = resumeParams.toString() ? `?${resumeParams.toString()}` : "";
       try {
         const res = await fetch(`/api/cart/resume${qs}`);
         const data = (await res.json()) as { lines?: CartLine[] };
@@ -333,7 +381,7 @@ export function useCheckoutClient({
     return () => {
       cancelled = true;
     };
-  }, [initialResumeCartId]);
+  }, [initialResumeCartId, initialResumeToken]);
 
   const checkoutLinesSignature = useMemo(
     () => lines.map((l) => `${l.variantId}:${l.quantity}`).join("|"),
@@ -386,7 +434,9 @@ export function useCheckoutClient({
             setMedusaPricePreview(null);
             setMedusaPriceStatus("error");
             setMedusaPreviewError(
-              e instanceof Error ? e.message : "Could not load checkout totals.",
+              e instanceof Error
+                ? e.message
+                : "Could not load checkout totals.",
             );
           }
         }
@@ -462,7 +512,10 @@ export function useCheckoutClient({
   }, [profileGate, hydrated, lines.length, authStatus]);
 
   useEffect(() => {
-    if (medusaPriceStatus !== "ready" || !medusaPricePreview?.quoteFingerprint) {
+    if (
+      medusaPriceStatus !== "ready" ||
+      !medusaPricePreview?.quoteFingerprint
+    ) {
       quoteFingerprintObsRef.current = null;
       return;
     }
@@ -492,7 +545,9 @@ export function useCheckoutClient({
       return;
     }
     if (!providerAvailable[paymentMethod]) {
-      setError("Choose an available way to pay, or ask the shop owner to turn on that option.");
+      setError(
+        "Choose an available way to pay, or ask the shop owner to turn on that option.",
+      );
       return;
     }
     if (quoteReviewRequired) {
@@ -504,14 +559,17 @@ export function useCheckoutClient({
     medusaPreviewAbortRef.current = null;
     setLoading(true);
     setError(null);
+    setCheckoutPhase("starting");
 
     const cartTotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
+    const telemetryTotal = medusaPricePreview?.total ?? cartTotal;
     // Telemetry must not block payment initiation if a browser analytics SDK stalls.
     queueMicrotask(() => {
       try {
         trackBeginCheckout({
-          value: cartTotal,
+          value: telemetryTotal,
           itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+          currencyCode: displayCurrency,
         });
       } catch {
         /* checkout remains authoritative when telemetry is unavailable */
@@ -526,6 +584,7 @@ export function useCheckoutClient({
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)
       ) {
         setError("Enter a valid email address or leave the field blank.");
+        setCheckoutPhase("error");
         setLoading(false);
         payInFlightRef.current = false;
         return;
@@ -555,6 +614,7 @@ export function useCheckoutClient({
             (codJson.error ??
               "Cash on delivery needs a complete delivery profile.") + hint,
           );
+          setCheckoutPhase("error");
           setLoading(false);
           payInFlightRef.current = false;
           return;
@@ -567,6 +627,7 @@ export function useCheckoutClient({
           setError(
             "Could not load delivery details for cash on delivery. Update your account profile or pick another payment option.",
           );
+          setCheckoutPhase("error");
           setLoading(false);
           payInFlightRef.current = false;
           return;
@@ -576,16 +637,32 @@ export function useCheckoutClient({
 
       let result: MedusaCheckoutResult;
       if (paymentMethod === "COD") {
+        const url = new URL(window.location.href);
+        const attribution = normalizeCommerceAttribution({
+          source: url.searchParams.get("utm_source") ?? undefined,
+          medium: url.searchParams.get("utm_medium") ?? undefined,
+          campaign: url.searchParams.get("utm_campaign") ?? undefined,
+          campaignId: url.searchParams.get("campaign_id") ?? undefined,
+          couponCode: promoApplied?.code,
+          referralCode:
+            url.searchParams.get("ref") ??
+            url.searchParams.get("referral") ??
+            undefined,
+        });
         result = await startMedusaCheckout({
           lines,
           providerId: PAYMENT_PROVIDER_IDS.COD,
           codCartPayload,
           loyaltyPointsToRedeem: parsedLoyalty,
           shippingOptionId: selectedShippingOptionId ?? undefined,
+          attribution,
         });
       } else {
         const startController = new AbortController();
-        const startTimeout = window.setTimeout(() => startController.abort(), 90_000);
+        const startTimeout = window.setTimeout(
+          () => startController.abort(),
+          90_000,
+        );
         try {
           const startRes = await fetch("/api/checkout/start", {
             method: "POST",
@@ -605,13 +682,40 @@ export function useCheckoutClient({
                   ? parsedLoyalty
                   : undefined,
               shippingOptionId: selectedShippingOptionId ?? undefined,
+              attribution: normalizeCommerceAttribution({
+                source:
+                  new URL(window.location.href).searchParams.get(
+                    "utm_source",
+                  ) ?? undefined,
+                medium:
+                  new URL(window.location.href).searchParams.get(
+                    "utm_medium",
+                  ) ?? undefined,
+                campaign:
+                  new URL(window.location.href).searchParams.get(
+                    "utm_campaign",
+                  ) ?? undefined,
+                campaignId:
+                  new URL(window.location.href).searchParams.get(
+                    "campaign_id",
+                  ) ?? undefined,
+                couponCode: promoApplied?.code,
+                referralCode:
+                  new URL(window.location.href).searchParams.get("ref") ??
+                  new URL(window.location.href).searchParams.get("referral") ??
+                  undefined,
+              }),
             }),
           });
-          const body = (await startRes.json().catch(() => ({}))) as MedusaCheckoutResult & {
+          const body = (await startRes
+            .json()
+            .catch(() => ({}))) as MedusaCheckoutResult & {
             error?: string;
           };
           if (!startRes.ok || typeof body.cartId !== "string") {
-            throw new Error(body.error || "Could not start checkout. Please try again.");
+            throw new Error(
+              body.error || "Could not start checkout. Please try again.",
+            );
           }
           result = body;
         } catch (error) {
@@ -633,6 +737,9 @@ export function useCheckoutClient({
         codOrderPlaced,
         orderId,
         confirmedPreview,
+        checkoutActionKind,
+        qrImageUrl,
+        qrPayload,
       } = result;
 
       if (confirmedPreview) {
@@ -642,15 +749,23 @@ export function useCheckoutClient({
 
       let trackingPageUrl = result.trackingPageUrl;
       let checkoutCorrelationId = result.correlationId;
-      if (!codOrderPlaced && (typeof trackingPageUrl !== "string" || !checkoutCorrelationId)) {
+      if (
+        !codOrderPlaced &&
+        (typeof trackingPageUrl !== "string" || !checkoutCorrelationId)
+      ) {
         const bindRes = await fetch("/api/cart/medusa-bind", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cartId }),
         });
         if (!bindRes.ok) {
-          const bindJson = (await bindRes.json().catch(() => ({}))) as { error?: string };
-          throw new Error(bindJson.error || "Could not secure the checkout cart. Please try again.");
+          const bindJson = (await bindRes.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          throw new Error(
+            bindJson.error ||
+              "Could not secure the checkout cart. Please try again.",
+          );
         }
         const res = await fetch("/api/tracking-link", {
           method: "POST",
@@ -659,25 +774,35 @@ export function useCheckoutClient({
         });
         const data = (await res.json()) as { trackingPageUrl?: string };
         if (!res.ok || typeof data.trackingPageUrl !== "string") {
-          throw new Error("Could not create a secure order-tracking link. Please try again.");
+          throw new Error(
+            "Could not create a secure order-tracking link. Please try again.",
+          );
         }
         trackingPageUrl = data.trackingPageUrl;
       }
       if (typeof trackingPageUrl !== "string" || !trackingPageUrl) {
-        throw new Error("Could not create a secure order-tracking link. Please try again.");
+        throw new Error(
+          "Could not create a secure order-tracking link. Please try again.",
+        );
       }
 
       if (codOrderPlaced && orderId?.trim()) {
         trackPurchase({
           orderId: orderId.trim(),
-          value: cartTotal,
+          value: confirmedTotal,
           itemCount: lines.reduce((s, l) => s + l.quantity, 0),
           paymentMethod: "COD",
+          currencyCode,
         });
         clearCart();
-        const safeTrackingUrl = sanitizeSameOriginUrl(trackingPageUrl, window.location.origin);
+        const safeTrackingUrl = sanitizeSameOriginUrl(
+          trackingPageUrl,
+          window.location.origin,
+        );
         if (!safeTrackingUrl) {
-          setError("The tracking link returned by checkout is invalid. Open your order from the confirmation email.");
+          setError(
+            "The tracking link returned by checkout is invalid. Open your order from the confirmation email.",
+          );
           return;
         }
         window.location.href = safeTrackingUrl;
@@ -697,9 +822,15 @@ export function useCheckoutClient({
         typeof sessionData.paymentSessionId === "string"
           ? sessionData.paymentSessionId
           : paypalOrderId;
-      const usePayPalElement = paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
+      const providerPaymentId =
+        typeof sessionData.providerPaymentId === "string"
+          ? sessionData.providerPaymentId
+          : undefined;
+      const usePayPalElement =
+        paymentMethod === "PAYPAL" && Boolean(paypalOrderId);
       const useXenditComponents =
-        paymentMethod === "XENDIT" && Boolean(xenditComponentsSdkKey && providerSessionId);
+        paymentMethod === "XENDIT" &&
+        Boolean(xenditComponentsSdkKey && providerSessionId);
       const providerKey = paymentMethod.toLowerCase() as HostedReturnProvider;
       const amountMinor = Math.round(
         confirmedTotal * minorUnitDivisor(currencyCode),
@@ -717,6 +848,7 @@ export function useCheckoutClient({
             variantIds: result.variantIds,
             productIds: result.productIds,
             providerSessionId,
+            providerPaymentId,
           }),
         });
         const regJson = (await regRes.json().catch(() => ({}))) as {
@@ -725,7 +857,8 @@ export function useCheckoutClient({
         };
         if (!regRes.ok || typeof regJson.correlationId !== "string") {
           throw new Error(
-            regJson.error || "Could not register a durable payment attempt. Please try again.",
+            regJson.error ||
+              "Could not register a durable payment attempt. Please try again.",
           );
         }
         checkoutCorrelationId = regJson.correlationId;
@@ -750,6 +883,28 @@ export function useCheckoutClient({
           currencyCode,
           correlationId: checkoutCorrelationId,
         });
+        setCheckoutPhase("embedded");
+        setCopyDone(false);
+      } else if (checkoutActionKind === "qr") {
+        if (!qrImageUrl && !qrPayload) {
+          throw new Error(
+            "The payment provider returned an empty QR payment action. Start checkout again.",
+          );
+        }
+        setPendingPayment({
+          checkoutUrl: "",
+          actionKind: "qr",
+          qrImageUrl,
+          qrPayload,
+          trackingPageUrl,
+          providerLabel,
+          confirmedTotal,
+          currencyCode,
+          priceMismatch: false,
+          providerKey,
+          correlationId: checkoutCorrelationId,
+        });
+        setCheckoutPhase("awaiting_provider");
         setCopyDone(false);
       } else {
         if (!checkoutCorrelationId && paymentMethod !== "COD") {
@@ -757,16 +912,35 @@ export function useCheckoutClient({
             "Could not register a durable payment attempt for this checkout. Try again before leaving for payment.",
           );
         }
-        const comparableBagTotal =
-          medusaPricePreview?.total ?? localTotal;
+        const comparableBagTotal = medusaPricePreview?.total ?? localTotal;
         const tol = Math.max(0.5, comparableBagTotal * 0.02);
         const priceMismatch =
           Number.isFinite(confirmedTotal) &&
           Number.isFinite(comparableBagTotal) &&
           Math.abs(confirmedTotal - comparableBagTotal) > tol;
 
+        const safeCheckoutUrl = sanitizeHostedCheckoutUrl(
+          providerKey,
+          checkoutUrl,
+        );
+        if (!safeCheckoutUrl) {
+          throw new Error(
+            "The payment provider returned an invalid checkout link. Start checkout again.",
+          );
+        }
+        if (checkoutCorrelationId) {
+          try {
+            sessionStorage.setItem(
+              "payment_checkout_correlation_id",
+              checkoutCorrelationId,
+            );
+          } catch {
+            /* ignore unavailable session storage */
+          }
+        }
         setPendingPayment({
           checkoutUrl,
+          actionKind: checkoutActionKind === "wallet" ? "wallet" : "redirect",
           trackingPageUrl,
           providerLabel,
           confirmedTotal,
@@ -775,9 +949,13 @@ export function useCheckoutClient({
           providerKey,
           correlationId: checkoutCorrelationId,
         });
+        setCheckoutPhase("redirecting");
         setCopyDone(false);
+        window.location.assign(safeCheckoutUrl);
+        return;
       }
     } catch (e) {
+      setCheckoutPhase("error");
       setError(e instanceof Error ? e.message : "Checkout failed");
     } finally {
       setLoading(false);
@@ -802,18 +980,20 @@ export function useCheckoutClient({
       pendingPayment.checkoutUrl,
     );
     if (!safeCheckoutUrl) {
-      setError("The payment provider returned an invalid checkout link. Start checkout again.");
+      setError(
+        "The payment provider returned an invalid checkout link. Start checkout again.",
+      );
       return;
     }
-    clearCart();
-    window.location.href = safeCheckoutUrl;
+    window.location.assign(safeCheckoutUrl);
   }
 
-  async function finalizeCheckoutAttempt(
-    active: { correlationId: string },
-  ): Promise<void> {
+  async function finalizeCheckoutAttempt(active: {
+    correlationId: string;
+  }): Promise<void> {
     setLoading(true);
     setError(null);
+    setCheckoutPhase("finalizing");
     try {
       const finalizeRes = await fetch(
         `/api/payments/checkout-intents/${encodeURIComponent(active.correlationId)}/finalize`,
@@ -831,9 +1011,13 @@ export function useCheckoutClient({
         typeof finalizeJson.redirectUrl === "string" &&
         finalizeJson.redirectUrl.length > 0
       ) {
-        const safeRedirectUrl = sanitizeTrustedPublicUrl(finalizeJson.redirectUrl);
+        const safeRedirectUrl = sanitizeTrustedPublicUrl(
+          finalizeJson.redirectUrl,
+        );
         if (!safeRedirectUrl) {
-          setError("The payment provider returned an invalid redirect. Start checkout again.");
+          setError(
+            "The payment provider returned an invalid redirect. Start checkout again.",
+          );
           return;
         }
         clearCart();
@@ -850,26 +1034,42 @@ export function useCheckoutClient({
         const statusJson = (await statusRes.json().catch(() => ({}))) as {
           status?: string;
           medusaOrderId?: string | null;
+          trackingPageUrl?: string | null;
           lastError?: string | null;
           staleReason?: string | null;
         };
         if (
           statusRes.ok &&
           statusJson.status === "completed" &&
-          typeof statusJson.medusaOrderId === "string" &&
-          statusJson.medusaOrderId.length > 0
+          typeof statusJson.trackingPageUrl === "string" &&
+          statusJson.trackingPageUrl.length > 0
         ) {
+          const safeTrackingUrl = sanitizeSameOriginUrl(
+            statusJson.trackingPageUrl,
+            window.location.origin,
+          );
+          if (!safeTrackingUrl) {
+            throw new Error(
+              "Your order is complete, but its tracking link is invalid. Check your account or confirmation email.",
+            );
+          }
           clearCart();
-          window.location.href = `/track/${encodeURIComponent(statusJson.medusaOrderId)}`;
+          window.location.href = safeTrackingUrl;
           return;
         }
         if (
           statusRes.ok &&
-          (statusJson.status === "needs_review" || statusJson.status === "expired") &&
-          typeof (statusJson.staleReason ?? statusJson.lastError) === "string" &&
+          (statusJson.status === "needs_review" ||
+            statusJson.status === "expired") &&
+          typeof (statusJson.staleReason ?? statusJson.lastError) ===
+            "string" &&
           (statusJson.staleReason ?? statusJson.lastError)!.length > 0
         ) {
-          throw new Error(statusJson.staleReason ?? statusJson.lastError ?? "Checkout needs review.");
+          throw new Error(
+            statusJson.staleReason ??
+              statusJson.lastError ??
+              "Checkout needs review.",
+          );
         }
       }
 
@@ -878,6 +1078,7 @@ export function useCheckoutClient({
           "Payment was accepted, but order finalization is still pending. Use your tracking link to resume safely.",
       );
     } catch (error) {
+      setCheckoutPhase("error");
       setError(
         error instanceof Error
           ? error.message
@@ -890,20 +1091,36 @@ export function useCheckoutClient({
 
   async function completeEmbeddedPayment(
     active: CheckoutEmbeddedData,
+    paypalOrderId?: string,
   ): Promise<void> {
-    await finalizeCheckoutAttempt(active);
-  }
-
-  async function resumePendingHostedPayment(
-    active: CheckoutPendingPayment,
-  ): Promise<void> {
-    if (!active.correlationId) {
-      setError(
-        "This checkout session cannot be resumed because the payment attempt was not recorded. Start checkout again.",
-      );
-      return;
+    if (active.provider === "PAYPAL") {
+      if (!paypalOrderId) {
+        setError(
+          "PayPal did not return an order identifier. Your bag is unchanged; try again.",
+        );
+        return;
+      }
+      const confirmRes = await fetch("/api/checkout/paypal/confirm", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          correlationId: active.correlationId,
+          orderId: paypalOrderId,
+        }),
+      });
+      if (!confirmRes.ok) {
+        const confirmJson = (await confirmRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        setError(
+          confirmJson.error ??
+            "PayPal payment could not be confirmed. Your bag is unchanged; try again.",
+        );
+        return;
+      }
     }
-    await finalizeCheckoutAttempt({ correlationId: active.correlationId });
+    await finalizeCheckoutAttempt(active);
   }
 
   async function copyTrackingLink() {
@@ -940,7 +1157,11 @@ export function useCheckoutClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cartId, code }),
       });
-      const json = (await res.json()) as { ok?: boolean; error?: string; discountAmount?: number };
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        discountAmount?: number;
+      };
       if (!json.ok) {
         setPromoError(json.error ?? "Could not apply that code.");
         return;
@@ -982,6 +1203,7 @@ export function useCheckoutClient({
     error,
     setError,
     loading,
+    checkoutPhase,
     paymentMethod,
     setPaymentMethod: (next: PaymentProviderKey) => {
       userSelectedPaymentMethodRef.current = true;
@@ -1012,7 +1234,7 @@ export function useCheckoutClient({
     displayCurrency,
     handlePay,
     completeEmbeddedPayment,
-    resumePendingHostedPayment,
+    finalizeCheckoutAttempt,
     continueToHostedCheckout,
     copyTrackingLink,
     phVatRate: PH_VAT_RATE,

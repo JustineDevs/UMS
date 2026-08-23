@@ -1,0 +1,300 @@
+{
+  "repo_notes": [
+    {
+      "content": ""
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "High-level introduction to the Universal Music Store (UVS) monorepo: what it is, its dual-database architecture (Medusa + Supabase), the apps and packages it contains, and how to navigate the wiki.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Architecture & Data Ownership",
+      "purpose": "Deep dive into the two-database split (Medusa as commerce SoR, Supabase as platform/identity SoR), ADR decisions, data ownership rules, and how the apps and packages relate to each other.",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Getting Started & Environment Setup",
+      "purpose": "How to set up the local development environment: pnpm workspace, environment variables, Docker for Medusa, DevContainer, and the monorepo root env loader script.",
+      "parent": "Overview",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Storefront Application",
+      "purpose": "Overview of apps/storefront — the Next.js 15 customer-facing app. Links to child pages covering routing, checkout, cart, CMS rendering, and observability.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Storefront Routing & Pages",
+      "purpose": "The Next.js App Router structure for the storefront: public routes (shop, PDP, cart, checkout, account, blog, etc.), SEO sitemap generation, and the OnboardingGuard.",
+      "parent": "Storefront Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Checkout & Payment Flow",
+      "purpose": "End-to-end checkout lifecycle: cart preparation, payment intent creation, provider-specific flows (Stripe, PayPal, Xendit, COD), finalization, and the cron-based recovery mechanism for stuck payments.",
+      "parent": "Storefront Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Cart Management",
+      "purpose": "Cart API routes: attaching customers, merging guest carts, Medusa-bind on sign-in, cart abandonment beacon, and the CartSyncOnSignIn/WishlistSyncOnLogin lifecycle hooks.",
+      "parent": "Storefront Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Storefront CMS & Product Components",
+      "purpose": "How the storefront renders CMS blocks (hero, rich_text, cta_row, featured_products), the CmsBlocksRenderer, CmsAnnouncementBar, CmsExperimentAssigner, product gallery, add-to-cart, and review form components.",
+      "parent": "Storefront Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Admin Dashboard Application",
+      "purpose": "Overview of apps/admin — the Next.js 15 internal operations dashboard for staff. Links to child pages covering POS, CMS management, finance, and the admin API layer.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Point of Sale (POS)",
+      "purpose": "The POS sub-system: commit-sale API route, shift management, POS policy enforcement via omnichannel-policy, the terminal-agent printer service, and the printer-core ESC/POS library.",
+      "parent": "Admin Dashboard Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Admin CMS Management",
+      "purpose": "The admin-side CMS editors: pages, navigation, announcements, media, blog, categories, redirects, experiments, and forms — all backed by the platform-data CMS modules.",
+      "parent": "Admin Dashboard Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Admin Finance & Payments",
+      "purpose": "Payment management routes (list, retry, mark-review), reconciliation dashboard, payment health endpoint, and the admin settings pages for payment providers and storefront configuration.",
+      "parent": "Admin Dashboard Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Admin API Layer & Staff Auth",
+      "purpose": "The BFF (Backend for Frontend) pattern used in apps/admin: staff session validation, permission gates, correlation IDs, staff API response helpers, and the product lookup proxy.",
+      "parent": "Admin Dashboard Application",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Medusa Commerce Engine",
+      "purpose": "Overview of apps/medusa — the Medusa 2.x headless commerce backend. Links to child pages covering payment modules, webhooks, subscribers, and configuration.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Payment Provider Modules",
+      "purpose": "The four custom Medusa payment modules: Stripe Checkout, PayPal, Xendit, and COD. Covers service implementations, webhook handling, HMAC verification, and deduplication logic.",
+      "parent": "Medusa Commerce Engine",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Medusa Subscribers, Workflows & Logistics",
+      "purpose": "Event-driven subscribers (order placed, fulfillment, loyalty points, digital receipts, SMS), the J&T Express webhook integration, and the notify-order-shipped workflow.",
+      "parent": "Medusa Commerce Engine",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Shared Packages",
+      "purpose": "Overview of the internal workspace packages that are shared across apps. Links to child pages for platform-data, validation, SDK, database, and other utility packages.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "platform-data Package",
+      "purpose": "The @universal-music-store/platform-data package: Supabase client initialization, RBAC/identity, CMS modules, POS data, loyalty, compliance/DSAR, payment ledger, and the outbox pattern.",
+      "parent": "Shared Packages",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "database Package & Supabase Migrations",
+      "purpose": "The @universal-music-store/database package: Supabase schema, migration scripts, seed data, data-boundaries module, and the apply-sql tooling.",
+      "parent": "Shared Packages",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "validation, sdk, types & utility Packages",
+      "purpose": "The remaining shared packages: validation (Zod schemas for HTTP, CMS, compliance), sdk (env helpers, CMS helpers, analytics, feature flags, i18n, PH tax), types (shared domain types), rate-limits, resend-mail, omnichannel-policy, user-preferences, and the shared UI library.",
+      "parent": "Shared Packages",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Auxiliary Services",
+      "purpose": "Overview of the two auxiliary runtime services: the Express API sidecar (apps/api) and the Terminal Agent (apps/terminal-agent). Links to child pages for each.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Express API Sidecar (apps/api)",
+      "purpose": "The Node.js/Express sidecar service: health/readiness endpoints, compliance routes (DSAR export and erasure), internal API key auth, rate limiting, and deployment on Fly.io.",
+      "parent": "Auxiliary Services",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Terminal Agent (apps/terminal-agent)",
+      "purpose": "The local HTTP agent for POS hardware: ESC/POS receipt and label printing, cash drawer control, multi-adapter support (TCP, HTTP relay, QZ Tray, Epson ePOS, Star CloudPRNT), and Supabase device heartbeat.",
+      "parent": "Auxiliary Services",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Testing Infrastructure",
+      "purpose": "Overview of the multi-tier testing strategy: unit tests, contract tests, E2E Playwright suites, stress/chaos tests, and visual regression (dogfood). Links to child pages for E2E and CI pipelines.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "E2E Test Suites & Playwright Configuration",
+      "purpose": "Playwright configuration, test categories (smoke, flows, dogfood, regressions), key specs (full-commerce-journey, PSP checkout flows, COD, storefront security/rate-limit), and the helpers/fixtures layer.",
+      "parent": "Testing Infrastructure",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "CI/CD Pipelines & Release Gates",
+      "purpose": "GitHub Actions workflows: E2E release gate, full release gate, PSP sandbox connectivity checks, SBOM/license audit, security audit (Semgrep, Trivy, Gitleaks), and the DevContainer setup.",
+      "parent": "Testing Infrastructure",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Security & Compliance",
+      "purpose": "Overview of the security posture: secret scanning, boundary checks, OWASP controls, GDPR/privacy compliance, and the security program documentation.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Security Boundaries & Audit Tooling",
+      "purpose": "The three automated security boundary checks (storefront client boundary, commerce migration boundary, admin API staff guard), the commit CLI security scanner, and the parallel-commit workflow.",
+      "parent": "Security & Compliance",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Privacy, Compliance & Data Governance",
+      "purpose": "GDPR/privacy compliance implementation: DSAR export, PII anonymization, data retention policies, the privacy-terms document, and the data-ownership ADR.",
+      "parent": "Security & Compliance",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    },
+    {
+      "title": "Developer Tooling & Scripts",
+      "purpose": "Root-level developer scripts: dev startup orchestration, port management, cleanup utilities, the commit CLI, Bruno API collection generation, and the Cursor AI commands/skills system.",
+      "page_notes": [
+        {
+          "content": ""
+        }
+      ]
+    }
+  ]
+}

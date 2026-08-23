@@ -13,6 +13,7 @@ import {
 } from "@/lib/medusa-pos";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function POST(req: Request) {
   const correlationId = getCorrelationId(req);
@@ -26,7 +27,9 @@ export async function POST(req: Request) {
     phase: "start",
   });
 
-  const body = (await req.json().catch(() => ({}))) as {
+  const parsedBody = await parseBoundedJson(req, 16 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const body = (parsedBody.valid ? parsedBody.value : {}) as {
     barcode?: string;
     sku?: string;
   };
