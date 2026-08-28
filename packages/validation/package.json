@@ -14,6 +14,7 @@
     "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts src/http-schemas.test.ts src/medusa-inventory-math.test.ts src/sanitize-cms-html.test.ts"
   },
   "dependencies": {
+    "escape-string-regexp": "^4.0.0",
     "htmlparser2": "^12.0.0",
     "sanitize-html": "^2.17.0",
     "zod": "^3.23.0"
