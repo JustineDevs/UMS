@@ -14,8 +14,26 @@ jobs:
   commerce-browser-suites:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: medusa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d medusa_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     env:
       HAS_PSP_SECRETS: ${{ secrets.E2E_STRIPE_API_KEY != '' || secrets.E2E_PAYPAL_CLIENT_ID != '' || secrets.E2E_XENDIT_SECRET_KEY != '' }}
+      DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/medusa_ci
+      STORE_CORS: http://localhost:3000
+      ADMIN_CORS: http://localhost:3001,http://localhost:9000
+      AUTH_CORS: http://localhost:3000,http://localhost:3001,http://localhost:9000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -27,7 +45,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Prepare Medusa E2E data
-        run: pnpm e2e:prep:medusa
+        run: |
+          pnpm --filter medusa exec medusa db:migrate --all-or-nothing
+          pnpm e2e:prep:medusa
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
@@ -66,6 +86,26 @@ jobs:
   contract-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: medusa_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d medusa_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/medusa_ci
+      STORE_CORS: http://localhost:3000
+      ADMIN_CORS: http://localhost:3001,http://localhost:9000
+      AUTH_CORS: http://localhost:3000,http://localhost:3001,http://localhost:9000
+      MEDUSA_BACKEND_URL: http://localhost:9000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -74,6 +114,19 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
+      - name: Prepare and start Medusa
+        run: |
+          pnpm --filter medusa exec medusa db:migrate --all-or-nothing
+          pnpm e2e:prep:medusa
+          pnpm --filter medusa dev > "$RUNNER_TEMP/medusa.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:9000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat "$RUNNER_TEMP/medusa.log"
+          exit 1
       - name: Run contract tests
         run: node --import tsx/esm --test apps/storefront/src/lib/__tests__/medusa-contract.test.ts
         env:
