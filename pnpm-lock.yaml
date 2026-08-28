@@ -457,6 +457,9 @@ importers:
 
   apps/storefront:
     dependencies:
+      '@supabase/auth-js':
+        specifier: 2.99.3
+        version: 2.99.3
       '@babel/runtime':
         specifier: ^7.29.7
         version: 7.29.7
@@ -535,6 +538,15 @@ importers:
       side-channel:
         specifier: ^1.1.1
         version: 1.1.1
+      side-channel-list:
+        specifier: 1.0.1
+        version: 1.0.1
+      side-channel-map:
+        specifier: 1.0.1
+        version: 1.0.1
+      side-channel-weakmap:
+        specifier: 1.0.2
+        version: 1.0.2
       tslib:
         specifier: 2.8.1
         version: 2.8.1
@@ -684,6 +696,12 @@ importers:
 
   packages/platform-data:
     dependencies:
+      '@supabase/auth-js':
+        specifier: 2.99.3
+        version: 2.99.3
+      '@supabase/functions-js':
+        specifier: 2.99.3
+        version: 2.99.3
       '@supabase/postgrest-js':
         specifier: 2.99.3
         version: 2.99.3
@@ -692,6 +710,9 @@ importers:
         version: 2.99.3
       '@supabase/supabase-js':
         specifier: ^2.45.0
+        version: 2.99.3
+      '@supabase/storage-js':
+        specifier: 2.99.3
         version: 2.99.3
       tslib:
         specifier: 2.8.1

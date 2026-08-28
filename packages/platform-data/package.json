@@ -23,9 +23,12 @@
     "test": "node --require ../../scripts/load-platform-data-test-env.cjs --import tsx/esm --test src/admin-users.test.ts src/permissions.test.ts src/storefront-home-cms.test.ts src/storefront-public-metadata.test.ts src/supabase-errors.test.ts src/tracking-capability-revocation.test.ts src/cms-public-visibility.test.ts src/cms-media.test.ts src/payment-ledger-list.test.ts src/payment-ledger-quote.test.ts src/payment-ledger-supabase.integration.test.ts src/payment-reconciliation-jobs.test.ts src/payment-settlement-reconciliation.test.ts src/product-reviews.test.ts src/catalog-provider-projections.test.ts src/payment-provider-capabilities.test.ts src/crm-integration-mappings.test.ts src/delivery-logistics-checklist.test.ts src/delivery-logistics-ledger.test.ts src/delivery-logistics-operations.test.ts src/order-delivery-ledger.test.ts src/crm-operations.test.ts src/platform-feature-mappings.test.ts src/pos-enterprise.test.ts src/delivery-enterprise.test.ts src/inventory-reservations.test.ts src/invoice-lifecycle.test.ts src/commerce-attribution.test.ts src/payment-state-machine.test.ts"
   },
   "dependencies": {
+    "@supabase/auth-js": "2.99.3",
+    "@supabase/functions-js": "2.99.3",
     "@supabase/postgrest-js": "2.99.3",
     "@supabase/realtime-js": "2.99.3",
     "@supabase/supabase-js": "^2.45.0",
+    "@supabase/storage-js": "2.99.3",
     "tslib": "2.8.1"
   },
   "devDependencies": {
