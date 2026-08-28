@@ -16,10 +16,17 @@ export function normalizeMedusaRedisUrl(value: string | undefined): string {
 export function medusaRedisModules(redisUrl: string) {
   if (!redisUrl) return [] as const;
 
+  const redisOptions = {
+    // Keep hosted Upstash connections on the broadly supported IPv4 route.
+    family: 4,
+    connectTimeout: 30_000,
+    keepAlive: 10_000,
+  } as const;
+
   return [
     {
       resolve: "@medusajs/medusa/event-bus-redis",
-      options: { redisUrl },
+      options: { redisUrl, redisOptions },
     },
     {
       resolve: "@medusajs/medusa/locking",
@@ -29,7 +36,7 @@ export function medusaRedisModules(redisUrl: string) {
             id: "locking-redis",
             resolve: "@medusajs/medusa/locking-redis",
             is_default: true,
-            options: { redisUrl },
+            options: { redisUrl, redisOptions },
           },
         ],
       },
