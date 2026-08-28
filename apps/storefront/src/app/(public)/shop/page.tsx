@@ -352,7 +352,7 @@ export default async function ShopPage({
 
       {cmsCategory?.blocks?.length ? (
         <div className="mb-10">
-          <CmsBlocksRenderer blocks={cmsCategory.blocks} />
+          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
         </div>
       ) : null}
 

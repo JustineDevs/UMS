@@ -48,7 +48,7 @@ export default async function AboutPage() {
         <h1 className="font-headline text-4xl font-bold tracking-tighter text-primary sm:text-6xl">{cmsPage?.title?.trim() || "Music gear that earns its place."}</h1>
         <p className="mt-6 text-lg leading-8 text-on-surface-variant">{cmsPage?.meta_description?.trim() || SITE_DESCRIPTION}</p>
       </header>
-      {cmsBlocks.length > 0 ? <div className="mt-16"><CmsBlocksRenderer blocks={cmsBlocks} /></div> : <div className="mt-16 grid gap-8 md:grid-cols-3">
+      {cmsBlocks.length > 0 ? <div className="mt-16">{await CmsBlocksRenderer({ blocks: cmsBlocks })}</div> : <div className="mt-16 grid gap-8 md:grid-cols-3">
         <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6">
           <h2 className="font-headline text-xl font-bold text-primary">Curated for players</h2>
           <p className="mt-3 text-sm leading-6 text-on-surface-variant">We focus on dependable instruments and useful gear, with product details that help you choose with confidence.</p>

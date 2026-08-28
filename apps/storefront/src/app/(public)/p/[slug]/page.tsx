@@ -124,7 +124,7 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
           dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(page.body) }}
         />
       ) : null}
-      <CmsBlocksRenderer blocks={page.blocks} />
+      {await CmsBlocksRenderer({ blocks: page.blocks })}
     </main>
   );
 }
