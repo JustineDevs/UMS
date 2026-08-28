@@ -29,14 +29,26 @@ services:
       - key: MEDUSA_INTERNAL_ADMIN_TOKEN
         sync: false
       - key: STORE_CORS
-        value: https://universalmusic.vercel.app
+        value: https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app,http://localhost:3000
       - key: ADMIN_CORS
-        value: https://universalmusic-admin.vercel.app
+        value: https://universalmusic-admin.vercel.app,http://localhost:3001
       - key: AUTH_CORS
-        value: https://universalmusic-admin.vercel.app
+        value: https://universalmusic-admin.vercel.app,http://localhost:3001
       - key: STRIPE_API_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      # Production-safe provider registration uses Nango. Direct PSP keys remain
+      # optional and are intentionally not enabled by NODE_ENV=production.
+      - key: NANGO_API_KEY
+        sync: false
+      - key: NANGO_PAYMENT_INTEGRATIONS
+        sync: false
+      - key: NANGO_WEBHOOK_SIGNING_KEY
+        sync: false
+      - key: NANGO_PAYMENT_CONNECTION_ID
+        sync: false
+      - key: NANGO_PAYMENT_PROVIDER_CONFIG_KEY
         sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
