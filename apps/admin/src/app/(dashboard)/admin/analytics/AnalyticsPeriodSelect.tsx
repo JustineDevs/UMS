@@ -4,8 +4,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export function AnalyticsPeriodSelect() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const pathname = usePathname() ?? "/admin/analytics";
+  const searchParams = useSearchParams() ?? new URLSearchParams();
   const value = searchParams.get("period") ?? "30";
 
   return (
