@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalPassThroughEnv": ["AUTH_DISABLE", "AUTH_DISABLED"],
+  "globalPassThroughEnv": ["AUTH_DISABLE", "AUTH_DISABLED", "DATABASE_URL"],
   "globalDependencies": ["**/.env.*local"],
   "tasks": {
     "build": {
