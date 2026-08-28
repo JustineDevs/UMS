@@ -72,10 +72,11 @@ const paypalProvider =
       ]
     : [];
 
+// Direct Xendit credentials are valid for hosted production deployments too;
+// sandbox-vs-live selection belongs to the credential set, not this gate.
 const xenditDirectConfigured =
-  directSandboxCredentialsAllowed &&
-  process.env.XENDIT_SECRET_KEY?.trim() &&
-  process.env.XENDIT_WEBHOOK_TOKEN?.trim();
+  Boolean(process.env.XENDIT_SECRET_KEY?.trim()) &&
+  Boolean(process.env.XENDIT_WEBHOOK_TOKEN?.trim());
 const xenditManagedByNango =
   !xenditDirectConfigured && nangoPaymentProviderConfigured(["xendit", "xendit-sandbox"]);
 const xenditProvider =
