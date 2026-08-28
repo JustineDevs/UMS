@@ -36,3 +36,18 @@ test("Google provider registration uses the original provider key", () => {
   registerGoogleFontsProvider({ addProvider: (name) => { registered = name; } }, provider);
   assert.equal(registered, "google");
 });
+
+test("removing an unknown font leaves active fonts unchanged", () => {
+  const head = new FakeHead();
+  const provider = new GoogleFontsProvider(head, () => new FakeLink());
+  provider.addFont("Inter");
+  provider.addFont("Roboto");
+
+  provider.removeFont("Missing");
+
+  assert.deepEqual(provider.activeFonts, ["Inter", "Roboto"]);
+  assert.equal(
+    head.link?.attributes.get("href"),
+    "https://fonts.googleapis.com/css2?display=swap&family=Inter&family=Roboto",
+  );
+});

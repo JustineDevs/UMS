@@ -24,6 +24,7 @@ export class GoogleFontsProvider {
 
   removeFont(fontName: string): void {
     const index = this.activeFonts.indexOf(fontName);
+    if (index === -1) return;
     this.activeFonts.splice(index, 1);
     this.updateFontList();
   }
