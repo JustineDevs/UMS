@@ -71,7 +71,7 @@ function emptyPage(): CmsPageRow {
 
 export function CmsPagesManager() {
   const { data: session, status } = useSession();
-  const searchParams = useSearchParams();
+  const section = useSearchParams()?.get("section");
   const canWrite =
     process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
     staffHasPermission(session?.user?.permissions ?? [], "content:write");
@@ -88,7 +88,7 @@ export function CmsPagesManager() {
   const [slugWhenOpened, setSlugWhenOpened] = useState<string | null>(null);
   const [redirectMessage, setRedirectMessage] = useState<string | null>(null);
   const [showStorefrontHome, setShowStorefrontHome] = useState(
-    () => searchParams.get("section") === "home",
+    () => section === "home",
   );
 
   const load = useCallback(() => {
@@ -115,8 +115,8 @@ export function CmsPagesManager() {
     load();
   }, [load]);
   useEffect(() => {
-    setShowStorefrontHome(searchParams.get("section") === "home");
-  }, [searchParams]);
+    setShowStorefrontHome(section === "home");
+  }, [section]);
   useEffect(() => {
     if (!editing) return;
     setBlocksJson(JSON.stringify(editing.blocks ?? [], null, 2));
