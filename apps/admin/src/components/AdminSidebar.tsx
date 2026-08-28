@@ -50,7 +50,7 @@ export function AdminSidebar({
   onOpenSearch,
   localAuthBypass = false,
 }: AdminSidebarProps) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/admin";
   const { data: session } = useSession();
   const sessionPerms = staffPermissionListForSession(session);
   // The local auth bypass is server-only, so the client session remains empty
