@@ -4,10 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   getWishlist,
-  clearWishlist,
   wishlistSyncStorageKey,
   type WishlistEntry,
 } from "@/lib/wishlist";
+import { isExpectedWishlistSyncUnauthorized, mergeWishlistSyncResult } from "@/lib/wishlist-sync-state";
+
+const localAuthBypass =
+  process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+  process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
 
 /**
  * Invisible component mounted in the layout that merges localStorage wishlist
@@ -30,6 +34,13 @@ export function WishlistSyncOnLogin() {
   const sync = useCallback(async () => {
     setSyncState("syncing");
     const localItems = getWishlist();
+    const syncableItems = localItems.filter((item) => item.medusaProductId?.trim());
+    if (syncableItems.length === 0) {
+      syncedRef.current = true;
+      if (identity) window.sessionStorage.setItem(wishlistSyncStorageKey(identity), "1");
+      setSyncState("idle");
+      return;
+    }
     try {
       const res = await fetch("/api/wishlist/sync", {
         method: "POST",
@@ -40,6 +51,14 @@ export function WishlistSyncOnLogin() {
             .map((item) => ({ medusaProductId: item.medusaProductId!.trim() })),
         }),
       });
+      if (isExpectedWishlistSyncUnauthorized(res.status)) {
+        // The API remains deny-by-default if the browser session expires between
+        // useSession() and the request. Do not turn that expected boundary into
+        // a persistent storefront error banner.
+        syncedRef.current = true;
+        setSyncState("idle");
+        return;
+      }
       if (!res.ok) throw new Error("wishlist_sync_failed");
       const json = (await res.json()) as {
         ok?: boolean;
@@ -52,14 +71,17 @@ export function WishlistSyncOnLogin() {
         skippedProductIds?: string[];
       };
       if (!json.ok || !Array.isArray(json.items)) throw new Error("wishlist_sync_invalid");
-      const merged: WishlistEntry[] = json.items.map((row) => ({
-        slug: row.product_slug,
-        name: row.product_name,
-        ...(row.medusa_product_id ? { medusaProductId: row.medusa_product_id } : {}),
-        addedAt: row.added_at,
-      }));
+      const merged: WishlistEntry[] = mergeWishlistSyncResult(
+        localItems,
+        json.items.map((row) => ({
+          slug: row.product_slug,
+          name: row.product_name,
+          medusaProductId: row.medusa_product_id,
+          addedAt: row.added_at,
+        })),
+        json.skippedProductIds ?? [],
+      );
       const skipped = new Set((json.skippedProductIds ?? []).map((id) => id.trim()).filter(Boolean));
-      clearWishlist();
       window.localStorage.setItem(
         "universal_music_store_wishlist_v1",
         JSON.stringify(merged),
@@ -74,6 +96,7 @@ export function WishlistSyncOnLogin() {
   }, [identity]);
 
   useEffect(() => {
+    if (localAuthBypass) return;
     if (status !== "authenticated" || !identity) return;
     if (identityRef.current !== identity) {
       identityRef.current = identity;
