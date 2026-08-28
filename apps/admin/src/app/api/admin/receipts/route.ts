@@ -10,7 +10,7 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import {
   claimAdminIdempotency,
   completeAdminIdempotency,
@@ -18,7 +18,10 @@ import {
   getRequestHash,
   parseAdminJson,
 } from "@/lib/admin-api-security";
-import { fetchMedusaOrderJson } from "@/lib/medusa-order-bridge";
+import {
+  fetchMedusaOrderJson,
+  resolveMedusaOrderReference,
+} from "@/lib/medusa-order-bridge";
 import { canonicalReceiptOrderFromMedusa } from "@/lib/receipt-order";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
@@ -35,31 +38,23 @@ export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user)
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "receipts:read")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
-  const orderId = req.nextUrl.searchParams.get("order_id");
-  if (!orderId) {
-    return correlatedJson(
-      cid,
-      { error: "order_id is required" },
-      { status: 400 },
-    );
+  const orderReference = req.nextUrl.searchParams.get("order_id");
+  if (!orderReference) {
+    return correlatedError(cid, 400, "order_id is required", "BAD_REQUEST");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
   const organization = await resolveStaffOrganization(sb, session.user.email);
-  if (!organization)
-    return correlatedJson(
-      cid,
-      { error: "Organization membership is not configured" },
-      { status: 403 },
-    );
+  if (!organization) return correlatedError(cid, 403, "Organization membership is not configured", "FORBIDDEN");
+  const orderId = await resolveMedusaOrderReference(orderReference);
+  if (!orderId) return correlatedError(cid, 404, "Not found", "NOT_FOUND");
   const receipt = await getReceiptByOrder(sb, orderId, organization.id);
-  if (!receipt)
-    return correlatedJson(cid, { error: "Not found" }, { status: 404 });
+  if (!receipt) return correlatedError(cid, 404, "Not found", "NOT_FOUND");
   return correlatedJson(cid, { data: receipt });
 }
 
@@ -67,55 +62,34 @@ export async function POST(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user)
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "receipts:send")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const parsed = await parseAdminJson(req, receiptRequestSchema);
   if (!parsed.ok)
-    return correlatedJson(
-      cid,
-      { error: parsed.error },
-      { status: parsed.status },
-    );
+    return correlatedError(cid, parsed.status, parsed.error, "VALIDATION_ERROR");
   const body = parsed.data;
   const idempotencyKey = getIdempotencyKey(req);
   if (!idempotencyKey) {
-    return correlatedJson(
-      cid,
-      { error: "Idempotency-Key is required for receipt mutations" },
-      { status: 400 },
-    );
+    return correlatedError(cid, 400, "Idempotency-Key is required for receipt mutations", "BAD_REQUEST");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
   const organization = await resolveStaffOrganization(sb, session.user.email);
-  if (!organization)
-    return correlatedJson(
-      cid,
-      { error: "Organization membership is not configured" },
-      { status: 403 },
-    );
-  const orderPayload = await fetchMedusaOrderJson(body.order_id);
-  if (!orderPayload?.id)
-    return correlatedJson(cid, { error: "Order not found" }, { status: 404 });
+  if (!organization) return correlatedError(cid, 403, "Organization membership is not configured", "FORBIDDEN");
+  const orderReference = await resolveMedusaOrderReference(body.order_id);
+  if (!orderReference) return correlatedError(cid, 404, "Order not found", "NOT_FOUND");
+  const orderPayload = await fetchMedusaOrderJson(orderReference);
+  if (!orderPayload?.id) return correlatedError(cid, 404, "Order not found", "NOT_FOUND");
   const order = canonicalReceiptOrderFromMedusa(orderPayload);
-  if (!order.id)
-    return correlatedJson(cid, { error: "Order not found" }, { status: 404 });
+  if (!order.id) return correlatedError(cid, 404, "Order not found", "NOT_FOUND");
   if (body.send && !order.customer_email) {
-    return correlatedJson(
-      cid,
-      { error: "The order has no customer email" },
-      { status: 400 },
-    );
+    return correlatedError(cid, 400, "The order has no customer email", "BAD_REQUEST");
   }
   if (body.send && !process.env.RESEND_API_KEY?.trim()) {
-    return correlatedJson(
-      cid,
-      { error: "Receipt email delivery is not configured" },
-      { status: 503 },
-    );
+    return correlatedError(cid, 503, "Receipt email delivery is not configured", "SERVICE_UNAVAILABLE");
   }
   const claim = await claimAdminIdempotency(sb, {
     actorKey: `${organization.id}:${session.user.email!.toLowerCase()}`,
@@ -126,11 +100,7 @@ export async function POST(req: NextRequest) {
   if (claim.kind === "replay")
     return correlatedJson(cid, claim.body, { status: claim.status });
   if (claim.kind !== "claimed") {
-    return correlatedJson(
-      cid,
-      { error: "Receipt mutation is already in progress or conflicts with a previous request" },
-      { status: 409 },
-    );
+    return correlatedError(cid, 409, "Receipt mutation is already in progress or conflicts with a previous request", "CONFLICT");
   }
   const idempotencyId = claim.id;
   let receipt = await getReceiptByOrder(sb, order.id, organization.id);
@@ -147,11 +117,7 @@ export async function POST(req: NextRequest) {
         receipt_html: html,
       });
     } catch {
-      const response = correlatedJson(
-        cid,
-        { error: "Unable to create receipt" },
-        { status: 502 },
-      );
+      const response = correlatedError(cid, 502, "Unable to create receipt", "INTERNAL_ERROR");
       await completeAdminIdempotency(sb, idempotencyId, response.status, {
         error: "Unable to create receipt",
       });
@@ -182,11 +148,7 @@ export async function POST(req: NextRequest) {
         tags: [{ name: "type", value: "staff_receipt" }],
       });
       if (!sent.ok) {
-        const response = correlatedJson(
-          cid,
-          { error: "Failed to send receipt email" },
-          { status: 502 },
-        );
+        const response = correlatedError(cid, 502, "Failed to send receipt email", "INTERNAL_ERROR");
         await completeAdminIdempotency(sb, idempotencyId, response.status, {
           error: "Failed to send receipt email",
         });

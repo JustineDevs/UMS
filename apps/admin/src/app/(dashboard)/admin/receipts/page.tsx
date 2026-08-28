@@ -18,7 +18,7 @@ export default async function ReceiptsPage({
   const sp = await searchParams;
   const initialOrderId =
     typeof sp.order_id === "string" ? sp.order_id.trim() : "";
-  const { orders } = await fetchMedusaOrdersForAdmin(100);
+  const { orders, commerceUnavailable } = await fetchMedusaOrdersForAdmin(100);
 
   return (
     <AdminPageShell
@@ -31,7 +31,11 @@ export default async function ReceiptsPage({
       }
       inspector={<AuditTimeline title="Recent activity" />}
     >
-      <DigitalReceiptLookup initialOrderId={initialOrderId} orders={orders} />
+      <DigitalReceiptLookup
+        initialOrderId={initialOrderId}
+        orders={orders}
+        commerceUnavailable={commerceUnavailable}
+      />
     </AdminPageShell>
   );
 }
