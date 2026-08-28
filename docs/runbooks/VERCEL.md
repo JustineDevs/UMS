@@ -8,7 +8,7 @@ Set these in Vercel → Project → Settings → Environment Variables. Without 
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://universal-music-store-medusa.onrender.com` |
+| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://ums-6455.onrender.com` |
 | `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key | From `medusa seed:ph` output |
 | `NEXT_PUBLIC_MEDUSA_REGION_ID` | Medusa region ID | From Medusa admin or seed |
 

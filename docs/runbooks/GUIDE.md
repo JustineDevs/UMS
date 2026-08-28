@@ -8,18 +8,18 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 **URL:** https://render.com
 
-**What you get:** A Render Blueprint deployment for the Medusa commerce backend. The service URL is `https://universal-music-store-medusa.onrender.com`.
+**What you get:** The existing Render `UMS` web service for the Medusa commerce backend. The service URL is `https://ums-6455.onrender.com`.
 
 **Payment required?** Render's free plan may sleep during inactivity. Use a paid plan for uninterrupted checkout and webhook availability.
 
 **Steps:**
 
-1. Push `render.yaml` to the `dev` branch and open the Render Blueprint creation flow.
-2. Connect `https://github.com/JustineDevs/E-Commerce` and select the `dev` branch.
-3. Apply the Blueprint and enter every variable marked `sync: false`.
-4. Verify `https://universal-music-store-medusa.onrender.com/health` returns HTTP 200 before pointing Vercel at it.
+1. Use the existing Render service in workspace `tea-d6vp73tm5p6s73afirag`; do not create a second service from the Blueprint.
+2. Keep its repository at `https://github.com/JustineDevs/UMS` on the `dev` branch.
+3. Enter every variable marked `sync: false` in the existing service environment.
+4. Verify `https://ums-6455.onrender.com/health` returns HTTP 200 before pointing Vercel at it.
 
-Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in `fly.toml`, Docker build arguments, or git. Fly secrets are injected at runtime.
+Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in Render build arguments or git. Secrets are injected at runtime.
 
 ---
 

@@ -79,7 +79,7 @@ Customers select **"GCash / Xendit"** on checkout when that provider is enabled.
 
 ### Webhooks
 
-Register: `https://universal-music-store-medusa.onrender.com/hooks/payment/xendit`
+Register: `https://ums-6455.onrender.com/hooks/payment/xendit_xendit`
 
 ---
 

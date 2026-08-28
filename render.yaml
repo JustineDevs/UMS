@@ -1,17 +1,16 @@
 services:
   - type: web
-    name: universal-music-store-medusa
-    runtime: docker
+    name: UMS
+    runtime: node
     plan: free
-    dockerfilePath: ./Dockerfile.medusa
-    dockerContext: .
+    region: ohio
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter medusa... build
+    startCommand: pnpm --filter medusa start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: "9000"
       - key: MEDUSA_ADMIN_DISABLED
         value: "true"
       - key: DATABASE_URL
