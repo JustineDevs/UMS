@@ -28,7 +28,7 @@ A Medusa-first music commerce monorepo built with Turborepo, pnpm workspaces, Ne
 ## Live Preview
 
 **Storefront (Vercel):** https://universalmusic.vercel.app — see [docs/runbooks/VERCEL.md](docs/runbooks/VERCEL.md)  
-**Medusa backend (Fly.io):** deployment and credentials notes are in [docs/runbooks/FLY.md](docs/runbooks/FLY.md)
+**Medusa backend (Render):** deployment and credentials are defined in [render.yaml](render.yaml)
 
 ## Project Structure
 
@@ -89,7 +89,7 @@ Copy `.env.example` to `.env.local`, then fill the required local-development va
 - `AUTH_CORS`
 - `CORS_ORIGIN`
 
-`NODE_ENV` must stay `development` in the local repo `.env.local`. Use `.env.production` for production host parity, and set `NODE_ENV=production` only in real deployment environment variables on Fly.io or Vercel.
+`NODE_ENV` must stay `development` in the local repo `.env.local`. Use `.env.production` for production host parity, and set `NODE_ENV=production` only in real deployment environment variables on Render or Vercel.
 
 The Next.js apps load the root env through `scripts/load-monorepo-root-env.cjs`, which intentionally skips `NODE_ENV` so `next dev` and `next build` keep their own mode handling. That guard protects storefront/admin from a copied production-style `.env.local` or `.env.production`.
 
@@ -113,7 +113,7 @@ pnpm dev
 ## Documentation
 
 - [docs/runbooks/GUIDE.md](docs/runbooks/GUIDE.md) — provider credential runbook
-- [docs/runbooks/FLY.md](docs/runbooks/FLY.md) — Fly.io Medusa deployment
+- [render.yaml](render.yaml) — Render Blueprint for the Medusa backend
 - [docs/runbooks/VERCEL.md](docs/runbooks/VERCEL.md) — Vercel-specific deployment notes
 - [docs/runbooks/PAYMENT-INTEGRATION.md](docs/runbooks/PAYMENT-INTEGRATION.md) — payment provider setup
 - [docs/spec.md](docs/spec.md) — system scope and functional requirements

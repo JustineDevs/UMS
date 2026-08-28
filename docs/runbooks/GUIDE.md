@@ -4,22 +4,20 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## Fly.io (Backend Hosting)
+## Render (Backend Hosting)
 
-**URL:** https://fly.io
+**URL:** https://render.com
 
-**What you get:** A production runtime for the Medusa commerce backend. The deployment produces a URL such as `https://universal-music-store-medusa.fly.dev`.
+**What you get:** A Render Blueprint deployment for the Medusa commerce backend. The service URL is `https://universal-music-store-medusa.onrender.com`.
 
-**Payment required?** Fly.io billing and machine pricing apply. Keep at least one machine running for checkout and webhook availability.
+**Payment required?** Render's free plan may sleep during inactivity. Use a paid plan for uninterrupted checkout and webhook availability.
 
 **Steps:**
 
-1. Install `flyctl` and sign in with `fly auth login`.
-2. From the repository root, review `fly.toml` and change `app` if the name is unavailable.
-3. Create the app without generating a second configuration: `fly apps create universal-music-store-medusa`.
-4. Set runtime secrets with `fly secrets set --app universal-music-store-medusa DATABASE_URL=... JWT_SECRET=... COOKIE_SECRET=... STORE_CORS=... ADMIN_CORS=... AUTH_CORS=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...`.
-5. Deploy from the repository root: `fly deploy --config fly.toml --remote-only`.
-6. Verify `https://universal-music-store-medusa.fly.dev/health` returns HTTP 200 before pointing Vercel at it.
+1. Push `render.yaml` to the `dev` branch and open the Render Blueprint creation flow.
+2. Connect `https://github.com/JustineDevs/E-Commerce` and select the `dev` branch.
+3. Apply the Blueprint and enter every variable marked `sync: false`.
+4. Verify `https://universal-music-store-medusa.onrender.com/health` returns HTTP 200 before pointing Vercel at it.
 
 Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in `fly.toml`, Docker build arguments, or git. Fly secrets are injected at runtime.
 
@@ -107,13 +105,13 @@ Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys 
 
 | Service      | Signup fee | To get API keys      | For live transactions  |
 |-------------|------------|----------------------|------------------------|
-| Fly.io      | No         | Account and billing setup | Paid machine runtime |
+| Render      | No         | Account and Git provider setup | Paid plan for always-on runtime |
 | Stripe      | No         | Free                 | % per transaction      |
 | PayPal      | No         | Free                 | % per transaction      |
 | Xendit      | No         | Business onboarding  | % per transaction      |
 | Tracking service | No      | Free tier OK         | Paid for higher volume |
 
-Hand these credentials to your developer. They will configure them in Fly.io or Vercel without committing secrets to the repository.
+Configure these credentials in Render or Vercel without committing secrets to the repository.
 
 ## Production env files
 

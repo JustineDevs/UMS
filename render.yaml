@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: universal-music-store-medusa
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.medusa
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "9000"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: COOKIE_SECRET
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: STORE_CORS
+        value: https://universalmusic.vercel.app
+      - key: ADMIN_CORS
+        value: https://universalmusic-admin.vercel.app
+      - key: AUTH_CORS
+        value: https://universalmusic-admin.vercel.app
+      - key: STRIPE_API_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: PAYPAL_ENVIRONMENT
+        value: live
+      - key: MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS
+        value: "false"
+      - key: XENDIT_SECRET_KEY
+        sync: false
+      - key: XENDIT_WEBHOOK_TOKEN
+        sync: false
+      - key: TRACKING_HMAC_SECRET
+        sync: false

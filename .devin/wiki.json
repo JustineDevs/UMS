@@ -211,7 +211,7 @@
     },
     {
       "title": "Express API Sidecar (apps/api)",
-      "purpose": "The Node.js/Express sidecar service: health/readiness endpoints, compliance routes (DSAR export and erasure), internal API key auth, rate limiting, and deployment on Fly.io.",
+      "purpose": "The Node.js/Express sidecar service: health/readiness endpoints, compliance routes (DSAR export and erasure), internal API key auth, rate limiting, and deployment on Render.",
       "parent": "Auxiliary Services",
       "page_notes": [
         {

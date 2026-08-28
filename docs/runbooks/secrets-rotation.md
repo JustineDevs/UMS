@@ -36,7 +36,7 @@ Update the tracking webhook signing secret in env; restart services that consume
 3. Copy the new key value.
 4. Update every environment that uses this key:
    - Vercel: `vercel env rm SUPABASE_SERVICE_ROLE_KEY production && vercel env add SUPABASE_SERVICE_ROLE_KEY production`
-   - Fly.io: rotate with `fly secrets set KEY=value --app universal-music-store-medusa`, then deploy or restart the affected machines.
+   - Render: rotate the variable in the service Environment settings, then trigger a deploy or restart the affected service.
    - Local `.env.local`: replace the value; do not commit to git.
 5. Deploy or restart the affected services (admin, storefront server functions).
 6. Verify the old key returns 401 on any test request.
