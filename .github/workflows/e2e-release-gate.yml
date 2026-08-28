@@ -42,12 +42,17 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
+      - name: Build workspace SDK dependencies
+        run: pnpm --filter @universal-music-store/sdk... build
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Prepare Medusa E2E data
         run: |
           pnpm --filter medusa exec medusa db:migrate --all-or-nothing
           pnpm e2e:prep:medusa
+          MEDUSA_PUBLISHABLE_API_KEY="$(psql "$DATABASE_URL" -Atqc "SELECT token FROM api_key WHERE type = 'publishable' AND revoked_at IS NULL ORDER BY created_at LIMIT 1")"
+          test -n "$MEDUSA_PUBLISHABLE_API_KEY"
+          echo "MEDUSA_PUBLISHABLE_API_KEY=$MEDUSA_PUBLISHABLE_API_KEY" >> "$GITHUB_ENV"
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
@@ -114,10 +119,15 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --no-frozen-lockfile
+      - name: Build workspace SDK dependencies
+        run: pnpm --filter @universal-music-store/sdk... build
       - name: Prepare and start Medusa
         run: |
           pnpm --filter medusa exec medusa db:migrate --all-or-nothing
           pnpm e2e:prep:medusa
+          MEDUSA_PUBLISHABLE_API_KEY="$(psql "$DATABASE_URL" -Atqc "SELECT token FROM api_key WHERE type = 'publishable' AND revoked_at IS NULL ORDER BY created_at LIMIT 1")"
+          test -n "$MEDUSA_PUBLISHABLE_API_KEY"
+          echo "MEDUSA_PUBLISHABLE_API_KEY=$MEDUSA_PUBLISHABLE_API_KEY" >> "$GITHUB_ENV"
           pnpm --filter medusa dev > "$RUNNER_TEMP/medusa.log" 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:9000/health >/dev/null; then
