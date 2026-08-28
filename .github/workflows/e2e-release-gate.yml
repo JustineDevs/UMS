@@ -38,17 +38,21 @@ jobs:
           CI_STRICT_E2E: "1"
       - name: Run PSP full matrix (when secrets present)
         if: |
-          secrets.E2E_PAYMONGO_SECRET_KEY != '' ||
-          secrets.E2E_MAYA_SECRET_KEY != ''
+          secrets.E2E_STRIPE_API_KEY != '' ||
+          secrets.E2E_PAYPAL_CLIENT_ID != '' ||
+          secrets.E2E_XENDIT_SECRET_KEY != ''
         run: pnpm test:e2e:psp-full -- --project=chromium
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
           CI_STRICT_E2E: "1"
-          E2E_PAYMONGO_SECRET_KEY: ${{ secrets.E2E_PAYMONGO_SECRET_KEY }}
-          E2E_MAYA_SECRET_KEY: ${{ secrets.E2E_MAYA_SECRET_KEY }}
+          E2E_STRIPE_API_KEY: ${{ secrets.E2E_STRIPE_API_KEY }}
+          E2E_STRIPE_WEBHOOK_SECRET: ${{ secrets.E2E_STRIPE_WEBHOOK_SECRET }}
           E2E_PAYPAL_CLIENT_ID: ${{ secrets.E2E_PAYPAL_CLIENT_ID }}
+          E2E_PAYPAL_CLIENT_SECRET: ${{ secrets.E2E_PAYPAL_CLIENT_SECRET }}
+          E2E_XENDIT_SECRET_KEY: ${{ secrets.E2E_XENDIT_SECRET_KEY }}
+          E2E_XENDIT_WEBHOOK_TOKEN: ${{ secrets.E2E_XENDIT_WEBHOOK_TOKEN }}
         continue-on-error: false
       - name: Upload test results
         if: always()
