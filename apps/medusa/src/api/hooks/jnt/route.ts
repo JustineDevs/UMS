@@ -36,9 +36,12 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     warn?: (_m: string) => void;
   };
 
-  const secret = process.env.JNT_WEBHOOK_SECRET?.trim();
+  // Pancake forwards its configured Authorization header to this compatibility
+  // endpoint; direct J&T webhook credentials are not part of this topology.
+  const secret = process.env.PANCAKE_POS_API_KEY?.trim();
 
   const signature =
+    (req.headers.authorization as string | undefined) ??
     (req.headers["x-jnt-signature"] as string | undefined) ??
     (req.headers["x-signature"] as string | undefined);
 
@@ -46,6 +49,7 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     secret,
     rawBody: req.rawBody,
     signatureHeader: signature,
+    authMode: process.env.PANCAKE_POS_API_KEY?.trim() ? "bearer" : "hmac",
   });
   if (!prepared.parsed) {
     res.status(prepared.status).json(prepared.body);

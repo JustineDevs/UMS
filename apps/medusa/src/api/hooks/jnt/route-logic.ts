@@ -26,6 +26,7 @@ type PrepareInput = {
   secret: string | undefined;
   rawBody: Buffer | undefined;
   signatureHeader: string | undefined;
+  authMode?: "hmac" | "bearer";
 };
 
 const MAX_JNT_WEBHOOK_BODY_BYTES = 64 * 1024;
@@ -93,6 +94,17 @@ export function verifyJntHmac(
   }
 }
 
+function verifyBearerToken(
+  authorizationHeader: string | undefined,
+  expectedToken: string,
+): boolean {
+  const supplied = authorizationHeader?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!supplied) return false;
+  const a = Buffer.from(supplied, "utf8");
+  const b = Buffer.from(expectedToken, "utf8");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 export function pickMedusaOrderId(payload: JntWebhookPayload): string | undefined {
   if (typeof payload.orderNo === "string" && payload.orderNo.trim()) {
     const orderId = payload.orderNo.trim();
@@ -125,7 +137,11 @@ export function prepareJntWebhookEvent(
     };
   }
 
-  if (!verifyJntHmac(input.rawBody, input.signatureHeader, input.secret)) {
+  const authenticated =
+    input.authMode === "bearer"
+      ? verifyBearerToken(input.signatureHeader, input.secret)
+      : verifyJntHmac(input.rawBody, input.signatureHeader, input.secret);
+  if (!authenticated) {
     return {
       status: 401,
       body: { error: "Invalid signature", code: "INVALID_WEBHOOK_SIGNATURE" },

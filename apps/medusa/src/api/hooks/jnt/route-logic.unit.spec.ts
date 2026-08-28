@@ -29,6 +29,26 @@ describe("J&T webhook preparation", () => {
     expect(verifyJntHmac(body, "bad", secret)).toBe(false);
   });
 
+  it("accepts Pancake bearer authentication without a J&T signing secret", () => {
+    const rawBody = Buffer.from('{"orderNo":"order_1","status":"SIGNED"}');
+    const result = prepareJntWebhookEvent({
+      secret: "pancake-api-key",
+      rawBody,
+      signatureHeader: "Bearer pancake-api-key",
+      authMode: "bearer",
+    });
+    expect(result.status).toBe(200);
+    expect(result.parsed?.orderId).toBe("order_1");
+
+    const rejected = prepareJntWebhookEvent({
+      secret: "pancake-api-key",
+      rawBody,
+      signatureHeader: "Bearer wrong-key",
+      authMode: "bearer",
+    });
+    expect(rejected.status).toBe(401);
+  });
+
   it("rejects invalid signatures and malformed JSON", () => {
     const body = Buffer.from("{not-json");
     const invalidSignature = prepareJntWebhookEvent({
