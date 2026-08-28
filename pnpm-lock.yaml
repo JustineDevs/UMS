@@ -457,9 +457,6 @@ importers:
 
   apps/storefront:
     dependencies:
-      '@supabase/auth-js':
-        specifier: 2.99.3
-        version: 2.99.3
       '@babel/runtime':
         specifier: ^7.29.7
         version: 7.29.7
