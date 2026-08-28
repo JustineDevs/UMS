@@ -18,12 +18,21 @@ export function medusaRedisModules(redisUrl: string) {
 
   return [
     {
-      resolve: "@medusajs/event-bus-redis",
+      resolve: "@medusajs/medusa/event-bus-redis",
       options: { redisUrl },
     },
     {
-      resolve: "@medusajs/locking-redis",
-      options: { redisUrl },
+      resolve: "@medusajs/medusa/locking",
+      options: {
+        providers: [
+          {
+            id: "locking-redis",
+            resolve: "@medusajs/medusa/locking-redis",
+            is_default: true,
+            options: { redisUrl },
+          },
+        ],
+      },
     },
   ] as const;
 }

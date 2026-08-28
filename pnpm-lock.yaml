@@ -152,7 +152,7 @@ importers:
         version: 0.71.3
       '@sentry/nextjs':
         specifier: ^10.49.0
-        version: 10.49.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.0(@opentelemetry/api@1.9.1))(next@15.5.21(@babel/core@8.0.1)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.19.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.106.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.26))
+        version: 10.49.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@15.5.21(@babel/core@8.0.1)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.19.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.106.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.26))
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.99.3
@@ -353,15 +353,9 @@ importers:
       '@medusajs/draft-order':
         specifier: 2.17.2
         version: 2.17.2(@medusajs/admin-sdk@2.17.2)(@medusajs/cli@2.17.2(@types/node@20.19.37))(@medusajs/dashboard@2.17.2(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(typescript@5.9.3))(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))(@medusajs/icons@2.17.2(react@18.3.1))(@medusajs/test-utils@2.17.2)(@medusajs/ui@4.1.19(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
-      '@medusajs/event-bus-redis':
-        specifier: 2.17.2
-        version: 2.17.2(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))
       '@medusajs/framework':
         specifier: 2.17.2
         version: 2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76)
-      '@medusajs/locking-redis':
-        specifier: 2.17.2
-        version: 2.17.2(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))
       '@medusajs/medusa':
         specifier: 2.17.2
         version: 2.17.2(cb039fc49deb6b5ecf575df2a0063a72)
@@ -457,7 +451,6 @@ importers:
       yalc:
         specifier: ^1.0.0-pre.53
         version: 1.0.0-pre.53
-
   apps/storefront:
     dependencies:
       '@medusajs/js-sdk':
@@ -7816,6 +7809,7 @@ packages:
   cron-parser@4.9.0:
     resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
     engines: {node: '>=12.0.0'}
+    deprecated: v4 is no longer maintained, upgrade to v5
 
   cross-fetch@4.0.0:
     resolution: {integrity: sha512-e4a5N8lVvuLgAWgnCrLr2PP0YyDOTHa9H/Rj54dirp61qXnNq46m82bRhNqIA5VccJtWBvPTFRV3TtvHUKPB1g==}
@@ -18768,7 +18762,7 @@ snapshots:
 
   '@sentry/core@10.49.0': {}
 
-  '@sentry/nextjs@10.49.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.0(@opentelemetry/api@1.9.1))(next@15.5.21(@babel/core@8.0.1)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.19.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.106.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.26))':
+  '@sentry/nextjs@10.49.0(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(next@15.5.21(@babel/core@8.0.1)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.19.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.106.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.26))':
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -18777,7 +18771,7 @@ snapshots:
       '@sentry/bundler-plugin-core': 5.2.0
       '@sentry/core': 10.49.0
       '@sentry/node': 10.49.0(@opentelemetry/exporter-trace-otlp-http@0.221.0(@opentelemetry/api@1.9.1))
-      '@sentry/opentelemetry': 10.49.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
+      '@sentry/opentelemetry': 10.49.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
       '@sentry/react': 10.49.0(react@18.3.1)
       '@sentry/vercel-edge': 10.49.0
       '@sentry/webpack-plugin': 5.2.0(webpack@5.106.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(esbuild@0.28.2)(postcss@8.5.26))
@@ -18843,6 +18837,14 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/exporter-trace-otlp-http'
       - supports-color
+
+  '@sentry/opentelemetry@10.49.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      '@opentelemetry/core': 2.10.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-base': 2.10.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/semantic-conventions': 1.40.0
+      '@sentry/core': 10.49.0
 
   '@sentry/opentelemetry@10.49.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)':
     dependencies:

@@ -10,12 +10,21 @@ describe("Medusa Redis runtime configuration", () => {
   it("registers Redis event bus and distributed locking together", () => {
     expect(medusaRedisModules("rediss://cache.example:6379")).toEqual([
       {
-        resolve: "@medusajs/event-bus-redis",
+        resolve: "@medusajs/medusa/event-bus-redis",
         options: { redisUrl: "rediss://cache.example:6379" },
       },
       {
-        resolve: "@medusajs/locking-redis",
-        options: { redisUrl: "rediss://cache.example:6379" },
+        resolve: "@medusajs/medusa/locking",
+        options: {
+          providers: [
+            {
+              id: "locking-redis",
+              resolve: "@medusajs/medusa/locking-redis",
+              is_default: true,
+              options: { redisUrl: "rediss://cache.example:6379" },
+            },
+          ],
+        },
       },
     ]);
   });
