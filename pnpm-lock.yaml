@@ -466,6 +466,9 @@ importers:
       '@paypal/react-paypal-js':
         specifier: ^8.0.0
         version: 8.9.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@supabase/functions-js':
+        specifier: 2.99.3
+        version: 2.99.3
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.99.3
@@ -502,6 +505,9 @@ importers:
       dotenv:
         specifier: ^16.4.0
         version: 16.6.1
+      es-define-property:
+        specifier: 1.0.1
+        version: 1.0.1
       fetch-event-stream:
         specifier: ^0.1.6
         version: 0.1.6
