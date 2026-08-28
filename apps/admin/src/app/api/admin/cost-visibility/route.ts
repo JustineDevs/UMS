@@ -29,8 +29,6 @@ export async function GET() {
     { service: "Redis Cloud", category: "cache", monthlyCostPhp: 0, note: "If used" },
     { service: "Stripe Fees (~2.9%+30c)", category: "psp_fees", monthlyCostPhp: 0, note: "Variable based on volume" },
     { service: "PayPal Fees (~3.49%+49c)", category: "psp_fees", monthlyCostPhp: 0, note: "Variable based on volume" },
-    { service: "PayMongo Fees (~3.5%)", category: "psp_fees", monthlyCostPhp: 0, note: "Variable based on volume" },
-    { service: "Maya Fees (~2.5%)", category: "psp_fees", monthlyCostPhp: 0, note: "Variable based on volume" },
     { service: "Resend (Email)", category: "email", monthlyCostPhp: 0, note: "Free tier / usage based" },
     { service: "AfterShip (Tracking)", category: "tracking", monthlyCostPhp: 0, note: "Plan-dependent" },
     { service: "Vercel Edge Network", category: "cdn", monthlyCostPhp: 0, note: "Included with Vercel" },

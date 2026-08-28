@@ -166,7 +166,6 @@
     payments: {
       stripe: "Live · cards",
       paypal: "Live",
-      paymongo: "Test",
       regions: "PH default · PHP",
     },
 
