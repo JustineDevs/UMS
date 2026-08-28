@@ -36,6 +36,7 @@
     "botid": "1.5.11",
     "dotenv": "^16.4.0",
     "es-define-property": "1.0.1",
+    "es-errors": "1.3.0",
     "fetch-event-stream": "^0.1.6",
     "qs": "^6.15.3",
     "gsap": "^3.14.2",

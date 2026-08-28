@@ -508,6 +508,9 @@ importers:
       es-define-property:
         specifier: 1.0.1
         version: 1.0.1
+      es-errors:
+        specifier: 1.3.0
+        version: 1.3.0
       fetch-event-stream:
         specifier: ^0.1.6
         version: 0.1.6
@@ -678,6 +681,9 @@ importers:
 
   packages/platform-data:
     dependencies:
+      '@supabase/postgrest-js':
+        specifier: 2.99.3
+        version: 2.99.3
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.99.3
