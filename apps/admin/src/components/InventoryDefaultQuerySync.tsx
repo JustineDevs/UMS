@@ -9,7 +9,7 @@ import { readAdminPreferences } from "@universal-music-store/user-preferences";
  */
 export function InventoryDefaultQuerySync() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams() ?? new URLSearchParams();
 
   useEffect(() => {
     if (searchParams.get("page") || searchParams.get("pageSize")) return;
