@@ -1,0 +1,32 @@
+name: Storefront Operations Cron
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      STOREFRONT_URL: https://universalmusic.vercel.app
+      CRON_SECRET: ${{ secrets.STOREFRONT_CRON_SECRET }}
+    steps:
+      - name: Invoke protected storefront jobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CRON_SECRET"
+          for path in \
+            /api/cron/finalize-payment-attempts \
+            /api/cron/campaigns \
+            /api/cron/payment-reconciliation \
+            /api/cron/inventory-reservations; do
+            curl --fail-with-body --silent --show-error --max-time 30 \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              "$STOREFRONT_URL$path"
+            printf '\n'
+          done
