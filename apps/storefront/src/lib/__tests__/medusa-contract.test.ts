@@ -7,6 +7,10 @@ describe("Storefront BFF contract tests", () => {
   const publishableKey =
     process.env.MEDUSA_PUBLISHABLE_API_KEY ||
     process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+  const regionId = process.env.MEDUSA_REGION_ID || process.env.NEXT_PUBLIC_MEDUSA_REGION_ID;
+  const salesChannelId =
+    process.env.MEDUSA_SALES_CHANNEL_ID ||
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID;
 
   function storeHeaders(contentType = false): Record<string, string> {
     return {
@@ -76,7 +80,10 @@ describe("Storefront BFF contract tests", () => {
     const res = await fetch(`${MEDUSA_URL}/store/carts`, {
       method: "POST",
       headers: storeHeaders(true),
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        ...(regionId ? { region_id: regionId } : {}),
+        ...(salesChannelId ? { sales_channel_id: salesChannelId } : {}),
+      }),
     });
     if (!res.ok) {
       failOrSkip("Medusa not reachable for cart contract test");

@@ -51,8 +51,14 @@ jobs:
           pnpm --filter medusa exec medusa db:migrate --all-or-nothing
           pnpm e2e:prep:medusa
           MEDUSA_PUBLISHABLE_API_KEY="$(psql "$DATABASE_URL" -Atqc "SELECT token FROM api_key WHERE type = 'publishable' AND revoked_at IS NULL ORDER BY created_at LIMIT 1")"
+          MEDUSA_REGION_ID="$(psql "$DATABASE_URL" -Atqc "SELECT id FROM region WHERE currency_code = 'php' AND deleted_at IS NULL ORDER BY created_at LIMIT 1")"
+          MEDUSA_SALES_CHANNEL_ID="$(psql "$DATABASE_URL" -Atqc "SELECT id FROM sales_channel WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1")"
           test -n "$MEDUSA_PUBLISHABLE_API_KEY"
+          test -n "$MEDUSA_REGION_ID"
+          test -n "$MEDUSA_SALES_CHANNEL_ID"
           echo "MEDUSA_PUBLISHABLE_API_KEY=$MEDUSA_PUBLISHABLE_API_KEY" >> "$GITHUB_ENV"
+          echo "MEDUSA_REGION_ID=$MEDUSA_REGION_ID" >> "$GITHUB_ENV"
+          echo "MEDUSA_SALES_CHANNEL_ID=$MEDUSA_SALES_CHANNEL_ID" >> "$GITHUB_ENV"
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
@@ -126,8 +132,14 @@ jobs:
           pnpm --filter medusa exec medusa db:migrate --all-or-nothing
           pnpm e2e:prep:medusa
           MEDUSA_PUBLISHABLE_API_KEY="$(psql "$DATABASE_URL" -Atqc "SELECT token FROM api_key WHERE type = 'publishable' AND revoked_at IS NULL ORDER BY created_at LIMIT 1")"
+          MEDUSA_REGION_ID="$(psql "$DATABASE_URL" -Atqc "SELECT id FROM region WHERE currency_code = 'php' AND deleted_at IS NULL ORDER BY created_at LIMIT 1")"
+          MEDUSA_SALES_CHANNEL_ID="$(psql "$DATABASE_URL" -Atqc "SELECT id FROM sales_channel WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1")"
           test -n "$MEDUSA_PUBLISHABLE_API_KEY"
+          test -n "$MEDUSA_REGION_ID"
+          test -n "$MEDUSA_SALES_CHANNEL_ID"
           echo "MEDUSA_PUBLISHABLE_API_KEY=$MEDUSA_PUBLISHABLE_API_KEY" >> "$GITHUB_ENV"
+          echo "MEDUSA_REGION_ID=$MEDUSA_REGION_ID" >> "$GITHUB_ENV"
+          echo "MEDUSA_SALES_CHANNEL_ID=$MEDUSA_SALES_CHANNEL_ID" >> "$GITHUB_ENV"
           pnpm --filter medusa dev > "$RUNNER_TEMP/medusa.log" 2>&1 &
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:9000/health >/dev/null; then
