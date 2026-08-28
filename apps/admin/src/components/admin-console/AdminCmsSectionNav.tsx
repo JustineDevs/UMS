@@ -37,7 +37,7 @@ const GROUPS = [
 ] as const;
 
 export function AdminCmsSectionNav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/admin/cms/builder";
   return (
     <nav
       aria-label="Content sections"
