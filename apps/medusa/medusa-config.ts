@@ -139,7 +139,8 @@ export default defineConfig({
     },
   },
   admin: {
-    disable: false,
+    // The standalone admin app owns the dashboard in hosted deployments.
+    disable: process.env.MEDUSA_ADMIN_DISABLED === "true",
     backendUrl:
       process.env.MEDUSA_BACKEND_URL ||
       process.env.NEXT_PUBLIC_MEDUSA_URL ||
