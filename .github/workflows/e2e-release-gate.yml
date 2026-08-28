@@ -14,6 +14,8 @@ jobs:
   commerce-browser-suites:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      HAS_PSP_SECRETS: ${{ secrets.E2E_STRIPE_API_KEY != '' || secrets.E2E_PAYPAL_CLIENT_ID != '' || secrets.E2E_XENDIT_SECRET_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -37,10 +39,7 @@ jobs:
           E2E_BASE_URL: http://localhost:3000
           CI_STRICT_E2E: "1"
       - name: Run PSP full matrix (when secrets present)
-        if: |
-          secrets.E2E_STRIPE_API_KEY != '' ||
-          secrets.E2E_PAYPAL_CLIENT_ID != '' ||
-          secrets.E2E_XENDIT_SECRET_KEY != ''
+        if: env.HAS_PSP_SECRETS == 'true'
         run: pnpm test:e2e:psp-full -- --project=chromium
         env:
           MEDUSA_BACKEND_URL: http://localhost:9000
