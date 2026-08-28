@@ -24,6 +24,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: MEDUSA_INTERNAL_ADMIN_TOKEN
+        sync: false
       - key: STORE_CORS
         value: https://universalmusic.vercel.app
       - key: ADMIN_CORS
