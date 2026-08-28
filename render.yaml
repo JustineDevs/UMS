@@ -52,3 +52,22 @@ services:
         sync: false
       - key: TRACKING_HMAC_SECRET
         sync: false
+      # Pancake POS is the logistics boundary; direct J&T credentials are not used.
+      - key: PANCAKE_POS_API_URL
+        value: https://pos.pages.fm/api/v1
+      - key: PANCAKE_POS_API_KEY
+        sync: false
+      - key: PANCAKE_POS_SHOP_ID
+        sync: false
+      - key: PANCAKE_POS_PICKUP_NAME
+        value: Universal Music Store
+      - key: PANCAKE_POS_PICKUP_PHONE
+        sync: false
+      - key: PANCAKE_POS_PICKUP_PROVINCE
+        value: Cavite
+      - key: PANCAKE_POS_PICKUP_CITY
+        value: General Trias
+      - key: PANCAKE_POS_PICKUP_AREA
+        value: Navarro
+      - key: PANCAKE_POS_PICKUP_ADDRESS
+        sync: false
