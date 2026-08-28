@@ -17,11 +17,14 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
+import { catalogMediaUrlsFromProducts } from "@/lib/catalog-media-urls";
 
 const BUCKET = "catalog";
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 const MAX_CATALOG_MEDIA_BODY_BYTES = MAX_VIDEO_BYTES + 256 * 1024;
+const MEDUSA_PRODUCT_PAGE_SIZE = 100;
+const MEDUSA_PRODUCT_MAX_PAGES = 100;
 
 function safeSegment(s: string): string {
   return s.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 128);
@@ -45,30 +48,32 @@ export async function GET(req: NextRequest) {
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
   if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sp = req.nextUrl.searchParams;
+  let catalogSourceUnavailable = false;
   try {
-    const productsRes = await medusaAdminFetch(
-      "/admin/products?limit=200&fields=id,title,thumbnail,*images",
-      { method: "GET" },
-    );
-    if (productsRes.ok) {
-      const body = (await productsRes.json()) as { products?: unknown[] };
-      const urls = (body.products ?? []).flatMap((raw) => {
-        if (!raw || typeof raw !== "object") return [];
-        const product = raw as Record<string, unknown>;
-        const images = Array.isArray(product.images) ? product.images : [];
-        return [
-          product.thumbnail,
-          ...images.map((image) =>
-            image && typeof image === "object"
-              ? (image as Record<string, unknown>).url
-              : null,
-          ),
-        ].filter((url): url is string => typeof url === "string" && url.trim().length > 0);
+    const urls = new Set<string>();
+    for (let page = 0; page < MEDUSA_PRODUCT_MAX_PAGES; page += 1) {
+      const params = new URLSearchParams({
+        limit: String(MEDUSA_PRODUCT_PAGE_SIZE),
+        offset: String(page * MEDUSA_PRODUCT_PAGE_SIZE),
+        fields: "id,title,thumbnail,*images",
       });
-      await ensureExternalCatalogProductMediaRows(sup.client, urls, organization.id);
+      const productsRes = await medusaAdminFetch(`/admin/products?${params}`, {
+        method: "GET",
+      });
+      if (!productsRes.ok) {
+        catalogSourceUnavailable = true;
+        break;
+      }
+      const body = (await productsRes.json()) as { products?: unknown[] };
+      const products = Array.isArray(body.products) ? body.products : [];
+      for (const url of catalogMediaUrlsFromProducts(products)) urls.add(url);
+      if (products.length < MEDUSA_PRODUCT_PAGE_SIZE) break;
+    }
+    if (!catalogSourceUnavailable) {
+      await ensureExternalCatalogProductMediaRows(sup.client, [...urls], organization.id);
     }
   } catch {
-    // Commerce media mirroring is best effort; the CMS media list remains available.
+    catalogSourceUnavailable = true;
   }
   const opts: ListCmsMediaOptions = {
     limit: Math.min(Number(sp.get("limit")) || 200, 500),
@@ -81,6 +86,7 @@ export async function GET(req: NextRequest) {
   const data = await listCmsMedia(sup.client, opts);
   return correlatedJson(cid, {
     data,
+    catalogSourceUnavailable,
     // The browser session can hydrate after this request (and local auth has
     // no NextAuth cookie), so expose the server's already-authorized result.
     canWrite: staffSessionAllows(auth.session, "catalog:write"),
