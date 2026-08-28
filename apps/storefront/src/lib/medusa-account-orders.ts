@@ -48,6 +48,10 @@ type AdminOrderListRow = {
   items?: Array<{ quantity?: unknown }>;
 };
 
+export function normalizeAccountEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export function accountOrderMatchesCustomer(
   orderCustomerId: string | null | undefined,
   customerId: string,
@@ -62,8 +66,43 @@ export function accountOrderMatchesIdentity(
   customerId: string | null,
   email: string,
 ): boolean {
-  return (customerId !== null && orderCustomerId?.trim() === customerId) ||
-    orderEmail?.trim().toLowerCase() === email.trim().toLowerCase();
+  if (customerId !== null) {
+    return orderCustomerId?.trim() === customerId.trim();
+  }
+  return orderEmail?.trim().toLowerCase() === email.trim().toLowerCase();
+}
+
+export function accountOrderMatchesHistory(
+  order: { id?: string; customer_id?: string | null; email?: string | null },
+  customerId: string | null,
+  email: string,
+  legacyEmailMatchedOrderIds: ReadonlySet<string>,
+): boolean {
+  return (
+    accountOrderMatchesIdentity(order.customer_id, order.email, customerId, email) ||
+    (legacyEmailMatchedOrderIds.has(String(order.id ?? "")) &&
+      !order.customer_id &&
+      order.email?.trim().toLowerCase() === email.trim().toLowerCase())
+  );
+}
+
+export type AccountOrderViewState =
+  | "signed_out"
+  | "loading"
+  | "error"
+  | "empty"
+  | "ready";
+
+export function getAccountOrderViewState(input: {
+  authenticated: boolean;
+  loading: boolean;
+  error: string | null;
+  orderCount: number;
+}): AccountOrderViewState {
+  if (!input.authenticated) return "signed_out";
+  if (input.loading) return "loading";
+  if (input.error) return "error";
+  return input.orderCount > 0 ? "ready" : "empty";
 }
 
 export function countAccountOrderItems(items: AdminOrderListRow["items"]): number {
@@ -106,10 +145,11 @@ export async function fetchCustomerOrders(
     return { orders: [], error: "Commerce admin key is not configured." };
   }
   try {
-    const normalizedEmail = email.toLowerCase();
+    const normalizedEmail = normalizeAccountEmail(email);
     const customerId = await findMedusaCustomerIdByEmail(normalizedEmail);
     const rows: AdminOrderListRow[] = [];
     const seenOrderIds = new Set<string>();
+    const legacyEmailMatchedOrderIds = new Set<string>();
     const ownershipFilters = customerId ? [customerId, normalizedEmail] : [normalizedEmail];
     for (const ownershipFilter of ownershipFilters) {
       const filterCustomerId = ownershipFilter === customerId ? customerId : null;
@@ -134,6 +174,7 @@ export async function fetchCustomerOrders(
           if (id && !seenOrderIds.has(id)) {
             seenOrderIds.add(id);
             rows.push(order);
+            if (!filterCustomerId) legacyEmailMatchedOrderIds.add(id);
           }
         }
         if (page.length < 100) break;
@@ -142,8 +183,7 @@ export async function fetchCustomerOrders(
 
     const mapped: AccountOrder[] = rows
       .filter((o) => {
-        const orderEmail = o.email;
-        return accountOrderMatchesIdentity(o.customer_id, orderEmail, customerId, normalizedEmail);
+        return accountOrderMatchesHistory(o, customerId, normalizedEmail, legacyEmailMatchedOrderIds);
       })
       .map((o) => ({
         id: String(o.id ?? ""),

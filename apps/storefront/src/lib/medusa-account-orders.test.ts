@@ -4,8 +4,11 @@ import {
   buildAccountOrdersQuery,
   accountOrderMatchesCustomer,
   accountOrderMatchesIdentity,
+  accountOrderMatchesHistory,
   countAccountOrderItems,
   computeAccountOrderStats,
+  getAccountOrderViewState,
+  normalizeAccountEmail,
   type AccountOrder,
 } from "./medusa-account-orders";
 
@@ -26,6 +29,10 @@ test("account stats aggregate a single currency", () => {
     averageOrderValue: 75,
     currency: "PHP",
   });
+});
+
+test("account email normalization trims and lowercases before lookup", () => {
+  assert.equal(normalizeAccountEmail("  Buyer@Example.COM "), "buyer@example.com");
 });
 
 test("account stats do not add unlike currencies", () => {
@@ -63,6 +70,41 @@ test("account order detail requires the canonical customer id", () => {
 });
 
 test("account history accepts an exact email when a legacy order has no customer id", () => {
-  assert.equal(accountOrderMatchesIdentity(null, "buyer@example.com", "cus_123", "buyer@example.com"), true);
+  assert.equal(accountOrderMatchesIdentity(null, "buyer@example.com", null, "buyer@example.com"), true);
   assert.equal(accountOrderMatchesIdentity("cus_other", "other@example.com", "cus_123", "buyer@example.com"), false);
+});
+
+test("account history requires canonical ownership when a customer id exists", () => {
+  assert.equal(accountOrderMatchesIdentity("cus_other", "buyer@example.com", "cus_123", "buyer@example.com"), false);
+  assert.equal(accountOrderMatchesIdentity("cus_123", "other@example.com", "cus_123", "buyer@example.com"), true);
+});
+
+test("account history keeps an exact-email legacy order when customer lookup is canonical", () => {
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_legacy", customer_id: null, email: "buyer@example.com" },
+      "cus_123",
+      "buyer@example.com",
+      new Set(["order_legacy"]),
+    ),
+    true,
+  );
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_other", customer_id: null, email: "buyer@example.com" },
+      "cus_123",
+      "buyer@example.com",
+      new Set(),
+    ),
+    false,
+  );
+});
+
+test("account order view distinguishes signed out, loading, unavailable, empty, and ready", () => {
+  const base = { authenticated: true, loading: false, error: null, orderCount: 0 };
+  assert.equal(getAccountOrderViewState({ ...base, authenticated: false }), "signed_out");
+  assert.equal(getAccountOrderViewState({ ...base, loading: true }), "loading");
+  assert.equal(getAccountOrderViewState({ ...base, error: "unavailable" }), "error");
+  assert.equal(getAccountOrderViewState(base), "empty");
+  assert.equal(getAccountOrderViewState({ ...base, orderCount: 1 }), "ready");
 });
