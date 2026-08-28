@@ -529,6 +529,9 @@ importers:
       next-auth:
         specifier: ^4.24.15
         version: 4.24.15(next@15.5.21(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(@types/node@22.19.15)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      object-inspect:
+        specifier: 1.13.4
+        version: 1.13.4
       side-channel:
         specifier: ^1.1.1
         version: 1.1.1
@@ -682,6 +685,9 @@ importers:
   packages/platform-data:
     dependencies:
       '@supabase/postgrest-js':
+        specifier: 2.99.3
+        version: 2.99.3
+      '@supabase/realtime-js':
         specifier: 2.99.3
         version: 2.99.3
       '@supabase/supabase-js':
