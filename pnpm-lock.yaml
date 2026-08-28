@@ -353,12 +353,18 @@ importers:
       '@medusajs/draft-order':
         specifier: 2.17.2
         version: 2.17.2(@medusajs/admin-sdk@2.17.2)(@medusajs/cli@2.17.2(@types/node@20.19.37))(@medusajs/dashboard@2.17.2(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(typescript@5.9.3))(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))(@medusajs/icons@2.17.2(react@18.3.1))(@medusajs/test-utils@2.17.2)(@medusajs/ui@4.1.19(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3))(@types/react-dom@18.3.7(@types/react@18.3.28))(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react-router-dom@6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      '@medusajs/event-bus-redis':
+        specifier: 2.17.2
+        version: 2.17.2(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))
       '@medusajs/framework':
         specifier: 2.17.2
         version: 2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76)
+      '@medusajs/locking-redis':
+        specifier: 2.17.2
+        version: 2.17.2(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))
       '@medusajs/medusa':
         specifier: 2.17.2
-        version: 2.17.2(wkjviim5gb4ncd3yzgq4wvt6q4)
+        version: 2.17.2(cb039fc49deb6b5ecf575df2a0063a72)
       '@paypal/paypal-server-sdk':
         specifier: ^2.0.0
         version: 2.2.0
@@ -13992,7 +13998,7 @@ snapshots:
     dependencies:
       '@medusajs/framework': 2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76)
 
-  '@medusajs/medusa@2.17.2(wkjviim5gb4ncd3yzgq4wvt6q4)':
+  '@medusajs/medusa@2.17.2(cb039fc49deb6b5ecf575df2a0063a72)':
     dependencies:
       '@inquirer/checkbox': 2.5.0
       '@inquirer/confirm': 2.0.17
@@ -14234,7 +14240,7 @@ snapshots:
       ulid: 2.4.0
     optionalDependencies:
       '@medusajs/core-flows': 2.17.2(@medusajs/framework@2.17.2(@medusajs/cli@2.17.2(@types/node@20.19.37))(@types/node@20.19.37)(ioredis@5.10.1)(vite@8.2.1(@types/node@20.19.37)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.49.2)(tsx@4.21.0)(yaml@2.8.3))(zod@3.25.76))
-      '@medusajs/medusa': 2.17.2(wkjviim5gb4ncd3yzgq4wvt6q4)
+      '@medusajs/medusa': 2.17.2(cb039fc49deb6b5ecf575df2a0063a72)
     transitivePeerDependencies:
       - debug
       - supports-color

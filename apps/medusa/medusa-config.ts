@@ -3,6 +3,10 @@ import { defineConfig } from "@medusajs/framework/utils";
 import { config as loadDotenv } from "dotenv";
 import { validateMedusaProcessEnv } from "./src/loaders/validate-process-env";
 import { nangoPaymentProviderConfigured } from "./src/lib/nango-payment-credentials";
+import {
+  medusaRedisModules,
+  normalizeMedusaRedisUrl,
+} from "./src/lib/redis-runtime-config";
 
 const repoRoot = resolve(process.cwd(), "../..");
 const preservedNodeEnv = process.env.NODE_ENV;
@@ -114,18 +118,13 @@ if (stripeProvider.length === 0 && process.env.NODE_ENV === "production") {
 /** Medusa event bus / locking: requires a TCP `redis://` or `rediss://` URL. REST-only Upstash vars are not used here. */
 const configuredRedisUrl =
   process.env.REDIS_URL?.trim() || process.env.MEDUSA_REDIS_URL?.trim() || "";
-const redisUrl = (() => {
-  if (!configuredRedisUrl) return "";
-  try {
-    const url = new URL(configuredRedisUrl);
-    if (url.hostname.endsWith(".upstash.io") && url.protocol === "redis:") {
-      url.protocol = "rediss:";
-    }
-    return url.toString();
-  } catch {
-    return configuredRedisUrl;
-  }
-})();
+const redisUrl = normalizeMedusaRedisUrl(configuredRedisUrl);
+
+if (process.env.NODE_ENV === "production" && !redisUrl) {
+  throw new Error(
+    "REDIS_URL or MEDUSA_REDIS_URL is required in production for Redis event bus and distributed locking.",
+  );
+}
 
 export default defineConfig({
   projectConfig: {
@@ -148,6 +147,7 @@ export default defineConfig({
       "http://localhost:9000",
   },
   modules: [
+    ...medusaRedisModules(redisUrl),
     ...(paymentProviders.length
       ? [
           {
