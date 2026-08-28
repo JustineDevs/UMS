@@ -23,9 +23,8 @@ if (preservedNodeEnv === undefined) {
 validateMedusaProcessEnv();
 
 /** Hosted Stripe Checkout (checkout.sessions) — same provider id `pp_stripe_stripe` as the stock plugin. */
-const directSandboxCredentialsAllowed = process.env.NODE_ENV !== "production";
 const stripeDirectConfigured =
-  directSandboxCredentialsAllowed && Boolean(process.env.STRIPE_API_KEY?.trim());
+  Boolean(process.env.STRIPE_API_KEY?.trim());
 const stripeManagedByNango =
   !stripeDirectConfigured && nangoPaymentProviderConfigured("stripe");
 const stripeProvider = stripeManagedByNango || stripeDirectConfigured
@@ -33,6 +32,18 @@ const stripeProvider = stripeManagedByNango || stripeDirectConfigured
       {
         resolve: "./src/modules/stripe-checkout-payment",
         id: "stripe",
+        options: {
+          apiKey: stripeManagedByNango ? "" : process.env.STRIPE_API_KEY,
+          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+          successUrl: process.env.STRIPE_CHECKOUT_SUCCESS_URL?.trim(),
+          cancelUrl: process.env.STRIPE_CHECKOUT_CANCEL_URL?.trim(),
+        },
+      },
+      // Keep regions created by the legacy Medusa Stripe plugin operational.
+      // The canonical registration remains pp_stripe_stripe; this alias resolves
+      // existing payment sessions that still carry the old pp_stripe ID.
+      {
+        resolve: "./src/modules/stripe-checkout-payment",
         options: {
           apiKey: stripeManagedByNango ? "" : process.env.STRIPE_API_KEY,
           webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
@@ -52,7 +63,7 @@ const codProvider = [
 ];
 
 const paypalDirectConfigured = Boolean(
-  directSandboxCredentialsAllowed &&
+  process.env.NODE_ENV !== "production" &&
     process.env.PAYPAL_CLIENT_ID?.trim() &&
     process.env.PAYPAL_CLIENT_SECRET?.trim(),
 );
