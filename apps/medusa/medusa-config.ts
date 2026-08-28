@@ -117,6 +117,13 @@ const paymentProviders = [
   ...xenditProvider,
 ];
 
+const fulfillmentProviders = [
+  {
+    resolve: "@medusajs/fulfillment-manual",
+    id: "manual",
+  },
+];
+
 if (stripeProvider.length === 0 && process.env.NODE_ENV === "production") {
   console.warn(
     "[medusa-config] Stripe provider is not registered (Nango integration is not configured). " +
@@ -159,6 +166,10 @@ export default defineConfig({
   },
   modules: [
     ...medusaRedisModules(redisUrl),
+    {
+      resolve: "@medusajs/medusa/fulfillment" as const,
+      options: { providers: fulfillmentProviders },
+    },
     ...(paymentProviders.length
       ? [
           {
