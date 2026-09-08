@@ -151,6 +151,9 @@ function dockerComposeArgs(args) {
     "compose",
     "-f",
     composeFile,
+    ...(existsSync(join(root, ".env.local"))
+      ? ["--env-file", join(root, ".env.local")]
+      : []),
     "--project-name",
     composeProjectName,
     ...args,

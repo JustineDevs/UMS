@@ -25,3 +25,7 @@ test("explicit guest checkout is exempt from the authenticated profile guard", (
   assert.equal(isExplicitGuestCheckout("/checkout", "guest=0"), false);
   assert.equal(isExplicitGuestCheckout("/account", "guest=1"), false);
 });
+
+test("guest checkout bypasses the render-time profile loading gate", () => {
+  assert.equal(isExplicitGuestCheckout("/checkout", "guest=1"), true);
+});

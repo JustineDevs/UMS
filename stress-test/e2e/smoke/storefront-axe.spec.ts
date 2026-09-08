@@ -49,7 +49,9 @@ test("axe: /account auth-disabled local mode", async ({ page }) => {
 test("axe: mobile shop filter dialog", async ({ page }) => {
   await setViewport(page, "mobile");
   await page.goto("/shop", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Filters" }).click();
+  const trigger = page.getByRole("button", { name: "Filters" });
+  await expect(trigger).toHaveAttribute("data-hydrated", "true");
+  await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Shop filters" });
   await expect(dialog).toBeVisible({ timeout: 15_000 });
   const results = await new AxeBuilder({ page })

@@ -10,6 +10,17 @@ export const metadata: Metadata = buildPageMetadata({
   noindex: true,
 });
 
-export default function StripeCheckoutReturnPage() {
-  return <HostedCheckoutReturn provider="stripe" status="success" />;
+export default async function StripeCheckoutReturnPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ stripe_session?: string }>;
+}) {
+  const sp = await searchParams;
+  return (
+    <HostedCheckoutReturn
+      provider="stripe"
+      status="success"
+      providerOrderId={sp.stripe_session}
+    />
+  );
 }

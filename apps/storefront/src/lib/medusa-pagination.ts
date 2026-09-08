@@ -1,4 +1,4 @@
-export function shouldFetchNextMedusaPage(input: {
+function shouldFetchNextMedusaPage(input: {
   offset: number;
   pageSize: number;
   rows: number;

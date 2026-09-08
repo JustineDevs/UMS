@@ -5,7 +5,7 @@ import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { parseAdminJson } from "@/lib/admin-api-security";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
 
@@ -81,10 +81,11 @@ async function post(req: NextRequest) {
 
   const parsed = await parseAdminJson(req, exportRequestSchema);
   if (!parsed.ok) {
-    return correlatedJson(
+    return correlatedError(
       correlationId,
-      { error: parsed.error, code: "VALIDATION_ERROR", requestId: correlationId },
-      { status: parsed.status },
+      parsed.status,
+      parsed.error,
+      "VALIDATION_ERROR",
     );
   }
 

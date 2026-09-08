@@ -23,8 +23,14 @@ function HelpfulButton({
     if (voted || loading) return;
     setLoading(true);
     try {
+      const csrfResponse = await fetch("/api/reviews/csrf", { credentials: "same-origin" });
+      const csrfBody = (await csrfResponse.json()) as { token?: string };
+      if (!csrfResponse.ok || !csrfBody.token) return;
       const res = await fetch(`/api/reviews/helpful/${encodeURIComponent(reviewId)}`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ csrfToken: csrfBody.token }),
       });
       if (res.ok) {
         setVotes((v) => v + 1);
@@ -137,7 +143,7 @@ export function ProductReviewsFeedClient({
   reviews: ProductReviewRow[];
   productSlug: string;
   medusaProductId: string;
-  onReviewsChange?: (reviews: ProductReviewRow[]) => void;
+  onReviewsChange?: (_reviews: ProductReviewRow[]) => void;
 }) {
   const [allReviews, setAllReviews] = useState(reviews);
   const [nextCursor, setNextCursor] = useState(
@@ -164,7 +170,7 @@ export function ProductReviewsFeedClient({
         cursor: nextCursor,
         limit: "50",
       });
-      const response = await fetch(`/api/reviews?${params.toString()}`, {
+      const response = await fetch(`/api/reviews/feed?${params.toString()}`, {
         // The API supplies a short public cache window for anonymous review reads.
         credentials: "same-origin",
       });

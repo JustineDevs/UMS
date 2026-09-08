@@ -5,6 +5,7 @@ import {
   verifyRecaptchaAction,
 } from "@/lib/recaptcha-enterprise";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 const MAX_PUBLIC_FORM_BODY_BYTES = 16 * 1024;
 
@@ -12,6 +13,9 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ formKey: string }> },
 ) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const { formKey } = await ctx.params;
   if (formKey === "contact") {
     if (!isRecaptchaConfigured()) {

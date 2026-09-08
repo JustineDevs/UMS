@@ -237,7 +237,6 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
   });
 
   test("PayPal cancel return does not expose an order", async ({ page }) => {
-    await startPayPalCheckout(page);
     await page.goto(
       `${storefrontBase}/checkout/hosted-return?provider=paypal&status=cancel`,
       {
@@ -257,7 +256,6 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
   test("PayPal declined payment return does not expose an order", async ({
     page,
   }) => {
-    await startPayPalCheckout(page);
     await page.goto(
       `${storefrontBase}/checkout/hosted-return?provider=paypal&status=failed`,
       {

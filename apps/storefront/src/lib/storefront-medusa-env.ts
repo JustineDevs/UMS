@@ -7,7 +7,7 @@ import {
   getMedusaSalesChannelId as getMedusaSalesChannelIdBase,
   getMedusaSecretApiKey as getMedusaSecretApiKeyBase,
   withSalesChannelId as withSalesChannelIdBase,
-} from "@universal-music-store/sdk";
+} from "@universal-music-store/sdk/medusa-env";
 
 /** Env hydration from monorepo root `.env.local` files runs in `instrumentation.ts` (Node only). */
 

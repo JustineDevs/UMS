@@ -1,6 +1,6 @@
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 
-export const MEDUSA_VARIANT_INVENTORY_FIELDS =
+const MEDUSA_VARIANT_INVENTORY_FIELDS =
   "id,product_id,sku,manage_inventory,*inventory_items,*inventory_items.inventory,*inventory_items.inventory.location_levels";
 
 /** Medusa exposes variant detail through the filtered collection endpoint. */

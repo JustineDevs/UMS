@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
+  generateOpaqueTrackingCapability,
   resolveOpaqueTrackingCapability,
   verifyTrackingCapability,
 } from "@universal-music-store/sdk";
@@ -117,4 +118,10 @@ export function resolveCartResumeCapability(
   const opaqueCartId = resolveOpaqueTrackingCapability(token.trim());
   if (opaqueCartId?.startsWith("cart_")) return opaqueCartId;
   return null;
+}
+
+/** Keep cart recovery URLs opaque; the server resolves the cart after access checks. */
+export function buildCartResumeHref(cartId: string): string | null {
+  const token = generateOpaqueTrackingCapability(cartId);
+  return token ? `/checkout?token=${encodeURIComponent(token)}` : null;
 }

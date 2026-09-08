@@ -74,10 +74,10 @@ export function CookieConsentBanner() {
       role="dialog"
       aria-modal="false"
       aria-label="Cookie consent"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-outline-variant/20 bg-surface px-4 py-4 shadow-lg sm:px-6"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-outline-variant/20 bg-surface px-4 py-3 shadow-sm sm:px-6"
     >
       <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-        <p className="flex-1 text-sm text-on-surface-variant leading-relaxed">
+        <p className="flex-1 text-xs leading-relaxed text-on-surface-variant sm:text-sm">
           We use cookies to improve your shopping experience and for analytics. By continuing, you agree
           to our{" "}
           <Link href="/privacy" className="text-primary underline">
@@ -93,14 +93,14 @@ export function CookieConsentBanner() {
           <button
             type="button"
             onClick={essentialOnly}
-            className="rounded border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:bg-surface-container transition-colors"
+            className="min-h-11 rounded border border-outline-variant px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-container"
           >
             Essential only
           </button>
           <button
             type="button"
             onClick={accept}
-            className="rounded bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-primary hover:opacity-90 transition-opacity"
+            className="min-h-11 rounded bg-primary px-4 py-2 text-xs font-bold uppercase tracking-wider text-on-primary transition-opacity hover:opacity-90"
           >
             Accept all
           </button>

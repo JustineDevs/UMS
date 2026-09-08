@@ -54,6 +54,7 @@ import {
   nangoPaymentProxyConfigured,
   nangoPaymentProviderConfigured,
 } from "../../lib/nango-payment-credentials";
+import { safeLogIdentifier } from "../../lib/safe-log";
 
 export type PayPalPaymentOptions = {
   clientId: string;
@@ -72,6 +73,17 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   static identifier = "paypal";
 
   protected readonly options_: PayPalPaymentOptions;
+
+  private providerFailure(operation: string, identifier: string, error: unknown): MedusaError {
+    console.error(
+      `[payment-provider] paypal ${operation} failed id=${safeLogIdentifier(identifier)}`,
+      error,
+    );
+    return new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `PayPal ${operation} failed. Try again or choose another payment method.`,
+    );
+  }
 
   constructor(cradle: Record<string, unknown>, options: PayPalPaymentOptions) {
     super(cradle, options);
@@ -146,8 +158,15 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
 
     const currency = String(
       (input.context as { currency_code?: string } | undefined)?.currency_code ??
-        "php",
-    ).toUpperCase();
+        (input.data as { currency_code?: string } | undefined)?.currency_code ??
+        "",
+    ).trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "PayPal initiatePayment: missing or invalid currency_code on payment context.",
+      );
+    }
 
     const storefrontOrigin =
       process.env.STOREFRONT_PUBLIC_URL?.trim() ||
@@ -188,10 +207,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         },
       };
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `PayPal create order failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("create order", sessionId, err);
     }
   }
 
@@ -265,10 +281,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       };
     } catch (err) {
       if (err instanceof MedusaError) throw err;
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `PayPal capture failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("capture", orderId, err);
     }
   }
 
@@ -364,10 +377,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         amountMajor: major,
       });
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw this.providerFailure("refund", captureId, err);
     }
     return { data: input.data ?? {} };
   }

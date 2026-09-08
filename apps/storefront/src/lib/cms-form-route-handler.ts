@@ -28,7 +28,7 @@ const MAX_PUBLIC_FORM_BODY_BYTES = 16 * 1024;
 type ContactFormRouteDeps = {
   createAnonSupabase?: () => SupabaseClient | null;
   createServiceSupabase?: () => SupabaseClient | null;
-  getIp?: (req: NextRequest) => string;
+  getIp?: (_req: NextRequest) => string;
   rateLimit?: typeof rateLimitFixedWindow;
   insertSubmission?: typeof insertCmsFormSubmission;
   getSettings?: typeof getCmsFormSettings;

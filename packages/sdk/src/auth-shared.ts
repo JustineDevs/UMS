@@ -28,6 +28,7 @@ export function loadGoogleCredentials(appLabel: string): {
 
 export type SharedSessionUser = {
   id?: string;
+  medusaCustomerId?: string;
   email?: string | null;
   name?: string | null;
   image?: string | null;
@@ -45,6 +46,12 @@ export type SharedSession = {
  * Both apps share the same core fields: email, name, image.
  */
 export function buildSharedJwtCallback() {
+  return buildSharedJwtCallbackWithResolver();
+}
+
+export function buildSharedJwtCallbackWithResolver(options?: {
+  resolveCustomerId?: (email: string) => Promise<string | null>;
+}) {
   return async function jwtCallback({
     token,
     user,
@@ -67,6 +74,14 @@ export function buildSharedJwtCallback() {
       if (user.name !== undefined) token.name = user.name;
       if (user.image !== undefined) token.picture = user.image;
       if (user.role) token.role = user.role;
+      if (!token.medusaCustomerId && user.email && options?.resolveCustomerId) {
+        try {
+          const medusaCustomerId = await options.resolveCustomerId(user.email);
+          if (medusaCustomerId) token.medusaCustomerId = medusaCustomerId;
+        } catch {
+          // Authentication remains available when the commerce identity service is temporarily unavailable.
+        }
+      }
     }
     if (!token.id && account?.providerAccountId) {
       token.id = account.providerAccountId;
@@ -93,6 +108,9 @@ export function buildSharedSessionCallback() {
     if (session.user) {
       session.user.id =
         (token.id as string | undefined) ?? (token.sub as string | undefined) ?? session.user.id;
+      if (typeof token.medusaCustomerId === "string") {
+        session.user.medusaCustomerId = token.medusaCustomerId;
+      }
       session.user.email = (token.email as string | undefined) ?? undefined;
       session.user.name = (token.name as string | undefined) ?? undefined;
       session.user.image = (token.picture as string | undefined) ?? undefined;

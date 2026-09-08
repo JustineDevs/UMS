@@ -6,6 +6,7 @@ import { parseJsonBody, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
 
 type ConfirmBody = { correlationId?: unknown; orderId?: unknown };
 
@@ -23,9 +24,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "PayPal confirmation identifiers are required" }, { status: 400 });
   }
 
-  const cartId = await readCartIdFromCookie();
+  const cartCookie = await readCartIdFromCookie();
+  const attemptCookie = await readCheckoutAttemptCookie();
   const supabase = createStorefrontServiceSupabase();
   const attempt = supabase ? await getPaymentAttemptByCorrelationId(supabase, correlationId) : null;
+  const cartId = cartCookie ?? (attemptCookie === correlationId ? attempt?.cart_id ?? null : null);
   if (!cartId || !attempt || attempt.cart_id !== cartId || attempt.provider !== "paypal") {
     return NextResponse.json({ error: "PayPal confirmation does not match this checkout" }, { status: 404 });
   }
@@ -53,16 +56,73 @@ export async function POST(req: Request) {
   }
 
   const base = (process.env.MEDUSA_ADMIN_API_URL ?? process.env.MEDUSA_BACKEND_URL ?? process.env.MEDUSA_URL)?.trim();
-  const internalToken = (
-    process.env.MEDUSA_INTERNAL_ADMIN_TOKEN || process.env.MEDUSA_SECRET_API_KEY
-  )?.trim();
-  if (!base || !internalToken) {
+  if (!base) {
     return NextResponse.json({ error: "PayPal confirmation service is not configured" }, { status: 503 });
+  }
+  const retrieveResponse = await medusaAdminFetch(`${base.replace(/\/$/, "")}/admin/payment-provider/paypal`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      operation: "payment",
+      action: "retrieve",
+      order_id: orderId,
+      idempotency_key: `paypal-retrieve:${orderId}`,
+    }),
+  });
+  const retrieveBody = (await retrieveResponse.json().catch(() => ({}))) as {
+    data?: {
+      status?: unknown;
+      purchase_units?: Array<{
+        amount?: { value?: unknown; currency_code?: unknown };
+        payments?: { captures?: Array<{ status?: unknown; amount?: { value?: unknown; currency_code?: unknown } }> };
+      }>;
+    };
+  };
+  if (!retrieveResponse.ok) {
+    return NextResponse.json({ error: "PayPal payment could not be verified" }, { status: 502 });
+  }
+  let providerData = retrieveBody.data;
+  const retrievedStatus = String(providerData?.status ?? "").toUpperCase();
+  if (retrievedStatus === "APPROVED" || retrievedStatus === "PAYER_ACTION_REQUIRED") {
+    const captureResponse = await medusaAdminFetch(`${base.replace(/\/$/, "")}/admin/payment-provider/paypal`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        operation: "payment",
+        action: "capture",
+        order_id: orderId,
+        idempotency_key: `paypal-capture:${orderId}`,
+      }),
+    });
+    const captureBody = (await captureResponse.json().catch(() => ({}))) as { data?: typeof providerData };
+    if (!captureResponse.ok || !captureBody.data) {
+      return NextResponse.json({ error: "PayPal payment could not be captured" }, { status: 502 });
+    }
+    providerData = captureBody.data;
+  }
+  const unit = providerData?.purchase_units?.[0];
+  const capture = unit?.payments?.captures?.[0];
+  const captureStatus = String(capture?.status ?? providerData?.status ?? "").toUpperCase();
+  const captureAmount = Number(capture?.amount?.value ?? unit?.amount?.value);
+  const captureCurrency = String(capture?.amount?.currency_code ?? unit?.amount?.currency_code ?? "").toUpperCase();
+  const expectedAmount = Number(attempt.amount_minor ?? 0) / 100;
+  const expectedCurrency = String(attempt.currency ?? cart.currency_code ?? "").toUpperCase();
+  if (
+    captureStatus !== "COMPLETED" ||
+    !Number.isFinite(captureAmount) ||
+    Math.round(captureAmount * 100) !== Math.round(expectedAmount * 100) ||
+    !/^[A-Z]{3}$/.test(captureCurrency) ||
+    (expectedCurrency && captureCurrency !== expectedCurrency)
+  ) {
+    return NextResponse.json({ error: "PayPal payment is not a completed match for this checkout" }, { status: 409 });
   }
   const response = await medusaAdminFetch(`${base.replace(/\/$/, "")}/admin/payment-provider/paypal`, {
     method: "POST",
     headers: {
-      "x-uvs-internal-token": internalToken,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

@@ -102,7 +102,7 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
     await page.getByLabel("Email").fill("e2e@example.com");
     await page.getByPlaceholder("905 123 4567").fill("9171234567");
     await page.getByRole("button", { name: "Pay with Cards", exact: true }).click();
-    await page.waitForURL(/\/checkout\/hosted-return\?provider=xendit&status=success/i, {
+    await expect(page).toHaveURL(/\/checkout\/hosted-return\?provider=xendit&status=success/i, {
       timeout: 90_000,
     });
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -116,7 +116,6 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
   test("Xendit failed payment return does not expose an order", async ({
     page,
   }) => {
-    await startXenditCheckout(page);
     await page.goto(
       `${storefrontBase}/checkout/hosted-return?provider=xendit&status=failed`,
       {
@@ -136,7 +135,6 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
   test("Xendit expired payment return does not expose an order", async ({
     page,
   }) => {
-    await startXenditCheckout(page);
     await page.goto(
       `${storefrontBase}/checkout/hosted-return?provider=xendit&status=expired`,
       {

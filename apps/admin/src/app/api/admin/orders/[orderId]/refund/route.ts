@@ -15,7 +15,7 @@ import {
   refundMedusaPayment,
 } from "@/lib/medusa-order-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import {
   claimAdminIdempotency,
   completeAdminIdempotency,
@@ -41,35 +41,31 @@ export async function POST(
   const correlationId = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) {
-    return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
+    return correlatedError(correlationId, 401, "Unauthorized", "UNAUTHORIZED");
   }
   if (!staffSessionAllows(session, "orders:write")) {
-    return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(correlationId, 403, "Forbidden", "FORBIDDEN");
   }
   const idempotencyKey = requireIdempotencyKey(req);
   if (!idempotencyKey) {
-    return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
+    return correlatedError(correlationId, 400, "Idempotency-Key is required", "BAD_REQUEST");
   }
   if (!stepUpRequired("orders.refund", req)) {
-    return correlatedJson(correlationId, { error: "Step-up authentication required" }, { status: 403 });
+    return correlatedError(correlationId, 403, "Step-up authentication required", "FORBIDDEN");
   }
 
   const { orderId } = await ctx.params;
   if (!orderId?.startsWith("order_")) {
-    return correlatedJson(correlationId, { error: "Invalid order id" }, { status: 400 });
+    return correlatedError(correlationId, 400, "Invalid order id", "BAD_REQUEST");
   }
 
   const parsed = await parseAdminJson(req, refundSchema);
-  if (!parsed.ok) return correlatedJson(correlationId, { error: parsed.error }, { status: parsed.status });
+  if (!parsed.ok) return correlatedError(correlationId, parsed.status, parsed.error, "VALIDATION_ERROR");
   const body = parsed.data;
 
   const payments = await fetchMedusaOrderPaymentsForAdmin(orderId);
   if (payments.length === 0) {
-    return correlatedJson(
-      correlationId,
-      { error: "No payments found for this order" },
-      { status: 404 },
-    );
+    return correlatedError(correlationId, 404, "No payments found for this order", "NOT_FOUND");
   }
 
   const paymentId =
@@ -77,12 +73,12 @@ export async function POST(
       ? body.payment_id.trim()
       : payments[0]?.id;
   if (!paymentId) {
-    return correlatedJson(correlationId, { error: "No payment id" }, { status: 400 });
+    return correlatedError(correlationId, 400, "No payment id", "BAD_REQUEST");
   }
 
   const selected = payments.find((p) => p.id === paymentId);
   if (!selected) {
-    return correlatedJson(correlationId, { error: "Payment not on this order" }, { status: 400 });
+    return correlatedError(correlationId, 400, "Payment not on this order", "BAD_REQUEST");
   }
 
   const captured =
@@ -100,19 +96,14 @@ export async function POST(
       ? Math.floor(Number(body.amount_minor))
       : refundable;
   if (amountMinor <= 0) {
-    return correlatedJson(
-      correlationId,
-      { error: "Nothing to refund for this payment" },
-      { status: 400 },
-    );
+    return correlatedError(correlationId, 400, "Nothing to refund for this payment", "BAD_REQUEST");
   }
   if (amountMinor > refundable) {
-    return correlatedJson(
+    return correlatedError(
       correlationId,
-      {
-        error: `Amount exceeds refundable balance (${refundable} minor units).`,
-      },
-      { status: 400 },
+      400,
+      `Amount exceeds refundable balance (${refundable} minor units).`,
+      "BAD_REQUEST",
     );
   }
 
@@ -124,10 +115,10 @@ export async function POST(
     requestHash: getRequestHash({ orderId, paymentId, amountMinor, note: body.note ?? null }),
   });
   if (claim.kind === "unavailable") {
-    return correlatedJson(correlationId, { error: "Idempotency service unavailable" }, { status: 503 });
+    return correlatedError(correlationId, 503, "Idempotency service unavailable", "SERVICE_UNAVAILABLE");
   }
   if (claim.kind === "conflict") {
-    return correlatedJson(correlationId, { error: "Request is already being processed or key was reused" }, { status: 409 });
+    return correlatedError(correlationId, 409, "Request is already being processed or key was reused", "CONFLICT");
   }
   if (claim.kind === "replay") {
     return correlatedJson(correlationId, claim.body, { status: claim.status });
@@ -188,11 +179,7 @@ export async function POST(
       phase: "error",
       detail: { orderId, error: result.error },
     });
-    return correlatedJson(
-      correlationId,
-      responseBody,
-      { status },
-    );
+    return correlatedError(correlationId, status, responseBody.error, status >= 500 ? "INTERNAL_ERROR" : "CONFLICT");
   }
 
   if (sb && refundAuditId) {

@@ -11,7 +11,10 @@ describe("Medusa Redis runtime configuration", () => {
     expect(medusaRedisModules("rediss://cache.example:6379")).toEqual([
       {
         resolve: "@medusajs/medusa/event-bus-redis",
-        options: { redisUrl: "rediss://cache.example:6379" },
+        options: {
+          redisUrl: "rediss://cache.example:6379",
+          redisOptions: { family: 4, connectTimeout: 30_000, keepAlive: 10_000 },
+        },
       },
       {
         resolve: "@medusajs/medusa/locking",
@@ -21,7 +24,10 @@ describe("Medusa Redis runtime configuration", () => {
               id: "locking-redis",
               resolve: "@medusajs/medusa/locking-redis",
               is_default: true,
-              options: { redisUrl: "rediss://cache.example:6379" },
+              options: {
+                redisUrl: "rediss://cache.example:6379",
+                redisOptions: { family: 4, connectTimeout: 30_000, keepAlive: 10_000 },
+              },
             },
           ],
         },

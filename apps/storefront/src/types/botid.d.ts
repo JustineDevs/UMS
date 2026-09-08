@@ -21,9 +21,9 @@ declare module "botid/client" {
     protect: Protect[];
   };
 
-  export const BotIdClient: (props: BotIdClientProps) => JSX.Element;
+  export const BotIdClient: (_props: BotIdClientProps) => JSX.Element;
 }
 
 declare module "botid/next/config" {
-  export function withBotId<T>(config: T): T;
+  export function withBotId<T>(_config: T): T;
 }

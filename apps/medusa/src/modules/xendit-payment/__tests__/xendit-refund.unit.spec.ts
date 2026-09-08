@@ -15,9 +15,41 @@ jest.mock("../../../lib/xendit-sdk-client", () => {
   return {
     ...actual,
     cancelXenditPayment: jest.fn(),
+    createXenditPaymentSession: jest.fn(),
     getXenditPaymentSession: jest.fn(),
     refundXenditPayment: jest.fn(),
   };
+});
+
+describe("Xendit checkout currency boundary", () => {
+  it("rejects a missing currency before contacting Xendit", async () => {
+    const service = new XenditPaymentProviderService(
+      {},
+      { secretKey: "xk_test", webhookToken: "wh_test" },
+    );
+
+    await expect(
+      service.initiatePayment({ data: { session_id: "sess_123" }, amount: 100 } as never),
+    ).rejects.toThrow("missing or invalid currency_code");
+  });
+
+  it("preserves actionable HTTPS callback guidance", async () => {
+    (createXenditPaymentSession as jest.Mock).mockRejectedValue(
+      new Error("Xendit successUrl must be an absolute HTTPS URL."),
+    );
+    const service = new XenditPaymentProviderService(
+      {},
+      { secretKey: "xk_test", webhookToken: "wh_test" },
+    );
+
+    await expect(
+      service.initiatePayment({
+        data: { session_id: "sess_123" },
+        amount: 100,
+        context: { currency_code: "PHP" },
+      } as never),
+    ).rejects.toThrow("Xendit checkout requires HTTPS");
+  });
 });
 
 describe("Xendit refundPayment", () => {

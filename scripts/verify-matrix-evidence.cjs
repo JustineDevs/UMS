@@ -5,7 +5,16 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const root = process.cwd();
-const matrixPath = path.join(root, ".omx/context/full-task(1).md");
+const matrixPathInputs = process.env.MATRIX_PATHS
+  ? process.env.MATRIX_PATHS.split(",").map((file) => file.trim()).filter(Boolean)
+  : [
+      ".omx/context/full-task(4).md",
+      ".omx/context/full-task(5).md",
+      ".omx/context/full-task(6).md",
+      ".omx/context/full-task(7).md",
+      ".omx/context/full-task(8).md",
+    ];
+const matrixPaths = matrixPathInputs.map((file) => path.resolve(root, file));
 const evidenceDir = path.resolve(process.env.MATRIX_EVIDENCE_DIR ?? "artifacts/verification");
 const requireHttps = process.env.MATRIX_REQUIRE_HTTPS === "1";
 const httpsRows = new Set(["PAY-01", "PAY-04", "PAY-05", "PAY-06", "PAY-08", "PAY-09", "PAY-10", "PAY-11", "PAY-12", "QA-05", "QA-10"]);
@@ -16,14 +25,44 @@ const browserProofRows = new Set([
 ]);
 const nonEmptyString = (value) => typeof value === "string" && value.trim().length > 0;
 
-const matrix = fs.readFileSync(matrixPath, "utf8");
-const rows = [...matrix.matchAll(/^\|\s*([A-Z]+-\d+)\s*\|.*?\|\s*(pending|implemented|verified|blocked)\s*\|$/gm)]
-  .map((match) => ({ id: match[1], status: match[2] }));
+const matrices = matrixPaths.map((matrixPath) => {
+  if (!fs.existsSync(matrixPath)) throw new Error(`matrix file not found: ${matrixPath}`);
+  return { path: matrixPath, text: fs.readFileSync(matrixPath, "utf8") };
+});
+const rowStatuses = new Set([
+  "todo",
+  "in_progress",
+  "needs-verification",
+  "pending",
+  "implemented",
+  "verified",
+  "blocked",
+]);
+const errors = [];
+const parsedRows = matrices.flatMap(({ path: matrixPath, text: matrix }) => {
+  const parsed = [];
+  for (const line of matrix.split("\n")) {
+    const id = /^\|\s*([A-Z][A-Z0-9-]*-\d+)\s*\|/i.exec(line)?.[1];
+    if (!id) continue;
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.replaceAll("`", "").trim().toLowerCase());
+    const status = cells.find((cell) => rowStatuses.has(cell));
+    if (!status) {
+      parsed.push({ id, status: "missing-status", matrixPath });
+      errors.push(`${path.relative(root, matrixPath)}: ${id} is missing a terminal row status`);
+      continue;
+    }
+    parsed.push({ id, status, matrixPath });
+  }
+  return parsed;
+});
+const rows = Array.from(new Map(parsedRows.map((row) => [row.id, row])).values());
 const expected = new Map(rows.map((row) => [row.id, row]));
 const files = fs.existsSync(evidenceDir)
   ? fs.readdirSync(evidenceDir).filter((file) => file.endsWith(".json"))
   : [];
-const errors = [];
 const evidence = new Map();
 
 for (const file of files) {
@@ -96,7 +135,7 @@ const unverified = rows.filter((row) => row.status !== "verified");
 if (unverified.length) errors.push(`matrix contains non-verified rows: ${unverified.map((row) => `${row.id}=${row.status}`).join(", ")}`);
 
 const summary = {
-  matrix: matrixPath,
+  matrices: matrixPaths,
   evidenceDir,
   totalRows: rows.length,
   verifiedRows: rows.filter((row) => row.status === "verified").length,

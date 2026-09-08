@@ -291,24 +291,6 @@ export function mergeStorefrontProductMetadata(
   return merged;
 }
 
-/** Keys we manage in the catalog editor (for removal when clearing fields). */
-export const CATALOG_METADATA_KEYS = [
-  "brand",
-  "video_url",
-  "gallery_video_urls",
-  "weight_kg",
-  "dimensions_label",
-  "material",
-  "lifestyle_image_url",
-  "seo_description",
-  "related_handles",
-  "hotspots",
-  "guitar_specs_json",
-  "audio_demos_json",
-  "trust_content_json",
-  "media_ids",
-] as const;
-
 export function metadataKeysToClear(
   fields: CatalogProductMetadataFields,
 ): string[] {

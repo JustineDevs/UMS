@@ -14,10 +14,16 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
-import { rankSearchSuggestions } from "@/lib/search-suggestion-ranking";
+import {
+  expandSearchQueries,
+  rankSearchSuggestions,
+} from "@/lib/search-suggestion-ranking";
 
 const FIELDS =
   "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
+const SUGGESTION_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=5, s-maxage=60, stale-while-revalidate=300",
+};
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
@@ -32,10 +38,10 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ suggestions: [] }, { headers: SUGGESTION_CACHE_HEADERS });
   }
   if (q.length > 100) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ suggestions: [] }, { headers: SUGGESTION_CACHE_HEADERS });
   }
   if (!getMedusaPublishableKey()?.trim() || !getMedusaRegionId()?.trim()) {
     return NextResponse.json(
@@ -46,23 +52,37 @@ export async function GET(req: Request) {
   try {
     const sdk = createStorefrontMedusaSdk();
     const regionId = getMedusaRegionId()!;
-    const baseParams = {
-      region_id: regionId,
-      q,
-      limit: 24,
-      fields: FIELDS,
-    };
-    const { products: primary } = await sdk.store.product.list(
-      withSalesChannelId({ ...baseParams }) as Parameters<typeof sdk.store.product.list>[0],
-    );
-    const products =
-      (primary?.length ?? 0) > 0 || !getMedusaSalesChannelId()
-        ? primary
-        : (
-            await sdk.store.product.list(baseParams as Parameters<
-              typeof sdk.store.product.list
-            >[0])
-          ).products;
+    const productsBySlug = new Map<string, unknown>();
+    for (const searchQuery of expandSearchQueries(q)) {
+      const baseParams = {
+        region_id: regionId,
+        q: searchQuery,
+        limit: 24,
+        fields: FIELDS,
+      };
+      const { products: primary } = await sdk.store.product.list(
+        withSalesChannelId({ ...baseParams }) as Parameters<typeof sdk.store.product.list>[0],
+      );
+      const products =
+        (primary?.length ?? 0) > 0 || !getMedusaSalesChannelId()
+          ? primary
+          : (
+              await sdk.store.product.list(baseParams as Parameters<
+                typeof sdk.store.product.list
+              >[0])
+            ).products;
+      for (const product of products ?? []) {
+        const slug =
+          product &&
+          typeof product === "object" &&
+          "handle" in product &&
+          typeof product.handle === "string"
+            ? product.handle
+            : undefined;
+        if (slug && !productsBySlug.has(slug)) productsBySlug.set(slug, product);
+      }
+    }
+    const products = [...productsBySlug.values()];
     const suggestions = (products ?? [])
       .map((raw) => {
         const p = catalogProductFromMedusaRaw(raw as never);
@@ -76,7 +96,10 @@ export async function GET(req: Request) {
         };
       })
       .filter((s): s is NonNullable<typeof s> => s != null);
-    return NextResponse.json({ suggestions: rankSearchSuggestions(suggestions, q).slice(0, 8) });
+    return NextResponse.json(
+      { suggestions: rankSearchSuggestions(suggestions, q).slice(0, 8) },
+      { headers: SUGGESTION_CACHE_HEADERS },
+    );
   } catch {
     return NextResponse.json(
       { suggestions: [], error: "catalog_unavailable" },

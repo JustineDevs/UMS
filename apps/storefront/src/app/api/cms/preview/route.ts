@@ -23,8 +23,12 @@ export async function GET(req: NextRequest) {
   const locale = req.nextUrl.searchParams.get("locale") ?? "en";
   const token = req.nextUrl.searchParams.get("token");
   const kind = req.nextUrl.searchParams.get("kind") ?? "page";
+  const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim();
   if (!slug?.trim() || !token?.trim()) {
     return Response.json({ error: "slug and token required" }, { status: 400 });
+  }
+  if (!organizationId) {
+    return Response.json({ error: "Preview is not configured" }, { status: 503 });
   }
   let sb: ReturnType<typeof createSupabaseClient>;
   try {
@@ -33,11 +37,11 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Server configuration" }, { status: 503 });
   }
   if (kind === "blog") {
-    const row = await getCmsBlogPostBySlugPreview(sb, slug, locale, token);
+    const row = await getCmsBlogPostBySlugPreview(sb, slug, locale, token, organizationId);
     if (!row) return Response.json({ error: "Not found" }, { status: 404 });
     return Response.json({ kind: "blog", data: row });
   }
-  const row = await getCmsPageBySlugPreview(sb, slug, locale, token);
+  const row = await getCmsPageBySlugPreview(sb, slug, locale, token, organizationId);
   if (!row) return Response.json({ error: "Not found" }, { status: 404 });
   return Response.json({ kind: "page", data: row });
 }

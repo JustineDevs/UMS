@@ -142,21 +142,45 @@ export type ConfirmationOrder = PublicTrackOrder & {
   }>;
   total?: number;
   shipping_address?: {
-    address_1?: string;
-    address_2?: string;
     city?: string;
     province?: string;
     postal_code?: string;
   } | null;
 };
 
-const PUBLIC_TRACK_ORDER_FIELDS =
-  "id,display_id,updated_at,payment_status,fulfillment_status,email,+metadata,*fulfillments,*fulfillments.labels";
+export function maskConfirmationEmail(
+  value: string | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  const at = value.indexOf("@");
+  if (at <= 0 || at === value.length - 1) return undefined;
+  return `${value.slice(0, 1)}***${value.slice(at)}`;
+}
+
+/** Keep unscoped public tracking reads from fetching customer identity data. */
+export function buildPublicTrackOrderFields(includeCustomerEmail = false): string {
+  return [
+    "id",
+    "display_id",
+    "updated_at",
+    "payment_status",
+    "fulfillment_status",
+    ...(includeCustomerEmail ? ["email"] : []),
+    "+metadata",
+    "*fulfillments",
+    "*fulfillments.labels",
+  ].join(",");
+}
+
+type TrackFetchOptions = {
+  includePrivate?: boolean;
+  includeCustomerEmail?: boolean;
+};
 
 export type CarrierTrackingAdapter = {
   version: 1;
   host: string;
-  buildUrl: (trackingNumber: string) => string;
+  buildUrl: (_trackingNumber: string) => string;
 };
 
 const JNT_ADAPTER: CarrierTrackingAdapter = {
@@ -359,12 +383,6 @@ export function projectConfirmationOrder(
     total: typeof order.total === "number" ? order.total : undefined,
     shipping_address: address
       ? {
-          ...(typeof address.address_1 === "string"
-            ? { address_1: address.address_1 }
-            : {}),
-          ...(typeof address.address_2 === "string"
-            ? { address_2: address.address_2 }
-            : {}),
           ...(typeof address.city === "string" ? { city: address.city } : {}),
           ...(typeof address.province === "string"
             ? { province: address.province }
@@ -557,7 +575,7 @@ export function medusaReadFailureStatus(error: unknown): number {
 
 export async function fetchMedusaTrackByOrderId(
   orderId: string,
-  options?: { includePrivate?: boolean },
+  options?: TrackFetchOptions,
 ): Promise<TrackReadResult> {
   const key = getMedusaPublishableKey();
   if (!key) {
@@ -569,7 +587,7 @@ export async function fetchMedusaTrackByOrderId(
       fields:
         options?.includePrivate === true
           ? "id,display_id,updated_at,payment_status,fulfillment_status,+metadata,email,total,currency_code,shipping_address,*items"
-          : PUBLIC_TRACK_ORDER_FIELDS,
+          : buildPublicTrackOrderFields(options?.includeCustomerEmail),
     } as never);
     if (!order) {
       return trackReadFailure(404);
@@ -589,7 +607,7 @@ export async function fetchMedusaTrackByOrderId(
 
 export async function fetchMedusaTrackByCartId(
   cartId: string,
-  options?: { includePrivate?: boolean },
+  options?: TrackFetchOptions,
 ): Promise<TrackReadResult> {
   const key = getMedusaPublishableKey();
   const regionId = getMedusaRegionId();

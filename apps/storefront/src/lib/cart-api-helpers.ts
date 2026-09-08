@@ -92,6 +92,15 @@ export function isValidCartId(id: unknown): id is string {
   return medusaCartIdSchema.safeParse(id).success;
 }
 
+/** The Medusa SDK exposes upstream HTTP status on FetchError instances. */
+export function isMedusaNotFoundError(error: unknown): boolean {
+  return (
+    error !== null &&
+    typeof error === "object" &&
+    (error as { status?: unknown }).status === 404
+  );
+}
+
 /**
  * Writes the Medusa cart cookie with consistent options.
  */
@@ -163,7 +172,8 @@ export async function retrieveCartRaw(
       fields,
     } as never);
     return cart as unknown as Record<string, unknown>;
-  } catch {
-    return null;
+  } catch (error) {
+    if (isMedusaNotFoundError(error)) return null;
+    throw error;
   }
 }

@@ -37,6 +37,7 @@ import {
   claimXenditWebhookDedup,
 } from "../../lib/xendit-webhook-dedup";
 import { recordWebhookSecurityEvent } from "../../lib/webhook-security-metrics";
+import { safeLogIdentifier } from "../../lib/safe-log";
 import {
   createXenditPaymentSession,
   cancelXenditPayment,
@@ -121,6 +122,19 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
 
   protected readonly options_: XenditPaymentOptions;
 
+  private providerFailure(operation: string, identifier: string, error: unknown): MedusaError {
+    console.error(
+      `[payment-provider] xendit ${operation} failed id=${safeLogIdentifier(identifier)}`,
+      error,
+    );
+    const providerMessage = error instanceof Error ? error.message : "";
+    const message =
+      operation === "create session" && /absolute HTTPS URL/i.test(providerMessage)
+        ? "Xendit checkout requires HTTPS success and cancel callback URLs. Configure both callback URLs before retrying."
+        : `Xendit ${operation} failed. Try again or choose another payment method.`;
+    return new MedusaError(MedusaError.Types.INVALID_DATA, message);
+  }
+
   constructor(cradle: Record<string, unknown>, options: XenditPaymentOptions) {
     super(cradle, options);
     this.options_ = options;
@@ -184,8 +198,15 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
     }
     const currency = String(
       (input.context as { currency_code?: string } | undefined)?.currency_code ??
-        "PHP",
-    ).toUpperCase();
+        (input.data as { currency_code?: string } | undefined)?.currency_code ??
+        "",
+    ).trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Xendit initiatePayment: missing or invalid currency_code on payment context.",
+      );
+    }
 
     try {
       const session = await createXenditPaymentSession(await this.clientOptionsFor(input.context), {
@@ -234,10 +255,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
         },
       };
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `Xendit create session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("create session", sessionId, err);
     }
   }
 
@@ -291,10 +309,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
       };
     } catch (err) {
       if (err instanceof MedusaError) throw err;
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Xendit retrieve session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("retrieve session", sessionId, err);
     }
   }
 
@@ -320,10 +335,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
         idempotencyKey: `uvs-capture-${paymentId}`,
       });
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw this.providerFailure("capture", paymentId, err);
     }
     return { data: { ...(input.data ?? {}), xendit_payment_id: paymentId } };
   }
@@ -339,10 +351,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
     try {
       await cancelXenditPayment(await this.clientOptionsFor(input.data), paymentId, `uvs-cancel-${paymentId}`);
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw this.providerFailure("cancel", paymentId, err);
     }
     return { data: { ...(input.data ?? {}), xendit_payment_id: paymentId } };
   }
@@ -438,10 +447,7 @@ export default class XenditPaymentProviderService extends AbstractPaymentProvide
         idempotencyKey: `uvs-refund-${paymentRequestId}-${minor}`,
       });
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw this.providerFailure("refund", paymentRequestId, err);
     }
     return { data: input.data ?? {} };
   }

@@ -10,7 +10,7 @@ export function XenditComponentsCheckout({
 }: {
   componentsSdkKey: string;
   onComplete: () => void;
-  onError: (message: string) => void;
+  onError: (_message: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const componentsRef = useRef<XenditComponents | null>(null);

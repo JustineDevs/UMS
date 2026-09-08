@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   resolveOpaqueTrackingCapabilityDetails,
   sanitizeTrustedPublicUrl,
+  type ResolvedTrackingCapability,
 } from "@universal-music-store/sdk";
 import { isTrackingCapabilityRevoked } from "@universal-music-store/platform-data/tracking-capability-revocation";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
@@ -12,8 +13,11 @@ import {
   fetchMedusaTrackByOrderId,
   trackFreshness,
   trackingCapabilityScopeMatches,
+  trackReadFailure,
   type TrackReadResult,
 } from "@/lib/medusa-track-fetch";
+import { buildCartResumeHref } from "@/lib/cart-session-boundary";
+import { decodeTrackingPathSegment } from "@/lib/tracking-link-resolve";
 import { TrackingAutoRefresh } from "@/components/TrackingAutoRefresh";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
@@ -29,14 +33,20 @@ export const metadata: Metadata = buildPageMetadata({
   referrer: "no-referrer",
 });
 
-async function fetchPublicTrack(orderId: string): Promise<TrackReadResult> {
-  if (orderId.startsWith("order_")) {
-    return fetchMedusaTrackByOrderId(orderId);
+async function fetchPublicTrack(
+  capability: ResolvedTrackingCapability,
+): Promise<TrackReadResult> {
+  if (capability.id.startsWith("order_")) {
+    return fetchMedusaTrackByOrderId(capability.id, {
+      includeCustomerEmail: Boolean(capability.scope?.customerEmailHash),
+    });
   }
-  if (orderId.startsWith("cart_")) {
-    return fetchMedusaTrackByCartId(orderId);
+  if (capability.id.startsWith("cart_")) {
+    return fetchMedusaTrackByCartId(capability.id, {
+      includeCustomerEmail: Boolean(capability.scope?.customerEmailHash),
+    });
   }
-  return { ok: false, data: null, status: 404 };
+  return trackReadFailure(404);
 }
 
 export default async function TrackPage({
@@ -45,7 +55,7 @@ export default async function TrackPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId: rawOrderId } = await params;
-  const encodedId = decodeURIComponent(rawOrderId.trim());
+  const encodedId = decodeTrackingPathSegment(rawOrderId) ?? "";
   const capability = encodedId.startsWith("cap_")
     ? resolveOpaqueTrackingCapabilityDetails(encodedId.slice(4))
     : null;
@@ -143,7 +153,7 @@ export default async function TrackPage({
     );
   }
 
-  const { ok, data, status, correlationId } = await fetchPublicTrack(orderId);
+  const { ok, data, status, correlationId } = await fetchPublicTrack(capability);
 
   if (
     data &&
@@ -223,6 +233,9 @@ export default async function TrackPage({
   }
 
   const { order, shipments } = data;
+  const cartResumeHref = orderId.startsWith("cart_")
+    ? buildCartResumeHref(orderId)
+    : null;
   // Never render the decrypted commerce identifier when the display reference is absent.
   const displayRef = order.order_number ?? "your order";
   const freshness = trackFreshness(order.updated_at);
@@ -273,14 +286,14 @@ export default async function TrackPage({
       <TrackingAutoRefresh />
 
       {String(order.status) === "pending_payment" &&
-        orderId.startsWith("cart_") && (
+        cartResumeHref && (
           <div className="mb-8 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4">
             <p className="text-sm text-on-surface-variant mb-3">
               Payment not completed yet. Open checkout on this device using the
               same cart (for example after switching from another browser).
             </p>
             <Link
-              href={`/checkout?resume=${encodeURIComponent(orderId)}`}
+              href={cartResumeHref}
               className="inline-flex min-h-11 items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded font-medium text-sm hover:opacity-90"
             >
               Continue checkout

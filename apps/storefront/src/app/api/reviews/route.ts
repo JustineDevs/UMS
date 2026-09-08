@@ -34,13 +34,21 @@ import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const MAX_REVIEW_BODY_BYTES = 16 * 1024;
 
+function reviewError(body: Record<string, unknown>, status: number, headers?: Record<string, string>) {
+  return Response.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store", ...headers },
+  });
+}
+
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-get:${ip}`, 120, 60_000);
   if (!rl.ok) {
-    return Response.json(
+    return reviewError(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      429,
+      { "Retry-After": String(rl.retryAfterSec) },
     );
   }
   const u = new URL(req.url);
@@ -51,22 +59,16 @@ export async function GET(req: Request) {
     limit: u.searchParams.get("limit") || undefined,
   });
   if (!listParsed.success) {
-    return Response.json(
-      {
-        error: "Provide productSlug and/or medusaProductId",
-        details: listParsed.error.flatten(),
-      },
-      { status: 400 },
-    );
+    return reviewError({ error: "Provide productSlug and/or medusaProductId" }, 400);
   }
   const { productSlug = "", medusaProductId = "", cursor, limit } = listParsed.data;
   const decodedCursor = cursor ? decodeReviewCursor(cursor) : null;
   if (cursor && !decodedCursor) {
-    return Response.json({ error: "Invalid review cursor" }, { status: 400 });
+    return reviewError({ error: "Invalid review cursor" }, 400);
   }
   const sb = createStorefrontAnonSupabase();
   if (!sb) {
-    return Response.json({ error: "Service unavailable" }, { status: 503 });
+    return reviewError({ error: "Service unavailable" }, 503);
   }
   let q = sb
     .from("product_reviews")
@@ -92,7 +94,7 @@ export async function GET(req: Request) {
   }
   const { data, error } = await q;
   if (error) {
-    return Response.json({ error: "Unable to load reviews" }, { status: 503 });
+    return reviewError({ error: "Unable to load reviews" }, 503);
   }
   const rows = data ?? [];
   const seen = new Set<string>();
@@ -102,9 +104,11 @@ export async function GET(req: Request) {
     seen.add(id);
     return true;
   });
-  const last = rows.at(-1) as { created_at?: unknown; id?: unknown } | undefined;
+  // Continue from the last row the client actually received, not a duplicate
+  // row filtered out of the public page.
+  const last = deduped.at(-1) as { created_at?: unknown; id?: unknown } | undefined;
   const nextCursor =
-    rows.length === limit && typeof last?.created_at === "string" && typeof last.id === "string"
+    deduped.length === limit && typeof last?.created_at === "string" && typeof last.id === "string"
       ? encodeReviewCursor(last.created_at, last.id)
       : null;
   return Response.json(
@@ -129,61 +133,59 @@ function displayNameFromSession(params: {
 
 async function handlePOST(req: Request) {
   if (!isSameOriginMutation(req)) {
-    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+    return reviewError({ error: "Cross-site mutation rejected" }, 403);
   }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-post:${ip}`, 15, 60_000);
   if (!rl.ok) {
-    return Response.json(
+    return reviewError(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      429,
+      { "Retry-After": String(rl.retryAfterSec) },
     );
   }
 
   const session = await getStorefrontSession();
   const emailRaw = session?.user?.email?.trim();
   if (!emailRaw) {
-    return Response.json(
+    return reviewError(
       { error: "Sign in required to submit a review", code: "AUTH_REQUIRED" },
-      { status: 401 },
+      401,
     );
   }
   const email = emailRaw.toLowerCase();
   const userRl = await rateLimitFixedWindow(`reviews-post-user:${email}`, 5, 10 * 60_000);
   if (!userRl.ok) {
-    return Response.json({ error: "You have submitted too many reviews recently.", retryAfter: userRl.retryAfterSec }, { status: 429 });
+    return reviewError({ error: "You have submitted too many reviews recently.", retryAfter: userRl.retryAfterSec }, 429);
   }
 
   const bounded = await parseBoundedJson(req, MAX_REVIEW_BODY_BYTES);
   if (bounded.tooLarge) {
-    return Response.json({ error: "Request body too large" }, { status: 413 });
+    return reviewError({ error: "Request body too large" }, 413);
   }
   const body: unknown = bounded.valid ? bounded.value : null;
-  if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  if (!bounded.valid) return reviewError({ error: "Invalid JSON" }, 400);
   if (!isRecaptchaConfigured()) {
-    return Response.json({ error: "Security verification unavailable" }, { status: 503 });
+    return reviewError({ error: "Security verification unavailable" }, 503);
   }
   const recaptchaToken =
     body && typeof body === "object" && !Array.isArray(body)
       ? (body as Record<string, unknown>).recaptchaToken
       : undefined;
   if (!(await verifyRecaptchaAction(req, recaptchaToken, "review"))) {
-    return Response.json({ error: "Verification failed" }, { status: 400 });
+    return reviewError({ error: "Verification failed" }, 400);
   }
   const postParsed = storefrontReviewPostBodySchema.safeParse(body);
   if (!postParsed.success) {
-    return Response.json(
-      { error: "Invalid review payload", details: postParsed.error.flatten() },
-      { status: 400 },
-    );
+    return reviewError({ error: "Invalid review payload" }, 400);
   }
   const o = postParsed.data;
-  if (o._hp.trim()) return Response.json({ error: "Unable to submit review" }, { status: 400 });
-  if (!reviewFormTimingIsValid(o.formStartedAt)) return Response.json({ error: "Please take a moment to complete your review." }, { status: 400 });
+  if (o._hp.trim()) return reviewError({ error: "Unable to submit review" }, 400);
+  if (!reviewFormTimingIsValid(o.formStartedAt)) return reviewError({ error: "Please take a moment to complete your review." }, 400);
   const csrfCookie = req.headers.get("cookie")?.match(new RegExp(`${reviewCsrfCookieName()}=([^;]+)`))?.[1];
-  if (!verifyReviewCsrfToken(o.csrfToken, csrfCookie)) return Response.json({ error: "Security token expired. Reload and try again." }, { status: 403 });
+  if (!verifyReviewCsrfToken(o.csrfToken, csrfCookie)) return reviewError({ error: "Security token expired. Reload and try again." }, 403);
   const content = validateReviewBody(o.body);
-  if (!content.ok) return Response.json({ error: content.reason }, { status: 400 });
+  if (!content.ok) return reviewError({ error: content.reason }, 400);
 
   const productSlug = o.productSlug;
   const medusaProductId = o.medusaProductId;
@@ -191,9 +193,9 @@ async function handlePOST(req: Request) {
 
   const customerId = await findOrCreateMedusaCustomerIdByEmail(email);
   if (!customerId) {
-    return Response.json(
+    return reviewError(
       { error: "Unable to resolve customer for your account" },
-      { status: 502 },
+      502,
     );
   }
 
@@ -209,9 +211,9 @@ async function handlePOST(req: Request) {
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
-    return Response.json(
+    return reviewError(
       { error: "Reviews submission is not configured" },
-      { status: 503 },
+      503,
     );
   }
 
@@ -222,7 +224,7 @@ async function handlePOST(req: Request) {
     .in("status", ["pending", "approved", "hidden"])
     .limit(1)
     .maybeSingle();
-  if (duplicate) return Response.json({ error: "An identical review has already been submitted.", code: "DUPLICATE_REVIEW" }, { status: 409 });
+  if (duplicate) return reviewError({ error: "An identical review has already been submitted.", code: "DUPLICATE_REVIEW" }, 409);
 
   const insertRow = {
     product_slug: productSlug,
@@ -257,23 +259,26 @@ async function handlePOST(req: Request) {
       msg.includes("unique") ||
       msg.includes("idx_product_reviews_one_active")
     ) {
-      return Response.json(
+      return reviewError(
         {
           error:
             "You already have a review for this product. Remove or wait for moderation on the existing one.",
           code: "DUPLICATE_REVIEW",
         },
-        { status: 409 },
+        409,
       );
     }
-    return Response.json({ error: "Unable to save review" }, { status: 503 });
+    return reviewError({ error: "Unable to save review" }, 503);
   }
 
-  return Response.json({
-    ok: true,
-    status: "pending",
-    isVerifiedBuyer: verified.verified,
-  });
+  return Response.json(
+    {
+      ok: true,
+      status: "pending",
+      isVerifiedBuyer: verified.verified,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export const POST = withBotIdProtection(handlePOST);

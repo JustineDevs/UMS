@@ -38,7 +38,7 @@ export function isEmailAllowedForGuideDemos(email: string | null | undefined): b
 export function isAdminE2eCredentialsConfigured(): boolean {
   return (
     process.env.NODE_ENV === "development" &&
-    Boolean(process.env.NEXTAUTH_SECRET?.trim()) &&
+    Boolean(process.env.NEXTAUTH_SECRET?.trim() || process.env.AUTH_SECRET?.trim()) &&
     parseAdminAllowedEmailList().length > 0
   );
 }

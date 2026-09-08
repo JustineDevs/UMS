@@ -105,6 +105,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   if (
     status === "authenticated" &&
     !checked &&
+    !guestCheckout &&
     pathname &&
     requiresStorefrontOnboarding(pathname)
   ) {

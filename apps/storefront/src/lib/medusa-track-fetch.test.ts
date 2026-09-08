@@ -4,9 +4,11 @@ import test from "node:test";
 import {
   pendingCartTrackPayload,
   buildCarrierTrackingUrl,
+  buildPublicTrackOrderFields,
   formatTrackingNumber,
   latestShipmentEventStatus,
   mapMedusaOrderToTrack,
+  maskConfirmationEmail,
   medusaReadFailureStatus,
   orderTrackStatusFromMedusa,
   projectConfirmationOrder,
@@ -14,6 +16,15 @@ import {
   trackReadFailure,
   trackingCapabilityScopeMatches,
 } from "./medusa-track-fetch";
+
+test("public tracking fields fetch customer email only for scoped capabilities", () => {
+  assert.equal(buildPublicTrackOrderFields().includes("email"), false);
+  assert.equal(
+    buildPublicTrackOrderFields(true).includes("email"),
+    true,
+  );
+  assert.match(buildPublicTrackOrderFields(), /\*fulfillments\.labels/);
+});
 
 test("tracking scope comparison fails closed for wrong customer or store", () => {
   const capability = {
@@ -70,6 +81,14 @@ test("tracking failures receive opaque support correlation ids", () => {
   assert.equal(failure.status, 503);
   assert.match(failure.correlationId ?? "", /^[0-9a-f-]{36}$/);
   assert.equal(failure.data, null);
+});
+
+test("invalid tracking reads use the same opaque failure contract", () => {
+  const failure = trackReadFailure(404);
+  assert.equal(failure.ok, false);
+  assert.equal(failure.data, null);
+  assert.equal(failure.status, 404);
+  assert.match(failure.correlationId ?? "", /^[0-9a-f-]{36}$/);
 });
 
 test("carrier tracking links use the HTTPS allowlist and encode tracking numbers", () => {
@@ -250,10 +269,15 @@ test("projectConfirmationOrder keeps only approved confirmation fields", () => {
       },
     ],
     total: 12500,
-    shipping_address: { address_1: "1 Main St", city: "Manila" },
+    shipping_address: { city: "Manila" },
   });
   assert.equal("payment_collections" in result, false);
   assert.equal("metadata" in result, false);
+});
+
+test("confirmation email masking does not disclose the full address", () => {
+  assert.equal(maskConfirmationEmail("buyer@example.com"), "b***@example.com");
+  assert.equal(maskConfirmationEmail("invalid"), undefined);
 });
 
 test("orderTrackStatusFromMedusa returns pending_payment when payment is not captured", () => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const PUBLIC_REVIEW_FIELDS =
-  "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,helpful_votes,status" as const;
+  "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,helpful_votes" as const;
 
 export const PUBLIC_REVIEW_FIELD_NAMES = PUBLIC_REVIEW_FIELDS.split(",");
 
@@ -46,6 +46,12 @@ export function isReviewId(value: string): boolean {
 export function publicReviewFieldsAreSafe(): boolean {
   return PUBLIC_REVIEW_FIELD_NAMES.includes("helpful_votes") &&
     !PUBLIC_REVIEW_FIELD_NAMES.some((field) =>
-      ["customer_email", "medusa_customer_id", "verified_medusa_order_id", "risk_score"].includes(field),
+      [
+        "customer_email",
+        "medusa_customer_id",
+        "verified_medusa_order_id",
+        "risk_score",
+        "status",
+      ].includes(field),
     );
 }

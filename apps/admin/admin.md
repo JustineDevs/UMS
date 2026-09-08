@@ -800,6 +800,7 @@ Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supaba
 | `MEDUSA_SALES_CHANNEL_ID`, `NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID`                                                      | Sales channel                                |
 | `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID`                                                                              | Default payment provider hint                |
 | `CHANNEL_WEBHOOK_SECRET`                                                                                              | Channel webhook HMAC                         |
+| `CHANNEL_TENANT_KEY`                                                                                                  | Server-side channel event tenant scope       |
 | `INTERNAL_CHAT_INTAKE_KEY`                                                                                            | Chat intake API key                          |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                  | Distributed admin rate limiting              |
 | `ADMIN_STEP_UP_REQUIRED`, `ADMIN_STEP_UP_SECRET`                                                                      | Short-lived assertions for dangerous writes  |

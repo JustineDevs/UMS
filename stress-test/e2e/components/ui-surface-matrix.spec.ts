@@ -32,7 +32,7 @@ test.describe("@matrix @workflow PDP buy box when catalog exists", () => {
       test.skip(true, "No catalog product for matrix PDP.");
       return;
     }
-    const add = page.getByTestId("pdp-add-to-bag");
+    const add = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
     await expect(add).toBeVisible({ timeout: 30_000 });
     await expect(add).toBeEnabled({ timeout: 45_000 });
   });
@@ -49,5 +49,24 @@ test.describe("@matrix @admin command surface and sidebar", () => {
     await page.goto(`${adminBase}/admin/catalog`, { waitUntil: "domcontentloaded" });
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Unhandled Runtime Error/i);
+  });
+
+  test("receipts route renders an orders table with an explicit commerce state", async ({ page }) => {
+    test.setTimeout(120_000);
+    const login = await e2eAdminLogin(page);
+    if (login !== "ok") {
+      test.skip(true, "Admin E2E auth not configured.");
+      return;
+    }
+    await page.goto(`${adminBase}/admin/receipts`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Digital receipts" })).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByRole("columnheader", { name: "Order" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Customer" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Status" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Total" })).toBeVisible();
+    await expect(page.getByRole("columnheader", { name: "Action" })).toBeVisible();
+    const body = await page.locator("body").innerText();
+    expect(body).not.toMatch(/Unhandled Runtime Error|\bNot found\b/i);
+    expect(body).toMatch(/Commerce is unavailable|No orders found in commerce\.|\bLoad\b/);
   });
 });

@@ -13,7 +13,13 @@ const {
 // Repo-root env files (e.g. MEDUSA_SECRET_API_KEY for checkout totals preview)
 loadMonorepoRootEnv(__dirname);
 
-const allowedDevOrigins = ["127.0.0.1"];
+const allowedDevOrigins = [
+  "127.0.0.1",
+  ...(process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
 
 function resolvePnpmEntry(packagePrefix, relativePath) {
   const storeDir = path.join(__dirname, "../../node_modules/.pnpm");
@@ -77,9 +83,38 @@ const xenditRuntimeDependencies = [
   return aliases;
 }, {});
 
+const nextAuthRuntimeDependencies = [
+  "@babel/runtime",
+  "@panva/hkdf",
+  "cookie",
+  "jose",
+  "oauth",
+  "openid-client",
+  "preact",
+  "preact-render-to-string",
+  "uuid",
+].reduce((aliases, name) => {
+  try {
+    const nextAuthEntry = require.resolve("next-auth");
+    aliases[`${name}$`] =
+      name === "jose"
+        ? resolvePnpmEntry("jose@", path.join("jose", "dist", "browser", "index.js"))
+        : name === "@panva/hkdf"
+          ? resolvePnpmEntry("@panva+hkdf@", path.join("@panva", "hkdf", "dist", "web", "index.js"))
+        : require.resolve(name, { paths: [path.dirname(nextAuthEntry)] });
+  } catch {
+    // Keep development startup resilient when an optional package is absent.
+  }
+  return aliases;
+}, {});
+
 const entitiesDecodeEntry = resolvePnpmEntry(
   "entities@",
   path.join("entities", "lib", "decode.js"),
+);
+const icebergEntry = resolvePnpmEntry(
+  "iceberg-js@",
+  path.join("iceberg-js", "dist", "index.mjs"),
 );
 
 function imageRemotePatterns() {
@@ -131,6 +166,7 @@ function buildCsp() {
     "https://connect.facebook.net",
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
+    "https://www.google.com",
     "https://www.recaptcha.net",
     "https://www.gstatic.com",
     "https://va.vercel-scripts.com",
@@ -142,6 +178,7 @@ function buildCsp() {
     "https://hooks.stripe.com",
     "https://www.paypal.com",
     "https://www.sandbox.paypal.com",
+    "https://www.google.com",
     "https://www.recaptcha.net",
   ];
 
@@ -159,6 +196,7 @@ function buildCsp() {
     "https://api.stripe.com",
     "https://www.paypal.com",
     "https://www.sandbox.paypal.com",
+    "https://www.google.com",
     "https://www.google-analytics.com",
     "https://region1.google-analytics.com",
     "https://connect.facebook.net",
@@ -229,7 +267,14 @@ function previewFrameAncestors() {
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter((value) => /^https?:\/\//.test(value));
   if (process.env.NODE_ENV === "production") return configured;
-  return [...new Set([...configured, "http://localhost:3001", "http://127.0.0.1:3001"])];
+  return [...new Set([
+    ...configured,
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    // The auth-disabled local admin server is used for browser verification.
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+  ])];
 }
 
 const siteOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
@@ -292,7 +337,20 @@ const nextConfig = {
         source: "/api/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store, max-age=0" },
-          { key: "Pragma", value: "no-cache" },
+        ],
+      },
+      {
+        // This public query-keyed endpoint is the sole API cache exception.
+        source: "/api/shop/search-suggest",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=5, s-maxage=60, stale-while-revalidate=300" },
+        ],
+      },
+      {
+        // The feed route exports GET only; review submission remains no-store.
+        source: "/api/reviews/feed",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
         ],
       },
       {
@@ -340,7 +398,7 @@ const nextConfig = {
     ];
   },
   webpack: (config) => {
-    config.resolve.symlinks = false;
+    config.resolve.symlinks = true;
     config.resolve.alias = {
       ...config.resolve.alias,
       "@": path.resolve(__dirname, "src"),
@@ -349,7 +407,9 @@ const nextConfig = {
       ...(botIdClientCoreEntry ? { "botid/client/core": botIdClientCoreEntry } : {}),
       ...(opentelemetryApiEntry ? { "@opentelemetry/api": opentelemetryApiEntry } : {}),
       ...xenditRuntimeDependencies,
+      ...nextAuthRuntimeDependencies,
       ...(entitiesDecodeEntry ? { "entities/lib/decode.js": entitiesDecodeEntry } : {}),
+      ...(icebergEntry ? { "iceberg-js$": icebergEntry } : {}),
     };
     return config;
   },

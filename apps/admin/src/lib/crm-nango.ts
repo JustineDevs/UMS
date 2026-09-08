@@ -35,10 +35,6 @@ export function configuredCrmIntegrations(): CrmNangoIntegration[] {
     }));
 }
 
-export function crmIntegrationLabel(id: string): string {
-  return NANGO_CRM_SUPPORTED_APPS.find((app) => app.provider_config_key === id)?.label ?? id;
-}
-
 export function nangoCrmErrorMessage(value: unknown): string | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   const first = value[0] as Record<string, unknown> | null;

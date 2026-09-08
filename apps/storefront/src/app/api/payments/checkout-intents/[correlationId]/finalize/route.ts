@@ -17,6 +17,7 @@ import { capturePostHogEvent } from "@universal-music-store/sdk";
 import { isAuthorizedMedusaPaymentSession } from "@/lib/payment-session-verification";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { isPaidStripeCheckoutSession } from "@/lib/stripe-checkout-verification";
+import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,7 @@ export async function POST(
     applyRateLimit: async (request) =>
       applyRateLimit(request, "checkout-intents-finalize", 40, 60_000),
     readCartIdFromCookie,
+    readCheckoutCorrelationCookie: readCheckoutAttemptCookie,
     getPaymentAttemptRow: async (id) =>
       sb ? getPaymentAttemptByCorrelationId(sb, id) : null,
     readCurrentQuoteFingerprint: async (activeCartId) => {

@@ -1,7 +1,6 @@
 import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import {
   deleteCmsAnnouncement,
   getCmsAnnouncementAnalyticsMap,
@@ -10,20 +9,16 @@ import {
 } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
 import { cmsAnnouncementSchema } from "@/lib/cms-route-contracts";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:read")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("content:read");
+  if (!auth.ok) return tagResponse(auth.response, cid);
+  const session = auth.session;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, session.user.email);
@@ -45,13 +40,9 @@ export async function GET(req: NextRequest) {
 
 async function put(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("content:write");
+  if (!auth.ok) return tagResponse(auth.response, cid);
+  const session = auth.session;
   const body = await parseBoundedJson(req, 128 * 1024);
   if (body.tooLarge) return correlatedJson(cid, { error: "Request body is too large" }, { status: 413 });
   const parsed = cmsAnnouncementSchema.safeParse(body.valid ? body.value : null);
@@ -84,13 +75,9 @@ async function put(req: NextRequest) {
 
 async function deleteHandler(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
+  const auth = await requireStaffApiSession("content:write");
+  if (!auth.ok) return tagResponse(auth.response, cid);
+  const session = auth.session;
   const id = req.nextUrl.searchParams.get("id")?.trim();
   const locale = req.nextUrl.searchParams.get("locale")?.trim() || "en";
   if (!id) {

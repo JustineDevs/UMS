@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, ExternalLink, Trash2 } from "lucide-react";
 import { CatalogMediaPreview } from "./CatalogMediaPreview";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
+import { catalogMediaEmptyState } from "@/lib/admin-receipt-media-state";
 
 type MediaRow = {
   id: string;
@@ -40,6 +41,8 @@ export function CatalogMediaManager() {
   const canWrite = staffHasPermission(session?.user?.permissions ?? [], "catalog:write");
   const [rows, setRows] = useState<MediaRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadingRows, setLoadingRows] = useState(true);
+  const [catalogSourceUnavailable, setCatalogSourceUnavailable] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -64,16 +67,24 @@ export function CatalogMediaManager() {
     if (q.trim()) sp.set("q", q.trim());
     if (mime.trim()) sp.set("mime", mime.trim());
     sp.set("sort", sort);
+    setLoadingRows(true);
     setError(null);
     fetch(`/api/admin/catalog/media?${sp.toString()}`)
       .then(async (r) => {
-        const j = (await r.json()) as { data?: MediaRow[]; error?: string; canWrite?: boolean };
+        const j = (await r.json()) as {
+          data?: MediaRow[];
+          error?: string;
+          canWrite?: boolean;
+          catalogSourceUnavailable?: boolean;
+        };
         if (!r.ok) throw new Error(j.error ?? r.statusText);
         setServerCanWrite(Boolean(j.canWrite));
+        setCatalogSourceUnavailable(Boolean(j.catalogSourceUnavailable));
         return j.data ?? [];
       })
       .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load catalog media"));
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load catalog media"))
+      .finally(() => setLoadingRows(false));
   }, [q, mime, sort]);
 
   useEffect(() => {
@@ -236,7 +247,7 @@ export function CatalogMediaManager() {
 
   return (
     <div className="flex flex-col gap-4">
-      {error ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Unable to load catalog media: {error}</p> : null}
 
       <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-4 text-sm shadow-xs">
         <label className="flex items-center gap-2">
@@ -311,7 +322,13 @@ export function CatalogMediaManager() {
         />
       </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {loadingRows ? <p className="text-sm text-muted-foreground" aria-live="polite">Loading catalog media...</p> : null}
+      {!loadingRows && !error && catalogSourceUnavailable ? (
+        <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          Product catalog media is temporarily unavailable. Existing uploaded media is shown; retry to mirror the latest product assets.
+        </p>
+      ) : null}
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Catalog media assets" aria-busy={loadingRows}>
         {rows.map((m) => (
           <li key={m.id} className="group overflow-hidden break-all rounded-xl border bg-card text-sm shadow-xs transition-shadow hover:shadow-md">
             <div className="aspect-[4/3] w-full bg-muted">
@@ -431,7 +448,19 @@ export function CatalogMediaManager() {
           </li>
         ))}
       </ul>
-      {rows.length === 0 ? (
+      {!loadingRows && !error && catalogMediaEmptyState(rows.length, Boolean(q.trim() || mime.trim()), catalogSourceUnavailable) === "filtered" ? (
+        <div className="rounded-xl border border-dashed px-6 py-10 text-center">
+          <p className="text-sm font-medium text-foreground">No catalog media matches these filters</p>
+          <p className="mt-1 text-xs text-muted-foreground">Clear the search or MIME filter to see all catalog media.</p>
+        </div>
+      ) : null}
+      {!loadingRows && !error && catalogMediaEmptyState(rows.length, Boolean(q.trim() || mime.trim()), catalogSourceUnavailable) === "unavailable" ? (
+        <div className="rounded-xl border border-dashed border-amber-300 px-6 py-10 text-center">
+          <p className="text-sm font-medium text-foreground">Catalog media is temporarily unavailable</p>
+          <p className="mt-1 text-xs text-muted-foreground">Retry after the product catalog service is available.</p>
+        </div>
+      ) : null}
+      {!loadingRows && !error && catalogMediaEmptyState(rows.length, Boolean(q.trim() || mime.trim()), catalogSourceUnavailable) === "none" ? (
         <div className="rounded-xl border border-dashed px-6 py-10 text-center">
           <p className="text-sm font-medium text-foreground">No catalog media yet</p>
           <p className="mt-1 text-xs text-muted-foreground">Upload an image or video to reuse it across the catalog.</p>

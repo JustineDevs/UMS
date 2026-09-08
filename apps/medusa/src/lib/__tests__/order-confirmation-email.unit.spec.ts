@@ -19,4 +19,15 @@ describe("order confirmation email privacy", () => {
     expect(html).not.toContain("order_internal_123");
     expect(html).not.toContain("Order ID:");
   });
+
+  it("rejects raw or non-HTTPS tracking links at the renderer boundary", () => {
+    expect(() =>
+      buildRichHtml({
+        order: { display_id: 42 },
+        orderDisplayLabel: "42",
+        trackingUrl: "https://shop.example/track/order_42",
+        brandName: "Universal Music Store",
+      }),
+    ).toThrow(/tracking capability is invalid/i);
+  });
 });

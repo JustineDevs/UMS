@@ -6,7 +6,11 @@ import { AccountProfilePanel } from "@/components/AccountProfilePanel";
 import { getStorefrontSession } from "@/lib/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { PreferencesControls } from "@/components/PreferencesControls";
-import { computeAccountOrderStats, fetchCustomerOrders } from "@/lib/medusa-account-orders";
+import {
+  computeAccountOrderStats,
+  fetchCustomerOrders,
+  getAccountOrderViewState,
+} from "@/lib/medusa-account-orders";
 import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { loadCustomerProfileResult } from "@/lib/server-customer-profile";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
@@ -37,14 +41,24 @@ export default async function AccountPage() {
   const session = await getStorefrontSession();
   const user = session?.user;
   const userEmail = user?.email?.trim() ?? "";
+  const sessionCustomerId =
+    typeof (user as Record<string, unknown> | undefined)?.medusaCustomerId === "string"
+      ? String((user as Record<string, unknown>).medusaCustomerId).trim()
+      : null;
   const { orders, error: ordersError } = userEmail
-    ? await fetchCustomerOrders(userEmail)
+    ? await fetchCustomerOrders(userEmail, sessionCustomerId)
     : { orders: [], error: null };
   const profileResult = userEmail
     ? await loadCustomerProfileResult(userEmail)
     : { profile: null, unavailable: false };
   const profile = profileResult.profile;
   const stats = computeAccountOrderStats(orders);
+  const orderViewState = getAccountOrderViewState({
+    authenticated: Boolean(user),
+    loading: false,
+    error: ordersError,
+    orderCount: orders.length,
+  });
   const profileAvatar = profile?.avatarUrl ?? user?.image ?? null;
   const currency = stats.currency ?? (stats.lifetimeSpend === null ? "Multiple currencies" : "PHP");
 
@@ -101,7 +115,12 @@ export default async function AccountPage() {
                   <Link href="/contact?topic=orders" className="font-semibold underline">Contact support</Link>
                 </div>
               </div>
-            ) : orders.length > 0 ? (
+            ) : orderViewState === "signed_out" ? (
+              <div className="space-y-3 py-8 text-sm text-on-surface-variant">
+                <p>Sign in to view your order history.</p>
+                <Link href="/sign-in?callbackUrl=/account" className="font-semibold text-primary underline">Sign in to your account</Link>
+              </div>
+            ) : orderViewState === "ready" ? (
               <ul className="divide-y divide-outline-variant/15">
                 {orders.map((order) => (
                   <li key={order.id} className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">

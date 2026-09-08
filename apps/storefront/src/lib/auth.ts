@@ -4,13 +4,17 @@ import { getServerSession } from "next-auth/next";
 import GoogleProvider from "next-auth/providers/google";
 import {
   loadGoogleCredentials,
-  buildSharedJwtCallback,
+  buildSharedJwtCallbackWithResolver,
   buildSharedSessionCallback,
 } from "@universal-music-store/sdk";
+import { getAuthSecret } from "@/lib/auth-secret";
+import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
 
 const google = loadGoogleCredentials("storefront");
 
-const sharedJwt = buildSharedJwtCallback();
+const sharedJwt = buildSharedJwtCallbackWithResolver({
+  resolveCustomerId: findOrCreateMedusaCustomerIdByEmail,
+});
 const sharedSession = buildSharedSessionCallback();
 
 export const authOptions: NextAuthOptions = {
@@ -21,7 +25,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: google.clientSecret,
     }),
   ],
-  secret: process.env.NEXTAUTH_SECRET?.trim(),
+  secret: getAuthSecret(),
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
   pages: { signIn: "/sign-in" },
   cookies: {
@@ -41,9 +45,24 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
+/**
+ * Local browser QA may expose the bypass flag to the client so its session
+ * provider can render the same identity. Never let a public flag disable auth
+ * in a production server process.
+ */
+export function isStorefrontAuthDisabled(): boolean {
+  const serverFlags = [process.env.AUTH_DISABLED, process.env.AUTH_DISABLE];
+  if (serverFlags.some((value) => value === "true")) return true;
+  if (process.env.NODE_ENV === "production") return false;
+  return [
+    process.env.NEXT_PUBLIC_AUTH_DISABLED,
+    process.env.NEXT_PUBLIC_AUTH_DISABLE,
+  ].some((value) => value === "true");
+}
+
 /** Explicit auth-disabled mode is reserved for controlled browser QA. */
 export async function getStorefrontSession(): Promise<Session | null> {
-  if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
+  if (isStorefrontAuthDisabled()) {
     return {
       user: { name: "Local QA", email: "e2e-test@example.com" },
       authenticatedAt: Math.floor(Date.now() / 1000),

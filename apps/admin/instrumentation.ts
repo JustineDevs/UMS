@@ -9,11 +9,12 @@ export async function register() {
   const { assertAdminMedusaEnvProduction } = await import(
     "@universal-music-store/sdk"
   );
+  const { getAdminAuthSecret } = await import("./src/lib/auth-secret");
   assertAdminMedusaEnvProduction();
 
   if (process.env.NODE_ENV === "production") {
-    if (!process.env.NEXTAUTH_SECRET?.trim()) {
-      throw new Error("Admin: NEXTAUTH_SECRET is required in production");
+    if (!getAdminAuthSecret()) {
+      throw new Error("Admin: NEXTAUTH_SECRET or AUTH_SECRET is required in production");
     }
     if (
       !process.env.GOOGLE_CLIENT_ID?.trim() ||

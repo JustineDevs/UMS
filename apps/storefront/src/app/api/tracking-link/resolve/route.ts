@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { resolveTrackingPath } from "@/lib/tracking-link-resolve";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 const MAX_TRACKING_FORM_BYTES = 8 * 1024;
 
 export async function POST(request: Request): Promise<Response> {
+  if (!isSameOriginMutation(request)) {
+    return NextResponse.json(
+      { error: "Cross-site mutation rejected" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const contentLength = Number(request.headers.get("content-length") ?? "");
   if (Number.isFinite(contentLength) && contentLength > MAX_TRACKING_FORM_BYTES) {
     return NextResponse.json(

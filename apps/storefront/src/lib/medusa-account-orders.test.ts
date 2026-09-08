@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildAccountOrdersQuery,
   accountOrderMatchesCustomer,
+  accountOrderMatchesDetail,
   accountOrderMatchesIdentity,
   accountOrderMatchesHistory,
   countAccountOrderItems,
@@ -58,6 +59,27 @@ test("account order query prefers canonical customer ownership over email", () =
   assert.equal(legacy.searchParams.get("customer_id"), null);
 });
 
+test("account order loader accepts the immutable session customer id", () => {
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_session", customer_id: "cus_session", email: "old@example.com" },
+      "cus_session",
+      "new@example.com",
+      new Set(),
+    ),
+    true,
+  );
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_other", customer_id: "cus_other", email: "other@example.com" },
+      "cus_session",
+      "new@example.com",
+      new Set(),
+    ),
+    false,
+  );
+});
+
 test("account order item count reports units instead of line count", () => {
   assert.equal(countAccountOrderItems([{ quantity: 2 }, { quantity: 3 }]), 5);
   assert.equal(countAccountOrderItems([{ quantity: "3" }, { quantity: -2 }]), 0);
@@ -74,12 +96,33 @@ test("account history accepts an exact email when a legacy order has no customer
   assert.equal(accountOrderMatchesIdentity("cus_other", "other@example.com", "cus_123", "buyer@example.com"), false);
 });
 
-test("account history requires canonical ownership when a customer id exists", () => {
+test("account identity still rejects a mismatched customer when email differs", () => {
   assert.equal(accountOrderMatchesIdentity("cus_other", "buyer@example.com", "cus_123", "buyer@example.com"), false);
   assert.equal(accountOrderMatchesIdentity("cus_123", "other@example.com", "cus_123", "buyer@example.com"), true);
 });
 
-test("account history keeps an exact-email legacy order when customer lookup is canonical", () => {
+test("account history rejects a conflicting canonical customer despite matching email", () => {
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_migrated", customer_id: "cus_legacy", email: "buyer@example.com" },
+      "cus_123",
+      "buyer@example.com",
+      new Set(),
+    ),
+    false,
+  );
+  assert.equal(
+    accountOrderMatchesHistory(
+      { id: "order_other", customer_id: "cus_other", email: "other@example.com" },
+      "cus_123",
+      "buyer@example.com",
+      new Set(),
+    ),
+    false,
+  );
+});
+
+test("account history keeps an exact-email order when customer lookup is canonical", () => {
   assert.equal(
     accountOrderMatchesHistory(
       { id: "order_legacy", customer_id: null, email: "buyer@example.com" },
@@ -91,13 +134,20 @@ test("account history keeps an exact-email legacy order when customer lookup is 
   );
   assert.equal(
     accountOrderMatchesHistory(
-      { id: "order_other", customer_id: null, email: "buyer@example.com" },
+      { id: "order_other", customer_id: null, email: "other@example.com" },
       "cus_123",
       "buyer@example.com",
       new Set(),
     ),
     false,
   );
+});
+
+test("account order detail permits only canonical or legacy ownership", () => {
+  assert.equal(accountOrderMatchesDetail({ customer_id: null, email: "buyer@example.com" }, "cus_123", "buyer@example.com"), true);
+  assert.equal(accountOrderMatchesDetail({ customer_id: null, email: "other@example.com" }, "cus_123", "buyer@example.com"), false);
+  assert.equal(accountOrderMatchesDetail({ customer_id: "cus_other", email: "buyer@example.com" }, "cus_123", "buyer@example.com"), false);
+  assert.equal(accountOrderMatchesDetail({ customer_id: "cus_123", email: "buyer@example.com" }, "cus_123", "buyer@example.com"), true);
 });
 
 test("account order view distinguishes signed out, loading, unavailable, empty, and ready", () => {

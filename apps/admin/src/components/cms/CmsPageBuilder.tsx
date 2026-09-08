@@ -15,6 +15,7 @@ import {
 } from "@universal-music-store/platform-data";
 import {
   cmsComponentDefinitionSchema,
+  cmsComponentCanvasMutationSchema,
   cmsPreviewMessageSchema,
 } from "@/lib/cms-component-contract";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
@@ -65,6 +66,7 @@ import {
 } from "@/lib/cms-tree-commands";
 import { LiveCanvasEditor } from "@/lib/visual-builder/live-canvas-editor";
 import { UvsCmsClient } from "@/lib/visual-builder/cms-rest-client";
+import { mapCmsPreviewRectToCanvas } from "./cms-preview-geometry";
 
 const BLOCK_TYPES = [
   {
@@ -123,6 +125,7 @@ const FIXED_COMPONENT_TYPES = new Set([
 type BuilderPage = { id: string; title: string; slug: string; status: string };
 type PreviewTarget = {
   id: string;
+  blockId?: string | null;
   label: string;
   rect: { x: number; y: number; width: number; height: number };
   tagName?: string;
@@ -1470,17 +1473,13 @@ export function CmsPageBuilder({
     const onMessage = (event: MessageEvent) => {
       const frame = canvasVisualRef.current?.contentWindow;
       if (!frame || event.source !== frame || (event.origin !== window.location.origin && event.origin !== "null")) return;
-      if (!event.data || event.data.source !== "cms-component-canvas-mutation") return;
-      if (
-        event.data.event === "slot-drop" &&
-        typeof event.data.slot === "string" &&
-        typeof event.data.componentId === "string"
-      ) {
-        addInstanceToSlotRef.current?.(event.data.slot, event.data.componentId);
+      const message = cmsComponentCanvasMutationSchema.safeParse(event.data);
+      if (!message.success) return;
+      if ("event" in message.data && message.data.event === "slot-drop") {
+        addInstanceToSlotRef.current?.(message.data.slot, message.data.componentId);
         return;
       }
-      if (typeof event.data.property !== "string" || typeof event.data.value !== "string") return;
-      updateCanvasVisualProp(event.data.property, event.data.value);
+      if ("property" in message.data) updateCanvasVisualProp(message.data.property, message.data.value);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -1651,11 +1650,35 @@ export function CmsPageBuilder({
         const id = selection.element.dataset.cmsId;
         if (!id) return;
         const blockId = id.split("::", 1)[0];
-        const rect = {
+        const iframeRect = {
           x: selection.rect.left,
           y: selection.rect.top,
           width: selection.rect.width,
           height: selection.rect.height,
+        };
+        const frameRect = iframeRef.current?.getBoundingClientRect();
+        const canvasRect = iframeRef.current?.parentElement?.getBoundingClientRect();
+        const rect = frameRect && canvasRect && iframeRef.current
+          ? mapCmsPreviewRectToCanvas(iframeRect, {
+              frameLeft: frameRect.left,
+              frameTop: frameRect.top,
+              frameWidth: frameRect.width,
+              frameHeight: frameRect.height,
+              clientWidth: iframeRef.current.clientWidth,
+              clientHeight: iframeRef.current.clientHeight,
+              canvasLeft: canvasRect.left,
+              canvasTop: canvasRect.top,
+              zoom: zoomRef.current,
+            })
+          : iframeRect;
+        rawPreviewRef.current = {
+          id,
+          blockId,
+          label: selection.element.tagName.toLowerCase(),
+          rect: iframeRect,
+          tagName: selection.element.tagName.toLowerCase(),
+          text: selection.element.textContent ?? undefined,
+          parentId: selection.element.parentElement?.dataset.cmsId ?? null,
         };
         setSelectedPreview((current) => ({
           id,
@@ -1714,23 +1737,17 @@ export function CmsPageBuilder({
       if (!frame || !canvas) return rect;
       const frameRect = frame.getBoundingClientRect();
       const canvasRect = canvas.getBoundingClientRect();
-      const scale = zoomRef.current / 100;
-      const frameScaleX = frame.clientWidth
-        ? frameRect.width / frame.clientWidth
-        : scale;
-      const frameScaleY = frame.clientHeight
-        ? frameRect.height / frame.clientHeight
-        : scale;
-      return {
-        x:
-          (frameRect.left - canvasRect.left) / scale +
-          (rect.x * frameScaleX) / scale,
-        y:
-          (frameRect.top - canvasRect.top) / scale +
-          (rect.y * frameScaleY) / scale,
-        width: (rect.width * frameScaleX) / scale,
-        height: (rect.height * frameScaleY) / scale,
-      };
+      return mapCmsPreviewRectToCanvas(rect, {
+        frameLeft: frameRect.left,
+        frameTop: frameRect.top,
+        frameWidth: frameRect.width,
+        frameHeight: frameRect.height,
+        clientWidth: frame.clientWidth,
+        clientHeight: frame.clientHeight,
+        canvasLeft: canvasRect.left,
+        canvasTop: canvasRect.top,
+        zoom: zoomRef.current,
+      });
     };
     const setMappedPreview = (
       setter: typeof setSelectedPreview,
@@ -3279,8 +3296,8 @@ export function CmsPageBuilder({
           </button>
         </main>
         {rightOpen ? (
-          <aside className="z-30 w-[310px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white max-sm:absolute max-sm:right-0 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(310px,calc(100vw-40px))] max-sm:shadow-xl">
-            <div className="flex h-12 items-center gap-1 border-b border-slate-200 px-3">
+          <aside className="z-30 flex min-h-0 w-[310px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white max-sm:absolute max-sm:right-0 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(310px,calc(100vw-40px))] max-sm:shadow-xl">
+            <div className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-200 px-3">
               <button
                 type="button"
                 onClick={() => setRightTab("content")}
@@ -3345,6 +3362,7 @@ export function CmsPageBuilder({
                 </button>
               ) : null}
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {rightTab === "settings" ? (
               <div className="p-4">{settings}</div>
             ) : rightTab === "code" ? (
@@ -3745,6 +3763,7 @@ export function CmsPageBuilder({
                 {message}
               </p>
             ) : null}
+            </div>
           </aside>
         ) : null}
         <CatalogMediaPickerDialog

@@ -575,7 +575,11 @@ export function CheckoutClient({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
-              disabled={paymentMethod === "COD" || foreignCheckoutActive}
+              disabled={
+                authStatus === "authenticated" ||
+                paymentMethod === "COD" ||
+                foreignCheckoutActive
+              }
               className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
             />
             <p className="text-xs text-on-surface-variant mt-2">
@@ -587,9 +591,9 @@ export function CheckoutClient({
                 </>
               ) : (
                 <>
-                  Defaults to your sign-in email. Change it if you want order
-                  updates somewhere else. We only check that the format looks
-                  correct.
+                  {authStatus === "authenticated"
+                    ? "Signed-in orders are linked to your account email."
+                    : "Use this email for order updates and your receipt."}
                 </>
               )}
             </p>
@@ -1215,8 +1219,6 @@ export function CheckoutClient({
                 I agree to the{" "}
                 <a
                   href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="text-primary underline"
                 >
                   Terms and Conditions
@@ -1224,8 +1226,6 @@ export function CheckoutClient({
                 and{" "}
                 <a
                   href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="text-primary underline"
                 >
                   Privacy Policy

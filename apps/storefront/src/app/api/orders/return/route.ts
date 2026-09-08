@@ -72,10 +72,7 @@ export async function POST(req: Request) {
   const body = bounded.value;
   const parsed = storefrontReturnRequestBodySchema.safeParse(body);
   if (!parsed.success) {
-    return jsonNoStore(
-      { error: "Invalid return payload", details: parsed.error.flatten() },
-      { status: 400 },
-    );
+    return jsonNoStore({ error: "Invalid return payload" }, { status: 400 });
   }
 
   const { orderId, items, note } = parsed.data;

@@ -53,9 +53,10 @@ export function secureTrackingRedirectUrl(
         parsed.origin === origin &&
         parsed.pathname.startsWith("/track/") &&
         parsed.pathname.split("/").at(-1)?.startsWith("cap_") &&
-        !parsed.searchParams.has("t")
+        !parsed.search &&
+        !parsed.hash
       ) {
-        return redirectUrl;
+        return parsed.toString();
       }
     } catch {
       return null;

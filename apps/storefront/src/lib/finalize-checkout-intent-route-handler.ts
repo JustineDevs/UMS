@@ -37,6 +37,7 @@ type FinalizeResult =
 export type FinalizeCheckoutIntentRouteDeps = {
   applyRateLimit: (_req: Request) => Promise<RateLimitResult>;
   readCartIdFromCookie: () => Promise<string | null>;
+  readCheckoutCorrelationCookie?: () => Promise<string | null>;
   getPaymentAttemptRow: (_correlationId: string) => Promise<PaymentAttemptRow>;
   readCurrentQuoteFingerprint: (_cartId: string) => Promise<string | null>;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
@@ -61,10 +62,14 @@ export async function handleFinalizeCheckoutIntentRequest(
     return rl.response;
   }
 
-  const cartId = await deps.readCartIdFromCookie();
   const row = correlationId.trim()
     ? await deps.getPaymentAttemptRow(correlationId.trim())
     : null;
+  const cartCookie = await deps.readCartIdFromCookie();
+  const attemptCookie = deps.readCheckoutCorrelationCookie
+    ? await deps.readCheckoutCorrelationCookie()
+    : null;
+  const cartId = cartCookie ?? (attemptCookie === correlationId.trim() ? row?.cart_id ?? null : null);
   const currentQuoteFingerprint = cartId
     ? await deps.readCurrentQuoteFingerprint(cartId)
     : null;

@@ -4,7 +4,7 @@ import type { AdminOperationResult } from "@/lib/admin-operation-result";
 import { adminErr, adminOk } from "@/lib/admin-operation-result";
 
 /** Operational workflow states (Supabase overlay; Medusa holds commerce status). */
-export const WORKFLOW_STATES = [
+const WORKFLOW_STATES = [
   "draft",
   "pending_review",
   "approved",
@@ -166,7 +166,7 @@ export async function listEntityWorkflows(
   });
 }
 
-export async function getEntityWorkflow(
+async function getEntityWorkflow(
   client: SupabaseClient,
   organizationId: string,
   entityType: EntityWorkflowType,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getStorefrontSession } from "@/lib/auth";
+import { getStorefrontSession, isStorefrontAuthDisabled } from "@/lib/auth";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { isPrivacyErasureConfirmation } from "@/lib/account-privacy";
@@ -27,8 +27,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
-  const authDisabled = process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true";
-  if (!authDisabled && !hasRecentAuthentication(session)) {
+  if (!isStorefrontAuthDisabled() && !hasRecentAuthentication(session)) {
     return NextResponse.json(
       {
         error: "Please sign in again before deleting your account.",

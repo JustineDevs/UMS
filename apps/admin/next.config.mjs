@@ -98,6 +98,13 @@ function buildCsp() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Keep local production builds isolated from the running admin dev server.
+  distDir:
+    process.env.VERCEL === "1"
+      ? ".next"
+      : process.env.NODE_ENV === "production"
+        ? ".next-production"
+        : ".next",
   poweredByHeader: false,
   env: {
     NEXT_PUBLIC_AUTH_DISABLED:

@@ -13,6 +13,18 @@ function sameOriginOrLoopbackAlias(origin: URL, requestUrl: URL): boolean {
   );
 }
 
+function isConfiguredDevelopmentOrigin(origin: URL): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  const configured = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return configured.some((host) => {
+    const normalizedHost = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    return origin.hostname.toLowerCase() === normalizedHost && origin.protocol === "https:";
+  });
+}
+
 export function isSameOriginMutation(req: Request): boolean {
   const fetchSite = req.headers.get("sec-fetch-site")?.trim().toLowerCase();
   if (fetchSite === "cross-site") return false;
@@ -22,7 +34,11 @@ export function isSameOriginMutation(req: Request): boolean {
 
   try {
     const requestUrl = new URL(req.url);
-    return sameOriginOrLoopbackAlias(new URL(origin), requestUrl);
+    const parsedOrigin = new URL(origin);
+    return (
+      sameOriginOrLoopbackAlias(parsedOrigin, requestUrl) ||
+      isConfiguredDevelopmentOrigin(parsedOrigin)
+    );
   } catch {
     return false;
   }

@@ -7,10 +7,12 @@ import {
   DEFAULT_PUBLIC_SITE_ORIGIN,
   resolveOpaqueTrackingCapabilityDetails,
   sanitizeTrustedPublicUrl,
+  type ResolvedTrackingCapability,
 } from "@universal-music-store/sdk";
 import {
   fetchMedusaTrackByOrderId,
   fetchMedusaTrackByCartId,
+  maskConfirmationEmail,
   trackingCapabilityScopeMatches,
   type ConfirmationOrder,
   type TrackReadResult,
@@ -47,10 +49,6 @@ type ConfirmOrder = ConfirmationOrder & {
   tax_total?: number;
   total?: number;
   shipping_address?: {
-    first_name?: string;
-    last_name?: string;
-    address_1?: string;
-    address_2?: string;
     city?: string;
     province?: string;
     postal_code?: string;
@@ -76,11 +74,10 @@ function confirmationPayload(data: TrackPayload): ConfirmPayload {
 }
 
 async function fetchOrderData(
-  orderId: string,
+  capability: ResolvedTrackingCapability,
 ): Promise<Omit<TrackReadResult, "data"> & { data: ConfirmPayload | null }> {
-  const trimmed = orderId.trim();
-  if (trimmed.startsWith("order_")) {
-    const r = await fetchMedusaTrackByOrderId(trimmed, {
+  if (capability.id.startsWith("order_")) {
+    const r = await fetchMedusaTrackByOrderId(capability.id, {
       includePrivate: true,
     });
     return {
@@ -90,8 +87,8 @@ async function fetchOrderData(
       data: r.data ? confirmationPayload(r.data) : null,
     };
   }
-  if (trimmed.startsWith("cart_")) {
-    const r = await fetchMedusaTrackByCartId(trimmed, { includePrivate: true });
+  if (capability.id.startsWith("cart_")) {
+    const r = await fetchMedusaTrackByCartId(capability.id, { includePrivate: true });
     return {
       ok: r.ok,
       status: r.status,
@@ -137,7 +134,7 @@ export default async function OrderConfirmationPage({
       </main>
     );
   }
-  const { ok, data, status, correlationId } = await fetchOrderData(orderId);
+  const { ok, data, status, correlationId } = await fetchOrderData(capability);
 
   if (
     data &&
@@ -226,13 +223,16 @@ export default async function OrderConfirmationPage({
   const safeOrder = { ...order };
   delete safeOrder.id;
   const displayId = safeOrder.display_id ?? "your order";
+  const customerEmail = safeOrder.email;
+  delete safeOrder.email;
+  const displayEmail = maskConfirmationEmail(customerEmail);
   const trackingUrl =
     buildTrackingUrl(
       process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? DEFAULT_PUBLIC_SITE_ORIGIN,
       orderId,
       {
         customerEmail:
-          typeof safeOrder.email === "string" ? safeOrder.email : undefined,
+          typeof customerEmail === "string" ? customerEmail : undefined,
         storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
       },
     ) ?? "/track";
@@ -244,8 +244,6 @@ export default async function OrderConfirmationPage({
   const addr = safeOrder.shipping_address ?? null;
   const addrLine = addr
     ? [
-        addr.address_1,
-        addr.address_2,
         addr.city,
         addr.province,
         addr.postal_code,
@@ -278,7 +276,7 @@ export default async function OrderConfirmationPage({
         </h1>
         <p className="font-body text-on-surface-variant">
           Thank you for your order. We will send updates to{" "}
-          {safeOrder.email ? <strong>{safeOrder.email}</strong> : "your email"}.
+          {displayEmail ? <strong>{displayEmail}</strong> : "your email"}.
         </p>
         <p className="mt-2 text-sm text-on-surface-variant">
           Order #{displayId}
@@ -332,7 +330,7 @@ export default async function OrderConfirmationPage({
         <section className="mb-6 space-y-2 rounded-lg border border-outline-variant/20 p-4 text-sm">
           {addrLine && (
             <div>
-              <span className="font-medium text-primary">Delivering to: </span>
+              <span className="font-medium text-primary">Delivery area: </span>
               <span className="text-on-surface-variant">{addrLine}</span>
             </div>
           )}

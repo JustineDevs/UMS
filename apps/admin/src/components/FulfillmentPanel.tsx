@@ -55,7 +55,10 @@ export function FulfillmentPanel({
     setLoading("shipment");
     const res = await fetch("/api/medusa/shipments", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `shipment-${crypto.randomUUID()}`,
+      },
       body: JSON.stringify({
         orderId,
         trackingNumber: trackingNumber.trim(),
@@ -83,7 +86,10 @@ export function FulfillmentPanel({
       `/api/medusa/orders/${encodeURIComponent(orderId)}`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `order-status-${crypto.randomUUID()}`,
+        },
         body: JSON.stringify({ status: next }),
       },
     );

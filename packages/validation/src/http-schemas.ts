@@ -24,7 +24,7 @@ export const complianceEmailParamSchema = z
   .email();
 
 export const cartMergePostBodySchema = z.object({
-  mergeKey: z.string().trim().min(16).max(128).optional(),
+  mergeKey: z.string().trim().min(16).max(128),
   guestLines: z
     .array(
       z.object({

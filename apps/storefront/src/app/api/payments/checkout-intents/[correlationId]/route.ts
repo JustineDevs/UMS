@@ -5,6 +5,7 @@ import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-s
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { publicPaymentAttemptError } from "@/lib/payment-attempt-public";
+import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,7 @@ export async function GET(
   }
 
   const cartId = await readCartIdFromCookie();
-  if (!cartId) {
-    return NextResponse.json({ error: "No active cart" }, { status: 401 });
-  }
+  const attemptCookie = await readCheckoutAttemptCookie();
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
@@ -31,7 +30,7 @@ export async function GET(
   }
 
   const row = await getPaymentAttemptByCorrelationId(sb, correlationId.trim());
-  if (!row || row.cart_id !== cartId) {
+  if (!row || (cartId ? row.cart_id !== cartId : attemptCookie !== correlationId.trim())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

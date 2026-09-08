@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   let query = sup.client
     .from("product_reviews")
     .select(
-      "id,product_slug,medusa_product_id,rating,author_name,body,status,created_at,is_verified_buyer,risk_score,shadow_banned,moderated_at,moderation_note",
+      "id,product_slug,medusa_product_id,rating,author_name,body,status,created_at,customer_email,medusa_customer_id,verified_medusa_order_id,moderated_by_staff_email,is_verified_buyer,risk_score,shadow_banned,moderated_at,moderation_note",
     )
     .order("created_at", { ascending: false })
     .limit(limit);

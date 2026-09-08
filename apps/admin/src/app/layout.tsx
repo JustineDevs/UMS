@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
-import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
 import { AdminMutationRequestGuard } from "@/components/AdminMutationRequestGuard";
 import { LenisProvider } from "@/components/LenisProvider";
 import { VercelWebAnalytics } from "@/components/VercelWebAnalytics";
 import "./globals.css";
+
+export const dynamic = "force-dynamic";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -57,10 +58,8 @@ export default function RootLayout({
       className={`${plusJakarta.variable} ${inter.variable} ${materialSymbols.variable}`}
     >
       <body className="bg-surface font-body text-on-surface antialiased">
-        <NextAuthSessionProvider>
-          <AdminMutationRequestGuard />
-          <LenisProvider>{children}</LenisProvider>
-        </NextAuthSessionProvider>
+        <AdminMutationRequestGuard />
+        <LenisProvider>{children}</LenisProvider>
         <VercelWebAnalytics />
       </body>
     </html>

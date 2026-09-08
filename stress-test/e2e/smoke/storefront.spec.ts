@@ -133,7 +133,7 @@ test.describe("storefront smoke", () => {
     }
     await page.evaluate(() => {
       localStorage.removeItem("ums-commerce-cart-v3");
-      localStorage.removeItem("ums-commerce-cart-v4");
+      localStorage.removeItem("ums-commerce-cart-v5");
     });
     await page.reload({ waitUntil: "domcontentloaded" });
     const addBtn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();

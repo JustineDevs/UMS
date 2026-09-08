@@ -59,7 +59,7 @@ export async function getPendingSales(): Promise<OfflineSalePayload[]> {
   });
 }
 
-export async function removeOfflineSale(id: string): Promise<void> {
+async function removeOfflineSale(id: string): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");

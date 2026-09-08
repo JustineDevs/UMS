@@ -7,9 +7,13 @@ import {
   wishlistSyncStorageKey,
   type WishlistEntry,
 } from "@/lib/wishlist";
-import { isExpectedWishlistSyncUnauthorized, mergeWishlistSyncResult } from "@/lib/wishlist-sync-state";
+import {
+  canApplyWishlistSyncResult,
+  isExpectedWishlistSyncUnauthorized,
+  mergeWishlistSyncResult,
+} from "@/lib/wishlist-sync-state";
 
-const localAuthBypass =
+const publicAuthBypass =
   process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
   process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
 
@@ -21,22 +25,27 @@ const localAuthBypass =
  * Include once in the authenticated layout:
  *   <WishlistSyncOnLogin />
  */
-export function WishlistSyncOnLogin() {
+export function WishlistSyncOnLogin({ disabled = false }: { disabled?: boolean } = {}) {
   const { data: session, status } = useSession();
   const syncedRef = useRef(false);
   const identityRef = useRef<string | null>(null);
+  const inFlightIdentityRef = useRef<string | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "syncing" | "partial" | "error">("idle");
+  const localAuthBypass = disabled || publicAuthBypass;
   const identity =
     session?.user?.email?.trim().toLowerCase() ||
     session?.user?.id?.trim() ||
     null;
 
   const sync = useCallback(async () => {
+    if (!identity || inFlightIdentityRef.current === identity) return;
+    inFlightIdentityRef.current = identity;
     setSyncState("syncing");
     const localItems = getWishlist();
     const syncableItems = localItems.filter((item) => item.medusaProductId?.trim());
     if (syncableItems.length === 0) {
       syncedRef.current = true;
+      inFlightIdentityRef.current = null;
       if (identity) window.sessionStorage.setItem(wishlistSyncStorageKey(identity), "1");
       setSyncState("idle");
       return;
@@ -53,9 +62,13 @@ export function WishlistSyncOnLogin() {
       });
       if (isExpectedWishlistSyncUnauthorized(res.status)) {
         // The API remains deny-by-default if the browser session expires between
-        // useSession() and the request. Do not turn that expected boundary into
-        // a persistent storefront error banner.
+        // useSession() and the request. Persist the result for this tab so a
+        // remount or HMR cycle does not spam the protected endpoint.
+        if (identity) {
+          window.sessionStorage.setItem(wishlistSyncStorageKey(identity), "1");
+        }
         syncedRef.current = true;
+        inFlightIdentityRef.current = null;
         setSyncState("idle");
         return;
       }
@@ -71,6 +84,10 @@ export function WishlistSyncOnLogin() {
         skippedProductIds?: string[];
       };
       if (!json.ok || !Array.isArray(json.items)) throw new Error("wishlist_sync_invalid");
+      if (!canApplyWishlistSyncResult(identityRef.current, identity)) {
+        inFlightIdentityRef.current = null;
+        return;
+      }
       const merged: WishlistEntry[] = mergeWishlistSyncResult(
         localItems,
         json.items.map((row) => ({
@@ -88,8 +105,10 @@ export function WishlistSyncOnLogin() {
       );
       if (identity) window.sessionStorage.setItem(wishlistSyncStorageKey(identity), "1");
       syncedRef.current = true;
+      inFlightIdentityRef.current = null;
       setSyncState(skipped.size > 0 ? "partial" : "idle");
     } catch {
+      inFlightIdentityRef.current = null;
       syncedRef.current = false;
       setSyncState("error");
     }
@@ -113,7 +132,7 @@ export function WishlistSyncOnLogin() {
     }
 
     void sync();
-  }, [identity, status, sync]);
+  }, [identity, localAuthBypass, status, sync]);
 
   if (status !== "authenticated" || !["error", "partial"].includes(syncState)) return null;
   return (

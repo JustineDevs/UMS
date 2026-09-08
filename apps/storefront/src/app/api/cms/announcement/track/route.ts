@@ -4,10 +4,14 @@ import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 const ALLOWED = new Set(["impression", "click", "dismiss"]);
 
 async function handlePOST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`cms-announcement-track:${ip}`, 30, 60_000);
   if (!rl.ok) {

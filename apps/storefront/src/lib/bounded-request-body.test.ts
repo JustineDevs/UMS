@@ -29,3 +29,10 @@ test("bounded JSON parser distinguishes malformed input from oversized input", a
   );
   assert.deepEqual(oversized, { value: null, tooLarge: true, valid: false });
 });
+
+test("bounded JSON parser preserves a JSON null body for route-level validation", async () => {
+  assert.deepEqual(
+    await parseBoundedJson(new Request("https://storefront.test", { body: "null", method: "POST" }), 64),
+    { value: null, tooLarge: false, valid: true },
+  );
+});

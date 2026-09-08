@@ -43,4 +43,4 @@ export const CATALOG_COLOR_PRESETS = [
   "Printed",
 ] as const;
 
-export const CUSTOM_VARIANT_SENTINEL = "__custom__";
+const CUSTOM_VARIANT_SENTINEL = "__custom__";

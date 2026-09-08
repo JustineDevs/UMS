@@ -1,6 +1,6 @@
 /**
- * Channel webhook ingestion must not accept unsigned traffic on production-like deploys.
- * Vercel preview sets NODE_ENV=production for Next; use VERCEL_ENV to distinguish.
+ * Channel webhook ingestion must not accept unsigned traffic on any deployment.
+ * Local development is the only exception; Vercel preview also sets NODE_ENV=production.
  */
 export type ChannelWebhookGate =
   | { ok: true }
@@ -12,8 +12,8 @@ export function gateChannelWebhookSecretConfigured(
   nodeEnv: string | undefined,
 ): ChannelWebhookGate {
   const trimmed = secret?.trim();
-  const strict =
-    vercelEnv === "production" || (!vercelEnv && nodeEnv === "production");
+  const localDevelopment = nodeEnv === "development" && (!vercelEnv || vercelEnv === "development");
+  const strict = !localDevelopment;
   if (strict && !trimmed) {
     return {
       ok: false,

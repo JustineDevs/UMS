@@ -19,7 +19,7 @@ export type MedusaProductListRow = {
 };
 
 /** Medusa Dashboard (product editor, collections, etc.). Same host as the commerce API. */
-export function getMedusaAdminAppBaseUrl(): string {
+function getMedusaAdminAppBaseUrl(): string {
   return `${getMedusaStoreBaseUrl().replace(/\/$/, "")}/app`;
 }
 

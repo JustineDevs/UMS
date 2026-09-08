@@ -16,7 +16,19 @@ const root = path.join(__dirname, "..");
 const appDir = path.join(root, appRel);
 const isWin = process.platform === "win32";
 
-function findNextBinPath(workspaceRoot) {
+function findNextBinPath(appDirectory, workspaceRoot) {
+  const appNextBin = path.join(
+    appDirectory,
+    "node_modules",
+    "next",
+    "dist",
+    "bin",
+    "next",
+  );
+  if (existsSync(appNextBin)) {
+    return appNextBin;
+  }
+
   const storeDir = path.join(workspaceRoot, "node_modules", ".pnpm");
   if (!existsSync(storeDir)) {
     return null;
@@ -104,7 +116,7 @@ if ((cleanTrace.status ?? 0) !== 0) {
   process.exit(cleanTrace.status ?? 1);
 }
 
-const nextBin = findNextBinPath(root);
+const nextBin = findNextBinPath(appDir, root);
 if (!nextBin) {
   console.error(
     "Unable to resolve Next.js binary from the pnpm store. Run pnpm install at the workspace root first.",

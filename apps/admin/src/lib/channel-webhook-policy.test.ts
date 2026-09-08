@@ -8,13 +8,13 @@ describe("gateChannelWebhookSecretConfigured", () => {
     assert.equal(r.ok, true);
   });
 
-  it("allows empty secret on Vercel preview", () => {
+  it("rejects empty secret on Vercel preview", () => {
     const r = gateChannelWebhookSecretConfigured(
       "",
       "preview",
       "production",
     );
-    assert.equal(r.ok, true);
+    assert.equal(r.ok, false);
   });
 
   it("rejects empty secret on Vercel production", () => {

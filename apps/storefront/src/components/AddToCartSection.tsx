@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Product } from "@universal-music-store/types";
 import { addCartLine, type CartLine } from "@/lib/cart";
@@ -21,6 +21,8 @@ export function AddToCartSection({
   testId?: string;
 }) {
   const router = useRouter();
+  const [clientReady, setClientReady] = useState(false);
+  useEffect(() => setClientReady(true), []);
   const types = useMemo(
     () => [...new Set(product.variants.map((v) => v.type).filter(Boolean))].sort(),
     [product.variants],
@@ -201,6 +203,7 @@ export function AddToCartSection({
         <button
           type="button"
           data-testid={testId}
+          data-client-ready={clientReady ? "true" : "false"}
           disabled={!variant || isOutOfStock}
           onClick={handleAddToBag}
           className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"

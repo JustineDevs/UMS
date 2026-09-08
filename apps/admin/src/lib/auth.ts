@@ -12,6 +12,7 @@ import {
   isAdminE2eCredentialsConfigured,
   parseAdminAllowedEmailList,
 } from "@/lib/admin-allowed-emails";
+import { getAdminAuthSecret } from "@/lib/auth-secret";
 
 const PERMISSIONS_CACHE_TTL_MS = 60_000;
 const staffSnapshotCache = new Map<
@@ -105,7 +106,7 @@ export function buildAuthOptions(): NextAuthOptions {
               const emailNorm = normalizeEmail(emailRaw);
               const allowed = parseAdminAllowedEmailList();
               if (!allowed.includes(emailNorm)) return reject("email not allow-listed");
-              if (pwd !== process.env.NEXTAUTH_SECRET?.trim()) return reject("password mismatch");
+              if (pwd !== getAdminAuthSecret()) return reject("password mismatch");
               const supabase = tryCreateSupabaseClient();
               if (!supabase) return reject("Supabase unavailable");
               const { data } = await supabase
@@ -132,7 +133,7 @@ export function buildAuthOptions(): NextAuthOptions {
         ]
       : []),
   ],
-  secret: process.env.NEXTAUTH_SECRET?.trim(),
+  secret: getAdminAuthSecret(),
   session: { strategy: "jwt", maxAge: 60 * 60 * 4 },
   cookies: {
     sessionToken: {

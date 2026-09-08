@@ -96,7 +96,7 @@ test("handleCodPlaceOrderRequest returns order redirect on success", async () =>
   assert.deepEqual(await res.json(), {
     ok: true,
     orderId: "order_cod",
-    redirectUrl: "/track/cap_v3.opaque",
+    redirectUrl: "http://localhost/track/cap_v3.opaque",
   });
 });
 

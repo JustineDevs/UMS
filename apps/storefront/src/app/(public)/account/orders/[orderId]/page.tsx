@@ -6,7 +6,7 @@ import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { findMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
-import { accountOrderMatchesCustomer } from "@/lib/medusa-account-orders";
+import { accountOrderMatchesDetail } from "@/lib/medusa-account-orders";
 
 export const metadata: Metadata = {
   title: "Order details",
@@ -123,12 +123,8 @@ export default async function AccountOrderPage({
     notFound();
   }
 
-  if (!accountOrderMatchesCustomer(order.customer_id, customerId)) {
-    notFound();
-  }
-
   const orderEmail = order.email?.trim().toLowerCase();
-  if (!orderEmail || orderEmail !== userEmail) {
+  if (!orderEmail || !accountOrderMatchesDetail(order, customerId, userEmail)) {
     notFound();
   }
 

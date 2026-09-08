@@ -9,6 +9,8 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { parseReconciliationQuery } from "@/lib/reconciliation-params";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedError } from "@/lib/staff-api-response";
 
 export type ReconciliationRow = {
   date: string;
@@ -89,6 +91,7 @@ function reconciliationProviders(input: string): string[] {
 }
 
 export async function GET(request: Request) {
+  const correlationId = getCorrelationId(request);
   const staff = await requireStaffApiSession("dashboard:read");
   if (!staff.ok) return staff.response;
   const sup = adminSupabaseOr503("reconciliation");
@@ -98,15 +101,12 @@ export async function GET(request: Request) {
     staff.session.user?.email,
   );
   if (!organization) {
-    return NextResponse.json(
-      { error: "Organization membership is not configured" },
-      { status: 403 },
-    );
+    return correlatedError(correlationId, 403, "Organization membership is not configured", "FORBIDDEN");
   }
 
   const { searchParams } = new URL(request.url);
   const query = parseReconciliationQuery(searchParams);
-  if (!query.ok) return NextResponse.json({ error: query.error }, { status: 400 });
+  if (!query.ok) return correlatedError(correlationId, 400, query.error, "VALIDATION_ERROR");
   const { days, provider } = query.value;
 
   const rows: ReconciliationRow[] = [];

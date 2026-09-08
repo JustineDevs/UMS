@@ -54,13 +54,16 @@ export async function POST(req: MedusaRequest, res: MedusaResponse): Promise<voi
     nango_connection_id: nangoConnectionId,
     nango_provider_config_key: nangoProviderConfigKey,
   };
-  const credentials = nangoPaymentProxyConfigured(nangoContext)
-    ? null
-    : await getNangoPaymentCredentials(nangoContext);
-  const clientId = String(credentials?.client_id ?? credentials?.clientId ?? "").trim();
-  const clientSecret = String(credentials?.client_secret ?? credentials?.clientSecret ?? "").trim();
+  const proxyConfigured = nangoPaymentProxyConfigured(nangoContext);
+  const credentials = proxyConfigured ? null : await getNangoPaymentCredentials(nangoContext);
+  const clientId = String(
+    credentials?.client_id ?? credentials?.clientId ?? process.env.PAYPAL_CLIENT_ID ?? "",
+  ).trim();
+  const clientSecret = String(
+    credentials?.client_secret ?? credentials?.clientSecret ?? process.env.PAYPAL_CLIENT_SECRET ?? "",
+  ).trim();
   const accessToken = String(credentials?.access_token ?? "").trim() || undefined;
-  if ((!clientId || !clientSecret) && !accessToken && !nangoPaymentProxyConfigured(nangoContext)) return void res.status(503).json({ error: "PayPal operation is not configured", code: "PAYPAL_NOT_CONFIGURED" });
+  if ((!clientId || !clientSecret) && !accessToken && !proxyConfigured) return void res.status(503).json({ error: "PayPal operation is not configured", code: "PAYPAL_NOT_CONFIGURED" });
   const options: PayPalClientOptions = {
     clientId: clientId || "nango-managed",
     clientSecret,

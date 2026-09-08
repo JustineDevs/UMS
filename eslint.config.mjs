@@ -45,6 +45,13 @@ export default [
       "no-undef": "error",
     },
   },
+  {
+    files: ["**/*.d.ts"],
+    rules: {
+      // Ambient module/interface names are consumed by TypeScript declaration merging.
+      "no-unused-vars": "off",
+    },
+  },
   ...(nextPlugin
     ? [
         {

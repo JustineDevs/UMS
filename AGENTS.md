@@ -24,7 +24,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Set Function regions near your primary data source; avoid cross-region DB/service roundtrips
 - Tune Fluid Compute knobs (e.g., `maxDuration`, memory/CPU) for long I/O-heavy calls (LLMs, APIs)
 - Use Runtime Cache for fast **regional** caching + tag invalidation (don't treat it as global KV)
-- Use Cron Jobs for schedules; cron runs in UTC and triggers your production URL via HTTP GET
+- Use GitHub Actions for scheduled storefront jobs; cron runs in UTC and invokes protected production URLs via HTTP GET
 - Use Vercel Blob for uploads/media; Use Edge Config for small, globally-read config
 - If Enable Deployment Protection is enabled, use a bypass secret to directly access them
 - Add OpenTelemetry via `@vercel/otel` on Node; don't expect OTEL support on the Edge runtime
@@ -41,6 +41,9 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Never make direct production changes or deploy production from a feature branch.
 - Promote changes through a pull request from `dev` to `main` only after reviewing all CI results, PR comments, and findings.
 - Fix every review or CI finding on `dev`, rerun the required checks, and merge only when the PR is verified clean.
+- Vercel Cron is not part of this topology. Keep scheduled storefront recovery in `.github/workflows/storefront-cron.yml`; do not add a Vercel `crons` block or treat Vercel Hobby Cron limits as a payment-webhook solution.
+- Before pushing any branch, run the local Act gate with `pnpm ci:local`; a failed or skipped local gate must not be pushed.
+- Local Act validates the non-secret release workflow. Provider sandbox, security, and production-only checks still require their documented credentials or infrastructure and must not be simulated with empty secrets.
 
 <!-- CONTINUAL LEARNING -->
 - Sprint and `/sprint` backlog: Treat the user's listed sprint items as mandatory commitments—they stay under Committed unless Blocked by a concrete, named external blocker; do not downgrade to optional/stretch, silently drop items, narrow acceptance criteria, or replace implementation work with docs or placeholders without explicit Product Owner approval.

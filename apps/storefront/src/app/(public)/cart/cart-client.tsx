@@ -29,7 +29,14 @@ function formatCartMoney(amount: number, currencyCode: string): string {
 }
 
 export function CartPageClient() {
-  const { cartId, lines, hydrationSource, replaceLines, setCartId } =
+  const {
+    cartId,
+    lines,
+    hydrationSource,
+    isHydrating,
+    replaceLines,
+    setCartId,
+  } =
     useMedusaCart();
   const [mounted, setMounted] = useState(false);
   const [reconciling, setReconciling] = useState(false);
@@ -48,8 +55,11 @@ export function CartPageClient() {
   const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
   const [quantityStatus, setQuantityStatus] = useState("");
   const reconcileAbortRef = useRef<AbortController | null>(null);
+  const reconcileTimerRef = useRef<number | null>(null);
   const reconcileSequenceRef = useRef(0);
-  const pendingQuantityRef = useRef<Record<string, number>>({});
+  const pendingQuantityRef = useRef<
+    Record<string, { desired: number; running: boolean }>
+  >({});
 
   const refresh = useCallback(() => {
     const next = readCart();
@@ -166,95 +176,140 @@ export function CartPageClient() {
     }
   }, [refresh, replaceLines]);
 
+  const scheduleReconcile = useCallback(() => {
+    if (reconcileTimerRef.current !== null) {
+      window.clearTimeout(reconcileTimerRef.current);
+    }
+    reconcileTimerRef.current = window.setTimeout(() => {
+      reconcileTimerRef.current = null;
+      void reconcile();
+    }, 150);
+  }, [reconcile]);
+
   useEffect(() => {
     setMounted(true);
+    if (isHydrating) return;
     void reconcile();
-    const onFocus = () => void reconcile();
     const onStorage = (event: StorageEvent) => {
-      if (event.key === CART_STORAGE_KEY) void reconcile();
+      if (event.key !== CART_STORAGE_KEY) return;
+      reconcileAbortRef.current?.abort();
+      reconcileSequenceRef.current += 1;
+      // Adopt the persisted envelope before reconciling so another tab cannot
+      // leave the controlled quantity input on the previous local snapshot.
+      refresh();
+      void reconcile();
     };
-    window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     return () => {
       reconcileAbortRef.current?.abort();
-      window.removeEventListener("focus", onFocus);
+      if (reconcileTimerRef.current !== null) {
+        window.clearTimeout(reconcileTimerRef.current);
+      }
       window.removeEventListener("storage", onStorage);
     };
-  }, [reconcile]);
+  }, [isHydrating, reconcile]);
 
-  async function commitQuantity(variantId: string, quantity: number) {
-    if (pendingQuantityRef.current[variantId] === quantity) return;
-    pendingQuantityRef.current[variantId] = quantity;
-    try {
-      if (cartId) {
-        const response = await fetch("/api/cart/line", {
-          method: quantity === 0 ? "DELETE" : "PUT",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            variantId,
-            ...(quantity > 0 ? { quantity } : {}),
-          }),
-        });
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as {
-            code?: string;
-          } | null;
-          if (payload?.code === "CART_COMPLETED") {
-            setCartId(null);
-          } else {
+  function commitQuantity(variantId: string, quantity: number): void {
+    const pending = pendingQuantityRef.current[variantId] ?? {
+      desired: quantity,
+      running: false,
+    };
+    pending.desired = quantity;
+    pendingQuantityRef.current[variantId] = pending;
+    if (pending.running) return;
+    pending.running = true;
+
+    void (async () => {
+      try {
+        while (true) {
+          const requested = pending.desired;
+          let failed = false;
+          try {
+            if (cartId) {
+              const response = await fetch("/api/cart/line", {
+                method: requested === 0 ? "DELETE" : "PUT",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                  variantId,
+                  ...(requested > 0 ? { quantity: requested } : {}),
+                }),
+              });
+              if (!response.ok) {
+                const payload = (await response.json().catch(() => null)) as {
+                  code?: string;
+                } | null;
+                if (payload?.code === "CART_COMPLETED") {
+                  setCartId(null);
+                } else {
+                  failed = true;
+                  setLineErrors((errors) => ({
+                    ...errors,
+                    [variantId]:
+                      requested === 0
+                        ? "This item could not be removed from the server cart. Try again."
+                        : "This quantity could not be saved to the server cart. Try again.",
+                  }));
+                  setQuantityStatus(
+                    requested === 0
+                      ? "The item was not removed. Try again."
+                      : "The quantity was not saved. Try again.",
+                  );
+                }
+              }
+            }
+            if (!failed) {
+              updateLineQuantity(variantId, requested);
+              setQuantityStatus(
+                requested === 0
+                  ? "Item removed from your bag."
+                  : "Quantity updated.",
+              );
+              setAuthoritativeTotal(null);
+              setReconciledAt(null);
+              setQuantityDrafts((drafts) => {
+                const next = { ...drafts };
+                delete next[variantId];
+                return next;
+              });
+              setQuantityErrors((errors) => {
+                const next = { ...errors };
+                delete next[variantId];
+                return next;
+              });
+              refresh();
+              scheduleReconcile();
+            }
+          } catch {
+            failed = true;
             setLineErrors((errors) => ({
               ...errors,
               [variantId]:
-                quantity === 0
-                  ? "This item could not be removed from the server cart. Try again."
-                  : "This quantity could not be saved to the server cart. Try again.",
+                "The quantity could not be saved. Check your connection and try again.",
             }));
-            setQuantityStatus(
-              quantity === 0
-                ? "The item was not removed. Try again."
-                : "The quantity was not saved. Try again.",
-            );
-            return;
+            setQuantityStatus("The quantity was not saved. Try again.");
           }
+          if (pending.desired === requested) break;
+        }
+      } finally {
+        if (pendingQuantityRef.current[variantId] === pending) {
+          delete pendingQuantityRef.current[variantId];
         }
       }
-      updateLineQuantity(variantId, quantity);
-      setQuantityStatus(
-        quantity === 0 ? "Item removed from your bag." : "Quantity updated.",
-      );
-      setAuthoritativeTotal(null);
-      setReconciledAt(null);
-      setQuantityDrafts((drafts) => {
-        const next = { ...drafts };
-        delete next[variantId];
-        return next;
-      });
-      setQuantityErrors((errors) => {
-        const next = { ...errors };
-        delete next[variantId];
-        return next;
-      });
-      refresh();
-      void reconcile();
-    } catch {
-      setLineErrors((errors) => ({
-        ...errors,
-        [variantId]:
-          "The quantity could not be saved. Check your connection and try again.",
-      }));
-      setQuantityStatus("The quantity was not saved. Try again.");
-    } finally {
-      if (pendingQuantityRef.current[variantId] === quantity) {
-        delete pendingQuantityRef.current[variantId];
-      }
-    }
+    })();
   }
 
   if (!mounted) {
     return (
-      <p className="text-sm text-on-surface-variant py-8 text-center">
-        Loading your bag…
-      </p>
+      <div
+        className="space-y-4 py-8"
+        aria-busy="true"
+        aria-label="Loading your bag"
+        data-testid="cart-loading-skeleton"
+      >
+        <div className="h-5 w-1/3 animate-pulse rounded bg-surface-container-high" />
+        <div className="h-11 w-full animate-pulse rounded bg-surface-container-high" />
+        <div className="h-11 w-2/3 animate-pulse rounded bg-surface-container-high" />
+      </div>
     );
   }
 
@@ -362,6 +417,19 @@ export function CartPageClient() {
                   onKeyDown={(event) => {
                     if (event.key !== "Enter") return;
                     event.preventDefault();
+                    const next = parseCartQuantityInput(
+                      event.currentTarget.value,
+                    );
+                    if (next === null) {
+                      setQuantityErrors((errors) => ({
+                        ...errors,
+                        [l.variantId]: "Enter a whole number, or 0 to remove.",
+                      }));
+                      return;
+                    }
+                    void commitQuantity(l.variantId, next);
+                  }}
+                  onBlur={(event) => {
                     const next = parseCartQuantityInput(
                       event.currentTarget.value,
                     );

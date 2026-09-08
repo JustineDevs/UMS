@@ -17,7 +17,7 @@ export type ChatIntakeRow = {
   created_at: string;
 };
 
-export const chatOrderTransitions: Record<string, readonly string[]> = {
+const chatOrderTransitions: Record<string, readonly string[]> = {
   pending: ["draft_created", "processing", "cancelled"],
   draft_created: ["processing", "completed", "cancelled"],
   processing: ["completed", "failed", "cancelled"],

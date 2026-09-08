@@ -89,10 +89,13 @@ test.describe("@admin Admin operations E2E", () => {
     await expect(padding).toBeVisible();
     await padding.fill("24px");
     await padding.blur();
-    const color = page.locator("label").filter({ hasText: /^\\s*color\\s*$/ }).locator("input");
+    const color = page.locator("label").filter({ hasText: /^\s*color\s*$/ }).locator("input");
     await color.fill("rgb(255, 0, 0)");
     await color.press("Enter");
-    await expect(nested).toHaveCSS("color", "rgb(255, 0, 0)");
+    const activeSelected = canvas
+      .locator('[data-cms-id][data-selected="true"]')
+      .first();
+    await expect(activeSelected).toHaveCSS("color", "rgb(255, 0, 0)");
     const undo = page.getByRole("button", { name: "Undo" });
     const redo = page.getByRole("button", { name: "Redo" });
     await expect(undo).toBeEnabled();
@@ -102,7 +105,7 @@ test.describe("@admin Admin operations E2E", () => {
     await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
   });
 
-  test("Component Canvas edits a reusable definition through its isolated DOM", async ({ page }) => {
+  test("Component Canvas remains disabled until the feature is enabled", async ({ page }) => {
     test.setTimeout(120_000);
     const login = await e2eAdminLogin(page);
     if (login === "skip_no_ui" || login === "skip_no_env") test.skip(true, "Admin E2E auth is not configured.");
@@ -111,14 +114,12 @@ test.describe("@admin Admin operations E2E", () => {
     await page.getByRole("button", { name: "Components", exact: true }).click();
     await page.getByRole("button", { name: /Hero banner/ }).first().click();
 
-    const canvas = page.locator('iframe[title="Isolated component definition canvas"]');
-    await expect(canvas).toBeVisible({ timeout: 30_000 });
-    const frame = canvas.contentFrame();
-    const title = frame.locator('[data-cms-prop="title"]');
-    await expect(title).toBeVisible();
-    await title.fill("Browser-authored hero");
-    await title.blur();
-    await expect(page.getByLabel("Main component definition JSON")).toContainText("Browser-authored hero");
+    await expect(
+      page.locator('iframe[title="Isolated component definition canvas"]'),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Canvas disabled" }),
+    ).toBeDisabled();
     await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
   });
 });

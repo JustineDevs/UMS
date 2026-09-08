@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * Server-side recovery for payment attempts stuck after hosted pay (webhook lag, closed tab).
- * Schedule: Vercel cron (`apps/storefront/vercel.json`) or external worker GET with secret.
- * Auth: `Authorization: Bearer <secret>` or `x-cron-secret`. Secret is `CRON_SECRET` (Vercel)
- * or `STOREFRONT_PAYMENT_CRON_SECRET` for local parity.
+ * Schedule: external scheduler GET with secret. The deployed fallback is GitHub Actions;
+ * webhooks remain the primary payment-completion path.
+ * Auth: `Authorization: Bearer <secret>` or `x-cron-secret`. Secret is `CRON_SECRET`,
+ * with `STOREFRONT_PAYMENT_CRON_SECRET` supported for local parity.
  */
 export async function GET(req: Request) {
   const secret =

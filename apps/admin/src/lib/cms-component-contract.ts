@@ -112,3 +112,24 @@ export const cmsPreviewMessageSchema = z.union(
     z.object({ source: z.literal("cms-builder") }).merge(previewTargetSchema),
   ],
 );
+
+export const cmsComponentCanvasMutationSchema = z.union([
+  z.object({
+    source: z.literal("cms-component-canvas-mutation"),
+    id: z.string().min(1).max(200),
+    event: z.literal("ready"),
+  }).strict(),
+  z.object({
+    source: z.literal("cms-component-canvas-mutation"),
+    id: z.string().min(1).max(200),
+    event: z.literal("slot-drop"),
+    slot: z.string().min(1).max(80),
+    componentId: z.string().min(1).max(100),
+  }).strict(),
+  z.object({
+    source: z.literal("cms-component-canvas-mutation"),
+    id: z.string().min(1).max(200),
+    property: z.string().min(1).max(80),
+    value: z.string().max(100_000),
+  }).strict(),
+]);

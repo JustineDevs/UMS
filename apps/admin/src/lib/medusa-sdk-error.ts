@@ -35,7 +35,7 @@ export function formatMedusaSdkError(e: unknown): string {
 }
 
 /** HTTP status from SDK / fetch error when present (Medusa Admin 4xx/5xx). */
-export function medusaSdkErrorHttpStatus(e: unknown): number | undefined {
+function medusaSdkErrorHttpStatus(e: unknown): number | undefined {
   const any = e as {
     status?: number;
     response?: { status?: number };

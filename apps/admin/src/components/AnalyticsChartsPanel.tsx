@@ -76,6 +76,16 @@ export function AnalyticsChartsPanel({ payload }: Props) {
   }
 
   const data: AnalyticsChartsPayload = parsed.data;
+  if (!chartReady) {
+    return (
+      <section className="mt-10" aria-busy="true" aria-live="polite">
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
+          <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
+          <div className="h-96 animate-pulse rounded-xl bg-muted/40" />
+        </div>
+      </section>
+    );
+  }
   const dailyChart = data.daily.map((row) => ({
     ...row,
     label: formatShortDate(row.date),

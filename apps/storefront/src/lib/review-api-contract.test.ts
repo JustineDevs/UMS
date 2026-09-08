@@ -14,6 +14,7 @@ test("public review contract includes vote counts and excludes private moderatio
   assert.ok(PUBLIC_REVIEW_FIELD_NAMES.includes("helpful_votes"));
   assert.equal(PUBLIC_REVIEW_FIELD_NAMES.includes("customer_email"), false);
   assert.equal(PUBLIC_REVIEW_FIELD_NAMES.includes("risk_score"), false);
+  assert.equal(PUBLIC_REVIEW_FIELD_NAMES.includes("status"), false);
 });
 
 test("review ids must be UUIDs before reaching vote queries", () => {

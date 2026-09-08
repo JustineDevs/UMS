@@ -61,6 +61,7 @@ export { PH_VAT_RATE, PH_VAT_PERCENT, computeDisplayVat } from "./ph-tax.js";
 export {
   loadGoogleCredentials,
   buildSharedJwtCallback,
+  buildSharedJwtCallbackWithResolver,
   buildSharedSessionCallback,
   extractSessionEmail,
   isSessionStaff,

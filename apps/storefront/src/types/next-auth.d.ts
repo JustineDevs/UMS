@@ -5,6 +5,7 @@ declare module "next-auth" {
     authenticatedAt?: number;
     user: {
       id?: string;
+      medusaCustomerId?: string;
       role?: string;
     } & DefaultSession["user"];
   }
@@ -12,6 +13,7 @@ declare module "next-auth" {
   interface User {
     id?: string;
     role?: string;
+    medusaCustomerId?: string;
   }
 }
 

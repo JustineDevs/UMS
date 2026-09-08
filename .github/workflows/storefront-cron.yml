@@ -24,7 +24,8 @@ jobs:
             /api/cron/finalize-payment-attempts \
             /api/cron/campaigns \
             /api/cron/payment-reconciliation \
-            /api/cron/inventory-reservations; do
+            /api/cron/inventory-reservations \
+            /api/cron/back-in-stock; do
             curl --fail-with-body --silent --show-error --max-time 30 \
               -H "Authorization: Bearer $CRON_SECRET" \
               "$STOREFRONT_URL$path"

@@ -63,7 +63,12 @@ export async function POST(request: Request) {
       if (!canonicalProductId) {
         return { variantId: line.variantId, status: "error" as const };
       }
-      const product = await fetchProductById(canonicalProductId);
+      const product = await fetchProductById(canonicalProductId).catch(() => null);
+      // Catalog failures are authority failures, not empty products. Keep the
+      // whole reconciliation response fail-closed and machine-readable.
+      if (!product) {
+        return { variantId: line.variantId, status: "error" as const };
+      }
       if (
         product.kind === "service_error" ||
         product.kind === "misconfigured"

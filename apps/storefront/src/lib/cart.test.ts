@@ -141,6 +141,31 @@ test("cart storage migrates legacy arrays and increments revisions", async () =>
   Object.defineProperty(globalThis, "localStorage", { configurable: true, value: originalStorage });
 });
 
+test("cart discards stock-max bug storage before reading a new cart", async () => {
+  const { CART_STORAGE_KEY, readCart } = await import("./cart");
+  const originalWindow = globalThis.window;
+  const originalStorage = globalThis.localStorage;
+  const storage = new Map<string, string>([
+    ["ums-commerce-cart-v3", JSON.stringify([{ variantId: "old", quantity: 866 }])],
+    ["ums-commerce-cart-v4", JSON.stringify([{ variantId: "old", quantity: 867 }])],
+    [CART_STORAGE_KEY, JSON.stringify([{ variantId: "new", quantity: 1 }])],
+  ]);
+  const localStorage = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+  } as unknown as Storage;
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage } });
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: localStorage });
+
+  assert.deepEqual(readCart().map((line) => line.variantId), ["new"]);
+  assert.equal(storage.has("ums-commerce-cart-v3"), false);
+  assert.equal(storage.has("ums-commerce-cart-v4"), false);
+
+  Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: originalStorage });
+});
+
 test("wishlist-style add keeps the latest catalog metadata while adding one unit", async () => {
   const { addCartLine, readCart, clearCart } = await import("./cart");
   const originalWindow = globalThis.window;

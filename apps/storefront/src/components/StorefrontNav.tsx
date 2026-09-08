@@ -31,6 +31,7 @@ export function StorefrontNav({
           height={1080}
           className="h-full w-full object-contain object-center"
           sizes="(max-width: 640px) 44px, (max-width: 1024px) 52px, 56px"
+          unoptimized
           priority
         />
       </Link>

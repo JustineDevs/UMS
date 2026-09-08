@@ -16,6 +16,7 @@
     "lint": "pnpm exec turbo lint",
     "ci:preflight": "node scripts/ci-preflight.cjs",
     "ci:preflight:full": "node scripts/ci-preflight-full.cjs",
+    "ci:local": "bash scripts/ci-local-act.sh",
     "db:migrate": "pnpm --filter @universal-music-store/database migrate",
     "db:migrate:status": "pnpm --filter @universal-music-store/database migrate:status",
     "medusa:seed:categories": "pnpm --filter medusa seed:categories",

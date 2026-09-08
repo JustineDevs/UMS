@@ -36,20 +36,32 @@ export async function findOrCreateMedusaCustomerIdByEmail(
 ): Promise<string | null> {
   const q = email.trim().toLowerCase();
   if (!q) return null;
-  let listRes = await medusaAdminFetch(
-    `/admin/customers?q=${encodeURIComponent(q)}`,
-  );
-  if (!listRes.ok) {
-    listRes = await medusaAdminFetch(
-      `/admin/customers?email=${encodeURIComponent(q)}`,
+  try {
+    const exactEmailResponse = await medusaAdminFetch(
+      `/admin/customers?email=${encodeURIComponent(q)}&limit=10&fields=id,email`,
     );
-  }
-  if (!listRes.ok) return null;
-  const listJson = (await listRes.json()) as {
-    customers?: Array<{ id: string }>;
-  };
-  let id = listJson.customers?.[0]?.id;
-  if (!id) {
+    if (exactEmailResponse.ok) {
+      const exactBody = (await exactEmailResponse.json()) as {
+        customers?: Array<{ id?: string; email?: string | null }>;
+      };
+      const exactId = pickExactMedusaCustomerId(exactBody.customers, q);
+      if (exactId) return exactId;
+    }
+
+    const searchResponse = await medusaAdminFetch(
+      `/admin/customers?q=${encodeURIComponent(q)}&limit=10&fields=id,email`,
+    );
+    if (!searchResponse.ok && !exactEmailResponse.ok) return null;
+
+    let id: string | undefined;
+    if (searchResponse.ok) {
+      const searchBody = (await searchResponse.json()) as {
+        customers?: Array<{ id?: string; email?: string | null }>;
+      };
+      id = pickExactMedusaCustomerId(searchBody.customers, q) ?? undefined;
+    }
+    if (id) return id;
+
     const createRes = await medusaAdminFetch("/admin/customers", {
       method: "POST",
       body: JSON.stringify({ email: q }),
@@ -57,8 +69,23 @@ export async function findOrCreateMedusaCustomerIdByEmail(
     if (!createRes.ok) return null;
     const created = (await createRes.json()) as { customer?: { id: string } };
     id = created.customer?.id;
+    return id ?? null;
+  } catch {
+    return null;
   }
-  return id ?? null;
+}
+
+/** Never bind an authenticated session to a fuzzy customer-search result. */
+export function pickExactMedusaCustomerId(
+  customers: Array<{ id?: string; email?: string | null }> | undefined,
+  email: string,
+): string | null {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !Array.isArray(customers)) return null;
+  const exact = customers.find(
+    (customer) => customer.email?.trim().toLowerCase() === normalized,
+  );
+  return exact?.id?.trim() || null;
 }
 
 export async function findMedusaCustomerIdByEmail(

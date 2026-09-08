@@ -63,7 +63,7 @@ test.describe("@checkout @cod COD checkout flow", () => {
 
     await navigateToShopAndAddFirstProduct(page);
     const cartLines = await page.evaluate(() => {
-      const raw = window.localStorage.getItem("ums-commerce-cart-v4");
+      const raw = window.localStorage.getItem("ums-commerce-cart-v5");
       const envelope = raw ? (JSON.parse(raw) as { lines?: unknown }) : {};
       return Array.isArray(envelope.lines)
         ? envelope.lines.filter(

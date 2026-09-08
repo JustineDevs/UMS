@@ -20,7 +20,7 @@ export function mediaUrlPropKey(mediaIdKey: string): string | null {
   return `${base}${base.toLowerCase() === "src" ? "" : "Url"}`;
 }
 
-function visitMediaProps(value: unknown, visit: (props: Record<string, unknown>) => void): void {
+function visitMediaProps(value: unknown, visit: (_props: Record<string, unknown>) => void): void {
   if (Array.isArray(value)) {
     value.forEach((item) => visitMediaProps(item, visit));
     return;
@@ -471,7 +471,9 @@ export async function findCmsMediaReferences(
     }
   }
 
-  const { data: home } = await supabase.from("storefront_home_content").select("id, payload");
+  let homeQuery = supabase.from("storefront_home_content").select("id, payload");
+  if (organizationId) homeQuery = homeQuery.eq("organization_id", organizationId);
+  const { data: home } = await homeQuery;
   for (const entry of home ?? []) {
     const row = entry as Record<string, unknown>;
     if (JSON.stringify(row).includes(needle)) {

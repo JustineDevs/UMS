@@ -387,7 +387,7 @@ This document specifies product requirements for a music commerce stack for a re
 ### Deployment
 - **Storefront**: Vercel or similar (auto-deploy from `main` branch)
 - **Admin**: Same Vercel app or separate instance
-- **API**: Node.js service on Fly.io or similar
+- **API**: Node.js service on Render or similar
 - **Database**: Supabase managed Postgres
 - **CI/CD**: GitHub Actions for lint, build, test; branch-based auto-deploy
 
@@ -542,7 +542,7 @@ Provider will use the following technology stack:
 - Database: PostgreSQL via Supabase
 - Monorepo: Turborepo + pnpm
 - Auth: NextAuth/Auth.js with Google OAuth
-- Deployment: Vercel (storefront/admin), Fly.io or similar (API)
+- Deployment: Vercel (storefront/admin), Render or similar (API)
 - CI/CD: GitHub Actions
 
 Any deviation from this stack requires written approval from Client.
@@ -693,7 +693,7 @@ Client agrees to:
 
 - Provide timely feedback and approval on deliverables
 - Provide third-party API keys (payment processors, shipping provider, Google OAuth)
-- Arrange and pay for hosting services (Vercel, Supabase, Fly.io, etc.)
+- Arrange and pay for hosting services (Vercel, Supabase, Render, etc.)
 - Test the application thoroughly before production launch
 - Maintain regular backups
 
@@ -789,7 +789,7 @@ Client will pay for and maintain:
 
 - Vercel hosting (storefront/admin)
 - Supabase Postgres database
-- Fly.io or similar (API server)
+- Render or similar (API server)
 - Third-party API services (payment processors, shipping provider, Google Cloud)
 - Email/domain services
 

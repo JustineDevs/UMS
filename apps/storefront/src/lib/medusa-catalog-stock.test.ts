@@ -108,6 +108,30 @@ describe("medusaProductRawHasSellableVariant", () => {
 });
 
 describe("catalogProductFromMedusaRaw", () => {
+  it("keeps product, image, and variant identity canonical", () => {
+    const p = catalogProductFromMedusaRaw({
+      id: "prod_canonical",
+      handle: "studio-guitar",
+      title: "Studio Guitar",
+      images: [{ id: "img_1", url: "https://cdn.example.test/guitar.jpg" }],
+      variants: [{ id: "var_1", manage_inventory: false }],
+    });
+    assert.ok(p);
+    assert.equal(p!.id, "prod_canonical");
+    assert.equal(p!.images[0]?.productId, p!.id);
+    assert.equal(p!.variants[0]?.productId, p!.id);
+  });
+
+  it("rejects catalog records without a Medusa product id", () => {
+    assert.equal(
+      catalogProductFromMedusaRaw({
+        title: "Unidentifiable product",
+        variants: [{ id: "var_1", manage_inventory: false }],
+      }),
+      null,
+    );
+  });
+
   it("preserves catalog image alt text in the PDP gallery", () => {
     const p = catalogProductFromMedusaRaw({
       id: "prod_gallery",

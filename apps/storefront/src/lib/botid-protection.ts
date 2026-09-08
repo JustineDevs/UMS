@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkBotId as runBotIdCheck } from "botid/server";
 import { isSameOriginMutation } from "./request-origin";
+import { isStorefrontAuthDisabled } from "./auth";
 
 type BotIdVerification = {
   isBot: boolean;
@@ -26,7 +27,7 @@ export function withBotIdProtection<
         { status: 403 },
       );
     }
-    if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
+    if (isStorefrontAuthDisabled()) {
       return handler(..._args);
     }
     let verification: BotIdVerification;

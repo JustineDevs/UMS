@@ -1,4 +1,5 @@
 import nextDynamic from "next/dynamic";
+import { unstable_cache } from "next/cache";
 import { loadStorefrontHomeContentForPublic, storefrontSocialLinks } from "@universal-music-store/platform-data";
 import Link from "next/link";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
@@ -16,6 +17,12 @@ import {
   SITE_NAME,
 } from "@/lib/seo";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
+
+const getCachedPublicHomeContent = unstable_cache(
+  loadStorefrontHomeContentForPublic,
+  ["storefront-home-content"],
+  { revalidate: 60, tags: ["storefront:home"] },
+);
 
 const HomeScrollExperience = nextDynamic(
   () =>
@@ -53,7 +60,7 @@ export default async function HomePage({
     (Array.isArray(adminPreview) && adminPreview.includes("1"));
   const [featured, home] = await Promise.all([
     fetchFeaturedProducts(4),
-    loadStorefrontHomeContentForPublic(),
+    getCachedPublicHomeContent(),
   ]);
   if (featured.kind !== "ok" && !isAdminPreview) {
     return (

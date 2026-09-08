@@ -2,21 +2,22 @@ import "../runtime-logs-init";
 import { expect, type Page } from "@playwright/test";
 
 /**
- * Checkout is auth-gated: guests see a Checkout heading and sign-in CTA; signed-in users with a
- * complete profile see pay controls (`checkout-submit-pay`).
+ * Checkout is auth-gated: guests see a Checkout heading and sign-in CTA; signed-in users may
+ * first see profile onboarding before pay controls (`checkout-submit-pay`).
  */
 export async function expectCheckoutShellVisible(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { name: /^Checkout$/i })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    page.getByRole("heading", { name: /^(Checkout|Welcome)$/i }),
+  ).toBeVisible({ timeout: 30_000 });
   const pay = page.getByTestId("checkout-submit-pay");
   const guest = page.getByTestId("checkout-guest-sign-in");
   const onboard = page.getByTestId("checkout-onboarding-continue");
   const retry = page.getByTestId("checkout-profile-retry");
   const signIn = page.getByRole("heading", { name: "Sign in", exact: true });
-  await expect(pay.or(guest).or(onboard).or(retry).or(signIn)).toBeVisible({
-    timeout: 20_000,
-  });
+  const onboardingGuard = page.getByRole("button", { name: "Continue", exact: true });
+  await expect(
+    pay.or(guest).or(onboard).or(retry).or(signIn).or(onboardingGuard),
+  ).toBeVisible({ timeout: 20_000 });
 }
 
 /**

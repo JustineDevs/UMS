@@ -35,3 +35,36 @@ test("same-origin mutation policy rejects explicit cross-site metadata", () => {
     false,
   );
 });
+
+test("same-origin mutation policy accepts an explicitly configured HTTPS dev tunnel", () => {
+  const previous = process.env.NEXT_ALLOWED_DEV_ORIGINS;
+  process.env.NEXT_ALLOWED_DEV_ORIGINS = "cute-cases-thank.loca.lt";
+  try {
+    assert.equal(
+      isSameOriginMutation(new Request("http://127.0.0.1:3000/api/cart/line", {
+        headers: { origin: "https://cute-cases-thank.loca.lt" },
+      })),
+      true,
+    );
+    assert.equal(
+      isSameOriginMutation(new Request("http://127.0.0.1:3000/api/cart/line", {
+        headers: { origin: "https://evil.test" },
+      })),
+      false,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_ALLOWED_DEV_ORIGINS;
+    else process.env.NEXT_ALLOWED_DEV_ORIGINS = previous;
+  }
+});
+
+test("same-origin mutation policy rejects explicit cross-site requests", () => {
+  const request = new Request("https://store.example/api/forms/contact", {
+    method: "POST",
+    headers: {
+      origin: "https://attacker.example",
+      "sec-fetch-site": "cross-site",
+    },
+  });
+  assert.equal(isSameOriginMutation(request), false);
+});

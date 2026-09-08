@@ -25,7 +25,7 @@ test.describe("@chaos @resilience storefront degrades without white screen", () 
   });
 
   test("checkout shell after chaos navigation", async ({ page }) => {
-    await page.goto("/checkout", { waitUntil: "domcontentloaded" });
+    await page.goto("/checkout?guest=1", { waitUntil: "domcontentloaded" });
     await expectCheckoutShellVisible(page);
   });
 });

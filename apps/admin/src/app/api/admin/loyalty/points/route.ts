@@ -8,22 +8,22 @@ import {
 } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "loyalty:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const parsedBody = await parseBoundedJson(req, 16 * 1024);
-  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
   const raw = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value) ? parsedBody.value as Record<string, unknown> : {};
   const { account_id, points, reason, order_id, action } = raw;
   if (!account_id || points == null || !reason) {
-    return correlatedJson(cid, { error: "account_id, points, and reason are required" }, { status: 400 });
+    return correlatedError(cid, 400, "account_id, points, and reason are required", "VALIDATION_ERROR");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;

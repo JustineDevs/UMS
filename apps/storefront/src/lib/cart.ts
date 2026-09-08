@@ -65,8 +65,9 @@ export function parseCartQuantityInput(value: string): number | null {
 }
 
 /** Browser-only bag until checkout builds a Medusa cart; line prices here are for display. */
-// v4 intentionally invalidates v3 quantities created by the old stock-max bug.
-export const CART_STORAGE_KEY = "ums-commerce-cart-v4";
+// v5 intentionally invalidates v3/v4 quantities created by the old stock-max bug.
+export const CART_STORAGE_KEY = "ums-commerce-cart-v5";
+const LEGACY_CART_STORAGE_KEYS = ["ums-commerce-cart-v3", "ums-commerce-cart-v4"];
 export const CART_UPDATED_EVENT = "ums-cart-updated";
 const CART_MERGE_KEY = "ums-commerce-cart-merge-v1";
 const CART_STORAGE_VERSION = 1;
@@ -184,6 +185,7 @@ export function mergeReconciledCartLines(
 
 export function readCart(): CartLine[] {
   if (!isBrowser()) return [];
+  for (const key of LEGACY_CART_STORAGE_KEYS) localStorage.removeItem(key);
   const raw = localStorage.getItem(CART_STORAGE_KEY);
   if (!raw) return [];
   let parsed: unknown;

@@ -110,7 +110,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Behavior Implemented:** `apps/storefront/src/app/api/cron/finalize-payment-attempts/route.ts` implements secret check and finalize delegation. `render.yaml` includes cron curl example. Root and `apps/storefront/vercel.json` have **no** `crons` block for Vercel-native scheduling.
 
-**Missing For Completion:** Vercel Cron (or equivalent) wired to storefront URL with `STOREFRONT_PAYMENT_CRON_SECRET`. Runbook step that treats this as **mandatory** for production, not optional.
+**Scheduling decision:** Vercel Cron is intentionally not used. Scheduled storefront recovery runs from `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`; webhook delivery remains provider-driven and immediate.
 
 **Validation:** integration test or staging cron dry-run. manual: invoke route with bearer secret.
 

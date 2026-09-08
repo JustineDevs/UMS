@@ -78,11 +78,25 @@ export function accountOrderMatchesHistory(
   email: string,
   legacyEmailMatchedOrderIds: ReadonlySet<string>,
 ): boolean {
+  const exactEmailMatch =
+    order.email?.trim().toLowerCase() === email.trim().toLowerCase();
   return (
     accountOrderMatchesIdentity(order.customer_id, order.email, customerId, email) ||
-    (legacyEmailMatchedOrderIds.has(String(order.id ?? "")) &&
-      !order.customer_id &&
-      order.email?.trim().toLowerCase() === email.trim().toLowerCase())
+    (!order.customer_id &&
+      exactEmailMatch &&
+      (customerId === null || legacyEmailMatchedOrderIds.has(String(order.id ?? ""))))
+  );
+}
+
+/** Allows legacy guest orders only when no customer id is attached and email matches exactly. */
+export function accountOrderMatchesDetail(
+  order: { customer_id?: string | null; email?: string | null },
+  customerId: string,
+  email: string,
+): boolean {
+  return (
+    accountOrderMatchesCustomer(order.customer_id, customerId) ||
+    (!order.customer_id && order.email?.trim().toLowerCase() === email.trim().toLowerCase())
   );
 }
 
@@ -132,6 +146,16 @@ export function buildAccountOrdersQuery(
   return `/admin/orders?${params.toString()}`;
 }
 
+function buildAccountOrdersFallbackQuery(offset: number): string {
+  const params = new URLSearchParams({
+    fields: "id,email,customer_id,display_id,status,total,currency_code,created_at,*items",
+    limit: "100",
+    offset: String(offset),
+    order: "-created_at",
+  });
+  return `/admin/orders?${params.toString()}`;
+}
+
 /**
  * Fetches orders for a customer by email using the Medusa Admin API.
  * The Store API requires Medusa customer auth (which this storefront does not use).
@@ -139,6 +163,7 @@ export function buildAccountOrdersQuery(
  */
 export async function fetchCustomerOrders(
   email: string,
+  sessionCustomerId?: string | null,
 ): Promise<{ orders: AccountOrder[]; error: string | null }> {
   const secret = getMedusaSecretApiKey();
   if (!secret) {
@@ -146,7 +171,8 @@ export async function fetchCustomerOrders(
   }
   try {
     const normalizedEmail = normalizeAccountEmail(email);
-    const customerId = await findMedusaCustomerIdByEmail(normalizedEmail);
+    const customerId =
+      sessionCustomerId?.trim() || (await findMedusaCustomerIdByEmail(normalizedEmail));
     const rows: AdminOrderListRow[] = [];
     const seenOrderIds = new Set<string>();
     const legacyEmailMatchedOrderIds = new Set<string>();
@@ -175,6 +201,41 @@ export async function fetchCustomerOrders(
             seenOrderIds.add(id);
             rows.push(order);
             if (!filterCustomerId) legacyEmailMatchedOrderIds.add(id);
+          }
+        }
+        if (page.length < 100) break;
+      }
+    }
+
+    // Some Medusa deployments return 200 for unsupported list filters. Scan the
+    // bounded admin projection only when filtered queries found nothing, then
+    // apply the same exact ownership predicate before mapping or returning it.
+    const hasOwnedRow = rows.some((order) =>
+      accountOrderMatchesHistory(
+        order,
+        customerId,
+        normalizedEmail,
+        legacyEmailMatchedOrderIds,
+      ),
+    );
+    if (!hasOwnedRow) {
+      const seenPages = new Set<string>();
+      for (let offset = 0; ; offset += 100) {
+        const res = await medusaAdminFetch(buildAccountOrdersFallbackQuery(offset), {
+          method: "GET",
+        });
+        if (!res.ok) break;
+        const data = (await res.json()) as { orders?: unknown[] };
+        const page = Array.isArray(data.orders) ? (data.orders as AdminOrderListRow[]) : [];
+        const pageKey = page.map((order) => String(order.id ?? "")).join(",");
+        if (seenPages.has(pageKey)) break;
+        seenPages.add(pageKey);
+        for (const order of page) {
+          const id = String(order.id ?? "");
+          if (id && !seenOrderIds.has(id)) {
+            seenOrderIds.add(id);
+            rows.push(order);
+            if (!order.customer_id) legacyEmailMatchedOrderIds.add(id);
           }
         }
         if (page.length < 100) break;

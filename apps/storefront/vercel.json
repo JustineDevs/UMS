@@ -2,23 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile --config.node-linker=hoisted",
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@universal-music-store/storefront",
-  "crons": [
-    {
-      "path": "/api/cron/finalize-payment-attempts",
-      "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/campaigns",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/payment-reconciliation",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/inventory-reservations",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "buildCommand": "pnpm run build"
 }

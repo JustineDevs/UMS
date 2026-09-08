@@ -17,6 +17,7 @@ import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
 } from "@/lib/image-helpers";
+import { normalizeCmsDomStyle } from "@/lib/cms-dom-edit";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -408,17 +409,17 @@ export function HomeScrollExperience({
       ) return;
       const target = selectedTargetRef.current;
       if (!target || event.data?.id !== target.dataset.cmsId) return;
-      const prop = event.data?.prop;
+      let prop = event.data?.prop;
       const value = typeof event.data?.value === "string" ? event.data.value : "";
       if (!prop || value.length > 100_000) return;
       if (prop === "textContent" && target.children.length === 0) target.textContent = value;
       else if (prop === "href" && target instanceof HTMLAnchorElement) target.href = value;
       else if (prop === "src" && target instanceof HTMLImageElement) target.src = value;
       else if (prop.startsWith("style.")) {
-        const css = prop.slice(6);
-        if (["display", "position", "width", "height", "margin", "padding", "color", "background-color", "font-size", "font-weight", "border-radius", "gap", "align-items", "justify-content", "grid-template-columns", "min-width", "max-width", "min-height", "max-height", "line-height", "letter-spacing", "border", "box-shadow", "object-fit", "object-position", "background-size", "background-position"].includes(css) && !/[{};]/.test(value) && !/url\s*\(/i.test(value)) {
-          target.style.setProperty(css, value);
-        }
+        const styleProperty = normalizeCmsDomStyle(prop, value);
+        if (!styleProperty) return;
+        target.style.setProperty(styleProperty.slice(6), value);
+        prop = styleProperty;
       } else return;
       const block = target.closest<HTMLElement>("[data-cms-block-id]");
       window.parent.postMessage({ source: "cms-builder-dom-mutation", id: target.dataset.cmsId, blockId: block?.dataset.cmsBlockId ?? null, prop, value }, parentOrigin);
@@ -899,7 +900,7 @@ export function HomeScrollExperience({
                     {tile.title}
                   </h3>
                   {tile.subtitle ? (
-                    <p className="mt-3 text-sm font-medium uppercase tracking-widest text-on-surface-variant">
+                    <p className="mt-3 text-sm font-medium uppercase tracking-widest text-primary/80">
                       {tile.subtitle}
                     </p>
                   ) : null}

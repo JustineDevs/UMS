@@ -73,7 +73,7 @@ test("handleFinalizeCheckoutIntentRequest returns order redirect on success", as
   assert.deepEqual(await res.json(), {
     ok: true,
     orderId: "order_1",
-    redirectUrl: "/track/cap_v3.opaque",
+    redirectUrl: "http://localhost/track/cap_v3.opaque",
   });
   assert.equal(patches[0]?.status, "completed");
 });
@@ -163,5 +163,21 @@ test("secureTrackingRedirectUrl rejects external tracking-looking URLs", () => {
       "https://store.example",
     ),
     "https://store.example/track/cap_v3.opaque",
+  );
+  assert.equal(
+    secureTrackingRedirectUrl(
+      "https://store.example/track/cap_v3.opaque?cache-bust=1",
+      undefined,
+      "https://store.example",
+    ),
+    null,
+  );
+  assert.equal(
+    secureTrackingRedirectUrl(
+      "https://store.example/track/cap_v3.opaque#fragment",
+      undefined,
+      "https://store.example",
+    ),
+    null,
   );
 });

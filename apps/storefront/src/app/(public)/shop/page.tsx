@@ -24,6 +24,7 @@ import { shopHref } from "@/lib/shop-url";
 import {
   parseShopPageQuery,
   parseShopPageQueryDiagnostics,
+  normalizeShopPageSearchParams,
   shopPageShouldNoIndex,
 } from "@/lib/shop-page-query";
 import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
@@ -41,30 +42,14 @@ import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export const revalidate = 60;
 
-type ShopSearchParams = {
-  category?: string;
-  locale?: string;
-  type?: string;
-  finish?: string;
-  brand?: string;
-  pickupConfig?: string;
-  bodyWood?: string;
-  condition?: string;
-  skillLevel?: string;
-  shippingSpeed?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  sort?: string;
-  offset?: string;
-  q?: string;
-};
+type ShopSearchParams = Record<string, string | string[] | undefined>;
 
 export async function generateMetadata({
   searchParams,
 }: {
   searchParams: Promise<ShopSearchParams>;
 }): Promise<Metadata> {
-  const sp = await searchParams;
+  const sp = normalizeShopPageSearchParams(await searchParams);
   const q = parseShopPageQuery(sp);
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
@@ -117,7 +102,7 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<ShopSearchParams>;
 }) {
-  const sp = await searchParams;
+  const sp = normalizeShopPageSearchParams(await searchParams);
   const cmsLocale = (sp.locale ?? "en").trim() || "en";
   const diagnostics = parseShopPageQueryDiagnostics(sp);
   if (diagnostics.invalidKeys.length > 0) {

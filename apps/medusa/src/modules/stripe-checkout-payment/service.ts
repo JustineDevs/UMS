@@ -42,6 +42,7 @@ import {
   claimStripeWebhookDedup,
 } from "../../lib/stripe-webhook-dedup";
 import { recordWebhookSecurityEvent } from "../../lib/webhook-security-metrics";
+import { safeLogIdentifier } from "../../lib/safe-log";
 
 export type StripeCheckoutPaymentOptions = {
   apiKey: string;
@@ -91,6 +92,17 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
 
   protected readonly options_: StripeCheckoutPaymentOptions;
   protected readonly stripe_: Stripe;
+
+  private providerFailure(operation: string, identifier: string, error: unknown): MedusaError {
+    console.error(
+      `[payment-provider] stripe ${operation} failed id=${safeLogIdentifier(identifier)}`,
+      error,
+    );
+    return new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Stripe ${operation} failed. Try again or choose another payment method.`,
+    );
+  }
 
   constructor(cradle: Record<string, unknown>, options: StripeCheckoutPaymentOptions) {
     super(cradle, options);
@@ -236,10 +248,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       };
     } catch (err) {
       if (err instanceof MedusaError) throw err;
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `Stripe create Checkout Session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("create checkout session", sessionId, err);
     }
   }
 
@@ -292,10 +301,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
         "[payment-pipeline] authorize_failed provider=stripe reason=retrieve_session",
         err,
       );
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Stripe retrieve Checkout Session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("retrieve checkout session", csId, err);
     }
   }
 

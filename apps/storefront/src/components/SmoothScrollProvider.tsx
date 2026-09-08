@@ -3,7 +3,6 @@
 import {
   createContext,
   useCallback,
-  useContext,
   useEffect,
   useState,
 } from "react";
@@ -23,10 +22,6 @@ const SmoothScrollContext = createContext<SmoothScrollContextValue>({
   lenis: null,
   setScrollLocked: () => {},
 });
-
-function useSmoothScroll() {
-  return useContext(SmoothScrollContext);
-}
 
 /**
  * Global smooth-scroll provider (Infiner pattern):

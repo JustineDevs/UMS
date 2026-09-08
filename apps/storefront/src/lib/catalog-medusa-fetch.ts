@@ -836,12 +836,6 @@ export async function fetchCategorySummaries(): Promise<CategorySummariesResult>
   return request;
 }
 
-type VariantFacets = {
-  types: string[];
-  finishes: string[];
-  brands: string[];
-};
-
 export async function fetchVariantFacets(
   category: string | undefined,
 ): Promise<VariantFacetsResult> {

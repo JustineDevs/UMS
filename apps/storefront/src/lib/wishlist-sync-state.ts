@@ -4,6 +4,13 @@ export function isExpectedWishlistSyncUnauthorized(status: number): boolean {
   return status === 401;
 }
 
+export function canApplyWishlistSyncResult(
+  activeIdentity: string | null,
+  requestIdentity: string,
+): boolean {
+  return activeIdentity === requestIdentity;
+}
+
 export type WishlistSyncResultItem = {
   slug: string;
   name: string;

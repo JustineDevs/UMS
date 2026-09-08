@@ -5,7 +5,11 @@ import {
   buildPayPalWebhookDedupId,
   claimPayPalWebhookDedup,
 } from "../../../lib/paypal-webhook-dedup";
-import { capturePayPalOrder, verifyPayPalWebhookSignature } from "../../../lib/paypal-sdk-client";
+import {
+  capturePayPalOrder,
+  createPayPalOrder,
+  verifyPayPalWebhookSignature,
+} from "../../../lib/paypal-sdk-client";
 
 jest.mock("../../../lib/paypal-webhook-dedup", () => ({
   buildPayPalWebhookDedupId: jest.fn((body: { event_type?: string; id?: string }) =>
@@ -16,8 +20,23 @@ jest.mock("../../../lib/paypal-webhook-dedup", () => ({
 
 jest.mock("../../../lib/paypal-sdk-client", () => ({
   capturePayPalOrder: jest.fn(),
+  createPayPalOrder: jest.fn(),
   verifyPayPalWebhookSignature: jest.fn(),
 }));
+
+describe("PayPal checkout currency boundary", () => {
+  it("rejects a missing currency before contacting PayPal", async () => {
+    const service = new PayPalPaymentProviderService(
+      {},
+      { clientId: "client-id", clientSecret: "client-secret", sandbox: true },
+    );
+
+    await expect(
+      service.initiatePayment({ data: { session_id: "sess_123" }, amount: 100 } as never),
+    ).rejects.toThrow("missing or invalid currency_code");
+    expect(createPayPalOrder).not.toHaveBeenCalled();
+  });
+});
 
 describe("PayPal webhook signature verification gate", () => {
   const originalEnv = process.env;

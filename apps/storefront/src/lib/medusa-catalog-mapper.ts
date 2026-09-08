@@ -392,12 +392,17 @@ function productWithSellableVariantsOnly(p: Product): Product | null {
 
 /** Map Medusa store product JSON and drop variants (and products) with no sellable stock. */
 export function catalogProductFromMedusaRaw(raw: MedusaProductRaw): Product | null {
-  const p = mapMedusaProductToProduct(raw);
+  if (typeof raw.id !== "string" || !raw.id.trim()) return null;
+  const canonicalRaw: MedusaProductRaw & { id: string } = {
+    ...raw,
+    id: raw.id.trim(),
+  };
+  const p = mapMedusaProductToProduct(canonicalRaw);
   return productWithSellableVariantsOnly(p);
 }
 
-function mapMedusaProductToProduct(raw: MedusaProductRaw): Product {
-  const id = raw.id ?? "unknown";
+function mapMedusaProductToProduct(raw: MedusaProductRaw & { id: string }): Product {
+  const id = raw.id;
   const images: ProductImage[] = (raw.images ?? [])
     .filter(Boolean)
     .map((img, i) => ({

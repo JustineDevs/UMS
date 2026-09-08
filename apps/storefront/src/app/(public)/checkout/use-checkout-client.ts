@@ -848,7 +848,7 @@ export function useCheckoutClient({
             variantIds: result.variantIds,
             productIds: result.productIds,
             providerSessionId,
-            providerPaymentId,
+            providerPaymentId: providerPaymentId ?? (paymentMethod === "PAYPAL" ? paypalOrderId : undefined),
           }),
         });
         const regJson = (await regRes.json().catch(() => ({}))) as {

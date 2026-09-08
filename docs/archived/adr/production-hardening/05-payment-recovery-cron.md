@@ -16,7 +16,7 @@ Every production deployment that uses Stripe or hosted PSP **schedules** this ro
 
 ## Concrete plan
 
-1. Add `crons` entry to `apps/storefront/vercel.json` pointing at `/api/cron/finalize-payment-attempts` with recommended schedule (e.g. every 5 minutes).
+1. Use `.github/workflows/storefront-cron.yml` to invoke `/api/cron/finalize-payment-attempts` with `STOREFRONT_CRON_SECRET`; do not add a Vercel `crons` entry.
 2. Update `docs/runbooks/PAYMENT-INTEGRATION.md` with Vercel-specific steps alongside Render.
 3. Add monitoring alert on cron401 or 500 spikes.
 4. Verify `STOREFRONT_INTERNAL_RECONCILE_SECRET` for admin retry path in same doc.

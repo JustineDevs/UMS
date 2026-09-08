@@ -69,6 +69,10 @@ export function buildRichHtml(params: {
   brandName: string;
 }): string {
   const { order, orderDisplayLabel, trackingUrl, brandName } = params;
+  const validatedTrackingUrl = safeTrackingUrl(trackingUrl);
+  if (!validatedTrackingUrl) {
+    throw new Error("Order confirmation tracking capability is invalid");
+  }
   const currency = (order.currency_code ?? "PHP").toUpperCase();
   const items = order.items ?? [];
   const addr = order.shipping_address;
@@ -157,7 +161,7 @@ export function buildRichHtml(params: {
           <td style="padding:24px 40px;text-align:center;border-bottom:1px solid #f1f5f9;background:#f8fafc;">
             <p style="margin:0 0 4px;font-size:13px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Order Number</p>
             <p style="margin:0 0 20px;font-size:28px;font-weight:700;color:#0f172a;letter-spacing:1px;">#${esc(orderDisplayLabel)}</p>
-            <a href="${esc(trackingUrl)}"
+            <a href="${esc(validatedTrackingUrl)}"
                style="display:inline-block;background:#0f172a;color:#f8fafc;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;letter-spacing:0.3px;">
               Track Your Order
             </a>

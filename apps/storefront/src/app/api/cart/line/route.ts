@@ -7,6 +7,7 @@ import {
   clearCartCookie,
   parseJsonBody,
   readCartIdFromCookie,
+  isMedusaNotFoundError,
 } from "@/lib/cart-api-helpers";
 import { isSameOriginMutation } from "@/lib/request-origin";
 
@@ -86,7 +87,7 @@ export async function PUT(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/already completed|completed/i.test(message)) {
+    if (isMedusaNotFoundError(error) || /already completed|completed/i.test(message)) {
       await clearCartCookie();
       return NextResponse.json(
         { error: "Cart expired", code: "CART_COMPLETED", recovered: true },
@@ -138,7 +139,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ ok: true, removed: lineIds.length });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/already completed|completed/i.test(message)) {
+    if (isMedusaNotFoundError(error) || /already completed|completed/i.test(message)) {
       await clearCartCookie();
       return NextResponse.json(
         { error: "Cart expired", code: "CART_COMPLETED", recovered: true },

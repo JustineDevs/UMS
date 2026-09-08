@@ -43,9 +43,9 @@ export async function fetchProductReviews(
     .eq("shadow_banned", false)
     .order("created_at", { ascending: false })
     .limit(limit);
-  if (mid && slug) {
-    q = q.or(`medusa_product_id.eq.${mid},product_slug.eq.${slug}`);
-  } else if (mid) {
+  // The canonical Medusa identity must win. Besides avoiding slug drift, this
+  // keeps route-derived text out of a PostgREST filter expression.
+  if (mid) {
     q = q.eq("medusa_product_id", mid);
   } else {
     q = q.eq("product_slug", slug);

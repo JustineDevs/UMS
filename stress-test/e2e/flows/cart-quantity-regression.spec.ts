@@ -1,5 +1,34 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "universal-music-store-cookie-consent-v1",
+      "essential-only",
+    );
+  });
+});
+
+// These fixtures all exercise the same localStorage-backed cart surface. Keep
+// them serial so parallel browser workers cannot interleave hydration and
+// development-server compilation while asserting the same contract.
+test.describe.configure({ mode: "serial" });
+
+test.describe("cart server-rendered loading state", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test("cart exposes a stable loading skeleton while server hydration is pending", async ({
+    page,
+  }) => {
+    await page.goto("/cart");
+    await expect(page.getByTestId("cart-loading-skeleton")).toBeAttached();
+    await expect(page.getByTestId("cart-loading-skeleton")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+  });
+});
+
 test("cart ignores legacy max-stock state and supports exact inline quantity edits", async ({
   page,
 }) => {
@@ -48,9 +77,9 @@ test("cart ignores legacy max-stock state and supports exact inline quantity edi
         },
       ]),
     );
-    if (!localStorage.getItem("ums-commerce-cart-v4")) {
+    if (!localStorage.getItem("ums-commerce-cart-v5")) {
       localStorage.setItem(
-        "ums-commerce-cart-v4",
+        "ums-commerce-cart-v5",
         JSON.stringify([
           {
             variantId: "v1",
@@ -154,7 +183,7 @@ test("bound cart quantity edits synchronize the server line without stock clampi
   });
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "bound-v1",
@@ -185,6 +214,167 @@ test("bound cart quantity edits synchronize the server line without stock clampi
   expect(updateRequest).toEqual({ variantId: "bound-v1", quantity: 3 });
 });
 
+test("serializes rapid quantity edits and commits the latest value", async ({
+  page,
+}) => {
+  const requests: Array<{ variantId?: string; quantity?: number }> = [];
+  let reconcileRequests = 0;
+  let releaseFirst: (() => void) | undefined;
+  const firstRequestFinished = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  await page.route("**/api/cart/resume", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        cartId: "cart_race_fixture",
+        lines: [],
+        available: true,
+      }),
+    }),
+  );
+  await page.route("**/api/cart/reconcile", async (route) => {
+    reconcileRequests += 1;
+    const body = (await route.request().postDataJSON()) as {
+      lines?: Array<{ variantId: string; quantity: number }>;
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        currency: "PHP",
+        cartTotal: (body.lines ?? []).reduce(
+          (total, line) => total + line.quantity * 100,
+          0,
+        ),
+        lines: (body.lines ?? []).map((line) => ({
+          ...line,
+          slug: "race-fixture",
+          name: "Race fixture",
+          sku: "RACE",
+          type: "Default",
+          finish: "",
+          price: 100,
+          currencyCode: "PHP",
+          availableQuantity: 10,
+          status: "current",
+        })),
+      }),
+    });
+  });
+  await page.route("**/api/cart/line", async (route) => {
+    const body = (await route.request().postDataJSON()) as {
+      variantId?: string;
+      quantity?: number;
+    };
+    requests.push(body);
+    if (requests.length === 1) {
+      await firstRequestFinished;
+    }
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, updated: 1 }),
+    });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "ums-commerce-cart-v5",
+      JSON.stringify([
+        {
+          variantId: "race-v1",
+          quantity: 1,
+          name: "Race fixture",
+          slug: "race-fixture",
+          sku: "RACE",
+          type: "Default",
+          finish: "",
+          price: 100,
+        },
+      ]),
+    );
+  });
+
+  await page.goto("/cart");
+  const quantity = page.getByRole("spinbutton", {
+    name: /quantity for race fixture/i,
+  });
+  await expect(quantity).toHaveValue("1", { timeout: 15000 });
+  await quantity.fill("3");
+  await quantity.press("Enter");
+  await expect.poll(() => requests.length).toBe(1);
+  await quantity.fill("5");
+  await quantity.press("Enter");
+  await expect.poll(() => requests.length).toBe(1);
+  releaseFirst?.();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests).toEqual([
+    { variantId: "race-v1", quantity: 3 },
+    { variantId: "race-v1", quantity: 5 },
+  ]);
+  await expect.poll(() => reconcileRequests).toBe(2);
+});
+
+test("cart commits a typed quantity when the field loses focus", async ({
+  page,
+}) => {
+  await page.route("**/api/cart/reconcile", async (route) => {
+    const body = (await route.request().postDataJSON()) as {
+      lines?: Array<{ variantId: string; quantity: number }>;
+    };
+    const quantity = body.lines?.[0]?.quantity ?? 1;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        currency: "PHP",
+        cartTotal: quantity * 100,
+        lines: [
+          {
+            variantId: "blur-v1",
+            quantity,
+            slug: "blur-item",
+            name: "Blur item",
+            sku: "BLUR",
+            type: "Default",
+            finish: "",
+            price: 100,
+            currencyCode: "PHP",
+            availableQuantity: 5,
+            status: "current",
+          },
+        ],
+      }),
+    });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "ums-commerce-cart-v5",
+      JSON.stringify([
+        {
+          variantId: "blur-v1",
+          quantity: 1,
+          name: "Blur item",
+          slug: "blur-item",
+          sku: "BLUR",
+          type: "Default",
+          finish: "",
+          price: 100,
+        },
+      ]),
+    );
+  });
+
+  await page.goto("/cart", { waitUntil: "domcontentloaded" });
+  const quantity = page.getByRole("spinbutton", {
+    name: /quantity for blur item/i,
+  });
+  await expect(quantity).toHaveValue("1", { timeout: 15000 });
+  await quantity.fill("2");
+  await quantity.blur();
+  await expect(quantity).toHaveValue("2");
+  await expect(page.getByTestId("authoritative-cart-total")).toContainText(
+    "200",
+  );
+});
+
 test("cart keeps the bag visible and blocks checkout when reconciliation is unavailable", async ({
   page,
 }) => {
@@ -197,7 +387,7 @@ test("cart keeps the bag visible and blocks checkout when reconciliation is unav
   );
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "outage-v1",
@@ -235,6 +425,75 @@ test("cart keeps the bag visible and blocks checkout when reconciliation is unav
   );
 });
 
+test("cart recovers from reconciliation outage before enabling checkout", async ({
+  page,
+}) => {
+  let attempts = 0;
+  await page.route("**/api/cart/reconcile", async (route) => {
+    attempts += 1;
+    if (attempts === 1) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "temporarily unavailable" }),
+      });
+      return;
+    }
+    const body = (await route.request().postDataJSON()) as {
+      lines?: Array<{ variantId: string; quantity: number }>;
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        currency: "PHP",
+        cartTotal: (body.lines ?? []).reduce(
+          (total, line) => total + line.quantity * 100,
+          0,
+        ),
+        lines: (body.lines ?? []).map((line) => ({
+          ...line,
+          slug: "recovery-fixture",
+          name: "Recovery fixture",
+          sku: "RECOVERY",
+          type: "Default",
+          finish: "",
+          price: 100,
+          currencyCode: "PHP",
+          availableQuantity: 5,
+          status: "current",
+        })),
+      }),
+    });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "ums-commerce-cart-v5",
+      JSON.stringify([
+        {
+          variantId: "recovery-v1",
+          quantity: 1,
+          name: "Recovery fixture",
+          slug: "recovery-fixture",
+          sku: "RECOVERY",
+          type: "Default",
+          finish: "",
+          price: 100,
+        },
+      ]),
+    );
+  });
+
+  await page.goto("/cart");
+  await expect(
+    page.getByRole("button", { name: "Refresh before checkout" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Refresh bag" }).click();
+  await expect(
+    page.getByRole("link", { name: "Proceed to checkout" }),
+  ).toBeVisible();
+  expect(attempts).toBe(2);
+});
+
 test("cart mobile actions and trust links keep thumb-sized targets", async ({
   page,
 }) => {
@@ -265,7 +524,7 @@ test("cart mobile actions and trust links keep thumb-sized targets", async ({
   );
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "mobile-v1",
@@ -329,7 +588,7 @@ test("cart identifies unavailable variants instead of presenting a stock count",
   );
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "gone-v1",
@@ -386,7 +645,7 @@ test("cart replaces stale display pricing with the authoritative reconciliation"
   );
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "stale-price",
@@ -431,7 +690,7 @@ test("cart exposes safe per-line reconciliation errors", async ({ page }) => {
   );
   await page.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "fixture-error",
@@ -470,6 +729,12 @@ test("cart reconciles a quantity update received from another tab", async ({
   page,
   context,
 }) => {
+  await context.route("**/api/cart/resume", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ lines: [], cartId: null, available: false }),
+    }),
+  );
   await context.route("**/api/cart/reconcile", async (route) => {
     const body = (await route.request().postDataJSON()) as {
       lines?: Array<{ variantId: string; quantity: number }>;
@@ -500,7 +765,7 @@ test("cart reconciles a quantity update received from another tab", async ({
   });
   await context.addInitScript(() => {
     localStorage.setItem(
-      "ums-commerce-cart-v4",
+      "ums-commerce-cart-v5",
       JSON.stringify([
         {
           variantId: "cross-tab-v1",
@@ -534,4 +799,27 @@ test("cart reconciles a quantity update received from another tab", async ({
   await firstQuantity.press("Enter");
   await expect(secondQuantity).toHaveValue("3", { timeout: 15_000 });
   await secondTab.close();
+});
+
+test("cart reconciliation rejects an unknown canonical variant", async ({
+  request,
+}) => {
+  const response = await request.post("http://localhost:3000/api/cart/reconcile", {
+    headers: { origin: "http://localhost:3000" },
+    data: {
+      lines: [
+        {
+          variantId: "forged-variant-with-client-price",
+          quantity: 1,
+        },
+      ],
+    },
+  });
+  expect(response.status()).toBe(503);
+  expect(await response.json()).toEqual({
+    error: "Catalog reconciliation is temporarily unavailable",
+    lines: [
+      { variantId: "forged-variant-with-client-price", status: "error" },
+    ],
+  });
 });

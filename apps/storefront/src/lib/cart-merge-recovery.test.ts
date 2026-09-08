@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildCartRestoreOperations } from "./cart-merge-recovery";
+import {
+  buildCartMergeResponse,
+  buildCartRestoreOperations,
+} from "./cart-merge-recovery";
+
+test("cart merge does not report success when final cart reload fails", () => {
+  assert.equal(buildCartMergeResponse("cart_1", null), null);
+});
 
 test("cart merge recovery restores changed, deleted, and newly-created lines", () => {
   assert.deepEqual(

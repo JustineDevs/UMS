@@ -39,6 +39,7 @@ export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
     const form = page.getByTestId("e2e-credentials-form");
     if ((await form.count()) === 0) return "skip_no_ui";
     await expect(form).toBeVisible({ timeout: 15_000 });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     const passwordInput = page.getByTestId("e2e-admin-password");
     await page.getByTestId("e2e-admin-email").fill(email);
     await passwordInput.fill(password);

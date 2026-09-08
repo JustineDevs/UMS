@@ -45,9 +45,9 @@ async function handlePOST(req: Request): Promise<Response> {
       { status: 400 },
     );
   }
-  const body = bounded.value as VerifyStockBody;
+  const body = bounded.value as VerifyStockBody | null;
 
-  if (!Array.isArray(body.lines) || body.lines.length === 0) {
+  if (!body || !Array.isArray(body.lines) || body.lines.length === 0) {
     return NextResponse.json(
       { ok: false, message: "No lines provided", code: "INVENTORY_CHECK_FAILED" },
       { status: 400 },

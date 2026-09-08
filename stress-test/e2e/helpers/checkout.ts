@@ -174,7 +174,11 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
         const element = document.querySelector<HTMLElement>(
           '[data-testid="pdp-add-to-bag"]',
         );
-        return Boolean(element && !element.matches(":disabled"));
+        return Boolean(
+          element &&
+            element.dataset.clientReady === "true" &&
+            !element.matches(":disabled"),
+        );
       },
       undefined,
       { timeout: 10_000 },
@@ -189,6 +193,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
+      await addButton.evaluate((element) => {
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+      });
       await addButton.click();
       await page.waitForTimeout(800);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
@@ -366,7 +373,7 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
 export async function navigateToCheckout(page: Page): Promise<void> {
   // Card providers are intentionally available to guests; enter that explicit
   // mode so provider smoke tests do not mistake the auth gate for a PSP gap.
-  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "load" });
+  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/guest=1/);
   await expect(page.getByRole("heading", { name: /checkout/i })).toBeVisible({
     timeout: 15_000,
@@ -406,37 +413,37 @@ export async function fillCheckoutShippingInfo(
   };
 
   const emailInput = page.getByLabel(/email/i).first();
-  if (await emailInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await emailInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await emailInput.fill(defaults.email);
   }
 
   const firstNameInput = page.getByLabel(/first name/i).first();
-  if (await firstNameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await firstNameInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await firstNameInput.fill(defaults.firstName);
   }
 
   const lastNameInput = page.getByLabel(/last name/i).first();
-  if (await lastNameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await lastNameInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await lastNameInput.fill(defaults.lastName);
   }
 
   const addressInput = page.getByLabel(/address/i).first();
-  if (await addressInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await addressInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await addressInput.fill(defaults.address);
   }
 
   const cityInput = page.getByLabel(/city/i).first();
-  if (await cityInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await cityInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await cityInput.fill(defaults.city);
   }
 
   const postalInput = page.getByLabel(/postal|zip/i).first();
-  if (await postalInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await postalInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await postalInput.fill(defaults.postalCode);
   }
 
   const phoneInput = page.getByLabel(/phone/i).first();
-  if (await phoneInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await phoneInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await phoneInput.fill(defaults.phone);
   }
 }

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import {
   getReceiptByOrder,
   saveReceipt,
@@ -10,7 +9,7 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
-import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson, tagResponse } from "@/lib/staff-api-response";
 import {
   claimAdminIdempotency,
   completeAdminIdempotency,
@@ -36,12 +35,9 @@ const receiptRequestSchema = z
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user)
-    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  if (!staffSessionAllows(session, "receipts:read")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
+  const auth = await requireStaffApiSession("receipts:read");
+  if (!auth.ok) return tagResponse(auth.response, cid);
+  const session = auth.session;
   const orderReference = req.nextUrl.searchParams.get("order_id");
   if (!orderReference) {
     return correlatedError(cid, 400, "order_id is required", "BAD_REQUEST");
@@ -60,12 +56,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user)
-    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  if (!staffSessionAllows(session, "receipts:send")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
+  const auth = await requireStaffApiSession("receipts:send");
+  if (!auth.ok) return tagResponse(auth.response, cid);
+  const session = auth.session;
   const parsed = await parseAdminJson(req, receiptRequestSchema);
   if (!parsed.ok)
     return correlatedError(cid, parsed.status, parsed.error, "VALIDATION_ERROR");

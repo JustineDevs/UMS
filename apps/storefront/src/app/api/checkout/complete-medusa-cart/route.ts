@@ -14,6 +14,7 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 function jsonNoStore(
   body: unknown,
@@ -36,6 +37,9 @@ function jsonNoStore(
  * cookie possession alone.
  */
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return jsonNoStore({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const rl = await applyRateLimit(req, "complete-medusa-cart", 40, 60_000);
   if (!rl.ok) {
     return rl.response;

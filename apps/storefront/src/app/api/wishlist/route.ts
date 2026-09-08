@@ -35,26 +35,40 @@ export async function GET(_req: Request) {
   const sb = createStorefrontServiceSupabase();
   if (!sb) return json({ error: "Database unavailable" }, 503);
 
-  const { data } = await sb
+  const { data, error } = await sb
     .from("wishlists")
     .select("product_slug, product_name, medusa_product_id, added_at")
     .eq("medusa_customer_id", customerId.trim())
     .order("added_at", { ascending: false })
     .limit(200);
+  if (error) return json({ error: "Saved items are temporarily unavailable" }, 503);
 
-  const items = await Promise.all((data ?? []).map(async (item) => {
+  const resolved = await Promise.all((data ?? []).map(async (item) => {
     const productId = typeof item.medusa_product_id === "string" ? item.medusa_product_id.trim() : "";
     if (!productId) return null;
-    const product = await fetchProductById(productId);
-    if (product.kind !== "ok") return null;
-    return {
-      product_slug: product.product.slug,
-      product_name: product.product.name,
-      medusa_product_id: product.product.id,
-      added_at: item.added_at,
-    };
+    try {
+      const product = await fetchProductById(productId);
+      if (product.kind === "not_found") return null;
+      if (product.kind !== "ok") return { kind: "unavailable" as const };
+      return {
+        kind: "item" as const,
+        item: {
+          product_slug: product.product.slug,
+          product_name: product.product.name,
+          medusa_product_id: product.product.id,
+          added_at: item.added_at,
+        },
+      };
+    } catch {
+      return { kind: "unavailable" as const };
+    }
   }));
-  return json({ items: items.filter(Boolean) });
+  if (resolved.some((result) => result?.kind === "unavailable")) {
+    return json({ error: "Saved items are temporarily unavailable" }, 503);
+  }
+  return json({
+    items: resolved.flatMap((result) => result?.kind === "item" ? [result.item] : []),
+  });
 }
 
 /**

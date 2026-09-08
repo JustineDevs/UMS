@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { sanitizeSameOriginUrl, sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { clearCart } from "@/lib/cart";
 import {
   buildHostedReturnMissingCorrelationMessage,
@@ -15,15 +15,15 @@ import {
 
 async function resolveCorrelationId(
   provider: HostedReturnProvider,
+  providerOrderId?: string,
 ): Promise<string | undefined> {
-  let id = sessionStorage
+  const storedId = sessionStorage
     .getItem(PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY)
     ?.trim();
-  if (id) return id;
   const rec = await fetch(
-    `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(
-      provider,
-    )}`,
+    `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(provider)}${
+      providerOrderId ? `&provider_order_id=${encodeURIComponent(providerOrderId)}` : ""
+    }`,
     { credentials: "include" },
   );
   const recJson = (await rec.json().catch(() => ({}))) as {
@@ -35,7 +35,7 @@ async function resolveCorrelationId(
     recJson.found === true &&
     typeof recJson.correlationId === "string"
   ) {
-    id = recJson.correlationId;
+    const id = recJson.correlationId;
     try {
       sessionStorage.setItem(PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY, id);
     } catch {
@@ -43,7 +43,7 @@ async function resolveCorrelationId(
     }
     return id;
   }
-  return undefined;
+  return storedId || undefined;
 }
 
 const POLL_MS = 2000;
@@ -65,6 +65,10 @@ export function HostedCheckoutReturn({
       : "Payment received. Finalizing your order…",
   );
   const [failed, setFailed] = useState(hasFailedStatus);
+  const recoveryLinkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    if (failed) recoveryLinkRef.current?.focus();
+  }, [failed]);
   useEffect(() => {
     let disposed = false;
     async function run(): Promise<void> {
@@ -74,7 +78,7 @@ export function HostedCheckoutReturn({
         return;
       }
 
-      const correlationId = await resolveCorrelationId(provider);
+      const correlationId = await resolveCorrelationId(provider, providerOrderId);
       if (!correlationId) {
         setMessage(buildHostedReturnMissingCorrelationMessage(provider));
         setFailed(true);
@@ -193,7 +197,13 @@ export function HostedCheckoutReturn({
       setFailed(true);
     }
 
-    void run();
+    void run().catch(() => {
+      if (disposed) return;
+      setMessage(
+        "We could not reach the payment service. Your bag is unchanged; return to checkout and try again.",
+      );
+      setFailed(true);
+    });
     return () => {
       disposed = true;
     };
@@ -204,13 +214,20 @@ export function HostedCheckoutReturn({
       <h1 className="font-headline text-2xl font-bold text-primary mb-4">
         {failed ? "Almost there" : "Processing your order"}
       </h1>
-      <p className="text-sm text-on-surface-variant leading-relaxed">
+      <p
+        className="text-sm text-on-surface-variant leading-relaxed"
+        role="status"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
         {message}
       </p>
       {failed ? (
         <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/checkout"
+            ref={recoveryLinkRef}
+            data-testid="hosted-return-back-to-checkout"
             className="inline-flex items-center justify-center rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
           >
             Back to checkout

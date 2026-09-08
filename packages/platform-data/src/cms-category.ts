@@ -15,16 +15,27 @@ export type CmsCategoryContentRow = {
   organization_id?: string | null;
 };
 
-function parseBlocks(v: unknown): CmsBlock[] {
+function stableBlockId(index: number, type: string, props: Record<string, unknown>): string {
+  const input = `${index}:${type}:${JSON.stringify(props)}`;
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `blk_${(hash >>> 0).toString(36)}`;
+}
+
+export function parseCmsCategoryBlocks(v: unknown): CmsBlock[] {
   if (!Array.isArray(v)) return [];
   const out: CmsBlock[] = [];
-  for (const item of v) {
+  for (const [index, item] of v.entries()) {
     if (item && typeof item === "object" && "type" in item) {
       const r = item as Record<string, unknown>;
+      const props = r.props && typeof r.props === "object" ? (r.props as Record<string, unknown>) : {};
       out.push({
-        id: typeof r.id === "string" ? r.id : `blk_${Math.random().toString(36).slice(2, 11)}`,
+        id: typeof r.id === "string" ? r.id : stableBlockId(index, String(r.type ?? "unknown"), props),
         type: String(r.type ?? "unknown"),
-        props: r.props && typeof r.props === "object" ? (r.props as Record<string, unknown>) : {},
+        props,
       });
     }
   }
@@ -57,7 +68,7 @@ export async function listCmsCategoryContent(supabase: SupabaseClient, organizat
       (r as Record<string, unknown>).banner_alt != null
         ? String((r as Record<string, unknown>).banner_alt)
         : null,
-    blocks: parseBlocks((r as Record<string, unknown>).blocks),
+    blocks: parseCmsCategoryBlocks((r as Record<string, unknown>).blocks),
     updated_at: String((r as Record<string, unknown>).updated_at ?? ""),
     organization_id: (r as Record<string, unknown>).organization_id != null ? String((r as Record<string, unknown>).organization_id) : null,
   }));
@@ -110,7 +121,7 @@ export async function upsertCmsCategoryContent(
       intro_html: String(r.intro_html ?? ""),
       banner_url: r.banner_url != null ? String(r.banner_url) : null,
       banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
-      blocks: parseBlocks(r.blocks),
+      blocks: parseCmsCategoryBlocks(r.blocks),
       updated_at: String(r.updated_at ?? ""),
       organization_id: r.organization_id != null ? String(r.organization_id) : null,
     };
@@ -144,7 +155,7 @@ export async function upsertCmsCategoryContent(
         intro_html: String(r.intro_html ?? ""),
         banner_url: r.banner_url != null ? String(r.banner_url) : null,
         banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
-        blocks: parseBlocks(r.blocks),
+        blocks: parseCmsCategoryBlocks(r.blocks),
         updated_at: String(r.updated_at ?? ""),
         organization_id: r.organization_id != null ? String(r.organization_id) : null,
       };
@@ -168,7 +179,7 @@ export async function upsertCmsCategoryContent(
     intro_html: String(r.intro_html ?? ""),
     banner_url: r.banner_url != null ? String(r.banner_url) : null,
     banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
-    blocks: parseBlocks(r.blocks),
+        blocks: parseCmsCategoryBlocks(r.blocks),
       updated_at: String(r.updated_at ?? ""),
       organization_id: r.organization_id != null ? String(r.organization_id) : null,
   };
@@ -220,7 +231,7 @@ export async function getCmsCategoryContentPublic(
     intro_html: String(r.intro_html ?? ""),
     banner_url: r.banner_url != null ? String(r.banner_url) : null,
     banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
-    blocks: parseBlocks(r.blocks),
+    blocks: parseCmsCategoryBlocks(r.blocks),
     updated_at: String(r.updated_at ?? ""),
   };
 }

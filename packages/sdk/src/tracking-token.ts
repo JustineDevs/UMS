@@ -1,8 +1,6 @@
 /**
- * HMAC-based tracking token for /track/[orderId] and /track?orderId=&t=
- * Spec: "Anonymous tracking SHALL use a scoped secret (e.g. HMAC of order id)
- * conveyed in the URL query string so that knowledge of the order UUID alone
- * is insufficient to read order or shipment data."
+ * Legacy HMAC helpers retained for migration compatibility. Public tracking
+ * uses the opaque, expiring `/track/cap_v3.*` capability path instead.
  *
  * Server-only: reads TRACKING_HMAC_SECRET from env.
  */

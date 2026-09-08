@@ -2,14 +2,14 @@ import { PLATFORM_FEATURE_MAPPINGS, buildPlatformFeatureMappingMetadata } from "
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   const correlationId = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
-  if (!staffSessionAllows(session, "dashboard:read")) return correlatedJson(correlationId, { error: "Forbidden" }, { status: 403 });
+  if (!session?.user) return correlatedError(correlationId, 401, "Unauthorized", "UNAUTHORIZED");
+  if (!staffSessionAllows(session, "dashboard:read")) return correlatedError(correlationId, 403, "Forbidden", "FORBIDDEN");
   return correlatedJson(correlationId, {
     data: buildPlatformFeatureMappingMetadata(),
     generatedAt: new Date().toISOString(),

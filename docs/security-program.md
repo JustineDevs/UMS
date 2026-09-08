@@ -25,7 +25,7 @@ GitHub Actions workflow: `.github/workflows/security-audit.yml`.
 
 - **Express** compliance and health: `INTERNAL_API_KEY` required in production (`apps/api`).
 - **Admin** App Router APIs: expected to call `requireStaffSession`, `getServerSession`, or an approved internal/HMAC pattern (enforced by `check-admin-api-staff-guard.mjs`).
-- **Channel webhook** (`/api/integrations/channels/webhook`): `CHANNEL_WEBHOOK_SECRET` required on Vercel production and on non-Vercel `NODE_ENV=production`; HMAC verified with constant-time compare (`channel-webhook-signature.ts`).
+- **Channel webhook** (`/api/integrations/channels/webhook`): `CHANNEL_WEBHOOK_SECRET` is required on every deployment, including Vercel preview and Render; only local `NODE_ENV=development` without a Vercel environment is exempt. HMAC is verified with constant-time compare (`channel-webhook-signature.ts`).
 
 ## 4. Ongoing work (not fully automatable)
 

@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  trackSearchSuggestionClick,
+  trackSearchSuggestionRequest,
+} from "@/lib/analytics";
 
 type Suggestion = { slug: string; name: string; minPrice: number };
 
@@ -68,7 +72,12 @@ export function CatalogSearchTypeahead({
       if (!res.ok) throw new Error("suggestions unavailable");
       const data = (await res.json()) as { suggestions?: Suggestion[] };
       if (controller.signal.aborted) return;
-      setItems(Array.isArray(data.suggestions) ? data.suggestions : []);
+      const nextItems = Array.isArray(data.suggestions) ? data.suggestions : [];
+      trackSearchSuggestionRequest({
+        queryLength: t.length,
+        resultCount: nextItems.length,
+      });
+      setItems(nextItems);
       setActiveIndex(-1);
     } catch {
       if (controller.signal.aborted) return;
@@ -143,6 +152,7 @@ export function CatalogSearchTypeahead({
         }
         onKeyDown={(event) => {
           if (event.key === "Escape") {
+            event.preventDefault();
             setOpen(false);
             setActiveIndex(-1);
             return;
@@ -208,7 +218,13 @@ export function CatalogSearchTypeahead({
               <Link
                 href={`/shop/${it.slug}`}
                 className={`block px-3 py-2 text-sm text-on-surface hover:bg-surface-container-low ${index === activeIndex ? "bg-surface-container-low" : ""}`}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  trackSearchSuggestionClick({
+                    position: index,
+                    resultCount: items.length,
+                  });
+                  setOpen(false);
+                }}
                 onMouseEnter={() => setActiveIndex(index)}
               >
                 <span className="font-medium text-primary">{it.name}</span>

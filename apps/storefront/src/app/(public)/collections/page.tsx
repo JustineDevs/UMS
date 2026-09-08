@@ -1,12 +1,19 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import Image from "next/image";
+import { unstable_cache } from "next/cache";
 import { loadCmsCategoryContentListPublic } from "@universal-music-store/platform-data";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { fetchCategorySummaries } from "@/lib/catalog-fetch";
 import { buildCatalogCategoryTree } from "@/lib/catalog-category-tree";
 import { buildPageMetadata, SEO_KEYWORDS, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo";
+
+const getCachedCmsCategoryContent = unstable_cache(
+  loadCmsCategoryContentListPublic,
+  ["storefront-category-content-list"],
+  { revalidate: 60, tags: ["collections:index", "storefront:cms"] },
+);
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +27,7 @@ export const metadata: Metadata = buildPageMetadata({
 export default async function CollectionsPage() {
   const [catRes, cmsRows] = await Promise.all([
     fetchCategorySummaries(),
-    loadCmsCategoryContentListPublic(),
+    getCachedCmsCategoryContent(),
   ]);
   if (catRes.kind !== "ok") {
     return (

@@ -41,6 +41,30 @@ export function trackProductClick(payload: { slug: string; id: string }): void {
   capturePostHog("product_click", payload);
 }
 
+export function trackSearchSuggestionRequest(payload: {
+  queryLength: number;
+  resultCount: number;
+}): void {
+  const data = {
+    query_length: payload.queryLength,
+    result_count: payload.resultCount,
+  };
+  va()?.("event", { name: "search_suggestion_request", ...data });
+  capturePostHog("search_suggestion_request", data);
+}
+
+export function trackSearchSuggestionClick(payload: {
+  position: number;
+  resultCount: number;
+}): void {
+  const data = {
+    position: payload.position,
+    result_count: payload.resultCount,
+  };
+  va()?.("event", { name: "search_suggestion_click", ...data });
+  capturePostHog("search_suggestion_click", data);
+}
+
 export function trackProductView(payload: { slug: string; id: string }): void {
   va()?.("event", { name: "product_view", ...payload });
   fireGtag("event", "view_item", { item_id: payload.id, item_name: payload.slug });

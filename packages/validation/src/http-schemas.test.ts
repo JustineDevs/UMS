@@ -36,17 +36,22 @@ describe("http-schemas", () => {
   });
 
   it("validates cart merge body", () => {
-    assert.ok(cartMergePostBodySchema.safeParse({}).success);
+    assert.ok(!cartMergePostBodySchema.safeParse({}).success);
     assert.ok(
       cartMergePostBodySchema.safeParse({
+        mergeKey: "merge-key-0123456789",
         guestLines: [{ variantId: "variant_01ABC", quantity: 2 }],
       }).success,
     );
     assert.ok(
       !cartMergePostBodySchema.safeParse({
+        mergeKey: "merge-key-0123456789",
         guestLines: [{ variantId: "bad", quantity: 1 }],
       }).success,
     );
+    assert.ok(!cartMergePostBodySchema.safeParse({
+      guestLines: [{ variantId: "variant_01ABC", quantity: 2 }],
+    }).success);
   });
 
   it("validates review list query", () => {

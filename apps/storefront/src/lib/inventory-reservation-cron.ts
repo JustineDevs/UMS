@@ -2,7 +2,7 @@ export type ReservationTenantRow = { tenant_id?: unknown };
 
 /** Collect every active reservation tenant without silently truncating large stores. */
 export async function collectActiveReservationTenants(
-  fetchPage: (from: number, to: number) => Promise<ReservationTenantRow[]>,
+  fetchPage: (_from: number, _to: number) => Promise<ReservationTenantRow[]>,
   pageSize = 1_000,
 ): Promise<string[]> {
   if (!Number.isInteger(pageSize) || pageSize <= 0) {

@@ -4,6 +4,7 @@ import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-li
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { fetchProductIdentityBySlug } from "@/lib/catalog-medusa-fetch";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const runtime = "nodejs";
 
@@ -69,6 +70,9 @@ function parseBackInStockPayload(body: unknown):
 }
 
 async function handlePOST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`back-in-stock:${ip}`, 12, 60_000);
   if (!rl.ok) {
@@ -77,7 +81,6 @@ async function handlePOST(req: NextRequest) {
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
     );
   }
-
   const bounded = await parseBoundedJson(req, MAX_BACK_IN_STOCK_BODY_BYTES);
   if (bounded.tooLarge) {
     return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
@@ -89,10 +92,7 @@ async function handlePOST(req: NextRequest) {
 
   const parsed = parseBackInStockPayload(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid payload", details: parsed.details },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
   const { email, productId, productSlug, variantId } = parsed.data;
   const requestedProductSlug = productSlug;

@@ -10,6 +10,7 @@ import type {
 } from "@universal-music-store/platform-data";
 import { useEffect, useState } from "react";
 import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
+import { parseHomePreviewMessage } from "@/components/home-preview-message";
 import type { HomepageSocialProof } from "@/lib/homepage-social-proof";
 import type { Product } from "@universal-music-store/types";
 
@@ -96,15 +97,10 @@ export function StorefrontHomePreviewBridge({
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
       if (event.origin !== parentOrigin) return;
-      if (event.data?.source !== "cms-builder-draft" || event.data.mode !== "home") {
-        return;
-      }
-      const blocks = Array.isArray(event.data.tree)
-        ? cmsTreeToBlocks(event.data.tree as Parameters<typeof cmsTreeToBlocks>[0])
-        : Array.isArray(event.data.blocks)
-          ? event.data.blocks
-          : [];
-      setHome((current) => draftHome(blocks as CmsBlock[], current));
+      const message = parseHomePreviewMessage(event.data);
+      if (!message) return;
+      const blocks = message.tree ? cmsTreeToBlocks(message.tree) : message.blocks ?? [];
+      setHome((current) => draftHome(blocks, current));
     };
     window.addEventListener("message", onMessage);
     window.parent.postMessage({ source: "cms-preview-ready" }, parentOrigin);

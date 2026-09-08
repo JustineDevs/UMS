@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankSearchSuggestions, type SearchSuggestion } from "./search-suggestion-ranking";
+import {
+  expandSearchQueries,
+  rankSearchSuggestions,
+  type SearchSuggestion,
+} from "./search-suggestion-ranking";
 
 const suggestion = (name: string, slug = name.toLowerCase().replaceAll(" ", "-")): SearchSuggestion => ({
   name,
@@ -27,4 +31,17 @@ test("search suggestion ranking is stable for equal scores", () => {
     "canary",
   );
   assert.deepEqual(ranked.map((item) => item.name), ["Canary Tone", "Canary Case"]);
+});
+
+test("search suggestions tolerate bounded music-catalog typos", () => {
+  const ranked = rankSearchSuggestions(
+    [suggestion("Acoustic Guitar"), suggestion("Electric Bass")],
+    "acustic guitar",
+  );
+  assert.equal(ranked[0]?.name, "Acoustic Guitar");
+});
+
+test("search query expansion adds synonyms and corrections without duplicates", () => {
+  assert.deepEqual(expandSearchQueries("guiter"), ["guiter", "guitar"]);
+  assert.deepEqual(expandSearchQueries("amp"), ["amp", "amplifier"]);
 });

@@ -22,6 +22,42 @@ export type ShopPageSearchParams = {
   q?: string;
 };
 
+type NextShopPageSearchParams = Record<string, string | string[] | undefined>;
+
+export function normalizeShopPageSearchParams(
+  searchParams: ShopPageSearchParams | NextShopPageSearchParams | URLSearchParams,
+): ShopPageSearchParams {
+  if (typeof (searchParams as URLSearchParams).entries === "function") {
+    return Object.fromEntries(
+      Array.from((searchParams as URLSearchParams).entries()),
+    );
+  }
+  return Object.fromEntries(
+    Object.entries(searchParams).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? value.at(-1) : value,
+    ]),
+  ) as ShopPageSearchParams;
+}
+
+const KNOWN_QUERY_KEYS = new Set([
+  "category",
+  "locale",
+  "type",
+  "finish",
+  "brand",
+  "pickupConfig",
+  "bodyWood",
+  "condition",
+  "skillLevel",
+  "shippingSpeed",
+  "minPrice",
+  "maxPrice",
+  "sort",
+  "offset",
+  "q",
+]);
+
 function buildCandidate(searchParams: ShopPageSearchParams) {
   return {
     limit: SHOP_PRODUCT_PAGE_SIZE,
@@ -60,7 +96,10 @@ export function parseShopPageQueryDiagnostics(
 ): ShopPageQueryDiagnostics {
   const candidate = buildCandidate(searchParams);
   const parsed = productListQuerySchema.safeParse(candidate);
-  if (parsed.success) return { query: parsed.data, invalidKeys: [] };
+  const unknownKeys = Object.keys(searchParams).filter(
+    (key) => !KNOWN_QUERY_KEYS.has(key),
+  );
+  if (parsed.success) return { query: parsed.data, invalidKeys: unknownKeys };
 
   const invalidPaths = new Set(
     parsed.error.issues.map((issue) => String(issue.path[0] ?? "")),
@@ -80,10 +119,16 @@ export function parseShopPageQueryDiagnostics(
   }
   const sanitized = productListQuerySchema.safeParse(sanitizedCandidate);
   if (sanitized.success) {
-    return { query: sanitized.data, invalidKeys: [...invalidPaths] };
+    return {
+      query: sanitized.data,
+      invalidKeys: [...new Set([...invalidPaths, ...unknownKeys])],
+    };
   }
 
-  return { query: parseDefaultQuery(), invalidKeys: [...invalidPaths] };
+  return {
+    query: parseDefaultQuery(),
+    invalidKeys: [...new Set([...invalidPaths, ...unknownKeys])],
+  };
 }
 
 export function parseShopPageQuery(

@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isExpectedWishlistSyncUnauthorized, mergeWishlistSyncResult } from "./wishlist-sync-state";
+import {
+  canApplyWishlistSyncResult,
+  isExpectedWishlistSyncUnauthorized,
+  mergeWishlistSyncResult,
+} from "./wishlist-sync-state";
 import type { WishlistEntry } from "./wishlist";
 
 test("treats an expired wishlist session as an expected signed-out state", () => {
   assert.equal(isExpectedWishlistSyncUnauthorized(401), true);
   assert.equal(isExpectedWishlistSyncUnauthorized(403), false);
   assert.equal(isExpectedWishlistSyncUnauthorized(503), false);
+});
+
+test("does not apply a stale account response after an account switch", () => {
+  assert.equal(canApplyWishlistSyncResult("alice@example.com", "alice@example.com"), true);
+  assert.equal(canApplyWishlistSyncResult("bob@example.com", "alice@example.com"), false);
+  assert.equal(canApplyWishlistSyncResult(null, "alice@example.com"), false);
 });
 
 test("preserves local entries that were not canonicalized by the server", () => {

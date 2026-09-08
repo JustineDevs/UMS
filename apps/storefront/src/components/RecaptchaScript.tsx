@@ -50,20 +50,33 @@ export async function getRecaptchaToken(action: string): Promise<string | null> 
   if (provider === "standard" && !window.grecaptcha?.ready) return null;
   return new Promise((resolve) => {
     const api = provider === "enterprise" ? window.grecaptcha?.enterprise : window.grecaptcha;
-    api?.ready?.(() => {
-      try {
-        const execution = provider === "enterprise"
-          ? window.grecaptcha?.enterprise?.execute(siteKey, { action })
-          : window.grecaptcha?.execute?.(siteKey, { action });
-        if (!execution) {
-          resolve(null);
-          return;
+    if (!api?.ready) {
+      resolve(null);
+      return;
+    }
+    const timeout = window.setTimeout(() => resolve(null), 5_000);
+    const finish = (token: string | null) => {
+      window.clearTimeout(timeout);
+      resolve(token);
+    };
+    try {
+      api.ready(() => {
+        try {
+          const execution = provider === "enterprise"
+            ? window.grecaptcha?.enterprise?.execute(siteKey, { action })
+            : window.grecaptcha?.execute?.(siteKey, { action });
+          if (!execution) {
+            finish(null);
+            return;
+          }
+          void execution.then(finish).catch(() => finish(null));
+        } catch {
+          finish(null);
         }
-        void execution.then(resolve).catch(() => resolve(null));
-      } catch {
-        resolve(null);
-      }
-    });
+      });
+    } catch {
+      finish(null);
+    }
   });
 }
 

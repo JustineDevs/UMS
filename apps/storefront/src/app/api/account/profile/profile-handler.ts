@@ -11,6 +11,7 @@ import {
 import type { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { hasRecentAuthentication } from "@/lib/recent-auth";
+import { isStorefrontAuthDisabled } from "@/lib/auth";
 
 const MAX_PROFILE_BODY_BYTES = 32 * 1024;
 
@@ -47,8 +48,7 @@ export async function handleStorefrontProfilePatchRequest(
   if (!email) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const authDisabled = process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true";
-  if (!authDisabled && !hasRecentAuthentication(session)) {
+  if (!isStorefrontAuthDisabled() && !hasRecentAuthentication(session)) {
     return Response.json(
       {
         error: "Please sign in again before changing your profile or addresses.",

@@ -35,14 +35,20 @@ export function CheckoutTrustBadges() {
         <li className="flex flex-col gap-1">
           <span className="font-medium text-primary">Returns &amp; warranty</span>
           <span className="text-xs leading-relaxed">
-            <Link href="/returns" className="underline hover:opacity-80">
-              Return window
+            <Link href="/returns" className="min-h-11 inline-flex items-center underline hover:opacity-80">
+              Review our return policy
             </Link>
             {" · "}
-            <Link href="/warranty" className="underline hover:opacity-80">
+            <Link href="/warranty" className="min-h-11 inline-flex items-center underline hover:opacity-80">
               Warranty info
             </Link>
           </span>
+        </li>
+        <li className="flex flex-col gap-1">
+          <span className="font-medium text-primary">Need help?</span>
+          <Link href="/contact" className="min-h-11 inline-flex items-center underline hover:opacity-80">
+            Contact customer support
+          </Link>
         </li>
       </ul>
     </div>

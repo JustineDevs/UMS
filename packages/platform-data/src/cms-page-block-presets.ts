@@ -2,18 +2,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 import type { CmsBlock, CmsPageBlockPresetRow } from "./cms-types.js";
 
-function parseBlocks(v: unknown): CmsBlock[] {
+function stableBlockId(index: number, type: string, props: Record<string, unknown>): string {
+  const input = `${index}:${type}:${JSON.stringify(props)}`;
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `blk_${(hash >>> 0).toString(36)}`;
+}
+
+export function parseCmsPagePresetBlocks(v: unknown): CmsBlock[] {
   if (!Array.isArray(v)) return [];
   const out: CmsBlock[] = [];
-  for (const item of v) {
+  for (const [index, item] of v.entries()) {
     if (!item || typeof item !== "object") continue;
     const r = item as Record<string, unknown>;
-    const id = typeof r.id === "string" ? r.id : `blk_${Math.random().toString(36).slice(2, 11)}`;
     const type = typeof r.type === "string" ? r.type : "unknown";
     const props =
       r.props && typeof r.props === "object" && r.props !== null
         ? (r.props as Record<string, unknown>)
         : {};
+    const id = typeof r.id === "string" ? r.id : stableBlockId(index, type, props);
     out.push({ id, type, props });
   }
   return out;
@@ -38,7 +48,7 @@ export async function listCmsPageBlockPresets(
     return {
       id: String(x.id),
       name: String(x.name ?? ""),
-      blocks: parseBlocks(x.blocks),
+      blocks: parseCmsPagePresetBlocks(x.blocks),
       created_at: String(x.created_at ?? ""),
     };
   });
@@ -65,7 +75,7 @@ export async function insertCmsPageBlockPreset(
   return {
     id: String(x.id),
     name: String(x.name ?? ""),
-    blocks: parseBlocks(x.blocks),
+    blocks: parseCmsPagePresetBlocks(x.blocks),
     created_at: String(x.created_at ?? ""),
   };
 }

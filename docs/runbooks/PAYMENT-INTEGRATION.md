@@ -41,7 +41,7 @@ Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa se
 
 1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
-3. Register PayPal webhooks to your Medusa PayPal hook URL.
+3. Register PayPal webhooks at `https://your-medusa-backend.example.com/hooks/payment/paypal`.
 
 ### Environment (Medusa)
 
@@ -79,7 +79,11 @@ Customers select **"GCash / Xendit"** on checkout when that provider is enabled.
 
 ### Webhooks
 
-Register: `https://ums-6455.onrender.com/hooks/payment/xendit_xendit`
+Register: `https://your-medusa-backend.example.com/hooks/payment/xendit`
+
+The provider suffix is `xendit`, not `xendit_xendit`. The same service exposes
+Stripe at `/hooks/payment/stripe` and PayPal at `/hooks/payment/paypal`. Do not
+register the storefront root or a Vercel page as a payment webhook endpoint.
 
 ---
 

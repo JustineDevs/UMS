@@ -4,6 +4,7 @@ import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { sanitizeSafeUrl } from "@universal-music-store/sdk";
 import { z } from "zod";
 import { useEffect } from "react";
+import { normalizeCmsDomStyle } from "@/lib/cms-dom-edit";
 
 type DraftBlock = {
   id: string;
@@ -165,36 +166,6 @@ function applyAccessibility(node: HTMLElement, value: unknown): HTMLElement {
   return node;
 }
 
-const editableDomStyles = new Set([
-  "display",
-  "position",
-  "width",
-  "height",
-  "margin",
-  "padding",
-  "color",
-  "background-color",
-  "font-size",
-  "font-weight",
-  "border-radius",
-  "gap",
-  "align-items",
-  "justify-content",
-  "grid-template-columns",
-  "min-width",
-  "max-width",
-  "min-height",
-  "max-height",
-  "line-height",
-  "letter-spacing",
-  "border",
-  "box-shadow",
-  "object-fit",
-  "object-position",
-  "background-size",
-  "background-position",
-]);
-
 const builderMessageSchema = z.object({
   source: z.string().max(64),
   id: z.string().max(200).optional(),
@@ -218,10 +189,9 @@ function applyDomEdit(node: HTMLElement, property: string, value: string) {
     setSafeUrl(node, value, "src");
     return node.hasAttribute("src");
   }
-  if (property.startsWith("style.") && editableDomStyles.has(property.slice(6))) {
-    const cssProperty = property.slice(6);
-    if (value.length > 200 || /[{};]/.test(value) || /url\s*\(/i.test(value)) return false;
-    node.style.setProperty(cssProperty, value);
+  const styleProperty = normalizeCmsDomStyle(property, value);
+  if (styleProperty) {
+    node.style.setProperty(styleProperty.slice(6), value);
     return true;
   }
   return false;
@@ -446,12 +416,13 @@ export function CmsPagePreviewBridge() {
         const value = message.data.value ?? "";
         if (!selectedNode || selectedNode.dataset.cmsId !== id || !property || value.length > 100_000) return;
         if (!applyDomEdit(selectedNode, property, value)) return;
+        const mutationProperty = normalizeCmsDomStyle(property, value) ?? property;
         window.parent.postMessage(
           {
             source: "cms-builder-dom-mutation",
             id,
             blockId: selectedNode.dataset.cmsBlockId ?? null,
-            prop: property,
+            prop: mutationProperty,
             value,
           },
           origin,

@@ -21,11 +21,17 @@ export default async function HostedReturnPage({
     provider?: string;
     status?: string;
     token?: string;
+    stripe_session?: string;
   }>;
 }) {
   const sp = await searchParams;
   const provider = normalizeHostedReturnProvider(sp.provider);
   const status = normalizeHostedReturnStatus(sp.status);
-  const providerOrderId = typeof sp.token === "string" ? sp.token : undefined;
+  const providerOrderId =
+    typeof sp.token === "string"
+      ? sp.token
+      : typeof sp.stripe_session === "string"
+        ? sp.stripe_session
+        : undefined;
   return <HostedCheckoutReturn provider={provider} status={status} providerOrderId={providerOrderId} />;
 }

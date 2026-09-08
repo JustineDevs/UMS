@@ -32,9 +32,29 @@ export function PayPalEmbeddedCheckout({
   }, [paypalOrderId]);
 
   const handleApprove = useCallback(
-    async (data: { orderID: string }) => {
+    async (
+      data: { orderID: string },
+      actions: { order?: { capture?: () => Promise<unknown> } },
+    ) => {
       setLoading(true);
       try {
+        if (typeof actions.order?.capture !== "function") {
+          throw new Error("PayPal capture is unavailable. Your bag was not charged.");
+        }
+        const capture = (await actions.order.capture()) as {
+          status?: unknown;
+          purchase_units?: Array<{
+            payments?: { captures?: Array<{ status?: unknown }> };
+          }>;
+        };
+        const captureStatus = String(
+          capture.purchase_units?.[0]?.payments?.captures?.[0]?.status ??
+            capture.status ??
+            "",
+        ).toUpperCase();
+        if (captureStatus !== "COMPLETED") {
+          throw new Error("PayPal did not complete the payment. Your bag was not charged.");
+        }
         await onApprove(data.orderID);
       } catch (err) {
         onError(err instanceof Error ? err.message : "PayPal payment failed.");

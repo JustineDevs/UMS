@@ -87,3 +87,27 @@ test("resume accepts only a valid cart-scoped recovery capability", async () => 
     else process.env.TRACKING_HMAC_SECRET = previous;
   }
 });
+
+test("cart resume href never exposes the raw cart identifier", async () => {
+  const previous = process.env.TRACKING_HMAC_SECRET;
+  process.env.TRACKING_HMAC_SECRET = "resume-href-test-secret";
+  try {
+    const {
+      buildCartResumeHref,
+      resolveCartResumeCapability,
+    } = await import("./cart-session-boundary");
+    const cartId = "cart_private_123";
+    const href = buildCartResumeHref(cartId);
+    assert.ok(href);
+    assert.equal(href.includes(cartId), false);
+    assert.equal(
+      resolveCartResumeCapability(
+        new URL(`https://shop.example${href}`).searchParams.get("token"),
+      ),
+      cartId,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.TRACKING_HMAC_SECRET;
+    else process.env.TRACKING_HMAC_SECRET = previous;
+  }
+});

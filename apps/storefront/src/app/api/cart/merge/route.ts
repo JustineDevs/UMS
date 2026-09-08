@@ -15,10 +15,14 @@ import {
   writeCartCookie,
   retrieveCartLines,
   retrieveCartRaw,
+  isMedusaNotFoundError,
 } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { cartMergePostBodySchema } from "@universal-music-store/validation";
-import { buildCartRestoreOperations } from "@/lib/cart-merge-recovery";
+import {
+  buildCartMergeResponse,
+  buildCartRestoreOperations,
+} from "@/lib/cart-merge-recovery";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 
@@ -50,10 +54,7 @@ export async function POST(req: Request) {
 
   const bodyParsed = cartMergePostBodySchema.safeParse(parsed.value);
   if (!bodyParsed.success) {
-    return NextResponse.json(
-      { error: "Invalid request body", details: bodyParsed.error.flatten() },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
   const guestLines = bodyParsed.data.guestLines ?? [];
@@ -82,24 +83,39 @@ export async function POST(req: Request) {
     return created?.id ?? null;
   };
 
-  if (!targetCartId) targetCartId = await createCart();
+  let existing: Record<string, unknown> | null;
+  try {
+    if (!targetCartId) targetCartId = await createCart();
 
-  if (!isValidCartId(targetCartId)) {
-    return NextResponse.json({ error: "No target cart" }, { status: 503 });
-  }
-
-  let existing = await retrieveCartRaw(
-    targetCartId,
-    "*items,*items.id,*items.variant_id,*items.quantity,+metadata",
-  );
-  if (!existing) {
-    // A stale cookie is normal after a Medusa reset or cart expiry. Replace it
-    // instead of turning login/cart merge into a 500.
-    targetCartId = await createCart();
     if (!isValidCartId(targetCartId)) {
       return NextResponse.json({ error: "No target cart" }, { status: 503 });
     }
-    existing = {};
+
+    existing = await retrieveCartRaw(
+      targetCartId,
+      "*items,*items.id,*items.variant_id,*items.quantity,+metadata",
+    );
+    if (!existing) {
+      // A stale cookie is normal after a Medusa reset or cart expiry. Replace it
+      // instead of turning login/cart merge into a 500.
+      targetCartId = await createCart();
+      if (!isValidCartId(targetCartId)) {
+        return NextResponse.json({ error: "No target cart" }, { status: 503 });
+      }
+      existing = {};
+    }
+  } catch (error) {
+    if (isMedusaNotFoundError(error)) {
+      return NextResponse.json({ error: "No target cart" }, { status: 503 });
+    }
+    console.error(
+      "[cart/merge] target cart lookup failed",
+      error instanceof Error ? error.message : String(error),
+    );
+    return NextResponse.json(
+      { error: "Cart merge is temporarily unavailable" },
+      { status: 503 },
+    );
   }
 
   // Claim only after stale-cookie recovery so the lock and completion record use
@@ -149,13 +165,38 @@ export async function POST(req: Request) {
       ? (existing.metadata as Record<string, unknown>)
       : {};
   if (mergeKey && existingMetadata.storefront_guest_merge_key === mergeKey) {
-    const lines = await retrieveCartLines(targetCartId);
-    const response = { ok: true, cartId: targetCartId, replayed: true, lines: lines ?? [] };
+    let lines: CartLine[] | null;
+    try {
+      lines = await retrieveCartLines(targetCartId);
+    } catch {
+      await mergeStore.rpc("release_cart_merge", {
+        p_cart_id: targetCartId,
+        p_merge_key: mergeKey,
+        p_owner_key: mergeOwner,
+      });
+      return NextResponse.json(
+        { error: "Cart merge could not reload the cart. Try again." },
+        { status: 503 },
+      );
+    }
+    const response = buildCartMergeResponse(targetCartId, lines);
+    if (!response) {
+      await mergeStore.rpc("release_cart_merge", {
+        p_cart_id: targetCartId,
+        p_merge_key: mergeKey,
+        p_owner_key: mergeOwner,
+      });
+      return NextResponse.json(
+        { error: "Cart merge could not reload the cart. Try again." },
+        { status: 503 },
+      );
+    }
+    const replayResponse = { ...response, replayed: true };
     const { data: completed } = await mergeStore.rpc("complete_cart_merge", {
       p_cart_id: targetCartId,
       p_merge_key: mergeKey,
       p_owner_key: mergeOwner,
-      p_response: response,
+      p_response: replayResponse,
     });
     if (completed !== true) {
       await mergeStore.rpc("release_cart_merge", {
@@ -166,7 +207,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Cart merge could not be durably recorded. Try again." }, { status: 503 });
     }
     await writeCartCookie(targetCartId);
-    return NextResponse.json(response);
+    return NextResponse.json(replayResponse);
   }
 
   const byVariant = new Map<string, number>();
@@ -227,7 +268,21 @@ export async function POST(req: Request) {
         : {}),
     });
   } catch {
-    const current = await retrieveCartRaw(targetCartId, "*items,*items.id,*items.variant_id,*items.quantity");
+    let current: Record<string, unknown> | null;
+    try {
+      current = await retrieveCartRaw(targetCartId, "*items,*items.id,*items.variant_id,*items.quantity");
+    } catch (error) {
+      await mergeStore.rpc("release_cart_merge", {
+        p_cart_id: targetCartId,
+        p_merge_key: mergeKey,
+        p_owner_key: mergeOwner,
+      });
+      console.error(
+        "[cart/merge] recovery lookup failed",
+        error instanceof Error ? error.message : String(error),
+      );
+      return NextResponse.json({ error: "Cart merge could not be recovered. Try again." }, { status: 503 });
+    }
     if (current) {
       const currentSnapshot = ((current as { items?: unknown[] }).items ?? []).flatMap((item) => {
         if (!item || typeof item !== "object") return [];
@@ -267,8 +322,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Cart merge failed; your cart was restored. Try again." }, { status: 503 });
   }
 
-  const lines = await retrieveCartLines(targetCartId);
-  const response = { ok: true, cartId: targetCartId, lines: lines ?? [] };
+  let lines: CartLine[] | null;
+  try {
+    lines = await retrieveCartLines(targetCartId);
+  } catch {
+    await mergeStore.rpc("release_cart_merge", {
+      p_cart_id: targetCartId,
+      p_merge_key: mergeKey,
+      p_owner_key: mergeOwner,
+    });
+    return NextResponse.json(
+      { error: "Cart merge could not reload the cart. Try again." },
+      { status: 503 },
+    );
+  }
+  const response = buildCartMergeResponse(targetCartId, lines);
+  if (!response) {
+    await mergeStore.rpc("release_cart_merge", {
+      p_cart_id: targetCartId,
+      p_merge_key: mergeKey,
+      p_owner_key: mergeOwner,
+    });
+    return NextResponse.json(
+      { error: "Cart merge could not reload the cart. Try again." },
+      { status: 503 },
+    );
+  }
   const { data: completed } = await mergeStore.rpc("complete_cart_merge", {
     p_cart_id: targetCartId,
     p_merge_key: mergeKey,

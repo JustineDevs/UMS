@@ -1,3 +1,5 @@
+import type { CartLine } from "./cart";
+
 export type CartMergeSnapshotItem = {
   id: string;
   variantId: string;
@@ -8,6 +10,13 @@ export type CartRestoreOperation =
   | { type: "update"; lineId: string; quantity: number }
   | { type: "delete"; lineId: string }
   | { type: "create"; variantId: string; quantity: number };
+
+export function buildCartMergeResponse(
+  cartId: string,
+  lines: CartLine[] | null,
+): { ok: true; cartId: string; lines: CartLine[] } | null {
+  return lines === null ? null : { ok: true, cartId, lines };
+}
 
 /** Builds the smallest set of operations that returns a cart to its snapshot. */
 export function buildCartRestoreOperations(

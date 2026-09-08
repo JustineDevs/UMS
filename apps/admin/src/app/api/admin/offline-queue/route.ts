@@ -10,15 +10,15 @@ import {
 } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
@@ -31,17 +31,17 @@ export async function GET(req: NextRequest) {
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const parsedBody = await parseBoundedJson(req, 256 * 1024);
-  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
   const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
     ? parsedBody.value as { device_name?: unknown; employee_id?: unknown; payload?: unknown }
     : null;
   if (!body?.device_name || !body.payload) {
-    return correlatedJson(cid, { error: "device_name and payload are required" }, { status: 400 });
+    return correlatedError(cid, 400, "device_name and payload are required", "VALIDATION_ERROR");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
@@ -57,18 +57,18 @@ async function post(req: NextRequest) {
 async function patch(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const parsedBody = await parseBoundedJson(req, 32 * 1024);
-  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
   const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
     ? parsedBody.value as { id?: unknown; action?: unknown; error_message?: unknown }
     : {};
   const { id, action, error_message } = body;
   if (!id || !action) {
-    return correlatedJson(cid, { error: "id and action required" }, { status: 400 });
+    return correlatedError(cid, 400, "id and action required", "VALIDATION_ERROR");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;

@@ -169,6 +169,7 @@ test.describe("storefront UX and compliance", () => {
     await expect(page.getByText(/no products found for/i)).toBeVisible({
       timeout: 30_000,
     });
+    await expect(page.locator('[data-product-slug="canary"]')).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Clear search" }),
     ).toHaveAttribute("href", "/shop?sort=newest");
@@ -185,6 +186,9 @@ test.describe("storefront UX and compliance", () => {
 
   test("shop result range is announced as a live status", async ({ page }) => {
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("[data-product-slug], [role='status']").first()).toBeVisible({
+      timeout: 30_000,
+    });
     const status = page
       .getByRole("status")
       .filter({ hasText: /Showing \d+–\d+ of \d+/ });
@@ -200,6 +204,7 @@ test.describe("storefront UX and compliance", () => {
   }) => {
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
     const categoryLink = page.locator("aside a[href*='category=']").first();
+    await expect(page.locator("aside")).toBeVisible({ timeout: 30_000 });
     if (!(await categoryLink.isVisible().catch(() => false))) {
       test.skip(true, "No seeded matching category available");
       return;
@@ -327,7 +332,7 @@ test.describe("storefront UX and compliance", () => {
   }) => {
     await page.addInitScript(() => {
       localStorage.setItem(
-        "ums-commerce-cart-v4",
+        "ums-commerce-cart-v5",
         JSON.stringify([
           {
             variantId: "hosted-recovery-fixture",
@@ -356,13 +361,39 @@ test.describe("storefront UX and compliance", () => {
             .getByText(/return to checkout|try again|did not confirm|left/i)
             .first(),
         ).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole("status")).toBeVisible();
+        await expect(
+          page.getByTestId("hosted-return-back-to-checkout"),
+        ).toBeFocused();
+        await expect(
+          page.getByTestId("hosted-return-back-to-checkout"),
+        ).toHaveAttribute("href", "/checkout");
         await expect
           .poll(async () =>
-            page.evaluate(() => localStorage.getItem("ums-commerce-cart-v4")),
+            page.evaluate(() => localStorage.getItem("ums-commerce-cart-v5")),
           )
           .toContain("hosted-recovery-fixture");
       }
     }
+  });
+
+  test("hosted payment recovery handles an unavailable intent service", async ({
+    page,
+  }) => {
+    await page.route("**/api/payments/checkout-intents/recover**", (route) =>
+      route.abort("failed"),
+    );
+    await page.goto("/checkout/hosted-return?provider=stripe", {
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page.getByRole("status")).toContainText(
+      /could not reach the payment service/i,
+    );
+    await expect(
+      page.getByTestId("hosted-return-back-to-checkout"),
+    ).toBeFocused();
+    await expect(page).not.toHaveURL(/\/track\//i);
   });
 
   test("collection handles render native catalog pages", async ({ page }) => {

@@ -43,7 +43,3 @@ export const COURIER_REGISTRY: CourierDefinition[] = [
     supportsLabels: false,
   },
 ];
-
-export function getCourierBySlug(slug: string): CourierDefinition | undefined {
-  return COURIER_REGISTRY.find((c) => c.slug === slug);
-}

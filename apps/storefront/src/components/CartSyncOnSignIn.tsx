@@ -42,6 +42,11 @@ export function CartSyncOnSignIn() {
               })),
             }),
           });
+          if (res.status === 401) {
+            // Keep the API unauthenticated response strict, but do not retry a
+            // stale client session forever from the shared storefront layout.
+            return;
+          }
           const data = (await res.json()) as { lines?: unknown };
           const mergedLines = parseCartMergeResponse(res.ok, data.lines);
           if (!mergedLines) {
@@ -53,6 +58,7 @@ export function CartSyncOnSignIn() {
           await refresh();
         } else {
           const res = await fetch("/api/cart/attach-customer", { method: "POST" });
+          if (res.status === 401) return;
           if (!res.ok) throw new Error("Cart attachment failed");
         }
       } catch {

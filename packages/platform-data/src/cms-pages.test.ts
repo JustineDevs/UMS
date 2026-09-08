@@ -5,9 +5,11 @@ import {
   cmsTreeToBlocks,
   getCmsPageById,
   getCmsPageBySlugLocalePublic,
+  getCmsPageBySlugPreview,
   normalizeCmsTree,
   validateCmsPublishTree,
 } from "./cms-pages.js";
+import { getCmsBlogPostBySlugPreview } from "./cms-blog.js";
 
 test("public CMS lookup fails closed without an organization scope", async () => {
   const supabase = {
@@ -19,6 +21,28 @@ test("public CMS lookup fails closed without an organization scope", async () =>
     await getCmsPageBySlugLocalePublic(supabase, "home", "en"),
     null,
   );
+});
+
+test("CMS page preview lookup scopes the preview token to the organization", async () => {
+  const filters: Array<[string, string]> = [];
+  const chain = {
+    select() { return chain; },
+    eq(column: string, value: string) { filters.push([column, value]); return chain; },
+    async maybeSingle() { return { data: null, error: null }; },
+  };
+  await getCmsPageBySlugPreview({ from: () => chain } as never, "home", "en", "token", "org-2");
+  assert.ok(filters.some(([column, value]) => column === "organization_id" && value === "org-2"));
+});
+
+test("CMS blog preview lookup scopes the preview token to the organization", async () => {
+  const filters: Array<[string, string]> = [];
+  const chain = {
+    select() { return chain; },
+    eq(column: string, value: string) { filters.push([column, value]); return chain; },
+    async maybeSingle() { return { data: null, error: null }; },
+  };
+  await getCmsBlogPostBySlugPreview({ from: () => chain } as never, "news", "en", "token", "org-2");
+  assert.ok(filters.some(([column, value]) => column === "organization_id" && value === "org-2"));
 });
 
 test("publish validation rejects orphan and inconsistent child links", () => {

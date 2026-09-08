@@ -22,10 +22,14 @@ import {
   verifyRecaptchaAction,
 } from "@/lib/recaptcha-enterprise";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 const MAX_NEWSLETTER_BODY_BYTES = 16 * 1024;
 
 async function handlePOST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`newsletter:${ip}`, 5, 60_000);
   if (!rl.ok) {

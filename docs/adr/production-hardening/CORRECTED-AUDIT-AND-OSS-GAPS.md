@@ -56,7 +56,7 @@ The following areas show **implemented request handlers and UI wiring** in the c
 
 - Route `GET /api/cron/finalize-payment-attempts` is implemented; **`apps/storefront/vercel.json` has no `crons` array** (Render example exists in `render.yaml`).
 
-**Fix direction:** Add Vercel Cron + `STOREFRONT_PAYMENT_CRON_SECRET`. **Or** use **Inngest** for durable scheduling and retries (infrastructure choice).
+**Fix direction:** Use the existing GitHub Actions scheduler in `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`. Vercel Cron is intentionally excluded because this topology does not use it.
 
 ### Gap F — `CI_STRICT_E2E` in GitHub Actions
 
@@ -94,7 +94,7 @@ The following areas show **implemented request handlers and UI wiring** in the c
 3. Supabase Realtime for stale admin data
 4. Medusa Promotions wiring for loyalty redemption at checkout
 5. Compliance anonymization + DSAR Medusa merge
-6. Vercel Cron (or Inngest schedule) for payment finalize
+6. GitHub Actions schedule for payment finalization and recovery
 7. Verify campaign execute + experiment storefront consumption
 8. Upstash (or equivalent) for distributed rate limits
 

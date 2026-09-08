@@ -9,6 +9,7 @@ import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries, fetchProductsPage } from "@/lib/catalog-fetch";
 import { buildPageMetadata, canonicalUrl, SITE_DESCRIPTION } from "@/lib/seo";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
+import { decodeCollectionHandle } from "@/lib/collection-route";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle } = await params;
-  const canonicalHandle = decodeURIComponent(handle).trim();
+  const canonicalHandle = decodeCollectionHandle(handle) ?? "collections";
   const categories = await fetchCategorySummaries();
   const label = categories.kind === "ok"
     ? categories.summaries.find((category) => category.handle.toLowerCase() === canonicalHandle.toLowerCase())?.category ?? canonicalHandle
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CollectionByHandlePage({ params, searchParams }: Props) {
   const { handle } = await params;
   const { locale = "en", page: pageRaw } = await searchParams;
-  const h = decodeURIComponent(handle).trim();
+  const h = decodeCollectionHandle(handle);
   if (!h) notFound();
   const parsedPage = Number.parseInt(pageRaw ?? "1", 10);
   const currentPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;

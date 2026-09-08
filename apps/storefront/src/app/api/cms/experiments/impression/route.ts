@@ -6,8 +6,12 @@ import {
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`cms-ab-impression:${ip}`, 120, 60_000);
   if (!rl.ok) {

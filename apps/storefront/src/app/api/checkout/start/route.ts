@@ -18,6 +18,8 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { checkoutAttemptCookieHeader } from "@/lib/checkout-attempt-cookie";
+import { resolveCheckoutEmail } from "@/lib/checkout-email";
 
 export const dynamic = "force-dynamic";
 
@@ -32,21 +34,24 @@ type StartBody = {
 
 const PROVIDER_IDS = new Set<string>(Object.values(PAYMENT_PROVIDER_IDS));
 
-function jsonResponse(body: unknown, status = 200, cartId?: string): Response {
+function jsonResponse(body: unknown, status = 200, cartId?: string, correlationId?: string): Response {
   const payload = JSON.stringify(body);
+  const headers = new Headers({
+    "Cache-Control": "no-store",
+    Connection: "close",
+    "Content-Length": String(Buffer.byteLength(payload)),
+    "Content-Type": "application/json; charset=utf-8",
+  });
+  if (cartId) {
+    headers.append(
+      "Set-Cookie",
+      `mcart_id=${encodeURIComponent(cartId)}; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax`,
+    );
+  }
+  if (correlationId) headers.append("Set-Cookie", checkoutAttemptCookieHeader(correlationId));
   return new Response(payload, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-      Connection: "close",
-      "Content-Length": String(Buffer.byteLength(payload)),
-      "Content-Type": "application/json; charset=utf-8",
-      ...(cartId
-        ? {
-            "Set-Cookie": `mcart_id=${encodeURIComponent(cartId)}; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax`,
-          }
-        : {}),
-    },
+    headers,
   });
 }
 
@@ -93,10 +98,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const email =
-    typeof parsed.data.email === "string" && parsed.data.email.trim()
-      ? parsed.data.email.trim().toLowerCase()
-      : sessionEmail;
+  const emailResult = resolveCheckoutEmail(sessionEmail, parsed.data.email);
+  if (!emailResult.ok && emailResult.error === "account_email_mismatch") {
+    return NextResponse.json(
+      { error: "Signed-in checkout must use the email on your account." },
+      { status: 409 },
+    );
+  }
+  const email = emailResult.ok ? emailResult.email : "";
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Enter a valid checkout email." }, { status: 400 });
   }
@@ -142,7 +151,9 @@ export async function POST(req: Request) {
       variantIds: result.variantIds,
       productIds: result.productIds,
       providerSessionId: result.paymentSessionId,
-      providerPaymentId: result.providerPaymentId,
+      providerPaymentId:
+        result.providerPaymentId ??
+        (providerId === PAYMENT_PROVIDER_IDS.PAYPAL ? result.paypalOrderId : undefined),
       supabaseAvailable: true,
       registerPaymentAttempt: (input) => registerPaymentAttempt(sb, input),
     });
@@ -153,9 +164,12 @@ export async function POST(req: Request) {
     if (typeof correlationId !== "string" || !correlationId) {
       return NextResponse.json({ error: "Could not register payment attempt." }, { status: 502 });
     }
-    if (result.providerPaymentId) {
+    const providerPaymentId =
+      result.providerPaymentId ??
+      (providerId === PAYMENT_PROVIDER_IDS.PAYPAL ? result.paypalOrderId : undefined);
+    if (providerPaymentId) {
       await updatePaymentAttemptByCorrelationId(sb, correlationId, {
-        provider_payment_id: result.providerPaymentId,
+        provider_payment_id: providerPaymentId,
       });
     }
     return jsonResponse({
@@ -165,7 +179,7 @@ export async function POST(req: Request) {
         customerEmail: email,
         storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
       }),
-    }, 200, result.cartId);
+    }, 200, result.cartId, correlationId);
   } catch (error) {
     const safeError = formatMedusaCheckoutError(error);
     console.error("[checkout-start] provider initialization failed", {
