@@ -35,6 +35,15 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 <!-- VERCEL BEST PRACTICES END -->
 
 ## Branch and Deployment Topology
+
+## Backend Hosting Architecture
+- Vercel hosts the frontend.
+- Alibaba Cloud ECS hosts only the backend runtime: API, Medusa, and Caddy.
+- Supabase Cloud provides PostgreSQL; do not deploy Supabase locally on ECS.
+- Upstash provides Redis; do not deploy Redis locally on ECS.
+- Do not deploy the storefront or admin application to ECS.
+- Use `api.uvs.jstn.site` for the ECS backend and preserve the existing `api.jstn.site` record.
+
 - `dev` is the only development and integration branch; make all changes there.
 - `dev` deploys to the preview environment at `https://universalmusic-preview.vercel.app`.
 - `main` is production and deploys to `https://universalmusic.vercel.app`.
