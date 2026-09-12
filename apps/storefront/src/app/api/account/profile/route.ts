@@ -75,7 +75,7 @@ async function handlePATCH(req: Request) {
       process.env.NODE_ENV !== "production" &&
       process.env.CI_STRICT_E2E === "1" &&
       isStorefrontAuthDisabled();
-    if (isolatedE2E && !process.env.API_URL?.trim()) {
+    if (isolatedE2E) {
       const bounded = await parseBoundedJson(req, 32 * 1024);
       if (bounded.tooLarge) return Response.json({ error: "Request body is too large" }, { status: 413 });
       if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
