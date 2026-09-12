@@ -9,7 +9,17 @@ type IsolatedCodAttempt = {
   medusa_order_id?: string;
 };
 
-const attempts = new Map<string, IsolatedCodAttempt>();
+const ISOLATED_COD_LEDGER_KEY = Symbol.for("uvs.isolated-cod-e2e-ledger");
+type IsolatedCodLedgerGlobal = typeof globalThis & {
+  [ISOLATED_COD_LEDGER_KEY]?: Map<string, IsolatedCodAttempt>;
+};
+
+// Next dev compiles route handlers into separate bundles. Keep the local-only
+// E2E ledger on globalThis so registration and placement observe one state store
+// across those bundles, while production continues to use the durable ledger.
+const attempts =
+  ((globalThis as IsolatedCodLedgerGlobal)[ISOLATED_COD_LEDGER_KEY] ??=
+    new Map<string, IsolatedCodAttempt>());
 
 export function isIsolatedCodE2E(): boolean {
   return (

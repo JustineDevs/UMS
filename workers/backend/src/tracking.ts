@@ -145,8 +145,15 @@ export async function handleTrackingRequest(
   const capability = await resolveCapability(token, env);
   if (!capability) return json({ error: "not_found" }, 404);
   const result = await database.query<OrderRow>(
-    `SELECT id, display_id, updated_at, payment_status, fulfillment_status, email, metadata
-       FROM public."order" WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+    `SELECT o.id, o.display_id, o.updated_at,
+            pc.status AS payment_status,
+            NULL::text AS fulfillment_status,
+            o.email, o.metadata
+       FROM public."order" o
+       LEFT JOIN public.order_payment_collection opc ON opc.order_id = o.id
+       LEFT JOIN public.payment_collection pc ON pc.id = opc.payment_collection_id
+      WHERE o.id = $1 AND o.deleted_at IS NULL
+      LIMIT 1`,
     [capability.id],
   );
   const row = result.rows[0];

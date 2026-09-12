@@ -172,6 +172,93 @@ function catalogServiceError(err: unknown): CommerceFetchFailure {
   return { kind: "service_error", message };
 }
 
+function workerCatalogUrl(path: string): string | null {
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  return base ? `${base}${path}` : null;
+}
+
+type WorkerCatalogProduct = {
+  id?: string;
+  title?: string;
+  handle?: string;
+  subtitle?: string | null;
+  description?: string | null;
+  thumbnail?: string | null;
+  status?: string;
+  created_at?: string | null;
+  metadata?: Record<string, unknown> | null;
+  variants?: Array<Record<string, unknown>> | null;
+};
+
+function mapWorkerCatalogProduct(raw: WorkerCatalogProduct): Product | null {
+  if (!raw.id || !raw.title || !raw.handle) return null;
+  const variants = (raw.variants ?? []).map((variant) => ({
+    ...variant,
+    product_id: raw.id,
+    options: [],
+  }));
+  return catalogProductFromMedusaRaw({
+    id: raw.id,
+    title: raw.title,
+    handle: raw.handle,
+    subtitle: raw.subtitle ?? null,
+    description: raw.description ?? null,
+    thumbnail: raw.thumbnail ?? null,
+    status: raw.status ?? "published",
+    created_at: raw.created_at ?? null,
+    metadata: raw.metadata ?? null,
+    images: raw.thumbnail ? [{ url: raw.thumbnail }] : [],
+    categories: [],
+    variants,
+  } as never);
+}
+
+async function fetchWorkerProducts(
+  limit: number,
+  options: CatalogQuery,
+): Promise<ProductsPageResult> {
+  const params = new URLSearchParams({
+    limit: "100",
+    offset: "0",
+  });
+  if (options.q?.trim()) params.set("q", options.q.trim());
+  try {
+    const response = await fetch(workerCatalogUrl(`/store/products?${params}`)!, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return { kind: "service_error", message: `Worker catalog returned ${response.status}` };
+    }
+    const payload = (await response.json()) as {
+      products?: WorkerCatalogProduct[];
+      count?: number;
+    };
+    let products = (payload.products ?? [])
+      .map(mapWorkerCatalogProduct)
+      .filter((product): product is Product => product !== null)
+      .filter((product) => productMatchesVariantFilters(product, options))
+      .filter((product) => productMatchesBrand(product, options.brand))
+      .filter((product) => productMatchesPriceRange(product, options.minPrice, options.maxPrice));
+    if (options.sort === "price_asc" || options.sort === "price_desc") {
+      products.sort((a, b) => {
+        const difference = minVariantPrice(a) - minVariantPrice(b);
+        return options.sort === "price_asc" ? difference : -difference;
+      });
+    } else if (options.sort === "name_asc") {
+      products.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    const offset = options.offset ?? 0;
+    return {
+      kind: "ok",
+      products: products.slice(offset, offset + limit),
+      total: products.length || Number(payload.count ?? 0),
+    };
+  } catch (error) {
+    return catalogServiceError(error);
+  }
+}
+
 const MEDUSA_LIST_FIELDS =
   "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
 
@@ -653,7 +740,10 @@ export async function fetchProductsPage(
     q: options.q?.trim() || undefined,
   };
   const cached = unstable_cache(
-    async () => fetchMedusaProductsPage(limit, normalizedOptions),
+    async () =>
+      process.env.API_URL?.trim()
+        ? fetchWorkerProducts(limit, normalizedOptions)
+        : fetchMedusaProductsPage(limit, normalizedOptions),
     [
       "storefront-products-page",
       catalogEnvCacheFingerprint(),
@@ -752,12 +842,37 @@ export async function fetchRelatedProducts(
 export async function fetchProductBySlug(
   slug: string,
 ): Promise<ProductBySlugResult> {
+  const workerUrl = workerCatalogUrl(`/store/products/${encodeURIComponent(slug)}`);
+  if (workerUrl) {
+    try {
+      const response = await fetch(workerUrl, { headers: { Accept: "application/json" }, cache: "no-store" });
+      if (response.status === 404) return { kind: "not_found" };
+      if (!response.ok) return { kind: "service_error", message: `Worker catalog returned ${response.status}` };
+      const payload = (await response.json()) as { product?: WorkerCatalogProduct };
+      const product = payload.product ? mapWorkerCatalogProduct(payload.product) : null;
+      return product ? { kind: "ok", product } : { kind: "not_found" };
+    } catch (error) {
+      return catalogServiceError(error);
+    }
+  }
   return fetchMedusaProductBySlug(slug);
 }
 
 export async function fetchProductById(
   productId: string,
 ): Promise<ProductBySlugResult> {
+  const workerUrl = workerCatalogUrl(`/store/products?id=${encodeURIComponent(productId)}`);
+  if (workerUrl) {
+    try {
+      const response = await fetch(workerUrl, { headers: { Accept: "application/json" }, cache: "no-store" });
+      if (!response.ok) return { kind: "service_error", message: `Worker catalog returned ${response.status}` };
+      const payload = (await response.json()) as { products?: WorkerCatalogProduct[] };
+      const product = payload.products?.[0] ? mapWorkerCatalogProduct(payload.products[0]) : null;
+      return product ? { kind: "ok", product } : { kind: "not_found" };
+    } catch (error) {
+      return catalogServiceError(error);
+    }
+  }
   return fetchMedusaProductById(productId);
 }
 

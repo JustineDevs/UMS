@@ -86,6 +86,7 @@ function json(body: Record<string, unknown>, status = 200): Response {
 export async function finalizeNativeOrder(
   database: WorkerDatabaseClient,
   correlationId: string,
+  organizationId?: string,
 ): Promise<{ orderId: string; replayed: boolean }> {
   return withWorkerTransaction(database, async (transaction) => {
     const attemptResult = await transaction.query<PaymentAttempt>(
@@ -99,7 +100,8 @@ export async function finalizeNativeOrder(
     const attempt = attemptResult.rows[0];
     if (!attempt) throw new Error("payment_attempt_not_found");
     if (attempt.medusa_order_id) return { orderId: attempt.medusa_order_id, replayed: true };
-    if (!PAID_STATUSES.has(attempt.status.toLowerCase()))
+    const codPlacement = attempt.provider?.toLowerCase() === "cod" && attempt.status.toLowerCase() === "initiated";
+    if (!PAID_STATUSES.has(attempt.status.toLowerCase()) && !codPlacement)
       throw new Error("payment_not_settled");
 
     // The APP ledger and Medusa transaction cannot share one PostgreSQL
@@ -162,7 +164,7 @@ export async function finalizeNativeOrder(
        VALUES ($1, $2, $3, $4, $5, $6, NULL, NULL,
                $7::jsonb, 'pending', false)
        RETURNING id`,
-      [orderId, cart.region_id, cart.customer_id, cart.sales_channel_id, cart.email, cart.currency_code, JSON.stringify({ ...cart.metadata, source: "worker-native", worker_payment_correlation_id: correlationId })],
+      [orderId, cart.region_id, cart.customer_id, cart.sales_channel_id, cart.email, cart.currency_code, JSON.stringify({ ...cart.metadata, source: "worker-native", ...(organizationId?.trim() ? { store_id: organizationId.trim() } : {}), worker_payment_correlation_id: correlationId })],
     );
     if (orderResult.rowCount !== 1) throw new Error("order_insert_failed");
 
@@ -222,7 +224,7 @@ export async function finalizeNativeOrder(
           raw_authorized_amount, captured_amount, raw_captured_amount,
           status, metadata, completed_at)
        VALUES ($1, $2, $3, $4::jsonb, $3, $4::jsonb, $3, $4::jsonb,
-               'captured', $5::jsonb, now())
+               'completed', $5::jsonb, now())
        RETURNING id`,
       [
         paymentCollectionId,
@@ -317,12 +319,16 @@ export async function finalizeNativeOrderAcrossDatabases(
   appDatabase: WorkerDatabaseClient,
   commerceDatabase: WorkerDatabaseClient,
   correlationId: string,
+  organizationId?: string,
 ): Promise<{ orderId: string; replayed: boolean }> {
   const claim = await appDatabase.query<PaymentAttempt>(
     `UPDATE public.payment_attempts
      SET checkout_state = 'finalizing', finalize_attempts = COALESCE(finalize_attempts, 0) + 1, updated_at = now()
      WHERE correlation_id = $1::uuid
-       AND status IN ('paid', 'completed', 'captured')
+       AND (
+         status IN ('paid', 'completed', 'captured')
+         OR (provider = 'cod' AND status = 'initiated')
+       )
        AND medusa_order_id IS NULL
        AND (
          checkout_state <> 'finalizing'
@@ -349,7 +355,7 @@ export async function finalizeNativeOrderAcrossDatabases(
     async end() {},
   };
   try {
-    return await finalizeNativeOrder(splitClient, correlationId);
+    return await finalizeNativeOrder(splitClient, correlationId, organizationId);
   } catch (error) {
     await appDatabase.query(
       `UPDATE public.payment_attempts
@@ -366,12 +372,13 @@ export async function handleNativeOrderFinalizationRequest(
   database: WorkerDatabaseClient,
   correlationId: string,
   appDatabase?: WorkerDatabaseClient,
+  organizationId?: string,
 ): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   try {
     const result = appDatabase
-      ? await finalizeNativeOrderAcrossDatabases(appDatabase, database, correlationId)
-      : await finalizeNativeOrder(database, correlationId);
+      ? await finalizeNativeOrderAcrossDatabases(appDatabase, database, correlationId, organizationId)
+      : await finalizeNativeOrder(database, correlationId, organizationId);
     return json(result, result.replayed ? 200 : 201);
   } catch (error) {
     const code = error instanceof Error ? error.message : "order_finalization_failed";

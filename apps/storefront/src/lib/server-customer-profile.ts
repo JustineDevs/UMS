@@ -21,36 +21,36 @@ export async function loadCustomerProfileResult(
 ): Promise<CustomerProfileLoadResult> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return { profile: null, unavailable: false };
+  if (
+    process.env.NODE_ENV !== "production" &&
+    process.env.CI_STRICT_E2E === "1" &&
+    isStorefrontAuthDisabled() &&
+    normalized === "e2e-test@example.com"
+  ) {
+    return {
+      unavailable: false,
+      profile: {
+        displayName: "E2E Tester",
+        phone: "+639171234567",
+        avatarUrl: null,
+        shippingAddresses: [
+          {
+            fullName: "E2E Tester",
+            line1: "123 Test Street",
+            city: "Manila",
+            postalCode: "1000",
+            barangay: "Barangay Test",
+            province: "Metro Manila",
+            country: "PH",
+            phone: "+639171234567",
+          },
+        ],
+        updatedAt: null,
+      },
+    };
+  }
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
-    if (
-      process.env.NODE_ENV !== "production" &&
-      process.env.CI_STRICT_E2E === "1" &&
-      isStorefrontAuthDisabled() &&
-      normalized === "e2e-test@example.com"
-    ) {
-      return {
-        unavailable: false,
-        profile: {
-          displayName: "E2E Tester",
-          phone: "+639171234567",
-          avatarUrl: null,
-          shippingAddresses: [
-            {
-              fullName: "E2E Tester",
-              line1: "123 Test Street",
-              city: "Manila",
-              postalCode: "1000",
-              barangay: "Barangay Test",
-              province: "Metro Manila",
-              country: "PH",
-              phone: "+639171234567",
-            },
-          ],
-          updatedAt: null,
-        },
-      };
-    }
     return { profile: null, unavailable: true };
   }
   const customerId = await findMedusaCustomerIdByEmail(normalized);

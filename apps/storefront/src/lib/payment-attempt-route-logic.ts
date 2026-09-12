@@ -443,7 +443,10 @@ export async function finalizeCheckoutIntentRouteLogic(
   }
 
   try {
-    const result = await input.finalizeMedusaCart(input.cartId);
+    const result = await input.finalizeMedusaCart(
+      input.cartId,
+      input.correlationId,
+    );
     if (!result.ok) {
       await input.updatePaymentAttempt(input.correlationId, {
         status: "paid_awaiting_order",
@@ -571,7 +574,10 @@ export async function codPlaceOrderRouteLogic(
   }
 
   try {
-    const result = await input.finalizeMedusaCart(input.cartId);
+    const result = await input.finalizeMedusaCart(
+      input.cartId,
+      input.correlationId,
+    );
     if (!result.ok) {
       await input.updatePaymentAttempt(input.correlationId, {
         status: "paid_awaiting_order",

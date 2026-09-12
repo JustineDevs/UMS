@@ -640,7 +640,7 @@ export async function handleBackendRequest(
         env as BackendEnv & WorkerDatabaseEnv,
         (appDatabase) => withWorkerDatabase(
           env as BackendEnv & WorkerDatabaseEnv,
-          (commerceDatabase) => handleNativeOrderFinalizationRequest(request, commerceDatabase, decodeURIComponent(paymentFinalizationMatch![1]), appDatabase),
+          (commerceDatabase) => handleNativeOrderFinalizationRequest(request, commerceDatabase, decodeURIComponent(paymentFinalizationMatch![1]), appDatabase, env.DEFAULT_ORGANIZATION_ID),
           "medusa",
         ),
         "app",

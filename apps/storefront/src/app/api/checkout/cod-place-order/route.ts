@@ -76,6 +76,9 @@ export async function POST(req: Request) {
     },
     claimFinalizeAttempt: async (id) => {
       if (isolatedCodE2E && !sb) return claimIsolatedCodAttempt(id);
+      // Native Worker finalization owns the durable claim. Claiming here first
+      // would make the Worker see its own request as already in progress.
+      if (sb && process.env.API_URL?.trim()) return true;
       if (!sb) throw new Error("Payment ledger is not configured");
       return claimPaymentAttemptForFinalization(sb, id);
     },
