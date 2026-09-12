@@ -71,7 +71,8 @@ export function getMedusaPublishableKey(): string | undefined {
 
 export function getMedusaRegionId(): string | undefined {
   const r =
-    process.env.MEDUSA_REGION_ID ?? process.env.NEXT_PUBLIC_MEDUSA_REGION_ID;
+    process.env.MEDUSA_REGION_ID?.trim() ||
+    process.env.NEXT_PUBLIC_MEDUSA_REGION_ID?.trim();
   return r?.trim() || undefined;
 }
 
