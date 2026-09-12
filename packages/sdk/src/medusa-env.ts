@@ -64,8 +64,8 @@ export function getMedusaSecretApiKey(): string | undefined {
 
 export function getMedusaPublishableKey(): string | undefined {
   const k =
-    process.env.MEDUSA_PUBLISHABLE_API_KEY ??
-    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+    process.env.MEDUSA_PUBLISHABLE_API_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY?.trim();
   return k?.trim() || undefined;
 }
 
