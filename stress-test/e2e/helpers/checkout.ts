@@ -194,7 +194,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
       await addButton.evaluate((element) => {
-        element.scrollIntoView({ block: "center", inline: "nearest" });
+        // The storefront header is fixed; placing the CTA at the viewport
+        // bottom keeps it clear of the header's hit-test area.
+        element.scrollIntoView({ block: "end", inline: "nearest" });
       });
       await addButton.click();
       await page.waitForTimeout(800);
