@@ -1,15 +1,15 @@
 /**
  * Medusa vs Supabase (legacy) boundaries for this monorepo.
  *
- * - **Medusa Postgres** (`apps/medusa` `DATABASE_URL`): authoritative commerce — catalog, cart, order,
+ * - **Medusa Postgres** (`apps/medusa` `MEDUSA_DB_URL`): authoritative commerce — catalog, cart, order,
  *   payment sessions/collections, inventory, regions, Medusa customers, fulfillments.
- * - **Supabase** (`LEGACY_DATABASE_URL`): platform only — staff identity/RBAC, CMS, audit, POS ops,
+ * - **Supabase** (`APP_DB_URL`): platform only — staff identity/RBAC, CMS, audit, POS ops,
  *   bridges (`medusa_*` reference columns), analytics events — **not** a second commerce catalog or order store.
  *
  * Do not add legacy tables that duplicate Medusa first-class entities. See `check-commerce-migration-boundary.mjs`.
  * If a legacy database ever contained mistaken copies of Medusa `public` tables (same names as
  * `internal/docs/exclusive/medusadb/schema.sql`), migration `015_drop_accidental_medusa_core_tables_from_legacy.sql`
- * drops them when applied via `LEGACY_DATABASE_URL` only.
+ * drops them when applied via `APP_DB_URL` only.
  */
 
 /** Commerce domains owned solely by Medusa (not recreated in Supabase). */
@@ -62,7 +62,7 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     surfaces: ["storefront"],
     kind: "platform",
     notes:
-      "Optional saved display name, phone, and shipping address book keyed by sign-in email; Medusa remains customer and order SoR.",
+      "Optional saved display name, phone, and shipping address book keyed by canonical Medusa customer ID; legacy sign-in-email rows are read only during migration. Medusa remains customer and order SoR.",
   },
   product_qa_entries: {
     surfaces: ["storefront", "admin"],
@@ -100,6 +100,11 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     surfaces: ["storefront", "admin"],
     kind: "platform",
     notes: "Public site copy; no product rows.",
+  },
+  platform_runtime_settings: {
+    surfaces: ["storefront", "admin", "api"],
+    kind: "platform",
+    notes: "Tenant-scoped non-secret operational configuration; provider credentials remain deployment secrets.",
   },
   pos_devices: {
     surfaces: ["admin", "api"],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   isPhilippinesMobilePhone,
@@ -12,6 +12,7 @@ type Initial = {
   phone: string | null;
   avatarUrl: string | null;
   shippingAddresses: StorefrontShippingAddress[];
+  updatedAt: string | null;
 };
 
 function emptyAddress(): StorefrontShippingAddress {
@@ -37,9 +38,17 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
       ? initial.shippingAddresses
       : [],
   );
+  const [updatedAt, setUpdatedAt] = useState(initial.updatedAt);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [reauthUrl, setReauthUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
+  const feedbackId = err ? "account-profile-error" : undefined;
+
+  useEffect(() => {
+    if (err) feedbackRef.current?.focus();
+  }, [err]);
 
   function addAddress() {
     if (addresses.length >= 5) return;
@@ -61,6 +70,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
 
   async function save() {
     setErr(null);
+    setReauthUrl(null);
     setMsg(null);
     const ph = phone.trim();
     if (ph && !isPhilippinesMobilePhone(ph)) {
@@ -94,17 +104,24 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          updatedAt: updatedAt ?? undefined,
           displayName: displayName.trim() || undefined,
           phone: ph || undefined,
           avatarUrl: avatarUrl.trim() || undefined,
           shippingAddresses: addresses,
         }),
       });
-      const j = (await res.json()) as { error?: string };
+      const j = (await res.json()) as { error?: string; updatedAt?: string; reauthUrl?: string };
       if (!res.ok) {
+        if (j.reauthUrl) {
+          setErr(j.error ?? "Recent sign-in required.");
+          setReauthUrl(j.reauthUrl);
+          return;
+        }
         setErr(j.error ?? "Save failed.");
         return;
       }
+      if (j.updatedAt) setUpdatedAt(j.updatedAt);
       setMsg("Saved.");
       router.refresh();
     } catch {
@@ -126,8 +143,25 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
       </p>
 
       {err ? (
-        <p className="mt-4 text-sm text-red-700" role="alert">
+        <p
+          ref={feedbackRef}
+          id="account-profile-error"
+          className="mt-4 text-sm text-red-700"
+          role="alert"
+          tabIndex={-1}
+        >
           {err}
+          {reauthUrl ? (
+            <>
+              {" "}
+              <a
+                href={reauthUrl}
+                className="font-semibold underline underline-offset-2"
+              >
+                Sign in again
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
       {msg ? (
@@ -138,38 +172,44 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
 
       <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+          <label htmlFor="account-display-name" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             Display name (optional)
           </label>
           <input
+            id="account-display-name"
             className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            aria-describedby={feedbackId}
             maxLength={120}
             placeholder="How we greet you in emails"
           />
         </div>
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+          <label htmlFor="account-avatar-url" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             Avatar URL (optional)
           </label>
           <input
+            id="account-avatar-url"
             className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
             value={avatarUrl}
             onChange={(e) => setAvatarUrl(e.target.value)}
+            aria-describedby={feedbackId}
             maxLength={500}
             placeholder="https://..."
             inputMode="url"
           />
         </div>
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+          <label htmlFor="account-phone" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             Mobile (Philippines)
           </label>
           <input
+            id="account-phone"
             className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            aria-describedby={feedbackId}
             maxLength={40}
             placeholder="+639XXXXXXXXX or 09XXXXXXXXX"
             inputMode="tel"
@@ -215,130 +255,149 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-full-name`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Full name
                     </label>
                     <input
+                      id={`account-address-${i}-full-name`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.fullName}
                       onChange={(e) =>
                         updateAddress(i, { fullName: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={120}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-phone`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Phone
                     </label>
                     <input
+                      id={`account-address-${i}-phone`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.phone}
                       onChange={(e) =>
                         updateAddress(i, { phone: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={40}
                       inputMode="tel"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-label`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Label (optional)
                     </label>
                     <input
+                      id={`account-address-${i}-label`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.label ?? ""}
                       onChange={(e) =>
                         updateAddress(i, { label: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={60}
                       placeholder="Home, Office…"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-line1`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Address line 1
                     </label>
                     <input
+                      id={`account-address-${i}-line1`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.line1}
                       onChange={(e) =>
                         updateAddress(i, { line1: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={200}
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-line2`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Address line 2 (optional)
                     </label>
                     <input
+                      id={`account-address-${i}-line2`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.line2 ?? ""}
                       onChange={(e) =>
                         updateAddress(i, { line2: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={200}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-barangay`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Barangay
                     </label>
                     <input
+                      id={`account-address-${i}-barangay`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.barangay ?? ""}
                       onChange={(e) =>
                         updateAddress(i, { barangay: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={120}
                       placeholder="Required for PH couriers"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-city`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       City / municipality
                     </label>
                     <input
+                      id={`account-address-${i}-city`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.city}
                       onChange={(e) =>
                         updateAddress(i, { city: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={100}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-province`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Province
                     </label>
                     <input
+                      id={`account-address-${i}-province`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.province}
                       onChange={(e) =>
                         updateAddress(i, { province: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={100}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-postal-code`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Postal code (optional)
                     </label>
                     <input
+                      id={`account-address-${i}-postal-code`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.postalCode ?? ""}
                       onChange={(e) =>
                         updateAddress(i, { postalCode: e.target.value })
                       }
+                      aria-describedby={feedbackId}
                       maxLength={20}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-country`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                       Country
                     </label>
                     <select
+                      id={`account-address-${i}-country`}
                       className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
                       value={a.country}
                       onChange={(e) =>
@@ -346,6 +405,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                           country: e.target.value.toUpperCase().slice(0, 2),
                         })
                       }
+                      aria-describedby={feedbackId}
                     >
                       <option value="PH">PH</option>
                     </select>

@@ -29,6 +29,26 @@ describe("J&T webhook preparation", () => {
     expect(verifyJntHmac(body, "bad", secret)).toBe(false);
   });
 
+  it("accepts Pancake bearer authentication without a J&T signing secret", () => {
+    const rawBody = Buffer.from('{"orderNo":"order_1","status":"SIGNED"}');
+    const result = prepareJntWebhookEvent({
+      secret: "pancake-api-key",
+      rawBody,
+      signatureHeader: "Bearer pancake-api-key",
+      authMode: "bearer",
+    });
+    expect(result.status).toBe(200);
+    expect(result.parsed?.orderId).toBe("order_1");
+
+    const rejected = prepareJntWebhookEvent({
+      secret: "pancake-api-key",
+      rawBody,
+      signatureHeader: "Bearer wrong-key",
+      authMode: "bearer",
+    });
+    expect(rejected.status).toBe(401);
+  });
+
   it("rejects invalid signatures and malformed JSON", () => {
     const body = Buffer.from("{not-json");
     const invalidSignature = prepareJntWebhookEvent({
@@ -68,6 +88,28 @@ describe("J&T webhook preparation", () => {
       signatureHeader: sign(noOrderBody.toString("utf8")),
     });
     expect(result.body).toEqual({ received: true, skipped: true });
+  });
+
+  it("rejects oversized payloads before JSON parsing", () => {
+    const rawBody = Buffer.alloc(64 * 1024 + 1, "x");
+    const result = prepareJntWebhookEvent({
+      secret,
+      rawBody,
+      signatureHeader: sign(rawBody.toString("utf8")),
+    });
+    expect(result.status).toBe(413);
+    expect(result.body.code).toBe("BODY_TOO_LARGE");
+  });
+
+  it("does not pass arbitrary order references to Medusa", () => {
+    const rawBody = Buffer.from(JSON.stringify({ orderNo: "../../other-order", status: "TRANSIT" }));
+    const result = prepareJntWebhookEvent({
+      secret,
+      rawBody,
+      signatureHeader: sign(rawBody.toString("utf8")),
+    });
+    expect(result.body).toEqual({ received: true, skipped: true });
+    expect(result.parsed).toBeUndefined();
   });
 
   it("maps status and extracts lastCheckpoint from statusDesc and updateTime", () => {

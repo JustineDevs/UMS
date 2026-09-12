@@ -267,14 +267,16 @@ export async function getCmsBlogPostBySlugPreview(
   slug: string,
   locale: string,
   previewToken: string,
+  organizationId?: string,
 ): Promise<CmsBlogPostRow | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("cms_blog_posts")
     .select("*")
     .eq("slug", slug)
     .eq("locale", locale)
-    .eq("preview_token", previewToken)
-    .maybeSingle();
+    .eq("preview_token", previewToken);
+  if (organizationId) query = query.eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-blog] preview", error.message);

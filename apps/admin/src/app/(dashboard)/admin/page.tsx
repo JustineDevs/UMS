@@ -1,11 +1,10 @@
-import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
 
 import { isStaffRole, staffHasPermission, staffPermissionListForSession } from "@universal-music-store/database";
 
 import { AdminPageShell } from "@/components/admin-console";
 import { EcommerceReferenceDashboard, type EcommerceDashboardData } from "@/components/reference-ecommerce/EcommerceReferenceDashboard";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { fetchMedusaInventoryPage } from "@/lib/medusa-inventory-bridge";
 import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
 
@@ -75,7 +74,7 @@ export default async function AdminDashboardPage({
   searchParams: Promise<{ denied?: string }>;
 }) {
   const { denied } = await searchParams;
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
 
   const authDisabled = process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
   if (!authDisabled && (!session?.user || !isStaffRole(session.user.role ?? ""))) {

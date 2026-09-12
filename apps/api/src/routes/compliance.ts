@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   createSupabaseClient,
   exportDataSubjectByEmail,
+  deleteDataSubjectByEmail,
+  purgeExpiredPrivacyData,
   anonymizeStaleOrderAddresses,
 } from "@universal-music-store/database";
 import { complianceEmailParamSchema } from "@universal-music-store/validation";
@@ -63,6 +65,7 @@ complianceRouter.post("/erasure", async (req, res, next) => {
     }
     const email = emailParsed.data;
     const supabase = createSupabaseClient();
+    const notificationData = await deleteDataSubjectByEmail(supabase, email);
     const { data: user, error: uErr } = await supabase
       .from("users")
       .select("id,email")
@@ -83,6 +86,7 @@ complianceRouter.post("/erasure", async (req, res, next) => {
       supabase_user_deleted: supabaseDeleted,
       medusa_customer_deleted: medusaDel.deleted,
       medusa_error: medusaDel.error,
+      deleted_platform_data: notificationData.deleted,
     });
   } catch (e) {
     next(e);
@@ -107,7 +111,8 @@ complianceRouter.post(
         supabase,
         cutoff.toISOString(),
       );
-      res.json({ ...out, cutoff: cutoff.toISOString(), days });
+      const purged = await purgeExpiredPrivacyData(supabase);
+      res.json({ ...out, ...purged, cutoff: cutoff.toISOString(), days });
     } catch (e) {
       next(e);
     }

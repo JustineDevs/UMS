@@ -1,5 +1,47 @@
 export type PrivacyTier = "public" | "internal" | "pii" | "financial";
 
+export type MetricWindow = {
+  /** UTC, inclusive start and exclusive end. */
+  start: string;
+  end: string;
+  timezone: "UTC";
+};
+
+export type CanonicalMetricContract = {
+  name: "revenue" | "orders" | "customers" | "refunds";
+  source: "medusa_orders" | "medusa_refunds";
+  window: MetricWindow;
+  currency: string;
+  amountBasis: "order_total_minus_refunds" | "order_total" | "refund_total";
+};
+
+export function createCanonicalMetricContract(input: Omit<CanonicalMetricContract, "currency"> & { currency: string }): CanonicalMetricContract {
+  const currency = input.currency.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Metric currency must be an ISO 4217 code");
+  if (input.window.timezone !== "UTC" || Date.parse(input.window.start) >= Date.parse(input.window.end)) {
+    throw new Error("Metric window must be a UTC half-open interval");
+  }
+  return { ...input, currency };
+}
+
+export type CommerceAttribution = {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  campaignId?: string;
+  couponCode?: string;
+  referralCode?: string;
+};
+
+export function normalizeCommerceAttribution(input?: CommerceAttribution): CommerceAttribution {
+  const clean = (value: string | undefined) => value?.trim().slice(0, 120) || undefined;
+  return {
+    source: clean(input?.source), medium: clean(input?.medium), campaign: clean(input?.campaign),
+    campaignId: clean(input?.campaignId), couponCode: clean(input?.couponCode)?.toUpperCase(),
+    referralCode: clean(input?.referralCode),
+  };
+}
+
 export type AnalyticsEventDef = {
   name: string;
   source: "storefront" | "admin" | "api" | "medusa" | "pos";
@@ -110,6 +152,19 @@ export function createAnalyticsEvent(
   properties: Record<string, unknown>,
   sessionId?: string,
 ): AnalyticsEvent {
+  const schema = ANALYTICS_EVENT_SCHEMA.find((definition) => definition.name === name);
+  if (!schema || schema.source !== source) {
+    throw new Error(`Unknown analytics event or source mismatch: ${source}:${name}`);
+  }
+  for (const [key, definition] of Object.entries(schema.properties)) {
+    const value = properties[key];
+    if (definition.required && value === undefined) {
+      throw new Error(`Missing required analytics property: ${name}.${key}`);
+    }
+    if (value !== undefined && (definition.type === "number" ? typeof value !== "number" : typeof value !== definition.type)) {
+      throw new Error(`Invalid analytics property type: ${name}.${key}`);
+    }
+  }
   return {
     name,
     timestamp: new Date().toISOString(),

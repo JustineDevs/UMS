@@ -40,7 +40,7 @@ export function StorefrontFooter({
             className="relative block aspect-[1536/1024] w-full max-w-xs shrink-0 overflow-visible opacity-90 transition-opacity hover:opacity-100 sm:max-w-sm md:max-w-md lg:max-w-lg"
           >
             <Image
-              src="/UVS/UVS_logo_landscape.png"
+              src="/brand/universal-music-store-logo-landscape.png"
               alt="Universal Music Store"
               width={1536}
               height={1024}
@@ -55,9 +55,9 @@ export function StorefrontFooter({
         </div>
         {cmsFooterColumns?.map((col) => (
           <div key={col.title} className="flex min-w-0 flex-col gap-4">
-            <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+            <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
               {col.title}
-            </h4>
+            </h2>
             <nav className="flex flex-col gap-2.5 md:gap-3" aria-label={col.title}>
               {col.links.map((l) => (
                 <Link
@@ -72,9 +72,9 @@ export function StorefrontFooter({
           </div>
         ))}
         <div className="flex min-w-0 flex-col gap-4">
-          <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Shop
-          </h4>
+          </h2>
           <nav
             data-cms-id="footer-shop-links"
             data-cms-label="Shop links"
@@ -108,9 +108,9 @@ export function StorefrontFooter({
           </nav>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Support
-          </h4>
+          </h2>
           <nav
             data-cms-id="footer-support-links"
             data-cms-label="Support links"
@@ -144,9 +144,9 @@ export function StorefrontFooter({
           </nav>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Account
-          </h4>
+          </h2>
           <nav
             className="flex flex-col gap-2.5 md:gap-3"
             aria-label="Account links"
@@ -172,9 +172,9 @@ export function StorefrontFooter({
           </nav>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Policies
-          </h4>
+          </h2>
           <nav
             className="flex flex-col gap-2.5 md:gap-3"
             aria-label="Legal links"
@@ -219,7 +219,7 @@ export function StorefrontFooter({
               href="/preferences"
               className="text-sm leading-snug text-slate-600 hover:text-primary md:text-base"
             >
-              Region &amp; language
+              Local preferences
             </Link>
             <Link
               href="/sitemap"
@@ -230,9 +230,9 @@ export function StorefrontFooter({
           </nav>
         </div>
         <div className="col-span-2 flex min-w-0 flex-col gap-4 lg:col-span-1">
-          <h4 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
+          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary md:text-base">
             Connect
-          </h4>
+          </h2>
           <nav data-cms-id="footer-social-links" data-cms-label="Social links" className="flex flex-col gap-2.5 md:gap-3" aria-label="Social">
             {socialLinks.map((s) => (
               <a

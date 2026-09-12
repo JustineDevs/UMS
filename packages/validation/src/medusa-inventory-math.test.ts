@@ -18,4 +18,21 @@ describe("medusa-inventory-math", () => {
     };
     assert.equal(availableQuantityFromVariantRaw(v), 7);
   });
+
+  it("aggregates available quantity across inventory items and locations", () => {
+    const v = {
+      inventory_items: [
+        { inventory: { location_levels: [{ stocked_quantity: 4, reserved_quantity: 1 }] } },
+        {
+          inventory: {
+            location_levels: [
+              { stocked_quantity: 6, reserved_quantity: 2 },
+              { stocked_quantity: 3, reserved_quantity: 8 },
+            ],
+          },
+        },
+      ],
+    };
+    assert.equal(availableQuantityFromVariantRaw(v), 7);
+  });
 });

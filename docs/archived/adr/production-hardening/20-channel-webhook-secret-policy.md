@@ -17,7 +17,7 @@ Any deployment that exposes `/api/integrations/channels/webhook` publicly **requ
 ## Concrete plan
 
 1. Enumerate env tuples: local dev, Vercel preview, Vercel production, Render, CI.
-2. Adjust policy so `VERCEL_ENV=preview` still requires secret if `CHANNEL_WEBHOOK_ENFORCE_IN_PREVIEW=true` (new flag) or default strict for all non-local.
+2. Adjust policy so `VERCEL_ENV=preview` requires the secret by default, with local `NODE_ENV=development` as the only exception.
 3. Add unit tests for policy matrix.
 4. Update `docs/security-program.md` with the matrix table.
 

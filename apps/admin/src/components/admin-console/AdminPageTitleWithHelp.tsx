@@ -5,7 +5,7 @@ import { getAdminPageHelp } from "@/config/admin-page-help";
 import { AdminPageHelpTip } from "./AdminPageHelpTip";
 
 export function AdminPageTitleWithHelp({ title }: { title: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const help = getAdminPageHelp(pathname);
 
   return (

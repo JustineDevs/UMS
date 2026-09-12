@@ -77,7 +77,7 @@ When an action touches both worlds (e.g. staff action on an order), use **one wr
 
 ## Appendix A: Legacy table inventory (Phase 1 baseline)
 
-Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where noted). **`pnpm db:migrate`** runs those files once per database and records applied names in **`public.legacy_platform_schema_migrations`** (separate from Medusa’s own migrations on `DATABASE_URL`). **Classification** is guidance for migration work; Medusa remains SoR for live commerce per section 1.
+Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where noted). **`pnpm db:migrate`** runs those files once per database and records applied names in **`public.legacy_platform_schema_migrations`** (separate from Medusa’s own migrations on `MEDUSA_DB_URL`). **Classification** is guidance for migration work; Medusa remains SoR for live commerce per section 1.
 
 | Table | Classification | Notes |
 |-------|----------------|-------|
@@ -96,7 +96,7 @@ Source: `packages/database/supabase/migrations/*.sql` (and `seed.sql` where note
 | `product_reviews` | Commerce-adjacent | Must key by Medusa `product` identity (slug or id); not a second catalog. |
 | `cart_abandonment_events` | Derived / analytics | No authoritative cart; event stream only. |
 
-**Medusa tables** (not listed here): live in the Medusa Postgres database (`DATABASE_URL` for `apps/medusa`); catalog, cart, order, payment, inventory, customer (commerce) live there. Schema reference: `internal/docs/exclusive/medusadb/schema.sql`. If the Supabase project (`LEGACY_DATABASE_URL`) ever held mistaken copies of those `public` table names, migration `015_drop_accidental_medusa_core_tables_from_legacy.sql` removes them (apply only to legacy, never to Medusa `DATABASE_URL`).
+**Medusa tables** (not listed here): live in the Medusa Postgres database (`MEDUSA_DB_URL` for `apps/medusa`); catalog, cart, order, payment, inventory, customer (commerce) live there. Schema reference: `internal/docs/exclusive/medusadb/schema.sql`. If the application database (`APP_DB_URL`) ever held mistaken copies of those `public` table names, migration `015_drop_accidental_medusa_core_tables_from_legacy.sql` removes them (apply only to the application database, never to Medusa `MEDUSA_DB_URL`).
 
 ---
 

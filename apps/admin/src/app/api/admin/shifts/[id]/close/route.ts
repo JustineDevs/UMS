@@ -7,8 +7,8 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { z } from "zod";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type Ctx = { params: Promise<{ id: string }> };
 const closeShiftSchema = z.object({
@@ -26,9 +26,9 @@ async function post(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
   const idempotencyKey = req.headers.get("idempotency-key")?.trim();
   if (!idempotencyKey) return correlatedJson(cid, { error: "Idempotency-Key is required" }, { status: 400 });
-  let rawBody: unknown;
-  try { rawBody = await req.json(); } catch { return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 }); }
-  const parsed = closeShiftSchema.safeParse(rawBody);
+  const rawBody = await parseBoundedJson(req, 16 * 1024);
+  if (rawBody.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = closeShiftSchema.safeParse(rawBody.valid ? rawBody.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid shift close payload" }, { status: 400 });
   const body = parsed.data;
   const sup = adminSupabaseOr503(cid);
@@ -44,19 +44,9 @@ async function post(req: NextRequest, ctx: Ctx) {
   }
   const currentShift = await getShiftById(sb, id, organization.id);
   if (!currentShift) return correlatedJson(cid, { error: "Shift not found" }, { status: 404 });
-  let cashSales = 0;
-  for (let offset = 0; offset < 5000; offset += 50) {
-    const query = new URLSearchParams({ limit: "50", offset: String(offset), fields: "id,total,metadata", order: "-created_at" });
-    const response = await medusaAdminFetch(`/admin/orders?${query.toString()}`, { method: "GET" });
-    if (!response.ok) return correlatedJson(cid, { error: "Unable to load shift sales" }, { status: 503 });
-    const orders = ((await response.json()) as { orders?: Array<{ total?: unknown; metadata?: Record<string, unknown> | null }> }).orders ?? [];
-    for (const order of orders) {
-      if (String(order.metadata?.pos_shift_id ?? "") !== id) continue;
-      const total = Number(order.total ?? 0);
-      if (Number.isFinite(total) && total >= 0) cashSales += Math.round(total);
-    }
-    if (orders.length < 50) break;
-  }
+  const sales = await sb.from("pos_sale_ledger").select("order_id,total_minor,payment_method").eq("organization_id", organization.id).eq("shift_id", id);
+  if (sales.error) return correlatedJson(cid, { error: "Unable to load shift sales" }, { status: 503 });
+  const cashSales = (sales.data ?? []).reduce((sum, sale) => sale.payment_method === "cash" ? sum + Math.max(0, Number(sale.total_minor ?? 0)) : sum, 0);
   const voids = await listVoids(sb, { shiftId: id, limit: 200, organizationId: organization.id });
   const cashRefunds = voids.reduce((sum, value) => sum + Math.max(0, Math.round(value.amount ?? 0)), 0);
   const reconciliation = calculatePosReconciliation({ openingCash: currentShift.opening_cash, cashSales, cashRefunds, payouts: 0, countedCash: body.closing_cash });

@@ -10,10 +10,12 @@ import {
 export function PayPalEmbeddedCheckout({
   paypalOrderId,
   onApprove,
+  onCancel,
   onError,
 }: {
   paypalOrderId: string;
-  onApprove: (_orderId: string) => void;
+  onApprove: (_orderId: string) => void | Promise<void>;
+  onCancel: () => void;
   onError: (_msg: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
@@ -30,10 +32,30 @@ export function PayPalEmbeddedCheckout({
   }, [paypalOrderId]);
 
   const handleApprove = useCallback(
-    async (data: { orderID: string }) => {
+    async (
+      data: { orderID: string },
+      actions: { order?: { capture?: () => Promise<unknown> } },
+    ) => {
       setLoading(true);
       try {
-        onApprove(data.orderID);
+        if (typeof actions.order?.capture !== "function") {
+          throw new Error("PayPal capture is unavailable. Your bag was not charged.");
+        }
+        const capture = (await actions.order.capture()) as {
+          status?: unknown;
+          purchase_units?: Array<{
+            payments?: { captures?: Array<{ status?: unknown }> };
+          }>;
+        };
+        const captureStatus = String(
+          capture.purchase_units?.[0]?.payments?.captures?.[0]?.status ??
+            capture.status ??
+            "",
+        ).toUpperCase();
+        if (captureStatus !== "COMPLETED") {
+          throw new Error("PayPal did not complete the payment. Your bag was not charged.");
+        }
+        await onApprove(data.orderID);
       } catch (err) {
         onError(err instanceof Error ? err.message : "PayPal payment failed.");
       } finally {
@@ -50,6 +72,11 @@ export function PayPalEmbeddedCheckout({
     [onError],
   );
 
+  const handleCancel = useCallback(() => {
+    setLoading(false);
+    onCancel();
+  }, [onCancel]);
+
   if (!clientId) {
     return (
       <p className="text-sm text-red-600">
@@ -60,6 +87,9 @@ export function PayPalEmbeddedCheckout({
 
   return (
     <div className="space-y-4">
+      <p id="paypal-popup-help" className="text-xs text-on-surface-variant" role="status">
+        PayPal opens its secure approval window. If the window is blocked, allow popups for this site and try again; canceling leaves your bag unchanged.
+      </p>
       <PayPalScriptProvider options={initialOptions}>
         <PayPalButtons
           style={{
@@ -70,8 +100,10 @@ export function PayPalEmbeddedCheckout({
           }}
           createOrder={handleCreateOrder}
           onApprove={handleApprove}
+          onCancel={handleCancel}
           onError={handleError}
           disabled={loading}
+          aria-label="Pay securely with PayPal"
         />
       </PayPalScriptProvider>
       {loading && (

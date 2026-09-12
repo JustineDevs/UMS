@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { tryCreateSupabaseClient } from "../lib/payment-supabase-bridge";
+import { safeLogIdentifier } from "../lib/safe-log";
 
 const POINTS_PER_100_CENTS = 1;
 
@@ -84,7 +85,7 @@ export default async function orderPlacedLoyaltyPoints({
         .select("id")
         .single();
       if (createErr) {
-        logger.warn?.(`[loyalty] create account: ${createErr.message}`);
+        logger.warn?.("[loyalty] create account failed");
         return;
       }
       accountId = String(created.id);
@@ -122,7 +123,9 @@ export default async function orderPlacedLoyaltyPoints({
             })
             .eq("id", accountId);
         }
-        logger.info?.(`[loyalty] -${toRedeem} redeemed points for ${email} on order ${data.id}`);
+        logger.info?.(
+          `[loyalty] -${toRedeem} redeemed points for ${safeLogIdentifier(email)} on order ${safeLogIdentifier(data.id)}`,
+        );
       }
     }
 
@@ -161,10 +164,12 @@ export default async function orderPlacedLoyaltyPoints({
           .eq("id", accountId);
       }
 
-      logger.info?.(`[loyalty] +${points} points for ${email} on order ${data.id}`);
+      logger.info?.(
+        `[loyalty] +${points} points for ${safeLogIdentifier(email)} on order ${safeLogIdentifier(data.id)}`,
+      );
     }
   } catch (err) {
-    logger.warn?.(`[loyalty] ${err instanceof Error ? err.message : String(err)}`);
+    logger.warn?.(`[loyalty] operation failed: ${err instanceof Error ? err.name : "unknown"}`);
   }
 }
 

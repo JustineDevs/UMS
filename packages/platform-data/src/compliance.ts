@@ -8,6 +8,10 @@ export type DataSubjectExport = {
   payments: unknown[];
   loyaltyAccounts?: unknown[];
   wishlistItems?: unknown[];
+  marketingPreferences?: unknown[];
+  newsletterConfirmations?: unknown[];
+  backInStockNotifications?: unknown[];
+  deliveryAttempts?: unknown[];
 };
 
 const ANONYMIZED_SENTINEL = "ANONYMIZED";
@@ -48,6 +52,16 @@ export async function exportDataSubjectByEmail(
     .select("product_slug,product_name,added_at")
     .eq("medusa_customer_id", (user as Record<string, unknown>).medusa_customer_id as string ?? "");
 
+  const { data: marketingPreferences } = await supabase
+    .from("marketing_preferences").select("email,channel,consent_status,source,consented_at,unsubscribed_at")
+    .eq("email", email);
+  const { data: newsletterConfirmations } = await supabase
+    .from("newsletter_confirmations").select("email,expires_at,confirmed_at,created_at").eq("email", email);
+  const { data: backInStockNotifications } = await supabase
+    .from("back_in_stock_notifications").select("email,product_id,product_slug,variant_id,notified,created_at,notified_at").eq("email", email);
+  const { data: deliveryAttempts } = await supabase
+    .from("public_delivery_attempts").select("delivery_kind,recipient,provider,status,created_at,sent_at,last_error").eq("recipient", email);
+
   return {
     user,
     addresses: [],
@@ -56,7 +70,52 @@ export async function exportDataSubjectByEmail(
     payments: [],
     loyaltyAccounts: loyaltyAccounts ?? [],
     wishlistItems: wishlistItems ?? [],
+    marketingPreferences: marketingPreferences ?? [],
+    newsletterConfirmations: newsletterConfirmations ?? [],
+    backInStockNotifications: backInStockNotifications ?? [],
+    deliveryAttempts: deliveryAttempts ?? [],
   };
+}
+
+export async function deleteDataSubjectByEmail(
+  supabase: SupabaseClient,
+  email: string,
+): Promise<{ deleted: string[] }> {
+  const deleted: string[] = [];
+  for (const table of [
+    "marketing_preferences",
+    "newsletter_confirmations",
+    "back_in_stock_notifications",
+  ]) {
+    const { error } = await supabase.from(table).delete().eq("email", email);
+    if (error) throw error;
+    deleted.push(table);
+  }
+  const { error: deliveryError } = await supabase
+    .from("public_delivery_attempts").delete().eq("recipient", email);
+  if (deliveryError) throw deliveryError;
+  deleted.push("public_delivery_attempts");
+  return { deleted };
+}
+
+export async function purgeExpiredPrivacyData(
+  supabase: SupabaseClient,
+  now = new Date(),
+): Promise<{ newsletterConfirmations: number; backInStockNotifications: number; deliveryAttempts: number }> {
+  const policies = [
+    ["newsletter_confirmations", 30, "newsletterConfirmations"],
+    ["back_in_stock_notifications", 365, "backInStockNotifications"],
+    ["public_delivery_attempts", 730, "deliveryAttempts"],
+  ] as const;
+  const counts = { newsletterConfirmations: 0, backInStockNotifications: 0, deliveryAttempts: 0 };
+  for (const [table, days, key] of policies) {
+    const cutoff = new Date(now);
+    cutoff.setUTCDate(cutoff.getUTCDate() - days);
+    const { data, error } = await supabase.from(table).delete().lt("created_at", cutoff.toISOString()).select("id");
+    if (error) throw error;
+    counts[key] = data?.length ?? 0;
+  }
+  return counts;
 }
 
 /**

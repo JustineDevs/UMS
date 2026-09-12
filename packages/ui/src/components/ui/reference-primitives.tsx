@@ -93,9 +93,9 @@ export const TooltipContent = ({ children, className, ...props }: React.HTMLAttr
 export const Popover = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 export const PopoverTrigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 export const PopoverContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("rounded-lg border bg-background p-4 shadow-lg", className)} {...props} />;
-export const HoverCard = Popover;
-export const HoverCardTrigger = PopoverTrigger;
-export const HoverCardContent = PopoverContent;
+export const HoverCard = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+export const HoverCardTrigger = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+export const HoverCardContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("rounded-lg border bg-background p-4 shadow-lg", className)} {...props} />;
 export const ButtonGroup = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div role="group" className={cn("flex items-center gap-1", className)} {...props} />;
 export const Drawer = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 export const DrawerContent = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("rounded-t-xl border bg-background p-4 shadow-lg", className)} {...props} />;

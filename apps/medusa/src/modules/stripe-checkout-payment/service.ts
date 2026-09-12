@@ -41,6 +41,8 @@ import {
   buildStripeWebhookDedupId,
   claimStripeWebhookDedup,
 } from "../../lib/stripe-webhook-dedup";
+import { recordWebhookSecurityEvent } from "../../lib/webhook-security-metrics";
+import { safeLogIdentifier } from "../../lib/safe-log";
 
 export type StripeCheckoutPaymentOptions = {
   apiKey: string;
@@ -90,6 +92,17 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
 
   protected readonly options_: StripeCheckoutPaymentOptions;
   protected readonly stripe_: Stripe;
+
+  private providerFailure(operation: string, identifier: string, error: unknown): MedusaError {
+    console.error(
+      `[payment-provider] stripe ${operation} failed id=${safeLogIdentifier(identifier)}`,
+      error,
+    );
+    return new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `Stripe ${operation} failed. Try again or choose another payment method.`,
+    );
+  }
 
   constructor(cradle: Record<string, unknown>, options: StripeCheckoutPaymentOptions) {
     super(cradle, options);
@@ -186,9 +199,17 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
           success_url: this.successUrl(),
           cancel_url: this.cancelUrl(),
           client_reference_id: sessionId,
-          metadata: { session_id: sessionId },
+          metadata: {
+            session_id: sessionId,
+            amount_minor: String(Math.round(amountMinor)),
+            currency,
+          },
           payment_intent_data: {
-            metadata: { session_id: sessionId },
+            metadata: {
+              session_id: sessionId,
+              amount_minor: String(Math.round(amountMinor)),
+              currency,
+            },
           },
           adaptive_pricing: { enabled: false },
           line_items: [
@@ -227,10 +248,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       };
     } catch (err) {
       if (err instanceof MedusaError) throw err;
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `Stripe create Checkout Session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("create checkout session", sessionId, err);
     }
   }
 
@@ -283,10 +301,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
         "[payment-pipeline] authorize_failed provider=stripe reason=retrieve_session",
         err,
       );
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `Stripe retrieve Checkout Session failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("retrieve checkout session", csId, err);
     }
   }
 
@@ -452,6 +467,7 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
         this.options_.webhookSecret,
       );
     } catch (err) {
+      await recordWebhookSecurityEvent("stripe", "signature_failure");
       console.error(
         "[payment-webhook] verification_failed provider=stripe reason=invalid_signature",
         err,
@@ -477,6 +493,26 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
       return { action: PaymentActions.NOT_SUPPORTED };
     }
 
+    const expectedAmount = Number(session.metadata?.amount_minor);
+    const expectedCurrency = session.metadata?.currency?.trim().toLowerCase();
+    const actualCurrency = session.currency?.trim().toLowerCase();
+    if (
+      !Number.isSafeInteger(expectedAmount) ||
+      expectedAmount < 1 ||
+      sessionAmountMinor(session.amount_total) !== expectedAmount ||
+      !expectedCurrency ||
+      !actualCurrency ||
+      actualCurrency !== expectedCurrency
+    ) {
+      console.error(
+        "[payment-webhook] verification_failed provider=stripe reason=amount_or_currency_mismatch",
+      );
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Stripe webhook amount or currency does not match the checkout session.",
+      );
+    }
+
     const dedupId = buildStripeWebhookDedupId(event);
     if (dedupId) {
       const isFirst = await claimStripeWebhookDedup(dedupId);
@@ -490,6 +526,16 @@ export default class StripeCheckoutPaymentProviderService extends AbstractPaymen
 
     if (event.type === "checkout.session.expired") {
       return { action: PaymentActions.CANCELED, data };
+    }
+
+    if (session.status !== "complete" || session.payment_status !== "paid") {
+      console.error(
+        "[payment-webhook] verification_failed provider=stripe reason=session_not_paid",
+      );
+      throw new MedusaError(
+        MedusaError.Types.NOT_ALLOWED,
+        "Stripe checkout session is not complete and paid.",
+      );
     }
 
     return { action: PaymentActions.SUCCESSFUL, data };

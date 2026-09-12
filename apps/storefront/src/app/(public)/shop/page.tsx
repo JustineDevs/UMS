@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@universal-music-store/platform-data";
@@ -20,10 +21,17 @@ import {
 import { cssColorForVariantColorLabel } from "@/lib/variant-color-swatch";
 import type { ShopQuery } from "@/lib/shop-url";
 import { shopHref } from "@/lib/shop-url";
-import { parseShopPageQuery } from "@/lib/shop-page-query";
+import {
+  parseShopPageQuery,
+  parseShopPageQueryDiagnostics,
+  normalizeShopPageSearchParams,
+  shopPageShouldNoIndex,
+} from "@/lib/shop-page-query";
 import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
+import { ShopFilterDrawer } from "@/components/ShopFilterDrawer";
+import { ShopFilterGroup } from "@/components/ShopFilterGroup";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import {
   buildPageMetadata,
@@ -34,30 +42,14 @@ import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 
 export const revalidate = 60;
 
-type ShopSearchParams = {
-  category?: string;
-  locale?: string;
-  type?: string;
-  finish?: string;
-  brand?: string;
-  pickupConfig?: string;
-  bodyWood?: string;
-  condition?: string;
-  skillLevel?: string;
-  shippingSpeed?: string;
-  minPrice?: string;
-  maxPrice?: string;
-  sort?: string;
-  offset?: string;
-  q?: string;
-};
+type ShopSearchParams = Record<string, string | string[] | undefined>;
 
 export async function generateMetadata({
   searchParams,
 }: {
   searchParams: Promise<ShopSearchParams>;
 }): Promise<Metadata> {
-  const sp = await searchParams;
+  const sp = normalizeShopPageSearchParams(await searchParams);
   const q = parseShopPageQuery(sp);
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
@@ -101,6 +93,7 @@ export async function generateMetadata({
       ...(brand ? [brand] : []),
       ...(searchQ ? [searchQ] : []),
     ],
+    noindex: shopPageShouldNoIndex(q),
   });
 }
 
@@ -109,9 +102,38 @@ export default async function ShopPage({
 }: {
   searchParams: Promise<ShopSearchParams>;
 }) {
-  const sp = await searchParams;
+  const sp = normalizeShopPageSearchParams(await searchParams);
   const cmsLocale = (sp.locale ?? "en").trim() || "en";
-  const q = parseShopPageQuery(sp);
+  const diagnostics = parseShopPageQueryDiagnostics(sp);
+  if (diagnostics.invalidKeys.length > 0) {
+    const allowedQueryKeys = new Set([
+      "category",
+      "type",
+      "finish",
+      "brand",
+      "pickupConfig",
+      "bodyWood",
+      "condition",
+      "skillLevel",
+      "shippingSpeed",
+      "minPrice",
+      "maxPrice",
+      "sort",
+      "offset",
+      "q",
+    ]);
+    const canonical = new URLSearchParams();
+    for (const [key, value] of Object.entries(sp)) {
+      if (
+        key === "locale" ||
+        !allowedQueryKeys.has(key) ||
+        diagnostics.invalidKeys.includes(key)
+      ) continue;
+      if (typeof value === "string" && value.trim()) canonical.set(key, value);
+    }
+    redirect(canonical.toString() ? `/shop?${canonical}` : "/shop");
+  }
+  const q = diagnostics.query;
 
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
@@ -129,7 +151,7 @@ export default async function ShopPage({
   const offset = q.offset ?? 0;
   const limit = q.limit ?? SHOP_PRODUCT_PAGE_SIZE;
 
-  const [pageRes, catRes, facetRes, cmsCategory] = await Promise.all([
+  const [pageRes, catRes, facetRes] = await Promise.all([
     fetchProductsPage(limit, {
       category,
       type,
@@ -149,7 +171,6 @@ export default async function ShopPage({
     }),
     fetchCategorySummaries(),
     fetchVariantFacets(category),
-    category ? loadCmsCategoryContentPublic(category, cmsLocale) : Promise.resolve(null),
   ]);
 
   const blockingFailure = primaryCommerceFailure(pageRes);
@@ -169,6 +190,13 @@ export default async function ShopPage({
     catRes.kind === "ok"
       ? catRes.summaries
       : ([] as Extract<typeof catRes, { kind: "ok" }>["summaries"]);
+  const cmsCategory = category
+    ? await loadCmsCategoryContentPublic(
+        category,
+        cmsLocale,
+        categories.find((item) => item.handle === category)?.id,
+      )
+    : null;
   const facets =
     facetRes.kind === "ok"
       ? facetRes.facets
@@ -207,6 +235,20 @@ export default async function ShopPage({
   });
 
   const h = (patch: Partial<ShopQuery>) => shopHref({ ...base(), ...patch });
+  const activeFilterCount = [
+    category,
+    type,
+    finish,
+    brand,
+    pickupConfig,
+    bodyWood,
+    condition,
+    skillLevel,
+    shippingSpeed,
+    searchQ,
+    minPrice,
+    maxPrice,
+  ].filter((value) => value !== undefined && value !== "").length;
 
   return (
     <main className="storefront-page-shell max-w-[1600px] pb-12 sm:pb-16 md:pb-24">
@@ -219,7 +261,7 @@ export default async function ShopPage({
         <div className="relative mb-10 aspect-[21/9] w-full overflow-hidden rounded-2xl bg-surface-container-low">
           <Image
             src={cmsCategory.banner_url}
-            alt=""
+            alt={cmsCategory.banner_alt ?? `${category ?? "Shop"} collection banner`}
             fill
             sizes="(max-width: 1600px) 100vw, 1600px"
             className="object-cover"
@@ -295,16 +337,14 @@ export default async function ShopPage({
 
       {cmsCategory?.blocks?.length ? (
         <div className="mb-10">
-          <CmsBlocksRenderer blocks={cmsCategory.blocks} />
+          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
         </div>
       ) : null}
 
       <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
-        <aside className="w-full lg:w-64 flex-shrink-0 space-y-12">
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Category
-            </h3>
+        <ShopFilterDrawer activeFilterCount={activeFilterCount}>
+          <aside className="w-full space-y-12">
+          <ShopFilterGroup title="Category">
             <ul className="space-y-4">
               <li>
                 <Link
@@ -318,7 +358,8 @@ export default async function ShopPage({
                     skillLevel,
                     shippingSpeed,
                   })}
-                  className={`flex items-center justify-between text-sm transition-colors ${
+                  aria-current={!category ? "page" : undefined}
+                  className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
                     !category
                       ? "font-medium text-primary"
                       : "text-on-surface-variant hover:text-primary"
@@ -343,7 +384,8 @@ export default async function ShopPage({
                       skillLevel: undefined,
                       shippingSpeed: undefined,
                     })}
-                    className={`flex items-center justify-between text-sm transition-colors ${
+                    aria-current={category === c.category ? "page" : undefined}
+                    className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
                       category === c.category
                         ? "font-medium text-primary"
                         : "text-on-surface-variant hover:text-primary"
@@ -355,12 +397,9 @@ export default async function ShopPage({
                 </li>
               ))}
             </ul>
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Type
-            </h3>
+          <ShopFilterGroup title="Type">
             {facets.types.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 No types in this view.
@@ -370,8 +409,8 @@ export default async function ShopPage({
                 {facets.types.map((t) => {
                   const active = type === t;
                   return (
-                    <Link
-                      key={t}
+                  <Link
+                    key={t}
                       href={h({
                         type: active ? undefined : t,
                         finish,
@@ -381,6 +420,7 @@ export default async function ShopPage({
                         skillLevel,
                         shippingSpeed,
                       })}
+                      aria-current={active ? "page" : undefined}
                       className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-all rounded ${
                         active
                           ? "bg-primary text-on-primary"
@@ -393,12 +433,9 @@ export default async function ShopPage({
                 })}
               </div>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Finish
-            </h3>
+          <ShopFilterGroup title="Finish">
             {facets.finishes.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 No finishes in this view.
@@ -418,8 +455,9 @@ export default async function ShopPage({
                         condition,
                         skillLevel,
                         shippingSpeed,
-                      })}
-                      className={`flex items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
+                        })}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex min-h-11 items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
                         active ? "ring-1 ring-primary" : ""
                       }`}
                     >
@@ -435,12 +473,9 @@ export default async function ShopPage({
                 })}
               </div>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Brand
-            </h3>
+          <ShopFilterGroup title="Brand">
             {facets.brands.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Set brand on products in store metadata to filter here.
@@ -460,7 +495,8 @@ export default async function ShopPage({
                           skillLevel,
                           shippingSpeed,
                         })}
-                        className={`text-sm ${
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -473,12 +509,9 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Price (PHP)
-            </h3>
+          <ShopFilterGroup title="Price (PHP)">
             <ShopPriceRangeForm
               category={category}
               type={type}
@@ -494,12 +527,9 @@ export default async function ShopPage({
               minPrice={minPrice}
               maxPrice={maxPrice}
             />
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Pickup config
-            </h3>
+          <ShopFilterGroup title="Pickup config">
             {facets.pickupConfigs.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Add pickup config metadata to variants to filter here.
@@ -514,7 +544,8 @@ export default async function ShopPage({
                         href={h({
                           pickupConfig: active ? undefined : value,
                         })}
-                        className={`text-sm ${
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -527,12 +558,9 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Body wood
-            </h3>
+          <ShopFilterGroup title="Body wood">
             {facets.bodyWoods.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Add body wood metadata to variants to filter here.
@@ -547,7 +575,8 @@ export default async function ShopPage({
                         href={h({
                           bodyWood: active ? undefined : value,
                         })}
-                        className={`text-sm ${
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -560,12 +589,9 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Condition
-            </h3>
+          <ShopFilterGroup title="Condition">
             {facets.conditions.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Add condition metadata to variants to filter here.
@@ -580,7 +606,8 @@ export default async function ShopPage({
                         href={h({
                           condition: active ? undefined : value,
                         })}
-                        className={`text-sm ${
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -593,12 +620,9 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Skill level
-            </h3>
+          <ShopFilterGroup title="Skill level">
             {facets.skillLevels.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Add skill level metadata to variants to filter here.
@@ -613,7 +637,8 @@ export default async function ShopPage({
                         href={h({
                           skillLevel: active ? undefined : value,
                         })}
-                        className={`text-sm ${
+                        aria-current={active ? "page" : undefined}
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -626,12 +651,9 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
-          <section>
-            <h3 className="font-headline text-sm font-bold uppercase tracking-[0.2em] mb-6 text-primary">
-              Shipping speed
-            </h3>
+          <ShopFilterGroup title="Shipping speed">
             {facets.shippingSpeeds.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 Add shipping speed metadata to variants to filter here.
@@ -646,7 +668,7 @@ export default async function ShopPage({
                         href={h({
                           shippingSpeed: active ? undefined : value,
                         })}
-                        className={`text-sm ${
+                        className={`flex min-h-11 items-center text-sm ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -659,7 +681,7 @@ export default async function ShopPage({
                 })}
               </ul>
             )}
-          </section>
+          </ShopFilterGroup>
 
           {(category ||
             type ||
@@ -675,24 +697,27 @@ export default async function ShopPage({
             maxPrice != null) && (
             <Link
               href="/shop"
-              className="inline-block text-xs font-medium text-primary underline underline-offset-4 hover:opacity-80"
+              className="inline-flex min-h-11 items-center text-xs font-medium text-primary underline underline-offset-4 hover:opacity-80"
             >
               Clear filters
             </Link>
           )}
-        </aside>
+          </aside>
+        </ShopFilterDrawer>
 
         <div className="flex-grow">
           {products.length === 0 ? (
             <div className="rounded-lg border border-surface-container-high bg-surface-container-lowest p-12 text-center">
-              <p className="text-on-surface-variant">
-                No products match these filters.
+              <p className="text-on-surface-variant" role="status" aria-live="polite">
+                {searchQ
+                  ? `No products found for “${searchQ}”. Try a broader term or browse the full catalog.`
+                  : "No products match these filters."}
               </p>
               <Link
-                href="/shop"
-                className="mt-4 inline-block text-primary text-sm font-medium underline"
+                href={searchQ ? h({ search: undefined, offset: 0 }) : "/shop"}
+                className="mt-4 inline-flex min-h-11 items-center text-primary text-sm font-medium underline"
               >
-                View all products
+                {searchQ ? "Clear search" : "View all products"}
               </Link>
             </div>
           ) : (
@@ -709,20 +734,35 @@ export default async function ShopPage({
 
           {total > 0 && (
             <div className="mt-16 flex flex-col items-center gap-6">
-              <p className="font-body text-xs text-on-surface-variant uppercase tracking-widest">
+              <p className="font-body text-xs text-on-surface-variant uppercase tracking-widest" role="status" aria-live="polite">
                 Showing {offset + 1}–{Math.min(offset + products.length, total)}{" "}
                 of {total}
               </p>
-              {hasMore && (
-                <Link
-                  href={h({
-                    offset: offset + limit,
-                  })}
-                  className="px-12 py-4 border border-primary text-primary text-xs font-bold uppercase tracking-[0.2em] hover:bg-primary hover:text-on-primary transition-all"
-                >
-                  Load more
-                </Link>
-              )}
+              <nav
+                aria-label="Shop pages"
+                className="flex flex-wrap items-center justify-center gap-3"
+              >
+                {offset > 0 ? (
+                  <Link
+                    href={h({ offset: Math.max(0, offset - limit) })}
+                    rel="prev"
+                    aria-label="Previous shop page"
+                    className="inline-flex min-h-11 items-center border border-outline-variant/50 px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-all hover:border-primary"
+                  >
+                    Previous page
+                  </Link>
+                ) : null}
+                {hasMore ? (
+                  <Link
+                    href={h({ offset: offset + limit })}
+                    rel="next"
+                    aria-label="Next shop page"
+                    className="inline-flex min-h-11 items-center border border-primary px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-all hover:bg-primary hover:text-on-primary"
+                  >
+                    Next page
+                  </Link>
+                ) : null}
+              </nav>
             </div>
           )}
         </div>

@@ -13,6 +13,8 @@ import {
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 function jsonNoStore(
   body: unknown,
@@ -35,6 +37,9 @@ function jsonNoStore(
  * cookie possession alone.
  */
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return jsonNoStore({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const rl = await applyRateLimit(req, "complete-medusa-cart", 40, 60_000);
   if (!rl.ok) {
     return rl.response;
@@ -68,17 +73,13 @@ async function handlePOST(req: Request) {
 
   const cartSuffix = cartId.length > 8 ? cartId.slice(-8) : cartId;
 
-  let correlationId: string | undefined;
-  try {
-    const body = (await req.json().catch(() => ({}))) as {
-      correlationId?: string;
-    };
-    if (typeof body.correlationId === "string" && body.correlationId.trim()) {
-      correlationId = body.correlationId.trim();
-    }
-  } catch {
-    correlationId = undefined;
-  }
+  const parsedBody = await parseBoundedJson(req, 8 * 1024);
+  if (parsedBody.tooLarge) return jsonNoStore({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid) return jsonNoStore({ error: "Invalid JSON" }, { status: 400 });
+  const body = parsedBody.value as { correlationId?: string };
+  const correlationId = typeof body.correlationId === "string" && body.correlationId.trim()
+    ? body.correlationId.trim()
+    : undefined;
 
   const sb = createStorefrontServiceSupabase();
 

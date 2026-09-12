@@ -1,16 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
 
 import { OrderCancelButton } from "@/components/OrderCancelButton";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import { findMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
+import {
+  accountOrderMatchesDetail,
+  fetchWorkerCustomerOrderDetail,
+} from "@/lib/medusa-account-orders";
 
 export const metadata: Metadata = {
   title: "Order details",
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
+  referrer: "no-referrer",
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 type OrderItemRow = {
   id?: string;
@@ -32,6 +41,7 @@ type FulfillmentRow = {
 
 type OrderRow = {
   id?: string;
+  customer_id?: string | null;
   display_id?: string | number;
   email?: string | null;
   status?: string;
@@ -43,8 +53,8 @@ type OrderRow = {
   currency_code?: string;
   created_at?: string;
   updated_at?: string;
-  payment_status?: string;
-  fulfillment_status?: string;
+  payment_status?: string | null;
+  fulfillment_status?: string | null;
   metadata?: Record<string, unknown> | null;
   shipping_address?: {
     first_name?: string | null;
@@ -68,7 +78,7 @@ function formatMoney(amount: number | undefined, currency = "PHP") {
   })}`;
 }
 
-function formatStatus(value: string | undefined) {
+function formatStatus(value: string | null | undefined) {
   return (value ?? "unknown").replace(/_/g, " ");
 }
 
@@ -84,9 +94,9 @@ export default async function AccountOrderPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const userEmail = session?.user?.email?.trim().toLowerCase();
-  if (!userEmail) {
+  if (!session || !userEmail) {
     redirect(`/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}`);
   }
 
@@ -94,23 +104,32 @@ export default async function AccountOrderPage({
     notFound();
   }
 
-  const res = await medusaAdminFetch(
-    `/admin/orders/${encodeURIComponent(orderId)}?fields=id,display_id,email,status,total,subtotal,tax_total,shipping_total,discount_total,currency_code,created_at,updated_at,payment_status,fulfillment_status,shipping_address,*items,*items.id,*items.title,*items.quantity,*items.unit_price,*items.total,*items.variant,+metadata,*fulfillments,*fulfillments.id,*fulfillments.status,*fulfillments.provider_id,*fulfillments.shipped_at,*fulfillments.tracking_numbers,*fulfillments.labels`,
-  );
-  if (!res.ok) {
-    notFound();
+  const workerDetail = await fetchWorkerCustomerOrderDetail(orderId);
+  let order: OrderRow | undefined;
+  if (workerDetail) {
+    if (workerDetail.error !== null || !workerDetail.order) notFound();
+    order = workerDetail.order;
+  } else {
+    const sessionCustomerId =
+      typeof (session.user as Record<string, unknown>).medusaCustomerId === "string"
+        ? String((session.user as Record<string, unknown>).medusaCustomerId).trim()
+        : "";
+    const customerId = sessionCustomerId || (await findMedusaCustomerIdByEmail(userEmail));
+    if (!customerId) notFound();
+
+    const res = await medusaAdminFetch(
+      `/admin/orders/${encodeURIComponent(orderId)}?fields=id,customer_id,display_id,email,status,total,subtotal,tax_total,shipping_total,discount_total,currency_code,created_at,updated_at,payment_status,fulfillment_status,shipping_address,*items,*items.id,*items.title,*items.quantity,*items.unit_price,*items.total,*items.variant,+metadata,*fulfillments,*fulfillments.id,*fulfillments.status,*fulfillments.provider_id,*fulfillments.shipped_at,*fulfillments.tracking_numbers,*fulfillments.labels`,
+    );
+    if (!res.ok) notFound();
+    const json = (await res.json()) as { order?: OrderRow };
+    order = json.order;
+    const orderEmail = order?.email?.trim().toLowerCase();
+    if (!order?.id || !orderEmail || !accountOrderMatchesDetail(order, customerId, userEmail)) {
+      notFound();
+    }
   }
 
-  const json = (await res.json()) as { order?: OrderRow };
-  const order = json.order;
-  if (!order?.id) {
-    notFound();
-  }
-
-  const orderEmail = order.email?.trim().toLowerCase();
-  if (!orderEmail || orderEmail !== userEmail) {
-    notFound();
-  }
+  if (!order?.id) notFound();
 
   const currency = String(order.currency_code ?? "PHP").toUpperCase();
   const displayId =
@@ -134,10 +153,20 @@ export default async function AccountOrderPage({
           <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary">
             Order #{displayId}
           </h1>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            Status: {formatStatus(order.status)} · Payment: {formatStatus(order.payment_status)} · Fulfillment:{" "}
-            {formatStatus(order.fulfillment_status)}
-          </p>
+          <dl className="mt-3 grid gap-x-5 gap-y-2 text-sm text-on-surface-variant sm:grid-cols-3" aria-label="Order state summary">
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Order status</dt>
+              <dd className="font-medium text-primary">{formatStatus(order.status)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Payment</dt>
+              <dd className="font-medium text-primary">{formatStatus(order.payment_status)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wide">Fulfillment</dt>
+              <dd className="font-medium text-primary">{formatStatus(order.fulfillment_status)}</dd>
+            </div>
+          </dl>
         </div>
         {(order.status === "pending" ||
           order.status === "pending_payment" ||
@@ -153,12 +182,19 @@ export default async function AccountOrderPage({
         <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
           Status timeline
         </h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-5">
+        <ol
+          className="mt-5 grid gap-4 sm:grid-cols-5"
+          aria-label={`Order status timeline; current step ${formatStatus(steps[currentIndex])}`}
+        >
           {steps.map((step, index) => {
             const isComplete = index <= currentIndex;
             const isCurrent = index === currentIndex;
             return (
-              <div key={step} className="rounded-xl border border-outline-variant/20 p-4">
+              <li
+                key={step}
+                className="rounded-xl border border-outline-variant/20 p-4"
+                aria-current={isCurrent ? "step" : undefined}
+              >
                 <div
                   className={`mb-3 h-3 w-3 rounded-full ${isComplete ? "bg-primary" : "bg-outline-variant/30"}`}
                 />
@@ -170,10 +206,10 @@ export default async function AccountOrderPage({
                     Current step
                   </p>
                 ) : null}
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ol>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

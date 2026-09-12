@@ -141,7 +141,14 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
             } else {
               await clickPayButton(page);
               if (provider === "paypal") {
-                const paypalRedirect = page.url().includes("paypal.com");
+                const paypalRedirect = (() => {
+                  try {
+                    const hostname = new URL(page.url()).hostname.toLowerCase();
+                    return hostname === "paypal.com" || hostname.endsWith(".paypal.com");
+                  } catch {
+                    return false;
+                  }
+                })();
                 if (paypalRedirect) {
                   await expect(page).toHaveURL(/paypal\.com/, { timeout: 30_000 });
                 } else {
@@ -237,7 +244,7 @@ test.describe("@workflow @checkout @stress @recovery checkout recovery stress", 
         }
 
         await clickPayButton(page);
-        const hostedContinue = page.getByTestId("checkout-continue-payment");
+        const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
         if (await hostedContinue.isVisible({ timeout: 15_000 }).catch(() => false)) {
           await clickContinueToStripeHostedCheckout(page);
           await fillStripeHostedCheckoutTestCard(page, STRIPE_SANDBOX_TEST_CARD_DECLINE);

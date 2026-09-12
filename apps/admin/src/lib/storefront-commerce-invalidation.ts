@@ -8,6 +8,7 @@ export type StorefrontCatalogMutationClassification =
   | "checkout_affecting";
 
 export type StorefrontCommerceInvalidationPayload = {
+  scope?: "commerce" | "cms";
   classification: StorefrontCatalogMutationClassification;
   productHandles?: string[];
   productIds?: string[];
@@ -17,6 +18,18 @@ export type StorefrontCommerceInvalidationPayload = {
   actorEmail?: string | null;
   reason?: string;
 };
+
+export async function notifyStorefrontCmsInvalidation(input: {
+  actorEmail?: string | null;
+  reason?: string;
+} = {}): Promise<{ ok: true } | { ok: false; error: string }> {
+  return notifyStorefrontCommerceInvalidation({
+    scope: "cms",
+    classification: "editorial_only",
+    actorEmail: input.actorEmail,
+    reason: input.reason ?? "cms_mutation",
+  });
+}
 
 function arraysEqual(left: string[], right: string[]): boolean {
   if (left.length !== right.length) return false;

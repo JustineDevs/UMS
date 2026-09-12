@@ -1,21 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
-import { Suspense } from "react";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
-import { BotIdClient } from "botid/client";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
-import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
-import { StorefrontPreferenceSync } from "@/components/StorefrontPreferenceSync";
-import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
-import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
-import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
-import { OnboardingGuard } from "@/components/OnboardingGuard";
-import { PostHogAnalytics } from "@/components/PostHogAnalytics";
-import { MedusaCartProvider } from "@/context/MedusaCartContext";
-import { CookieConsentBanner } from "@/components/CookieConsentBanner";
-import { RecaptchaScript } from "@/components/RecaptchaScript";
-import { WishlistSyncOnLogin } from "@/components/WishlistSyncOnLogin";
 import "./globals.css";
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -32,9 +18,6 @@ const inter = Inter({
 
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN;
-
-const botIdDisabledForLocalAuthBypass =
-  process.env.AUTH_DISABLED === "true";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -70,7 +53,7 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     title: `${SITE_NAME} — Music store`,
     description: SITE_DESCRIPTION,
-    images: [{ url: "/UVS/UVS_logo_landscape.png", alt: SITE_NAME }],
+    images: [{ url: "/brand/universal-music-store-logo-landscape.png", alt: SITE_NAME }],
   },
   twitter: {
     card: "summary_large_image",
@@ -115,41 +98,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
       <body className="min-h-[100dvh] min-w-0 overflow-x-hidden bg-surface text-on-surface font-body antialiased supports-[height:100dvh]:min-h-dvh">
-        <NextAuthSessionProvider>
-          <MedusaCartProvider>
-            <PostHogAnalytics />
-            {!botIdDisabledForLocalAuthBypass ? <BotIdClient
-              protect={[
-                { path: "/api/checkout", method: "POST" },
-                { path: "/api/checkout/cod-cart-payload", method: "POST" },
-                { path: "/api/checkout/cod-place-order", method: "POST" },
-                { path: "/api/checkout/complete-medusa-cart", method: "POST" },
-                { path: "/api/checkout/apply-promo", method: "POST" },
-                { path: "/api/checkout/verify-stock", method: "POST" },
-                { path: "/api/checkout/upload-payment-receipt", method: "POST" },
-                { path: "/api/account/profile", method: "PATCH" },
-                { path: "/api/account/orders/*/cancel", method: "POST" },
-                { path: "/api/reviews", method: "POST" },
-                { path: "/api/cart/medusa-bind", method: "POST" },
-                { path: "/api/cart/abandonment", method: "POST" },
-                { path: "/api/newsletter", method: "POST" },
-                { path: "/api/back-in-stock", method: "POST" },
-              ]}
-            /> : null}
-            <CartSyncOnSignIn />
-            <WishlistSyncOnLogin />
-            <StorefrontPreferenceSync />
-            <CartAbandonmentBeacon />
-            <Suspense fallback={null}>
-              <OnboardingGuard>
-                <SmoothScrollProvider>{children}</SmoothScrollProvider>
-              </OnboardingGuard>
-            </Suspense>
-          </MedusaCartProvider>
-        </NextAuthSessionProvider>
-        <RecaptchaScript />
-        {process.env.VERCEL === "1" ? <Analytics /> : null}
-        <CookieConsentBanner />
+        {children}
       </body>
     </html>
   );

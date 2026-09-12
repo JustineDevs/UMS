@@ -5,6 +5,7 @@
     "@types/.+",
     "@typescript-eslint/parser",
     "@medusajs/(admin-sdk|admin-shared|dashboard|draft-order|utils)",
+    "@medusajs/fulfillment-manual",
     "@universal-music-store/types",
     "eslint",
     "esbuild",
@@ -33,10 +34,16 @@
         "stress-test/e2e/runtime-logs-init.ts"
       ],
       "ignoreFiles": [
-        ".venv-favicon/**"
+        ".venv-favicon/**",
+        "**/.next-production/**"
       ]
     },
     "apps/admin": {
+      "ignoreFiles": [
+        "public/guide-demos/demo-mock-data.js",
+        "public/guide-demos/demo-runtime.js",
+        "public/guide-demos/demo-shared.css"
+      ],
       "next": {
         "entry": [
           "src/app/**/*/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}",
@@ -61,6 +68,7 @@
       "entry": [
         "medusa-config.ts",
         "instrumentation.ts",
+        "scripts/**/*.cjs",
         "src/api/**/*.ts",
         "src/scripts/**/*.ts",
         "src/subscribers/**/*.ts",
@@ -69,6 +77,12 @@
         "src/admin/i18n/index.ts",
         "src/lib/inngest/**/*.ts"
       ]
+    },
+    "packages/platform-data": {
+      "entry": ["src/index.ts"]
+    },
+    "packages/sdk": {
+      "entry": ["src/index.ts", "src/cms-experiment-pick.ts"]
     },
     "packages/config/tailwind": {
       "ignoreFiles": [

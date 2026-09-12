@@ -202,6 +202,16 @@ export default async function seedDemoData({ container }: ExecArgs) {
       [Modules.STOCK_LOCATION]: {
         stock_location_id: stockLocation.id,
       },
+    });
+  } catch {
+    // link may already exist
+  }
+
+  try {
+    await link.create({
+      [Modules.STOCK_LOCATION]: {
+        stock_location_id: stockLocation.id,
+      },
       [Modules.FULFILLMENT]: {
         fulfillment_provider_id: "manual_manual",
       },
@@ -286,6 +296,26 @@ export default async function seedDemoData({ container }: ExecArgs) {
     },
   });
 
+  // listFulfillmentSets may omit service-zone relations.
+  let serviceZoneId = fulfillmentSet.service_zones?.[0]?.id;
+  if (!serviceZoneId) {
+    fulfillmentSet = await fulfillmentModuleService.retrieveFulfillmentSet(
+      fulfillmentSet.id,
+      { relations: ["service_zones"] },
+    );
+    serviceZoneId = fulfillmentSet.service_zones?.[0]?.id;
+  }
+  if (!serviceZoneId) {
+    const zones = await fulfillmentModuleService.listServiceZones(
+      { fulfillment_set: { id: fulfillmentSet.id } },
+      { take: 20 },
+    );
+    serviceZoneId = zones[0]?.id;
+  }
+  if (!serviceZoneId) {
+    throw new Error("European fulfillment set has no service zone.");
+  }
+
   const existingShippingOptions = await fulfillmentModuleService.listShippingOptions(
     { name: "Standard Shipping" },
   );
@@ -296,7 +326,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
           name: "Standard Shipping",
           price_type: "flat",
           provider_id: "manual_manual",
-          service_zone_id: fulfillmentSet.service_zones[0].id,
+          service_zone_id: serviceZoneId,
           shipping_profile_id: shippingProfile.id,
           type: {
             label: "Standard",
@@ -334,7 +364,7 @@ export default async function seedDemoData({ container }: ExecArgs) {
           name: "Express Shipping",
           price_type: "flat",
           provider_id: "manual_manual",
-          service_zone_id: fulfillmentSet.service_zones[0].id,
+          service_zone_id: serviceZoneId,
           shipping_profile_id: shippingProfile.id,
           type: {
             label: "Express",

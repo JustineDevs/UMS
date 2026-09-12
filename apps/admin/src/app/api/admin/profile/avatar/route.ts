@@ -2,6 +2,8 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedError } from "@/lib/staff-api-response";
 
 // The source asset is intentionally served through the admin origin so the
 // admin app does not depend on the storefront's public directory.
@@ -14,6 +16,7 @@ function hashSeed(seed: string) {
 }
 
 export async function GET(request: Request) {
+  const correlationId = getCorrelationId(request);
   const auth = await requireStaffApiSession("content:read");
   if (!auth.ok) return auth.response;
   try {
@@ -31,7 +34,7 @@ export async function GET(request: Request) {
     const files = (await readdir(directory))
       .filter((file) => /\.(png|svg)$/i.test(file))
       .sort();
-    if (files.length === 0) return NextResponse.json({ error: "Avatar unavailable" }, { status: 404 });
+    if (files.length === 0) return correlatedError(correlationId, 404, "Avatar unavailable", "NOT_FOUND");
     const seed = new URL(request.url).searchParams.get("seed")?.trim() || "staff";
     const fileName = files[hashSeed(seed) % files.length];
     const file = await readFile(path.join(directory, fileName));
@@ -43,6 +46,6 @@ export async function GET(request: Request) {
       },
     });
   } catch {
-    return NextResponse.json({ error: "Avatar unavailable" }, { status: 404 });
+    return correlatedError(correlationId, 404, "Avatar unavailable", "NOT_FOUND");
   }
 }

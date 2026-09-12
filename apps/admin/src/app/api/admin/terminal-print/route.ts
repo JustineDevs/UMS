@@ -4,29 +4,25 @@ import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { terminalPrintBodySchema } from "@/lib/terminal-print-schemas";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   }
   if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
 
-  const raw = await req.json().catch(() => null);
+  const parsedBody = await parseBoundedJson(req, 128 * 1024);
+  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
+  const raw = parsedBody.valid ? parsedBody.value : null;
   const parsed = terminalPrintBodySchema.safeParse(raw);
   if (!parsed.success) {
-    return correlatedJson(
-      cid,
-      {
-        error: "Invalid receipt print payload",
-        details: parsed.error.flatten(),
-      },
-      { status: 400 },
-    );
+    return correlatedError(cid, 400, "Invalid receipt print payload", "VALIDATION_ERROR");
   }
 
   const base =

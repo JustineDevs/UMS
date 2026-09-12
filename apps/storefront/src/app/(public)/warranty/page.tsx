@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Warranty",
@@ -9,9 +10,9 @@ export const metadata: Metadata = buildPageMetadata({
   keywords: [...SEO_KEYWORDS.policies],
 });
 
-const PDF_URL = process.env.NEXT_PUBLIC_WARRANTY_PDF_URL?.trim() ?? "";
-
-export default function WarrantyPage() {
+export default async function WarrantyPage() {
+  const metadata = await getCachedPublicSiteMetadata();
+  const pdfUrl = metadata.warrantyPdfUrl;
   return (
     <main className="storefront-page-shell max-w-3xl font-body leading-relaxed text-on-surface-variant">
       <h1 className="font-headline text-4xl font-bold text-primary mb-8">Warranty</h1>
@@ -21,10 +22,10 @@ export default function WarrantyPage() {
         confirmation and any included setup notes.
       </p>
 
-      {PDF_URL ? (
+      {pdfUrl ? (
         <p className="mb-8">
           <a
-            href={PDF_URL}
+            href={pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center rounded bg-primary px-5 py-2.5 text-sm font-medium text-on-primary hover:opacity-90"

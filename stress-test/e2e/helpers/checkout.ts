@@ -6,9 +6,25 @@ import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
+function isTrustedProviderHost(value: string, hosts: readonly string[]): boolean {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 export async function enablePublicTunnelBypass(page: Page): Promise<void> {
   if (process.env.E2E_TUNNEL_BYPASS_HEADER === "1") {
-    await page.setExtraHTTPHeaders({ "bypass-tunnel-reminder": "1" });
+    await page.route(/https:\/\/[^/]+\.loca\.lt(?:\/|$)/, async (route) => {
+      await route.continue({
+        headers: {
+          ...route.request().headers(),
+          "bypass-tunnel-reminder": "1",
+        },
+      });
+    });
   }
 }
 
@@ -121,11 +137,17 @@ export type AddCatalogProductResult = { slug: string; productTitle?: string };
  */
 export async function navigateToShopAndAddPreferredCatalogProduct(
   page: Page,
-  options?: { maxCandidates?: number; log?: (_message: string) => void },
+  options?: {
+    maxCandidates?: number;
+    log?: (_message: string) => void;
+    shopPath?: string;
+  },
 ): Promise<AddCatalogProductResult | null> {
   const max = options?.maxCandidates ?? 8;
   const log = options?.log ?? (() => {});
-  await page.goto(`${baseURL}/shop`, { waitUntil: "load" });
+  await page.goto(`${baseURL}${options?.shopPath ?? "/shop"}`, {
+    waitUntil: "load",
+  });
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
 
   const cards = page.locator("[data-product-slug]");
@@ -141,7 +163,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
 
   const trySlug = async (slug: string): Promise<AddCatalogProductResult | null> => {
     const res = await page.goto(`${baseURL}/shop/${slug}`, {
-      waitUntil: "networkidle",
+      waitUntil: "domcontentloaded",
     });
     if (!res || res.status() >= 400) return null;
     const btn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
@@ -161,7 +183,11 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
         const element = document.querySelector<HTMLElement>(
           '[data-testid="pdp-add-to-bag"]',
         );
-        return Boolean(element && !element.matches(":disabled"));
+        return Boolean(
+          element &&
+            element.dataset.clientReady === "true" &&
+            !element.matches(":disabled"),
+        );
       },
       undefined,
       { timeout: 10_000 },
@@ -176,10 +202,37 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
+      await addButton.evaluate((element) => {
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+      });
+      // Keep the real click point outside the fixed header's hit-test area.
+      // A plain scrollIntoView can leave the CTA underneath the header when
+      // the page is close to a scroll boundary.
+      for (let scrollAttempt = 0; scrollAttempt < 3; scrollAttempt += 1) {
+        const [buttonBox, headerBox] = await Promise.all([
+          addButton.boundingBox(),
+          page.locator('[data-cms-id="storefront-header"]').boundingBox(),
+        ]);
+        if (!buttonBox) break;
+        if (await addButton.isDisabled()) {
+          log(`stress catalog: skip ${slug} (became unavailable during hydration)`);
+          return null;
+        }
+        const headerBottom = headerBox ? headerBox.y + headerBox.height : 0;
+        const viewportHeight = page.viewportSize()?.height ?? 800;
+        if (buttonBox.y >= headerBottom + 12 && buttonBox.y + buttonBox.height <= viewportHeight - 12) {
+          break;
+        }
+        const delta = buttonBox.y < headerBottom + 12
+          ? -(headerBottom + 24 - buttonBox.y)
+          : buttonBox.y + buttonBox.height - (viewportHeight - 12);
+        await page.mouse.wheel(0, delta);
+        await page.waitForTimeout(100);
+      }
       await addButton.click();
       await page.waitForTimeout(800);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
-        await page.reload({ waitUntil: "networkidle" });
+        await page.reload({ waitUntil: "domcontentloaded" });
       }
     }
     await expect(page).toHaveURL(/\/cart(?:\?|$)/, { timeout: 15_000 });
@@ -258,7 +311,7 @@ export async function verifyPostPaymentSuccess(
 
   if (provider === "stripe" || provider === "cod") {
     await expectOrderConfirmation(page);
-    await expect(page).toHaveURL(/\/(track\/order_|checkout\/stripe-return)/i, {
+    await expect(page).toHaveURL(/\/(track\/(?:order_|cap_)|checkout\/stripe-return)/i, {
       timeout: strict ? 60_000 : 30_000,
     });
     const m = page.url().match(/(order_[a-z0-9]+)/i);
@@ -345,6 +398,7 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
 
   const addToCartBtn = page.getByRole("button", { name: /add to (cart|bag)/i });
   if (await addToCartBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await expect(addToCartBtn).toBeEnabled({ timeout: 10_000 });
     await addToCartBtn.click();
     await page.waitForTimeout(1_000);
   }
@@ -353,7 +407,7 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
 export async function navigateToCheckout(page: Page): Promise<void> {
   // Card providers are intentionally available to guests; enter that explicit
   // mode so provider smoke tests do not mistake the auth gate for a PSP gap.
-  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "load" });
+  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/guest=1/);
   await expect(page.getByRole("heading", { name: /checkout/i })).toBeVisible({
     timeout: 15_000,
@@ -393,37 +447,37 @@ export async function fillCheckoutShippingInfo(
   };
 
   const emailInput = page.getByLabel(/email/i).first();
-  if (await emailInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await emailInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await emailInput.fill(defaults.email);
   }
 
   const firstNameInput = page.getByLabel(/first name/i).first();
-  if (await firstNameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await firstNameInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await firstNameInput.fill(defaults.firstName);
   }
 
   const lastNameInput = page.getByLabel(/last name/i).first();
-  if (await lastNameInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await lastNameInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await lastNameInput.fill(defaults.lastName);
   }
 
   const addressInput = page.getByLabel(/address/i).first();
-  if (await addressInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await addressInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await addressInput.fill(defaults.address);
   }
 
   const cityInput = page.getByLabel(/city/i).first();
-  if (await cityInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await cityInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await cityInput.fill(defaults.city);
   }
 
   const postalInput = page.getByLabel(/postal|zip/i).first();
-  if (await postalInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await postalInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await postalInput.fill(defaults.postalCode);
   }
 
   const phoneInput = page.getByLabel(/phone/i).first();
-  if (await phoneInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
+  if (await phoneInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await phoneInput.fill(defaults.phone);
   }
 }
@@ -511,14 +565,36 @@ export const STRIPE_SANDBOX_TEST_CARD_SUCCESS = "4242424242424242";
 export const STRIPE_SANDBOX_TEST_CARD_DECLINE = "4000000000000002";
 
 /**
- * After "Continue to payment", the storefront shows "Continue to Stripe" which sends the
- * browser to Stripe Hosted Checkout. Call this after {@link clickPayButton} when that button appears.
+ * Retry a failed hosted handoff only. Normal checkout navigates in the same tab
+ * without requiring a second confirmation click.
  */
 export async function clickContinueToStripeHostedCheckout(page: Page): Promise<void> {
-  const btn = page.getByTestId("checkout-continue-payment");
+  const btn = page.getByTestId("checkout-retry-payment-handoff");
   await expect(btn).toBeVisible({ timeout: 60_000 });
   await btn.click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 90_000 });
+}
+
+/** Accepts either direct navigation or the optional intermediate handoff UI. */
+export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
+  if (isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
+  const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
+  const winner = await Promise.race([
+    page
+      .waitForURL(/checkout\.stripe\.com/, { timeout: 60_000 })
+      .then(() => "redirect" as const)
+      .catch(() => null),
+    expect(hostedContinue)
+      .toBeVisible({ timeout: 60_000 })
+      .then(() => "handoff" as const)
+      .catch(() => null),
+  ]);
+  if (winner === "redirect" || isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
+  if (winner === "handoff") {
+    await clickContinueToStripeHostedCheckout(page);
+    return;
+  }
+  throw new Error("Stripe checkout did not redirect or expose its handoff control");
 }
 
 /**
@@ -538,7 +614,7 @@ export async function fillStripeHostedCheckoutTestCard(
   let filled = false;
   for (const frame of page.frames()) {
     const url = frame.url();
-    if (!url.includes("stripe") && !url.includes("js.stripe.com")) continue;
+    if (!isTrustedProviderHost(url, ["js.stripe.com", "checkout.stripe.com"])) continue;
     const numberLoc = frame.locator(
       'input[autocomplete="cc-number"], input[name="cardnumber"], input[data-elements-stable-field-name="cardNumber"]',
     );
@@ -611,10 +687,8 @@ export async function payWithStripeSandboxCard(
 ): Promise<void> {
   await clickPayButton(page);
 
-  const hostedContinue = page.getByTestId("checkout-continue-payment");
   try {
-    await expect(hostedContinue).toBeVisible({ timeout: 180_000 });
-    await clickContinueToStripeHostedCheckout(page);
+    await ensureStripeHostedCheckout(page);
     await fillStripeHostedCheckoutTestCard(page, cardNumber);
     await submitStripeHostedCheckoutAndWaitForReturn(page);
     return;

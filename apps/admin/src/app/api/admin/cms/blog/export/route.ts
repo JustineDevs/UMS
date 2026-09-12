@@ -5,6 +5,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
+import { correlatedError } from "@/lib/staff-api-response";
 
 function csvEscape(s: string): string {
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -15,10 +16,10 @@ export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) {
-    return new Response("Unauthorized", { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   }
   if (!staffSessionAllows(session, "content:read")) {
-    return new Response("Forbidden", { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     session.user.email,
   );
   if (!organization)
-    return new Response("Tenant scope unavailable", { status: 403 });
+    return correlatedError(cid, 403, "Tenant scope unavailable", "FORBIDDEN");
   const rawIds = req.nextUrl.searchParams.get("ids");
   const ids = rawIds
     ?.split(",")
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     ids &&
     (ids.length > 100 || ids.some((id) => !/^[0-9a-f-]{36}$/i.test(id)))
   ) {
-    return new Response("Invalid ids", { status: 400 });
+    return correlatedError(cid, 400, "Invalid ids", "VALIDATION_ERROR");
   }
   let query = sup.client
     .from("cms_blog_posts")
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
   query = query.eq("organization_id", organization.id);
   const { data, error } = await query;
   if (error)
-    return new Response("Unable to export blog posts", { status: 502 });
+    return correlatedError(cid, 502, "Unable to export blog posts", "SERVICE_UNAVAILABLE");
   const filtered = (data ?? []) as Array<Record<string, unknown>>;
 
   const header = [
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
   ];
   const body = lines.join("\r\n");
   if (new TextEncoder().encode(body).byteLength > 5 * 1024 * 1024) {
-    return new Response("Export too large", { status: 413 });
+    return correlatedError(cid, 413, "Export too large", "VALIDATION_ERROR");
   }
   await insertStaffAuditLog(sup.client, {
     actorEmail: session.user.email ?? "unknown",

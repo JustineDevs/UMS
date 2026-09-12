@@ -16,7 +16,7 @@ test.describe("@workflow @checkout Full commerce journey (guest)", () => {
     const res = await request.get("/api/health/sop");
     expect(res.ok(), `/api/health/sop ${res.status()}`).toBeTruthy();
     const json = (await res.json()) as { commerceSource?: string };
-    expect(json.commerceSource).toBe("medusa");
+    expect(json.commerceSource).toBe("cloudflare_worker");
   });
 
   test("shop to first PDP and add-to-bag when catalog exists", async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe("@workflow @checkout Full commerce journey (guest)", () => {
         "No catalog products. Run: node stress-test/scripts/e2e-prep-medusa.mjs (Medusa must be stopped or DB lock OK).",
       );
     }
-    const addBtn = page.getByTestId("pdp-add-to-bag");
+    const addBtn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
     await expect(addBtn).toBeVisible({ timeout: 30_000 });
     await expect(addBtn).not.toContainText("Loading", { timeout: 45_000 });
     await expect(addBtn).toBeEnabled({ timeout: 45_000 });

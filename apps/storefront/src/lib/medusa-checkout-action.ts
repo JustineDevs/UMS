@@ -10,7 +10,7 @@ export type MedusaPaymentSessionLike = {
 };
 
 export type CheckoutAction =
-  | { kind: "redirect"; url: string }
+  | { kind: "redirect"; url: string; providerPaymentId?: string }
   | { kind: "wallet"; url: string }
   | {
       kind: "qr";
@@ -106,7 +106,15 @@ export function resolveCheckoutAction(
   }
 
   if (checkoutUrlRaw && checkoutUrlRaw.startsWith("https://")) {
-    return { kind: "redirect", url: checkoutUrlRaw };
+    const providerPaymentId =
+      providerId.toLowerCase().includes("stripe") &&
+      typeof data.stripe_checkout_session_id === "string" &&
+      data.stripe_checkout_session_id.trim()
+        ? data.stripe_checkout_session_id.trim()
+        : providerId.toLowerCase().includes("stripe")
+          ? checkoutUrlRaw.match(/\/c\/pay\/(cs_[A-Za-z0-9_]+)/)?.[1]
+          : undefined;
+    return { kind: "redirect", url: checkoutUrlRaw, providerPaymentId };
   }
 
   const isStripe = providerId.toLowerCase().includes("stripe");

@@ -50,8 +50,8 @@ test.describe("Admin API — unauthenticated requests return 401", () => {
 
 test.describe("Admin API — authenticated requests return 200", () => {
   test.skip(
-    !process.env.ADMIN_ALLOWED_EMAILS || !process.env.NEXTAUTH_SECRET,
-    "Skipped: ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET not set",
+    !process.env.ADMIN_ALLOWED_EMAILS || !process.env.AUTH_SECRET,
+    "Skipped: ADMIN_ALLOWED_EMAILS and AUTH_SECRET not set",
   );
 
   for (const route of AUTH_REQUIRED_GET_ROUTES) {

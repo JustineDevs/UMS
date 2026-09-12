@@ -3,8 +3,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { AnalyticsChartsPanel } from "@/components/AnalyticsChartsPanel";
-import { fetchAnalyticsSummary, fetchValidatedAnalyticsCharts } from "@/lib/analytics-bridge";
-import { fetchMedusaOrdersForAdmin } from "@/lib/medusa-order-bridge";
+import { fetchAllMedusaOrdersForAnalytics, fetchAnalyticsSummary, fetchValidatedAnalyticsCharts } from "@/lib/analytics-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 import { RetentionPanel } from "./RetentionPanel";
 import { SalesTrendsPanel } from "./SalesTrendsPanel";
@@ -20,14 +19,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   const [summary, charts, ordersResult] = await Promise.all([
     fetchAnalyticsSummary(),
     fetchValidatedAnalyticsCharts(horizonDays),
-    fetchMedusaOrdersForAdmin(500, 0),
+    fetchAllMedusaOrdersForAnalytics(),
   ]);
-  const customerCount = new Set(ordersResult.orders.map((order) => order.customer_id).filter(Boolean)).size;
+  const customerCount = new Set(ordersResult.map((order) => order.customer_id).filter(Boolean)).size;
   const averageOrder = summary.orderCount ? summary.revenueTotal / summary.orderCount : 0;
   const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: summary.currency, maximumFractionDigits: 2 });
   const kpis = [
     ["Customer Accounts", customerCount.toLocaleString(), "Unique customers in orders", true],
-    ["Sessions", summary.orderCount.toLocaleString(), "Recorded orders", true],
+    ["Orders", summary.orderCount.toLocaleString(), "Completed and pending orders", true],
     ["Revenue", money.format(summary.revenueTotal), `Total ${summary.currency} revenue`, true],
     ["Average Order", money.format(averageOrder), "Revenue per order", true],
     ["Pending Orders", summary.pendingCount.toLocaleString(), "Awaiting payment or fulfillment", false],

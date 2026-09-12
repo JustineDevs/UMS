@@ -3,9 +3,10 @@ import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const MAX_CONCURRENCY = 3;
 
@@ -105,26 +106,26 @@ async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   }
   if (!staffSessionAllows(session, "orders:fulfill")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
 
-  let body: BulkFulfillBody;
-  try {
-    body = (await req.json()) as BulkFulfillBody;
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
+  const parsedBody = await parseBoundedJson(req, 64 * 1024);
+  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "BAD_REQUEST");
+  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
+    return correlatedError(cid, 400, "Invalid JSON", "VALIDATION_ERROR");
   }
+  const body = parsedBody.value as BulkFulfillBody;
 
   const { orderIds, trackingNumber, carrierId, notifyCustomer = true } = body;
 
   if (!Array.isArray(orderIds) || orderIds.length === 0) {
-    return correlatedJson(cid, { error: "orderIds must be a non-empty array" }, { status: 400 });
+    return correlatedError(cid, 400, "orderIds must be a non-empty array", "VALIDATION_ERROR");
   }
   if (orderIds.length > 100) {
-    return correlatedJson(cid, { error: "Maximum 100 orders per bulk request" }, { status: 400 });
+    return correlatedError(cid, 400, "Maximum 100 orders per bulk request", "VALIDATION_ERROR");
   }
 
   const results: FulfillResult[] = [];

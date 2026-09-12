@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
+import { sanitizeSameOriginUrl, sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { useEffect, useRef, useState } from "react";
+import { clearCart } from "@/lib/cart";
 import {
   buildHostedReturnMissingCorrelationMessage,
   buildHostedReturnStatusMessage,
@@ -14,15 +15,15 @@ import {
 
 async function resolveCorrelationId(
   provider: HostedReturnProvider,
+  providerOrderId?: string,
 ): Promise<string | undefined> {
-  let id = sessionStorage
+  const storedId = sessionStorage
     .getItem(PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY)
     ?.trim();
-  if (id) return id;
   const rec = await fetch(
-    `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(
-      provider,
-    )}`,
+    `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(provider)}${
+      providerOrderId ? `&provider_order_id=${encodeURIComponent(providerOrderId)}` : ""
+    }`,
     { credentials: "include" },
   );
   const recJson = (await rec.json().catch(() => ({}))) as {
@@ -34,7 +35,7 @@ async function resolveCorrelationId(
     recJson.found === true &&
     typeof recJson.correlationId === "string"
   ) {
-    id = recJson.correlationId;
+    const id = recJson.correlationId;
     try {
       sessionStorage.setItem(PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY, id);
     } catch {
@@ -42,7 +43,7 @@ async function resolveCorrelationId(
     }
     return id;
   }
-  return undefined;
+  return storedId || undefined;
 }
 
 const POLL_MS = 2000;
@@ -51,17 +52,25 @@ const POLL_MAX = 20;
 export function HostedCheckoutReturn({
   provider,
   status,
+  providerOrderId,
 }: {
   provider: HostedReturnProvider;
   status: HostedReturnStatus;
+  providerOrderId?: string;
 }) {
-  const [message, setMessage] = useState(
-    "Payment received. Finalizing your order…",
+  const hasFailedStatus = status === "cancel" || status === "failure";
+  const [message, setMessage] = useState(() =>
+    hasFailedStatus
+      ? buildHostedReturnStatusMessage(provider, status)
+      : "Payment received. Finalizing your order…",
   );
-  const [failed, setFailed] = useState(false);
-  const cancelled = useRef(false);
-
+  const [failed, setFailed] = useState(hasFailedStatus);
+  const recoveryLinkRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
+    if (failed) recoveryLinkRef.current?.focus();
+  }, [failed]);
+  useEffect(() => {
+    let disposed = false;
     async function run(): Promise<void> {
       if (status === "cancel" || status === "failure") {
         setMessage(buildHostedReturnStatusMessage(provider, status));
@@ -69,11 +78,25 @@ export function HostedCheckoutReturn({
         return;
       }
 
-      const correlationId = await resolveCorrelationId(provider);
+      const correlationId = await resolveCorrelationId(provider, providerOrderId);
       if (!correlationId) {
         setMessage(buildHostedReturnMissingCorrelationMessage(provider));
         setFailed(true);
         return;
+      }
+
+      if (provider === "paypal" && providerOrderId) {
+        const confirmRes = await fetch("/api/checkout/paypal/confirm", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ correlationId, orderId: providerOrderId }),
+        });
+        if (!confirmRes.ok) {
+          setMessage("PayPal did not confirm this payment. Your bag is unchanged; return to checkout and try again.");
+          setFailed(true);
+          return;
+        }
       }
 
       const finalizeOnce = await fetch(
@@ -84,11 +107,13 @@ export function HostedCheckoutReturn({
       );
       const finalizeJson = (await finalizeOnce.json().catch(() => ({}))) as {
         error?: string;
+        code?: string;
         redirectUrl?: string;
       };
-      if (cancelled.current) return;
+      if (disposed) return;
       if (
         finalizeOnce.status === 409 &&
+        finalizeJson.code !== "FINALIZE_IN_PROGRESS" &&
         typeof finalizeJson.error === "string" &&
         finalizeJson.error.trim()
       ) {
@@ -105,6 +130,7 @@ export function HostedCheckoutReturn({
           setMessage("Payment was confirmed, but the provider returned an invalid redirect. Check your order history.");
           return;
         }
+        clearCart();
         window.location.href = safeRedirectUrl;
         return;
       }
@@ -114,7 +140,7 @@ export function HostedCheckoutReturn({
       );
 
       for (let i = 0; i < POLL_MAX; i += 1) {
-        if (cancelled.current) return;
+        if (disposed) return;
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
         const st = await fetch(
           `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}`,
@@ -123,19 +149,28 @@ export function HostedCheckoutReturn({
         const stJson = (await st.json().catch(() => ({}))) as {
           status?: string;
           medusaOrderId?: string | null;
+          trackingPageUrl?: string | null;
           staleReason?: string | null;
           lastError?: string | null;
         };
-        if (cancelled.current) return;
+        if (disposed) return;
         if (
           st.ok &&
           stJson.status === "completed" &&
-          typeof stJson.medusaOrderId === "string" &&
-          stJson.medusaOrderId
+          typeof stJson.trackingPageUrl === "string" &&
+          stJson.trackingPageUrl
         ) {
-          window.location.href = `/track/${encodeURIComponent(
-            stJson.medusaOrderId,
-          )}`;
+          const safeTrackingUrl = sanitizeSameOriginUrl(
+            stJson.trackingPageUrl,
+            window.location.origin,
+          );
+          if (!safeTrackingUrl) {
+            setMessage("Your order is complete, but its tracking link is invalid. Check your account or confirmation email.");
+            setFailed(true);
+            return;
+          }
+          clearCart();
+          window.location.href = safeTrackingUrl;
           return;
         }
         if (
@@ -162,24 +197,37 @@ export function HostedCheckoutReturn({
       setFailed(true);
     }
 
-    void run();
+    void run().catch(() => {
+      if (disposed) return;
+      setMessage(
+        "We could not reach the payment service. Your bag is unchanged; return to checkout and try again.",
+      );
+      setFailed(true);
+    });
     return () => {
-      cancelled.current = true;
+      disposed = true;
     };
-  }, [provider, status]);
+  }, [provider, providerOrderId, status]);
 
   return (
     <main className="storefront-page-shell motion-surface max-w-lg mx-auto text-center py-16 px-4">
       <h1 className="font-headline text-2xl font-bold text-primary mb-4">
         {failed ? "Almost there" : "Processing your order"}
       </h1>
-      <p className="text-sm text-on-surface-variant leading-relaxed">
+      <p
+        className="text-sm text-on-surface-variant leading-relaxed"
+        role="status"
+        aria-live="assertive"
+        aria-atomic="true"
+      >
         {message}
       </p>
       {failed ? (
         <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/checkout"
+            ref={recoveryLinkRef}
+            data-testid="hosted-return-back-to-checkout"
             className="inline-flex items-center justify-center rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
           >
             Back to checkout

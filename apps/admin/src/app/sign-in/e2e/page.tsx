@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import {
   AuthSplitShell,
@@ -12,7 +11,7 @@ import {
   CardTitle,
 } from "@universal-music-store/ui";
 import { AdminE2eCredentialsForm } from "@/components/AdminE2eCredentialsForm";
-import { buildAuthOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import {
   firstAdminAllowedEmail,
   isAdminE2eCredentialsConfigured,
@@ -36,7 +35,7 @@ export default async function AdminE2eSignInPage({
     notFound();
   }
 
-  const session = await getServerSession(buildAuthOptions());
+  const session = await getAdminSession();
   const role = session?.user?.role as string | undefined;
   if (role === "admin" || role === "staff") {
     redirect("/admin");

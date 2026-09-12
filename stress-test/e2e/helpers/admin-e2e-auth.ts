@@ -14,7 +14,7 @@ function firstAdminAllowedEmail(): string | undefined {
 export type E2eAdminLoginResult = "ok" | "skip_no_ui" | "skip_no_env";
 
 /**
- * Signs in via `/sign-in/e2e` using the first `ADMIN_ALLOWED_EMAILS` entry and `NEXTAUTH_SECRET`.
+ * Signs in via `/sign-in/e2e` using the first `ADMIN_ALLOWED_EMAILS` entry and `AUTH_SECRET`.
  * Requires `pnpm e2e:ensure-staff` (user + `staff_permission_grants` `*` for full route coverage).
  */
 export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
@@ -29,7 +29,7 @@ export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
   }
   const email = firstAdminAllowedEmail();
   const password =
-    process.env.E2E_ADMIN_PASSWORD?.trim() || process.env.NEXTAUTH_SECRET?.trim();
+    process.env.E2E_ADMIN_PASSWORD?.trim() || process.env.AUTH_SECRET?.trim();
   if (!email || !password?.trim()) {
     return "skip_no_env";
   }
@@ -39,6 +39,7 @@ export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
     const form = page.getByTestId("e2e-credentials-form");
     if ((await form.count()) === 0) return "skip_no_ui";
     await expect(form).toBeVisible({ timeout: 15_000 });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     const passwordInput = page.getByTestId("e2e-admin-password");
     await page.getByTestId("e2e-admin-email").fill(email);
     await passwordInput.fill(password);

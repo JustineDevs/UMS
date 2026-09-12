@@ -1,0 +1,64 @@
+# Local-only backend integration stack. Production exposes the Worker gateway;
+# this compose file is not a production deployment definition.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      TRUST_PROXY: "1"
+    expose:
+      - "4000"
+    restart: unless-stopped
+    networks:
+      - uvs-backend
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  medusa:
+    build:
+      context: .
+      dockerfile: Dockerfile.medusa
+      target: runtime
+      args:
+        MEDUSA_DB_URL: ${MEDUSA_DB_URL:?MEDUSA_DB_URL must be configured}
+        MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:?MEDUSA_BACKEND_URL must be configured}
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      HOME: /tmp/medusa-config
+      XDG_CONFIG_HOME: /tmp/medusa-config
+      APPDATA: /tmp/medusa-config
+      LOCALAPPDATA: /tmp/medusa-config
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:?MEDUSA_BACKEND_URL must be configured}
+      PUBLIC_STOREFRONT_URL: ${PUBLIC_STOREFRONT_URL:?PUBLIC_STOREFRONT_URL must be configured}
+      NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:?NEXT_PUBLIC_STOREFRONT_URL must be configured}
+      STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:?STOREFRONT_PUBLIC_URL must be configured}
+      ADMIN_CORS: ${ADMIN_CORS:?ADMIN_CORS must be configured}
+      AUTH_CORS: ${AUTH_CORS:?AUTH_CORS must be configured}
+      STORE_CORS: ${STORE_CORS:?STORE_CORS must be configured}
+      STOREFRONT_ORIGIN: ${STOREFRONT_ORIGIN:?STOREFRONT_ORIGIN must be configured}
+    expose:
+      - "9000"
+    restart: unless-stopped
+    networks:
+      - uvs-backend
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9000/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+
+networks:
+  uvs-backend:
+    driver: bridge

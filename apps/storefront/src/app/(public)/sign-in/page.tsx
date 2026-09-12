@@ -26,7 +26,7 @@ export const metadata: Metadata = buildPageMetadata({
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+  searchParams: Promise<{ callbackUrl?: string; error?: string; reauth?: string }>;
 }) {
   const sp = await searchParams;
   const callback =
@@ -71,7 +71,7 @@ export default async function SignInPage({
               </AlertDescription>
             </Alert>
           ) : null}
-          <GoogleSignInButton callbackUrl={callback} />
+          <GoogleSignInButton callbackUrl={callback} promptLogin={sp.reauth === "1"} label={sp.reauth === "1" ? "Re-authenticate with Google" : undefined} />
           <p className="text-center text-sm text-on-surface-variant">
             New here?{" "}
             <Link

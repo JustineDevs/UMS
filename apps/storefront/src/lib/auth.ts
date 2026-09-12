@@ -1,53 +1,30 @@
-import type { NextAuthOptions } from "next-auth";
-import type { Session } from "next-auth";
-import { getServerSession } from "next-auth/next";
-import GoogleProvider from "next-auth/providers/google";
-import {
-  loadGoogleCredentials,
-  buildSharedJwtCallback,
-  buildSharedSessionCallback,
-} from "@universal-music-store/sdk";
+import type { User } from "@supabase/supabase-js";
+import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const google = loadGoogleCredentials("storefront");
+export type Session = { user: { id?: string; email?: string; name?: string | null; image?: string | null }; expires: string; authenticatedAt?: number };
 
-const sharedJwt = buildSharedJwtCallback();
-const sharedSession = buildSharedSessionCallback();
+export function isStorefrontAuthDisabled(): boolean {
+  if (process.env.NODE_ENV === "production") return false;
+  return [process.env.AUTH_DISABLED, process.env.AUTH_DISABLE].some((value) => value === "true");
+}
 
-export const authOptions: NextAuthOptions = {
-  debug: process.env.NEXTAUTH_DEBUG === "true",
-  providers: [
-    GoogleProvider({
-      clientId: google.clientId,
-      clientSecret: google.clientSecret,
-    }),
-  ],
-  secret: process.env.NEXTAUTH_SECRET?.trim(),
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
-  pages: { signIn: "/sign-in" },
-  cookies: {
-    sessionToken: {
-      name: "ums.storefront-session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
-      },
-    },
-  },
-  callbacks: {
-    jwt: sharedJwt as NextAuthOptions["callbacks"] extends { jwt?: infer J } ? J : never,
-    session: sharedSession as NextAuthOptions["callbacks"] extends { session?: infer S } ? S : never,
-  },
-};
+function toSession(user: User): Session {
+  const metadata = user.user_metadata as Record<string, unknown>;
+  const authenticatedAt = user.last_sign_in_at ? Date.parse(user.last_sign_in_at) / 1000 : undefined;
+  return { user: { id: user.id, email: user.email, name: typeof metadata.full_name === "string" ? metadata.full_name : typeof metadata.name === "string" ? metadata.name : null, image: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null }, expires: new Date(Date.now() + 3600_000).toISOString(), ...(authenticatedAt && Number.isFinite(authenticatedAt) ? { authenticatedAt } : {}) };
+}
 
-/** Explicit auth-disabled mode is reserved for controlled browser QA. */
 export async function getStorefrontSession(): Promise<Session | null> {
-  if (process.env.AUTH_DISABLED === "true") {
-    return {
-      user: { name: "Local QA", email: "e2e-test@example.com" },
-      expires: "2099-12-31T23:59:59.999Z",
-    } as Session;
+  if (isStorefrontAuthDisabled()) return { user: { id: "e2e-test-user", email: "e2e-test@example.com", name: "Local QA" }, expires: "2099-12-31T23:59:59.999Z" };
+  if (!process.env.SUPABASE_URL?.trim() || !process.env.SUPABASE_ANON_KEY?.trim()) return null;
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  const session = toSession(data.user);
+  if (session.user.email) {
+    const customerId = await findOrCreateMedusaCustomerIdByEmail(session.user.email).catch(() => null);
+    if (customerId) session.user.id = customerId;
   }
-  return getServerSession(authOptions);
+  return session;
 }

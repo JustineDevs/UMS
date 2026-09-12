@@ -11,7 +11,7 @@ export function StorefrontNav({
 }) {
   return (
     <nav
-      className="relative flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-[clamp(0.75rem,3vw,2rem)] py-1.5 font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:gap-3 sm:py-2"
+      className="pointer-events-none relative flex w-full min-w-0 max-w-full items-center justify-between gap-2 px-[clamp(0.75rem,3vw,2rem)] py-1.5 font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] sm:gap-3 sm:py-2 [&_a]:pointer-events-auto [&_button]:pointer-events-auto"
       aria-label="Primary navigation"
       data-cms-id="header-navigation"
       data-cms-label="Header navigation"
@@ -25,12 +25,13 @@ export function StorefrontNav({
         aria-label="Universal Music Store, home"
       >
         <Image
-          src="/UVS/UVS_Logo(transparent).png"
+          src="/brand/universal-music-store-logo-abstract.png"
           alt="Universal Music Store"
           width={1080}
           height={1080}
           className="h-full w-full object-contain object-center"
           sizes="(max-width: 640px) 44px, (max-width: 1024px) 52px, 56px"
+          unoptimized
           priority
         />
       </Link>

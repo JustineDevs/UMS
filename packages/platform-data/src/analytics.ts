@@ -30,6 +30,28 @@ export type TopProduct = {
   revenue: number;
 };
 
+/** Analytics buckets are UTC; timezone conversion belongs at presentation boundaries. */
+export function utcMonthWindow(now: Date, monthsAgo: number): {
+  start: Date;
+  end: Date;
+  period: string;
+} {
+  if (!Number.isInteger(monthsAgo) || monthsAgo < 0) {
+    throw new Error("monthsAgo must be a non-negative integer");
+  }
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo, 1),
+  );
+  const end = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo + 1, 1),
+  );
+  return {
+    start,
+    end,
+    period: `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`,
+  };
+}
+
 /**
  * Compute CLV for a customer based on loyalty_transactions data.
  * In production this would join Medusa order data. Here we use
@@ -86,15 +108,13 @@ export async function computeRetention(
   const now = new Date();
 
   for (let i = months - 1; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
-    const prevEnd = new Date(start.getTime() - 1);
+    const { start, end, period } = utcMonthWindow(now, i);
 
     const { data: currentMonth } = await supabase
       .from("loyalty_transactions")
       .select("loyalty_account_id")
       .gte("created_at", start.toISOString())
-      .lte("created_at", end.toISOString())
+      .lt("created_at", end.toISOString())
       .gt("points_delta", 0);
 
     const currentIds = new Set(
@@ -119,7 +139,7 @@ export async function computeRetention(
     }
 
     results.push({
-      period: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
+      period,
       new_customers: newCust,
       returning_customers: returning,
       retention_rate:
@@ -141,15 +161,14 @@ export async function computeSalesTrends(
   const now = new Date();
 
   for (let i = months - 1; i >= 0; i--) {
-    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    const { start, end, period } = utcMonthWindow(now, i);
 
     const { data: shifts } = await supabase
       .from("pos_shifts")
       .select("closing_cash, opening_cash")
       .eq("status", "closed")
       .gte("opened_at", start.toISOString())
-      .lte("opened_at", end.toISOString());
+      .lt("opened_at", end.toISOString());
 
     let revenue = 0;
     let count = 0;
@@ -163,7 +182,7 @@ export async function computeSalesTrends(
     }
 
     results.push({
-      period: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
+      period,
       revenue,
       order_count: count,
       avg_order_value: count > 0 ? revenue / count : 0,

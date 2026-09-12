@@ -12,6 +12,7 @@ import { tryDeleteStoreCart } from "./medusa-checkout-errors";
 import type { StorefrontStockResult } from "./storefront-inventory-guard";
 import { buildCheckoutQuoteFingerprint } from "./checkout-quote-fingerprint";
 import type { MedusaCartAddressPayload } from "@/lib/medusa-profile-address";
+import { normalizeCommerceAttribution, type CommerceAttribution } from "@universal-music-store/sdk";
 
 export type MedusaCheckoutLine = { variantId: string; quantity: number };
 
@@ -27,6 +28,16 @@ type MedusaShippingOptionPreview = {
   priceMajor: number;
   currencyCode: string;
 };
+
+export function resolveShippingOptionId(
+  options: Array<{ id?: string }>,
+  requested?: string,
+): string | null {
+  const normalized = requested?.trim();
+  if (normalized && options.some((option) => option.id === normalized)) return normalized;
+  if (options.length === 1) return options[0]?.id?.trim() || null;
+  return null;
+}
 
 export type MedusaCheckoutTotalsPreview = {
   cartId?: string;
@@ -53,6 +64,7 @@ type PrepareMedusaCartInput = {
   codCartPayload?: CodCartPayload;
   /** When set, must match a `listCartOptions` id for this cart. */
   shippingOptionId?: string;
+  attribution?: CommerceAttribution;
   signal?: AbortSignal;
 };
 
@@ -153,12 +165,13 @@ export async function prepareMedusaStoreCart(
     throw new Error("The store did not return a cart id.");
   }
 
-  for (const line of input.lines) {
-    await sdk.store.cart.createLineItem(cartId, {
-      variant_id: line.variantId,
-      quantity: line.quantity,
-    });
-  }
+  try {
+    for (const line of input.lines) {
+      await sdk.store.cart.createLineItem(cartId, {
+        variant_id: line.variantId,
+        quantity: line.quantity,
+      });
+    }
 
   const cartEmail = codFlow
     ? input.codCartPayload!.email.trim()
@@ -174,7 +187,12 @@ export async function prepareMedusaStoreCart(
       metadata: {
         payment_provider: "cod",
         cod_payment_status: "pending_collection",
+        attribution: normalizeCommerceAttribution(input.attribution),
       },
+    });
+  } else if (input.attribution) {
+    await sdk.store.cart.update(cartId, {
+      metadata: { attribution: normalizeCommerceAttribution(input.attribution) },
     });
   }
 
@@ -184,11 +202,10 @@ export async function prepareMedusaStoreCart(
   const currencyCode = String(created.currency_code ?? "PHP");
   const rawOpts = shipping_options ?? [];
   const shippingOptionPreviews = buildShippingOptionPreviews(rawOpts, currencyCode);
-  const requested = input.shippingOptionId?.trim();
-  const pickId =
-    requested && rawOpts.some((o) => (o as { id?: string }).id === requested)
-      ? requested
-      : (rawOpts[0] as { id?: string } | undefined)?.id;
+  const pickId = resolveShippingOptionId(
+    rawOpts as Array<{ id?: string }>,
+    input.shippingOptionId,
+  );
   if (!pickId?.trim()) {
     throw new Error(
       "No shipping options available for this cart. Check your region and shipping setup.",
@@ -221,15 +238,19 @@ export async function prepareMedusaStoreCart(
     }
   }
 
-  return {
-    sdk,
-    cartId,
-    baseUrl,
-    publishableKey,
-    shippingOptions: shippingOptionPreviews,
-    appliedShippingOptionId: pickId.trim(),
-    bindToken,
-  };
+    return {
+      sdk,
+      cartId,
+      baseUrl,
+      publishableKey,
+      shippingOptions: shippingOptionPreviews,
+      appliedShippingOptionId: pickId.trim(),
+      bindToken,
+    };
+  } catch (error) {
+    await tryDeleteStoreCart(cartId, baseUrl, publishableKey);
+    throw error;
+  }
 }
 
 /**

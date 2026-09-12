@@ -15,6 +15,7 @@ import {
 import { insertStaffAuditLog } from "@/lib/staff-audit";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { fetchMedusaCustomerById } from "@/lib/customers-bridge";
+import { recordInvoiceLifecycle } from "@universal-music-store/platform-data";
 
 export const dynamic = "force-dynamic";
 const lineSchema = z
@@ -55,6 +56,7 @@ const invoiceSchema = z
       })
       .strict(),
     taxId: z.enum(["gst", "vat", "service-tax", "none"]),
+    taxRate: z.number().finite().min(0).max(100).default(0),
     discountType: z.enum(["fixed", "percent"]),
     discountValue: z.number().finite().min(0).max(100000000),
     items: z.array(lineSchema).min(1).max(100),
@@ -75,15 +77,33 @@ const invoiceSchema = z
         message: "Percentage discount cannot exceed 100",
       });
     }
+    if (value.taxId !== "none" && value.taxRate === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["taxRate"],
+        message: "A jurisdiction-configured tax rate is required when tax is selected",
+      });
+    }
   });
 const requestSchema = z
   .object({
     invoice: invoiceSchema,
+    documentKind: z.enum(["admin_artifact", "commercial_invoice", "fiscal_invoice"]).default("admin_artifact"),
+    fiscalNumber: z.string().trim().min(1).max(80).optional(),
+    medusaOrderId: z.string().trim().min(1).max(255).optional(),
+    refundId: z.string().trim().min(1).max(255).optional(),
     mode: z.enum(["draft", "send"]).default("draft"),
   })
-  .strict();
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.documentKind === "fiscal_invoice" && !value.fiscalNumber) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fiscalNumber"], message: "Fiscal invoice number is required" });
+    }
+  });
 
-function totalOf(invoice: z.infer<typeof invoiceSchema>) {
+type InvoiceInput = Omit<z.infer<typeof invoiceSchema>, "taxRate"> & { taxRate?: number };
+
+function totalOf(invoice: InvoiceInput) {
   const subtotal = invoice.items.reduce(
     (sum, item) => sum + item.quantity * item.unitPrice,
     0,
@@ -93,15 +113,7 @@ function totalOf(invoice: z.infer<typeof invoiceSchema>) {
       ? (subtotal * invoice.discountValue) / 100
       : invoice.discountValue;
   const taxable = Math.max(0, subtotal - Math.min(discount, subtotal));
-  const rate =
-    invoice.taxId === "gst"
-      ? 18
-      : invoice.taxId === "vat"
-        ? 12
-        : invoice.taxId === "service-tax"
-          ? 10
-          : 0;
-  return Number((taxable + (taxable * rate) / 100).toFixed(2));
+  return Number((taxable + (taxable * (invoice.taxRate ?? 0)) / 100).toFixed(2));
 }
 
 function escapeHtml(value: string) {
@@ -113,7 +125,7 @@ function escapeHtml(value: string) {
       ] ?? char,
   );
 }
-function invoiceHtml(invoice: z.infer<typeof invoiceSchema>, total: number) {
+function invoiceHtml(invoice: InvoiceInput, total: number) {
   const rows = invoice.items
     .map(
       (item) =>
@@ -142,7 +154,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await sup.client
     .from("admin_invoices")
     .select(
-      "id,reference_number,status,currency,total,recipient_email,sent_at,created_by,created_at,updated_at",
+      "id,reference_number,status,currency,total,recipient_email,sent_at,created_by,created_at,updated_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id",
     )
     .eq("organization_id", organization.id)
     .order("created_at", { ascending: false })
@@ -167,7 +179,10 @@ export async function POST(req: NextRequest) {
       { error: parsed.error },
       { status: parsed.status },
     );
-  const { invoice, mode } = parsed.data;
+  const { invoice, mode, documentKind, fiscalNumber, medusaOrderId, refundId } = parsed.data;
+  if (documentKind === "fiscal_invoice" && !fiscalNumber) {
+    return correlatedJson(correlationId, { error: "fiscalNumber is required for fiscal invoices" }, { status: 400 });
+  }
   const total = totalOf(invoice);
   const sup = adminSupabaseOr503(correlationId);
   if ("response" in sup) return sup.response;
@@ -226,6 +241,7 @@ export async function POST(req: NextRequest) {
     customer.email;
   const safeInvoice = {
     ...invoice,
+    taxRate: invoice.taxRate ?? 0,
     to: {
       ...invoice.to,
       id: customer.id,
@@ -243,10 +259,15 @@ export async function POST(req: NextRequest) {
       total,
       recipient_email: customer.email,
       payload: safeInvoice,
+      document_kind: documentKind,
+      fiscal_status: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal",
+      fiscal_number: documentKind === "fiscal_invoice" ? fiscalNumber : null,
+      medusa_order_id: medusaOrderId ?? null,
+      refund_id: refundId ?? null,
       created_by: staff.session.user?.email ?? "local-admin@localhost",
     })
     .select(
-      "id,reference_number,status,currency,total,recipient_email,sent_at,created_at",
+      "id,reference_number,status,currency,total,recipient_email,sent_at,created_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id",
     )
     .single();
   if (error || !data) {
@@ -269,9 +290,12 @@ export async function POST(req: NextRequest) {
     return response;
   }
   let result = data;
+  await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, event: "create", status: "draft", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:create`, actorEmail: staff.session.user?.email });
   if (mode === "send") {
+    await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "sending", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:sending`, actorEmail: staff.session.user?.email });
     const resendKey = process.env.RESEND_API_KEY?.trim();
     if (!resendKey) {
+      await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "failed", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:failed`, actorEmail: staff.session.user?.email, metadata: { error: "RESEND_API_KEY is not configured" } }).catch(() => {});
       const response = correlatedJson(
         correlationId,
         {
@@ -303,6 +327,7 @@ export async function POST(req: NextRequest) {
       tags: [{ name: "type", value: "admin_invoice" }],
     });
     if (!sent.ok) {
+      await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "failed", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:failed`, actorEmail: staff.session.user?.email, metadata: { error: "Invoice email delivery failed" } }).catch(() => {});
       const response = correlatedJson(
         correlationId,
         { error: "Invoice saved as draft; email delivery failed", data },
@@ -316,18 +341,8 @@ export async function POST(req: NextRequest) {
       );
       return response;
     }
-    const updated = await sup.client
-      .from("admin_invoices")
-      .update({
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", data.id)
-      .select(
-        "id,reference_number,status,currency,total,recipient_email,sent_at,created_at",
-      )
-      .single();
+    const lifecycle = await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "sent", fiscalStatus: documentKind === "fiscal_invoice" ? "issued" : "non_fiscal", idempotencyKey: `${idempotencyKey}:sent`, actorEmail: staff.session.user?.email }).catch(() => null);
+    const updated = lifecycle ? await sup.client.from("admin_invoices").update({ sent_at: new Date().toISOString() }).eq("id", data.id).eq("organization_id", organization.id).select("id,reference_number,status,currency,total,recipient_email,sent_at,created_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id").single() : { error: new Error("lifecycle failed"), data: null };
     if (updated.error || !updated.data) {
       const response = correlatedJson(
         correlationId,

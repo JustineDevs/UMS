@@ -8,6 +8,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const bodySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("fiscal"), jurisdiction: z.string().trim().min(2).max(16), registrationNumber: z.string().trim().min(1).max(64), invoicePrefix: z.string().trim().min(1).max(16), enabled: z.boolean().default(false) }).strict(),
@@ -40,7 +41,9 @@ export async function GET(req: NextRequest) {
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req); const auth = await sessionFor(req, "pos:shift_manage"); if ("response" in auth) return auth.response;
-  let parsed; try { parsed = bodySchema.safeParse(await req.json()); } catch { return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 }); }
+  const body = await parseBoundedJson(req, 128 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = bodySchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid POS control payload" }, { status: 400 });
   const sup = adminSupabaseOr503(cid); if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);

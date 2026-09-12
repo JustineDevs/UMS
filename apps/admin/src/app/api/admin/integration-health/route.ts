@@ -17,8 +17,6 @@ export type IntegrationHealthEntry = {
 const PROVIDER_ENV_KEYS: Record<string, string[]> = {
   stripe: ["STRIPE_API_KEY"],
   paypal: ["PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"],
-  paymongo: ["PAYMONGO_SECRET_KEY"],
-  maya: ["MAYA_SECRET_KEY"],
   aftership: ["AFTERSHIP_API_KEY"],
   nango: ["NANGO_API_KEY"],
   pancake_pos: ["PANCAKE_POS_API_KEY"],
@@ -28,8 +26,6 @@ const SDK_VERSIONS: Record<string, string> = {
   stripe:
     "stripe (Checkout Session provider in apps/medusa/src/modules/stripe-checkout-payment)",
   paypal: "@paypal/paypal-server-sdk",
-  paymongo: "typed REST wrapper (no official Node SDK)",
-  maya: "typed REST wrapper (no official Node SDK)",
   aftership: "@aftership/tracking-sdk",
   nango: "@nangohq/node",
   pancake_pos: "Pancake POS Open API (server-side REST)",

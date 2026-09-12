@@ -16,6 +16,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { cmsMediaMetadataSchema } from "@/lib/cms-route-contracts";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -61,13 +62,9 @@ async function patch(req: NextRequest, ctx: RouteCtx) {
   }
   const canContentWrite = staffSessionAllows(session, "content:write");
   const canCatalogWrite = staffSessionAllows(session, "catalog:write");
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-  const parsed = cmsMediaMetadataSchema.safeParse(body);
+  const body = await parseBoundedJson(req, 64 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = cmsMediaMetadataSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid media metadata" }, { status: 400 });
   const b = parsed.data;
   const sup = adminSupabaseOr503(cid);

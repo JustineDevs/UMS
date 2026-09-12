@@ -34,7 +34,7 @@ export function EcommerceReferenceDashboard({ data }: { data?: EcommerceDashboar
 
   return (
     <div className="flex flex-col gap-4">
-      <AdminPageHeader title="Store Overview" subtitle={formattedDate} actions={<div className="flex flex-wrap items-center gap-2 lg:w-fit">
+      <AdminPageHeader title="Store Overview" subtitle={<span suppressHydrationWarning>{formattedDate}</span>} actions={<div className="flex flex-wrap items-center gap-2 lg:w-fit">
           <Select defaultValue="this-month">
             <SelectTrigger className="w-34" id="ecommerce-period" size="sm">
               <SelectValue placeholder="This Month" />

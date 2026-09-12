@@ -52,6 +52,7 @@ export const cmsBlockSchema = z.object({
 
 export const cmsPageSchema = z.object({
   id: z.string().uuid().optional(),
+  collection_id: z.string().trim().min(1).max(200).optional(),
   expectedVersion: z.number().int().positive().max(100000).optional(),
   slug: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   locale: z.string().trim().min(2).max(16).default("en"),
@@ -162,6 +163,7 @@ export const cmsCategoryContentSchema = z.object({
   locale: z.string().trim().min(2).max(16).default("en"),
   intro_html: z.string().max(100_000).optional(),
   banner_url: nullableText(2048),
+  banner_alt: nullableText(500),
   blocks: z.array(cmsBlockSchema).max(100).optional(),
 }).strict();
 

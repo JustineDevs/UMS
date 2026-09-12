@@ -1,22 +1,16 @@
 import { NextResponse } from "next/server";
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
-import {
-  catalogProductFromMedusaRaw,
-  minVariantPrice,
-} from "@/lib/medusa-catalog-mapper";
-import {
-  getMedusaPublishableKey,
-  getMedusaRegionId,
-  getMedusaSalesChannelId,
-  withSalesChannelId,
-} from "@/lib/storefront-medusa-env";
 import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import {
+  rankSearchSuggestions,
+  expandSearchQueries,
+} from "@/lib/search-suggestion-ranking";
 
-const FIELDS =
-  "*variants,*variants.calculated_price,*variants.options,*variants.barcode,*categories,*options,+thumbnail,*images,+metadata,+created_at";
+const SUGGESTION_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=5, s-maxage=60, stale-while-revalidate=300",
+};
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
@@ -31,49 +25,64 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ suggestions: [] }, { headers: SUGGESTION_CACHE_HEADERS });
   }
   if (q.length > 100) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ suggestions: [] }, { headers: SUGGESTION_CACHE_HEADERS });
   }
-  if (!getMedusaPublishableKey()?.trim() || !getMedusaRegionId()?.trim()) {
-    return NextResponse.json({ suggestions: [] });
+  const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!apiUrl) {
+    return NextResponse.json(
+      { suggestions: [], error: "catalog_unavailable" },
+      { status: 503 },
+    );
   }
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const regionId = getMedusaRegionId()!;
-    const baseParams = {
-      region_id: regionId,
-      q,
-      limit: 8,
-      fields: FIELDS,
-    };
-    const { products: primary } = await sdk.store.product.list(
-      withSalesChannelId({ ...baseParams }) as Parameters<typeof sdk.store.product.list>[0],
+    const suggestionsBySlug = new Map<string, {
+      slug: string;
+      name: string;
+      minPrice: number;
+      imageUrl?: string;
+    }>();
+    for (const searchQuery of expandSearchQueries(q)) {
+      const response = await fetch(
+        `${apiUrl}/store/search/suggestions?q=${encodeURIComponent(searchQuery)}`,
+        { headers: { Accept: "application/json" }, cache: "no-store" },
+      );
+      if (!response.ok) throw new Error(`worker_catalog_${response.status}`);
+      const payload = (await response.json()) as {
+        suggestions?: Array<{
+          slug?: unknown;
+          name?: unknown;
+          minPrice?: unknown;
+          imageUrl?: unknown;
+        }>;
+      };
+      for (const suggestion of payload.suggestions ?? []) {
+        if (
+          typeof suggestion.slug === "string" &&
+          typeof suggestion.name === "string" &&
+          typeof suggestion.minPrice === "number" &&
+          Number.isFinite(suggestion.minPrice) &&
+          (suggestion.imageUrl === undefined || typeof suggestion.imageUrl === "string")
+        ) {
+          suggestionsBySlug.set(suggestion.slug, {
+            slug: suggestion.slug,
+            name: suggestion.name,
+            minPrice: suggestion.minPrice,
+            ...(typeof suggestion.imageUrl === "string" ? { imageUrl: suggestion.imageUrl } : {}),
+          });
+        }
+      }
+    }
+    return NextResponse.json(
+      { suggestions: rankSearchSuggestions([...suggestionsBySlug.values()], q).slice(0, 8) },
+      { headers: SUGGESTION_CACHE_HEADERS },
     );
-    const products =
-      (primary?.length ?? 0) > 0 || !getMedusaSalesChannelId()
-        ? primary
-        : (
-            await sdk.store.product.list(baseParams as Parameters<
-              typeof sdk.store.product.list
-            >[0])
-          ).products;
-    const suggestions = (products ?? [])
-      .map((raw) => {
-        const p = catalogProductFromMedusaRaw(raw as never);
-        if (!p) return null;
-        const imageUrl = p.images?.[0]?.imageUrl?.trim() || undefined;
-        return {
-          slug: p.slug,
-          name: p.name,
-          minPrice: minVariantPrice(p),
-          imageUrl,
-        };
-      })
-      .filter((s): s is NonNullable<typeof s> => s != null);
-    return NextResponse.json({ suggestions });
   } catch {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json(
+      { suggestions: [], error: "catalog_unavailable" },
+      { status: 503 },
+    );
   }
 }

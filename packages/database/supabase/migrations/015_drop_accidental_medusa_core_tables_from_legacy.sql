@@ -1,7 +1,7 @@
 -- 015: Remove public tables that duplicate Medusa v2 commerce schema names.
 --
--- APPLY ONLY via LEGACY_DATABASE_URL (Supabase platform DB from packages/database migrations).
--- NEVER run against Medusa DATABASE_URL — that would destroy the commerce database.
+-- APPLY ONLY via APP_DB_URL (application/platform DB from packages/database migrations).
+-- NEVER run against Medusa MEDUSA_DB_URL — that would destroy the commerce database.
 --
 -- Name list derived from: internal/docs/exclusive/medusadb/schema.sql (Medusa public tables).
 -- Intentional legacy tables use different names (e.g. public.users staff, product_reviews bridge).

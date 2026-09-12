@@ -27,9 +27,9 @@ EXPOSE 9000
 CMD ["node", "./scripts/run-dev.cjs"]
 
 FROM deps AS build
-ARG DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
+ARG MEDUSA_DB_URL=postgresql://postgres:postgres@localhost:5432/postgres
 ARG MEDUSA_BACKEND_URL=http://localhost:9000
-ENV DATABASE_URL=$DATABASE_URL
+ENV MEDUSA_DB_URL=$MEDUSA_DB_URL
 ENV MEDUSA_BACKEND_URL=$MEDUSA_BACKEND_URL
 ENV NODE_ENV=development
 ENV XDG_CONFIG_HOME=/tmp/medusa-config

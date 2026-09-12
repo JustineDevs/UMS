@@ -21,6 +21,17 @@ export type SmsSendResult = {
   error?: string;
 };
 
+export function safeTrackingUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.search || url.hash) return null;
+    return /^\/track\/cap_[A-Za-z0-9._~-]+$/.test(url.pathname) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function sanitizePhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.startsWith("63") && digits.length === 12) return digits;
@@ -96,8 +107,9 @@ export function formatOrderPlacedSms(params: {
     `${store}: Order #${params.displayId} confirmed!`,
     `Total: ${amount}.`,
   ];
-  if (params.trackingUrl) {
-    lines.push(`Track: ${params.trackingUrl}`);
+  const trackingUrl = safeTrackingUrl(params.trackingUrl);
+  if (trackingUrl) {
+    lines.push(`Track: ${trackingUrl}`);
   }
   return lines.join(" ");
 }
@@ -116,8 +128,9 @@ export function formatOrderShippedSms(params: {
   } else if (params.trackingNumber) {
     parts.push(`Tracking: ${params.trackingNumber}.`);
   }
-  if (params.trackingUrl) {
-    parts.push(`Track: ${params.trackingUrl}`);
+  const trackingUrl = safeTrackingUrl(params.trackingUrl);
+  if (trackingUrl) {
+    parts.push(`Track: ${trackingUrl}`);
   }
   return parts.join(" ");
 }

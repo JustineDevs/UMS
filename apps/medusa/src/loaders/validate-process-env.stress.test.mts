@@ -15,17 +15,17 @@ function restoreEnv() {
 
 test.afterEach(restoreEnv);
 
-test("validateMedusaProcessEnv: throws when DATABASE_URL missing", () => {
-  process.env.DATABASE_URL = "";
+test("validateMedusaProcessEnv: throws when MEDUSA_DB_URL missing", () => {
+  process.env.MEDUSA_DB_URL = "";
   assert.throws(
     () => validateMedusaProcessEnv(),
-    /DATABASE_URL is required/,
+    /MEDUSA_DB_URL is required/,
   );
 });
 
-test("validateMedusaProcessEnv: passes in development with DATABASE_URL", () => {
+test("validateMedusaProcessEnv: passes in development with MEDUSA_DB_URL", () => {
   process.env.NODE_ENV = "development";
-  process.env.DATABASE_URL = "postgres://local:5432/test";
+  process.env.MEDUSA_DB_URL = "postgres://local:5432/test";
   assert.doesNotThrow(() => validateMedusaProcessEnv());
 });
 
@@ -37,7 +37,7 @@ const prodCors = () => {
 
 test("validateMedusaProcessEnv: throws in production when STORE_CORS missing", () => {
   process.env.NODE_ENV = "production";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.JWT_SECRET = "a";
   process.env.COOKIE_SECRET = "b";
   process.env.ADMIN_CORS = "x";
@@ -50,7 +50,7 @@ test("validateMedusaProcessEnv: throws in production when STORE_CORS missing", (
 
 test("validateMedusaProcessEnv: throws in production when JWT_SECRET missing", () => {
   process.env.NODE_ENV = "production";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.JWT_SECRET = "";
   process.env.COOKIE_SECRET = "some-secret";
   prodCors();
@@ -62,7 +62,7 @@ test("validateMedusaProcessEnv: throws in production when JWT_SECRET missing", (
 
 test("validateMedusaProcessEnv: throws in production when COOKIE_SECRET missing", () => {
   process.env.NODE_ENV = "production";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.JWT_SECRET = "some-secret";
   process.env.COOKIE_SECRET = "";
   prodCors();
@@ -74,7 +74,7 @@ test("validateMedusaProcessEnv: throws in production when COOKIE_SECRET missing"
 
 test("validateMedusaProcessEnv: throws in production when JWT_SECRET is supersecret", () => {
   process.env.NODE_ENV = "production";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.JWT_SECRET = "supersecret";
   process.env.COOKIE_SECRET = "other";
   prodCors();
@@ -86,7 +86,7 @@ test("validateMedusaProcessEnv: throws in production when JWT_SECRET is supersec
 
 function setupValidProd() {
   process.env.NODE_ENV = "production";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.JWT_SECRET = "real-secret-1";
   process.env.COOKIE_SECRET = "real-secret-2";
   process.env.STORE_CORS = "https://store.example.com";
@@ -123,6 +123,27 @@ test("validateMedusaProcessEnv: throws when Xendit secret is set without webhook
     () => validateMedusaProcessEnv(),
     /XENDIT_WEBHOOK_TOKEN.*required/,
   );
+});
+
+test("validateMedusaProcessEnv: rejects Xendit HTTP checkout callbacks in production", () => {
+  setupValidProd();
+  process.env.XENDIT_SECRET_KEY = "xendit-secret";
+  process.env.XENDIT_WEBHOOK_TOKEN = "xendit-webhook";
+  process.env.XENDIT_CHECKOUT_SUCCESS_URL = "http://localhost:3000/success";
+  process.env.XENDIT_CHECKOUT_CANCEL_URL = "https://store.example.com/cancel";
+  assert.throws(
+    () => validateMedusaProcessEnv(),
+    /XENDIT_CHECKOUT_SUCCESS_URL must be an absolute HTTPS URL/,
+  );
+});
+
+test("validateMedusaProcessEnv: accepts complete Xendit HTTPS callbacks in production", () => {
+  setupValidProd();
+  process.env.XENDIT_SECRET_KEY = "xendit-secret";
+  process.env.XENDIT_WEBHOOK_TOKEN = "xendit-webhook";
+  process.env.XENDIT_CHECKOUT_SUCCESS_URL = "https://store.example.com/success";
+  process.env.XENDIT_CHECKOUT_CANCEL_URL = "https://store.example.com/cancel";
+  assert.doesNotThrow(() => validateMedusaProcessEnv());
 });
 
 test("validateMedusaProcessEnv: passes when PayPal client ID, secret, and webhook ID all set", () => {
@@ -168,7 +189,7 @@ test("validateMedusaProcessEnv: throws in production when Resend configured but 
 
 test("validateMedusaProcessEnv: warns in development when Resend configured but TRACKING_HMAC_SECRET missing", () => {
   process.env.NODE_ENV = "development";
-  process.env.DATABASE_URL = "postgres://x";
+  process.env.MEDUSA_DB_URL = "postgres://x";
   process.env.RESEND_API_KEY = "re_xxx";
   process.env.RESEND_FROM_EMAIL = "noreply@example.com";
   delete process.env.TRACKING_HMAC_SECRET;

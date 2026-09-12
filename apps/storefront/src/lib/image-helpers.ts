@@ -6,9 +6,15 @@ export function shouldUnoptimizeImage(src: string | null | undefined): boolean {
   }
 
   try {
-    const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
+    const url = new URL(
+      trimmed.startsWith("//") ? `https:${trimmed}` : trimmed,
+    );
     const hostname = url.hostname.toLowerCase();
-    return hostname.endsWith("fbcdn.net") || hostname.endsWith("facebook.com");
+    return (
+      (hostname === "fbcdn.net" || hostname.endsWith(".fbcdn.net")) ||
+      (hostname === "facebook.com" || hostname.endsWith(".facebook.com")) ||
+      hostname.endsWith(".supabase.co")
+    );
   } catch {
     return false;
   }
@@ -20,11 +26,13 @@ export function isKnownUnavailableExternalImage(
   const trimmed = src?.trim();
   if (!trimmed) return false;
   try {
-    const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
+    const url = new URL(
+      trimmed.startsWith("//") ? `https:${trimmed}` : trimmed,
+    );
     const hostname = url.hostname.toLowerCase();
     return (
       hostname === "medusa-public-images.s3.eu-west-1.amazonaws.com" ||
-      hostname.endsWith("fbcdn.net")
+      hostname === "fbcdn.net" || hostname.endsWith(".fbcdn.net")
     );
   } catch {
     return false;

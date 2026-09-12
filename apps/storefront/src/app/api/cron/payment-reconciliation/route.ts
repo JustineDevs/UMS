@@ -4,10 +4,34 @@ import {
   completeJob,
   failJob,
   upsertPaymentProviderArtifact,
+  reconcileSettlement,
+  recordSettlementReconciliation,
 } from "@universal-music-store/platform-data";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 
 export const dynamic = "force-dynamic";
+
+async function fetchProviderReport(provider: "stripe" | "paypal" | "xendit", periodStart: string, periodEnd: string, paymentRequestIds: string[] = []) {
+  if (provider === "xendit" && paymentRequestIds.length === 0) return { source: "payment_requests", requests: [] as unknown[] };
+  const base = (process.env.MEDUSA_ADMIN_API_URL ?? process.env.MEDUSA_BACKEND_URL ?? process.env.MEDUSA_URL)?.trim().replace(/\/$/, "");
+  const secret = (process.env.MEDUSA_SECRET_API_KEY ?? process.env.MEDUSA_ADMIN_API_SECRET)?.trim();
+  const internalToken = process.env.MEDUSA_INTERNAL_ADMIN_TOKEN?.trim();
+  if (!base || !secret || !internalToken) throw new Error("Provider reconciliation service is not configured");
+  const auth = Buffer.from(`${secret}:`, "utf8").toString("base64");
+  const response = await fetch(`${base}/admin/payment-provider/${provider}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${auth}`,
+      "Content-Type": "application/json",
+      "x-uvs-internal-token": internalToken,
+    },
+    body: JSON.stringify({ operation: "reconcile", period_start: periodStart, period_end: periodEnd, idempotency_key: `cron:${provider}:${periodStart}:${periodEnd}`,
+      ...(provider === "xendit" ? { payment_request_ids: paymentRequestIds.slice(0, 100) } : {}) }),
+  });
+  const body = await response.json().catch(() => null) as { data?: Record<string, unknown> } | null;
+  if (!response.ok || !body?.data) throw new Error(`Provider reconciliation failed for ${provider}`);
+  return body.data;
+}
 
 function authorized(req: Request): boolean {
   const expected = process.env.CRON_SECRET?.trim();
@@ -64,7 +88,7 @@ export async function GET(req: Request) {
       supabase
         .from("payment_attempts")
         .select(
-          "correlation_id,status,amount_minor,currency,provider_payload,created_at",
+          "correlation_id,status,amount_minor,currency,provider_payload,provider_payment_id,medusa_order_id,created_at",
         )
         .eq("organization_id", organizationId)
         .eq("provider", provider)
@@ -84,6 +108,58 @@ export async function GET(req: Request) {
 
     const attemptRows = attempts.data ?? [];
     const artifactRows = artifacts.data ?? [];
+    const paymentRequestIds = provider === "xendit"
+      ? artifactRows.map((artifact) => String(artifact.external_id ?? "")).filter(Boolean)
+      : [];
+    const providerReport = await fetchProviderReport(provider, periodStart, periodEnd, paymentRequestIds);
+    const providerRows = Array.isArray(providerReport.transactions)
+      ? providerReport.transactions
+      : Array.isArray(providerReport.requests)
+        ? providerReport.requests
+        : [];
+    for (const raw of providerRows) {
+      const row = raw as Record<string, unknown>;
+      const externalId = String(row.external_id ?? row.payment_request_id ?? "").trim();
+      if (!externalId) continue;
+      const paymentExternalId = typeof row.payment_external_id === "string"
+        ? row.payment_external_id
+        : typeof row.payment_id === "string" ? row.payment_id : null;
+      const attempt = attemptRows.find((candidate) =>
+        paymentExternalId && candidate.provider_payment_id === paymentExternalId,
+      );
+      const expectedAmountMinor = attempt ? Number(attempt.amount_minor) : null;
+      const expectedCurrency = attempt?.currency ? String(attempt.currency) : null;
+      const match = reconcileSettlement({
+        providerExternalId: externalId,
+        providerPaymentExternalId: paymentExternalId,
+        expectedPaymentExternalId: attempt?.provider_payment_id ?? null,
+        expectedOrderId: attempt?.medusa_order_id ?? null,
+        providerOrderId: typeof row.reference_id === "string" ? row.reference_id : null,
+        expectedAmountMinor,
+        providerAmountMinor: Number.isFinite(Number(row.amount_minor)) ? Number(row.amount_minor) : null,
+        expectedCurrency,
+        providerCurrency: typeof row.currency === "string" ? row.currency : null,
+        providerStatus: String(row.status ?? "unknown"),
+      });
+      await recordSettlementReconciliation(supabase, {
+        organizationId,
+        provider,
+        merchantIdentity: organizationId,
+        externalId,
+        artifactType: "balance_transaction",
+        paymentExternalId,
+        medusaOrderId: attempt?.medusa_order_id ?? null,
+        amountMinor: Number.isFinite(Number(row.amount_minor)) ? Number(row.amount_minor) : null,
+        feeMinor: Number.isFinite(Number(row.fee_minor)) ? Number(row.fee_minor) : 0,
+        netMinor: Number.isFinite(Number(row.net_minor)) ? Number(row.net_minor) : null,
+        currency: typeof row.currency === "string" ? row.currency : null,
+        status: match.status,
+        providerOccurredAt: typeof row.provider_occurred_at === "string" ? row.provider_occurred_at : null,
+        idempotencyKey: `${idempotencyKey}:${externalId}`,
+        mismatchReason: match.mismatchReason,
+        metadata: { period_start: periodStart, period_end: periodEnd, provider_report_source: providerReport.source ?? null },
+      });
+    }
     for (const artifact of artifactRows) {
       if (!artifact.external_id || !artifact.status) continue;
       const invoiceProjection = await supabase
@@ -138,7 +214,7 @@ export async function GET(req: Request) {
         attemptAmount === artifactAmount
           ? "matched"
           : "review",
-      provider_api_pull: false,
+      provider_api_pull: true,
     };
     const externalId = `reconciliation:${provider}:${idempotencyKey}`;
     const reconciliationArtifactSaved = await upsertPaymentProviderArtifact(

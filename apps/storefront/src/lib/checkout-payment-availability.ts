@@ -119,11 +119,3 @@ export function resolveCheckoutPaymentAvailability(
     source: "medusa",
   };
 }
-
-/** @deprecated Prefer `resolveCheckoutPaymentAvailability` after loading region keys from the API. */
-function getCheckoutPaymentAvailability(): {
-  available: Record<PaymentProviderKey, boolean>;
-  preferredKey: PaymentProviderKey;
-} {
-  return getEnvOnlyCheckoutPaymentAvailability();
-}

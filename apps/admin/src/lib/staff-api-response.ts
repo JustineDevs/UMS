@@ -48,9 +48,22 @@ export function correlatedError(
     code === "INTERNAL_ERROR" || code === "SERVICE_UNAVAILABLE" || code === "MEDUSA_UNAVAILABLE"
       ? "The request could not be completed."
       : message;
-  return correlatedJson(
+  const response = correlatedJson(
     correlationId,
-    { error: safeMessage, code, requestId: correlationId },
-    { status },
+    {
+      type: `https://api.universalmusic.store/problems/${code.toLowerCase()}`,
+      title: code.replaceAll("_", " "),
+      status,
+      detail: safeMessage,
+      error: safeMessage,
+      code,
+      requestId: correlationId,
+      retryable: status === 408 || status === 425 || status === 429 || status >= 500,
+    },
+    {
+      status,
+      headers: { "content-type": "application/problem+json" },
+    },
   );
+  return response;
 }

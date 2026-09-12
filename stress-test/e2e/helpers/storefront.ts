@@ -2,21 +2,22 @@ import "../runtime-logs-init";
 import { expect, type Page } from "@playwright/test";
 
 /**
- * Checkout is auth-gated: guests see a Checkout heading and sign-in CTA; signed-in users with a
- * complete profile see pay controls (`checkout-submit-pay`).
+ * Checkout is auth-gated: guests see a Checkout heading and sign-in CTA; signed-in users may
+ * first see profile onboarding before pay controls (`checkout-submit-pay`).
  */
 export async function expectCheckoutShellVisible(page: Page): Promise<void> {
-  await expect(page.getByRole("heading", { name: /^Checkout$/i })).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    page.getByRole("heading", { name: /^(Checkout|Welcome)$/i }),
+  ).toBeVisible({ timeout: 30_000 });
   const pay = page.getByTestId("checkout-submit-pay");
   const guest = page.getByTestId("checkout-guest-sign-in");
   const onboard = page.getByTestId("checkout-onboarding-continue");
   const retry = page.getByTestId("checkout-profile-retry");
   const signIn = page.getByRole("heading", { name: "Sign in", exact: true });
-  await expect(pay.or(guest).or(onboard).or(retry).or(signIn)).toBeVisible({
-    timeout: 20_000,
-  });
+  const onboardingGuard = page.getByRole("button", { name: "Continue", exact: true });
+  await expect(
+    pay.or(guest).or(onboard).or(retry).or(signIn).or(onboardingGuard),
+  ).toBeVisible({ timeout: 20_000 });
 }
 
 /**
@@ -34,8 +35,20 @@ export async function gotoFirstCatalogPdp(page: Page): Promise<string | null> {
   const slug = await first.getAttribute("data-product-slug");
   const trimmed = slug?.trim();
   if (!trimmed) return null;
-  const res = await page.goto(`/shop/${trimmed}`, { waitUntil: "domcontentloaded" });
-  if (!res) return null;
-  if (res.status() >= 400) return null;
+  let navigationSucceeded = true;
+  let res;
+  try {
+    res = await page.goto(`/shop/${trimmed}`, { waitUntil: "domcontentloaded" });
+  } catch (error) {
+    // Next dev can abort a navigation while compiling the PDP. Confirm the
+    // resulting document before treating that transient browser error as a
+    // missing product.
+    if (!(error instanceof Error) || !error.message.includes("ERR_ABORTED")) throw error;
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    await page.locator("main").waitFor({ state: "visible", timeout: 30_000 });
+    navigationSucceeded = false;
+    res = null;
+  }
+  if (navigationSucceeded && (!res || res.status() >= 400)) return null;
   return trimmed;
 }

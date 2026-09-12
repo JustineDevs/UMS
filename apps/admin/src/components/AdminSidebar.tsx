@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut } from "@/lib/auth-client";
 import {
   staffHasPermission,
   staffPermissionListForSession,
@@ -50,7 +50,7 @@ export function AdminSidebar({
   onOpenSearch,
   localAuthBypass = false,
 }: AdminSidebarProps) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/admin";
   const { data: session } = useSession();
   const sessionPerms = staffPermissionListForSession(session);
   // The local auth bypass is server-only, so the client session remains empty

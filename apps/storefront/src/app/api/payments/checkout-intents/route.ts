@@ -14,6 +14,12 @@ import {
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+import {
+  isIsolatedCodE2E,
+  registerIsolatedCodAttempt,
+} from "@/lib/isolated-cod-e2e-ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +32,7 @@ type Body = {
   productIds?: string[];
   medusaPaymentSessionId?: string;
   providerSessionId?: string;
+  providerPaymentId?: string;
   idempotencyKey?: string;
 };
 
@@ -33,6 +40,9 @@ type Body = {
  * Registers a durable payment/checkout attempt (ledger row) before redirecting to a hosted PSP.
  */
 export async function POST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const session = await getStorefrontSession();
   const sessionEmail = session?.user?.email?.trim().toLowerCase();
   if (!sessionEmail) {
@@ -49,12 +59,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No active cart" }, { status: 400 });
   }
 
-  let body: Body = {};
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    body = {};
+  const bounded = await parseBoundedJson(req, 16 * 1024);
+  if (bounded.tooLarge) {
+    return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
   }
+  const body: Body = bounded.valid ? (bounded.value as Body) : {};
 
   const provider = typeof body.provider === "string" ? body.provider.trim().toLowerCase() : "";
   if (!provider || !["cod", "stripe", "paypal", "xendit"].includes(provider)) {
@@ -107,6 +116,7 @@ export async function POST(req: Request) {
   );
 
   const sb = createStorefrontServiceSupabase();
+  const isolatedCodE2E = isIsolatedCodE2E() && provider === "cod";
   const result = await registerCheckoutIntentRouteLogic({
     organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
     cartId,
@@ -118,13 +128,20 @@ export async function POST(req: Request) {
     productIds: authoritative.productIds,
     medusaPaymentSessionId: body.medusaPaymentSessionId,
     providerSessionId: body.providerSessionId,
+    providerPaymentId: body.providerPaymentId,
     idempotencyKey: body.idempotencyKey,
-    supabaseAvailable: Boolean(sb),
+    supabaseAvailable: Boolean(sb) || isolatedCodE2E,
     registerPaymentAttempt: async (input) => {
-      if (!sb) {
-        throw new Error("Payment ledger is not configured");
+      if (sb) {
+        return registerPaymentAttempt(sb, input);
       }
-      return registerPaymentAttempt(sb, input);
+      if (isolatedCodE2E) {
+        return registerIsolatedCodAttempt({
+          cartId: input.cartId,
+          quoteFingerprint: input.quoteFingerprint ?? "",
+        });
+      }
+      throw new Error("Payment ledger is not configured");
     },
   });
 

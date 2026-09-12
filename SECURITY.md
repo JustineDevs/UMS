@@ -34,7 +34,7 @@ In-scope for security reporting:
 
 Out-of-scope:
 
-- Issues in third-party services (payment processors, shipping providers, Supabase, NextAuth) – report to those providers
+- Issues in third-party services (payment processors, shipping providers, or Supabase) – report to those providers
 - Social engineering or physical access
 - Denial of service that requires significant resources
 
@@ -50,7 +50,7 @@ The Universal Music Store Platform follows these security practices:
 
 ### Authentication and Authorization
 
-- NextAuth/Auth.js with Google OAuth for staff and customers.
+- Supabase Auth SSR with Google OAuth for staff and customers.
 - Role-based access control (admin, staff, customer) enforced on admin and POS routes.
 - Sensitive credentials stored in environment variables, never in client bundles.
 

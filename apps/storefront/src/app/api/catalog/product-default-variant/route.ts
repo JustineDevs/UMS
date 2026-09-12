@@ -1,4 +1,3 @@
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 
 export const dynamic = "force-dynamic";
@@ -43,32 +42,30 @@ export async function GET(req: Request) {
   }
 
   try {
-    const sdk = createStorefrontMedusaSdk();
-
-    let variants: Array<{
-      id: string;
-      sku?: string | null;
-      manage_inventory?: boolean;
-      inventory_quantity?: number | null;
-      calculated_price?: {
-        calculated_amount?: number | null;
-        currency_code?: string | null;
-      } | null;
-    }> = [];
-
-    if (productId) {
-      const { product } = await sdk.store.product.retrieve(productId, {
-        fields: "id,variants.id,variants.sku,variants.manage_inventory,variants.calculated_price",
-      });
-      variants = (product?.variants ?? []) as typeof variants;
-    } else if (slug) {
-      const { products } = await sdk.store.product.list({
-        handle: slug,
-        fields: "id,variants.id,variants.sku,variants.manage_inventory,variants.calculated_price",
-      });
-      const p = products?.[0];
-      variants = (p?.variants ?? []) as typeof variants;
+    const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) throw new Error("worker_api_not_configured");
+    const endpoint = productId
+      ? `${baseUrl}/store/products?id=${encodeURIComponent(productId)}&limit=1`
+      : `${baseUrl}/store/products/${encodeURIComponent(slug ?? "")}`;
+    const response = await fetch(endpoint, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (response.status === 404) {
+      return Response.json({ error: "Product not found or has no variants" }, { status: 404 });
     }
+    if (!response.ok) throw new Error(`worker_catalog_${response.status}`);
+    const payload = (await response.json()) as {
+      product?: { variants?: unknown[] };
+      products?: Array<{ variants?: unknown[] }>;
+    };
+    const variants = (payload.product?.variants ?? payload.products?.[0]?.variants ?? [])
+      .filter((variant): variant is {
+        id: string;
+        sku?: string | null;
+        manage_inventory?: boolean;
+        calculated_price?: { calculated_amount?: number | null; currency_code?: string | null } | null;
+      } => Boolean(variant && typeof variant === "object" && typeof (variant as { id?: unknown }).id === "string"));
 
     if (!variants.length) {
       return Response.json({ error: "Product not found or has no variants" }, { status: 404 });
@@ -90,6 +87,9 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to resolve variant";
-    return Response.json({ error: msg }, { status: resolveVariantErrorStatus(msg) });
+    return Response.json(
+      { error: "Unable to resolve product variant" },
+      { status: resolveVariantErrorStatus(msg) },
+    );
   }
 }

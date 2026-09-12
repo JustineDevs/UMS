@@ -100,6 +100,26 @@ test("handleCmsFormSubmissionRequest rejects unknown forms", async () => {
   assert.deepEqual(await res.json(), { error: "Unknown form" });
 });
 
+test("handleCmsFormSubmissionRequest rejects oversized bodies before persistence", async () => {
+  let inserted = false;
+  const response = await handleCmsFormSubmissionRequest(
+    new Request("http://localhost/api/forms/contact", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "a@example.com", message: "x".repeat(20_000) }),
+    }) as unknown as NextRequest,
+    "contact",
+    {
+      insertSubmission: async () => {
+        inserted = true;
+        return "unexpected";
+      },
+    },
+  );
+  assert.equal(response.status, 413);
+  assert.equal(inserted, false);
+});
+
 test("handleCmsFormSubmissionRequest durably records successful webhook delivery", async () => {
   const events: string[] = [];
   const res = await handleCmsFormSubmissionRequest(

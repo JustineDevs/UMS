@@ -54,6 +54,7 @@ async function post(req: NextRequest) {
     const handle = (c.handle ?? "").trim();
     if (!handle || keys.has(handle)) continue;
     const row = await upsertCmsCategoryContent(sup.client, {
+      collection_id: c.id,
       collection_handle: handle,
       locale,
       intro_html: `<p>${escapeHtml(c.name ?? handle)}</p>`,

@@ -1,5 +1,6 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { registerPancakePosTracking } from "../lib/pancake-pos-client";
+import { safeLogIdentifier } from "../lib/safe-log";
 
 const LOGGER_TOKEN = "logger";
 const ORDER_MODULE_TOKEN = "order";
@@ -23,7 +24,7 @@ export default async function orderFulfillmentPancakePosHandler({
     };
     logger.warn(
       "[pancake-pos] PANCAKE_POS_API_KEY or PANCAKE_POS_SHOP_ID not configured — skipping fulfillment registration " +
-        data.fulfillment_id,
+        safeLogIdentifier(data.fulfillment_id),
     );
     return;
   }
@@ -68,7 +69,7 @@ export default async function orderFulfillmentPancakePosHandler({
   const trackingNumber = label?.tracking_number?.trim();
   if (!trackingNumber) {
     logger.warn(
-      `[pancake-pos] fulfillment ${data.fulfillment_id} has no label tracking number; skipping Pancake POS registration.`,
+      `[pancake-pos] fulfillment ${safeLogIdentifier(data.fulfillment_id)} has no label tracking number; skipping Pancake POS registration.`,
     );
     return;
   }
@@ -76,7 +77,7 @@ export default async function orderFulfillmentPancakePosHandler({
   const shipping = order.shipping_address;
   if (!shipping) {
     logger.warn(
-      `[pancake-pos] order ${data.order_id} has no shipping address; skipping Pancake POS registration.`,
+      `[pancake-pos] order ${safeLogIdentifier(data.order_id)} has no shipping address; skipping Pancake POS registration.`,
     );
     return;
   }
@@ -137,13 +138,11 @@ export default async function orderFulfillmentPancakePosHandler({
     });
 
     logger.info(
-      `[pancake-pos] registered ${trackingNumber} for order ${data.order_id} fulfillment ${data.fulfillment_id}`,
+      `[pancake-pos] registered tracking ${safeLogIdentifier(trackingNumber)} for order ${safeLogIdentifier(data.order_id)} fulfillment ${safeLogIdentifier(data.fulfillment_id)}`,
     );
   } catch (err) {
     logger.warn(
-      `[pancake-pos] tracking registration failed for ${trackingNumber}: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
+      `[pancake-pos] tracking registration failed for ${safeLogIdentifier(trackingNumber)}: ${err instanceof Error ? err.name : "unknown"}`,
     );
   }
 }

@@ -2,6 +2,8 @@ import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { z } from "zod";
 import {
   reserveInventory,
+  setInventoryReservationExpiry,
+  releaseInventoryReservation,
   type InventoryReservationRow,
 } from "@universal-music-store/platform-data";
 import { getCorrelationId } from "@/lib/request-correlation";
@@ -10,6 +12,7 @@ import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { fetchVariantStockedQuantity } from "@/lib/medusa-catalog-inventory-stock";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +24,11 @@ const reserveSchema = z
     referenceType: z.string().trim().max(100).optional(),
     referenceId: z.string().trim().max(200).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    expiresAt: z.string().datetime().optional(),
   })
   .strict();
+
+const DEFAULT_RESERVATION_TTL_MS = 15 * 60 * 1000;
 
 function row(row: InventoryReservationRow) {
   return {
@@ -38,6 +44,9 @@ function row(row: InventoryReservationRow) {
     reservedAt: row.reserved_at,
     releasedAt: row.released_at,
     committedAt: row.committed_at,
+    expiresAt: row.expires_at,
+    expiredAt: row.expired_at,
+    reconciliationStatus: row.reconciliation_status,
   };
 }
 
@@ -58,7 +67,7 @@ export async function GET(request: Request) {
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 50));
   let query = sup.client
     .from("inventory_reservations")
-    .select("id,tenant_id,location_id,inventory_item_id,quantity,status,reference_type,reference_id,medusa_reservation_id,reserved_at,released_at,committed_at")
+    .select("id,tenant_id,location_id,inventory_item_id,quantity,status,reference_type,reference_id,medusa_reservation_id,reserved_at,released_at,committed_at,expires_at,expired_at,reconciliation_status")
     .eq("tenant_id", organization.id)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -77,8 +86,9 @@ async function post(request: Request) {
   if (!staff.ok) return tagResponse(staff.response, correlationId);
   const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
   if (!idempotencyKey) return correlatedJson(correlationId, { error: "Idempotency-Key is required" }, { status: 400 });
-  const body = await request.json().catch(() => null);
-  const parsed = reserveSchema.safeParse(body);
+  const body = await parseBoundedJson(request, 64 * 1024);
+  if (body.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const parsed = reserveSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(correlationId, { error: "Invalid reservation payload" }, { status: 400 });
   const sup = adminSupabaseOr503(correlationId);
   if ("response" in sup) return sup.response;
@@ -87,7 +97,8 @@ async function post(request: Request) {
   const availableQuantity = await fetchVariantStockedQuantity(parsed.data.inventoryItemId);
   if (availableQuantity == null) return correlatedJson(correlationId, { error: "Inventory quantity is unavailable" }, { status: 502 });
   try {
-    const reservation = await reserveInventory(sup.client, {
+    const expiresAt = parsed.data.expiresAt ?? new Date(Date.now() + DEFAULT_RESERVATION_TTL_MS).toISOString();
+    let reservation = await reserveInventory(sup.client, {
       tenantId: organization.id,
       locationId: parsed.data.locationId,
       inventoryItemId: parsed.data.inventoryItemId,
@@ -98,6 +109,20 @@ async function post(request: Request) {
       referenceId: parsed.data.referenceId,
       metadata: parsed.data.metadata,
     });
+    try {
+      reservation = await setInventoryReservationExpiry(sup.client, {
+        tenantId: organization.id,
+        reservationId: reservation.id,
+        expiresAt,
+      });
+    } catch {
+      await releaseInventoryReservation(sup.client, {
+        tenantId: organization.id,
+        reservationId: reservation.id,
+        idempotencyKey: `${idempotencyKey}:expiry-failed`,
+      });
+      throw new Error("Unable to configure reservation expiry");
+    }
     return correlatedJson(correlationId, { data: row(reservation) }, { status: 201 });
   } catch {
     return correlatedJson(correlationId, { error: "Unable to reserve inventory", code: "INVENTORY_RESERVATION_FAILED" }, { status: 409 });

@@ -1,5 +1,8 @@
 import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
-import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
+import {
+  DEFAULT_PUBLIC_SITE_ORIGIN,
+  generateOpaqueTrackingCapability,
+} from "@universal-music-store/sdk";
 
 function cartRecoveryEnabled(): boolean {
   return process.env.STOREFRONT_CART_RECOVERY_EMAIL?.trim() === "1";
@@ -16,6 +19,7 @@ function isEmail(v: string): boolean {
 export async function sendCartRecoveryEmail(params: {
   to: string;
   lineCount: number;
+  resumeUrl?: string;
 }): Promise<boolean> {
   if (!cartRecoveryEnabled()) return false;
   const to = params.to.trim().toLowerCase();
@@ -27,7 +31,7 @@ export async function sendCartRecoveryEmail(params: {
   const origin = (
     process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN
   ).replace(/\/$/, "");
-  const resumeUrl = `${origin}/checkout`;
+  const resumeUrl = params.resumeUrl?.trim() || `${origin}/checkout`;
 
   const result = await sendResendTransactionalEmail({
     apiKey: key,
@@ -43,4 +47,11 @@ export async function sendCartRecoveryEmail(params: {
     tags: [{ name: "type", value: "cart_recovery" }],
   });
   return result.ok;
+}
+
+export function buildCartRecoveryUrl(baseUrl: string, cartId: string): string | null {
+  const id = cartId.trim();
+  const token = generateOpaqueTrackingCapability(id);
+  if (!id || !token) return null;
+  return `${baseUrl.replace(/\/$/, "")}/checkout?token=${encodeURIComponent(token)}`;
 }

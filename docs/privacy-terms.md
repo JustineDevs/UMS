@@ -380,14 +380,14 @@ This document specifies product requirements for a music commerce stack for a re
 - **Database**: PostgreSQL via Supabase
 - **Monorepo**: Turborepo + pnpm
 - **Styling**: Tailwind CSS + shadcn/ui
-- **Auth**: NextAuth/Auth.js with Google provider
+- **Auth**: Supabase Auth SSR with Google provider
 - **Payments**: Medusa payment modules and official PSP SDKs or typed clients where applicable
 - **Shipping**: shipment tracking provider + J&T Express Philippines
 
 ### Deployment
 - **Storefront**: Vercel or similar (auto-deploy from `main` branch)
 - **Admin**: Same Vercel app or separate instance
-- **API**: Node.js service on Fly.io or similar
+- **API**: Cloudflare Workers running the commerce and compliance route handlers
 - **Database**: Supabase managed Postgres
 - **CI/CD**: GitHub Actions for lint, build, test; branch-based auto-deploy
 
@@ -541,8 +541,8 @@ Provider will use the following technology stack:
 - Backend: Node.js with Express, TypeScript
 - Database: PostgreSQL via Supabase
 - Monorepo: Turborepo + pnpm
-- Auth: NextAuth/Auth.js with Google OAuth
-- Deployment: Vercel (storefront/admin), Fly.io or similar (API)
+- Auth: Supabase Auth SSR with Google OAuth
+- Deployment: Vercel (storefront/admin) and Cloudflare Workers (backend runtime)
 - CI/CD: GitHub Actions
 
 Any deviation from this stack requires written approval from Client.
@@ -693,7 +693,7 @@ Client agrees to:
 
 - Provide timely feedback and approval on deliverables
 - Provide third-party API keys (payment processors, shipping provider, Google OAuth)
-- Arrange and pay for hosting services (Vercel, Supabase, Fly.io, etc.)
+- Arrange and pay for hosting services (Vercel, Cloudflare Workers, and Supabase)
 - Test the application thoroughly before production launch
 - Maintain regular backups
 
@@ -789,7 +789,7 @@ Client will pay for and maintain:
 
 - Vercel hosting (storefront/admin)
 - Supabase Postgres database
-- Fly.io or similar (API server)
+- Cloudflare Workers (public API and backend runtime)
 - Third-party API services (payment processors, shipping provider, Google Cloud)
 - Email/domain services
 

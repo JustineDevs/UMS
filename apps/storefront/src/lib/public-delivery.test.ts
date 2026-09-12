@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  canTransitionPublicDelivery,
   publicDeliveryIdempotencyKey,
   recordPublicDeliveryAttempt,
 } from "./public-delivery.js";
@@ -43,8 +44,25 @@ test("delivery attempt persistence is idempotent", async () => {
       aggregate_id: "submission_1",
       recipient: "https://example.test/hook",
       provider: "webhook",
+      status: "queued",
       idempotency_key: "public_form_webhook:submission_1",
     },
     options: { onConflict: "idempotency_key", ignoreDuplicates: true },
   }]);
+});
+
+test("delivery lifecycle permits retry and blocks terminal resurrection", () => {
+  assert.equal(canTransitionPublicDelivery("failed", "retry"), true);
+  assert.equal(canTransitionPublicDelivery("retry", "sent"), true);
+  assert.equal(canTransitionPublicDelivery("suppressed", "sent"), false);
+});
+
+test("consent lookup fails closed when the preference store is unavailable", async () => {
+  const supabase = {
+    from: () => {
+      throw new Error("preference store unavailable");
+    },
+  } as never;
+  const { isEmailUnsubscribed } = await import("./public-delivery.js");
+  assert.equal(await isEmailUnsubscribed(supabase, "listener@example.test"), true);
 });

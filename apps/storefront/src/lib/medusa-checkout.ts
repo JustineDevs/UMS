@@ -24,6 +24,7 @@ import {
   type MedusaCheckoutTotalsPreview,
 } from "./medusa-checkout-cart-prep";
 import { emitCommerceObservabilityClient } from "./commerce-observability";
+import type { CommerceAttribution } from "@universal-music-store/sdk";
 import {
   pickPaymentSessionForProvider,
   resolveCheckoutAction,
@@ -50,6 +51,8 @@ export type MedusaCheckoutResult = {
   xenditComponentsSdkKey?: string;
   /** Provider payment-session ID used for durable reconciliation. */
   paymentSessionId?: string;
+  /** Provider-side payment identifier used for server-side verification. */
+  providerPaymentId?: string;
   /** Cash on delivery: cart was completed and an order was created. */
   codOrderPlaced?: boolean;
   /** Medusa order id when codOrderPlaced (e.g. order_...). */
@@ -100,6 +103,7 @@ export async function previewMedusaCheckoutTotals(input: {
   loyaltyPointsToRedeem?: number;
   paymentMethod: PaymentProviderKey;
   shippingOptionId?: string;
+  attribution?: CommerceAttribution;
   signal?: AbortSignal;
 }): Promise<MedusaCheckoutTotalsPreview> {
   if (typeof window === "undefined") {
@@ -151,6 +155,7 @@ export async function startMedusaCheckout(input: {
   /** Required when provider is COD; from POST /api/checkout/cod-cart-payload. */
   codCartPayload?: CodCartPayload;
   shippingOptionId?: string;
+  attribution?: CommerceAttribution;
 }): Promise<MedusaCheckoutResult> {
   const baseUrl = getMedusaStoreBaseUrl();
   const publishableKey = getMedusaPublishableKey();
@@ -182,6 +187,7 @@ export async function startMedusaCheckout(input: {
         codCartPayload: codFlow ? input.codCartPayload : undefined,
         loyaltyPointsToRedeem: input.loyaltyPointsToRedeem,
         shippingOptionId: input.shippingOptionId,
+        attribution: input.attribution,
       },
       codFlow,
     );
@@ -388,6 +394,7 @@ export async function startMedusaCheckout(input: {
       paypalOrderId: paypalOid,
       xenditComponentsSdkKey,
       paymentSessionId: typeof session?.id === "string" ? session.id : undefined,
+      providerPaymentId: action.kind === "redirect" ? action.providerPaymentId : undefined,
       quoteFingerprint: preview.quoteFingerprint,
       variantIds: preview.variantIds,
       productIds: preview.productIds,

@@ -95,4 +95,4 @@ Running `pnpm exec playwright test` without the wrapper still creates a timestam
 
 ## Admin E2E
 
-Same as parent `stress-test/README.md`: `ADMIN_ALLOWED_EMAILS`, `NEXTAUTH_SECRET`, `pnpm e2e:ensure-staff`, `/sign-in/e2e`.
+Same as parent `stress-test/README.md`: `ADMIN_ALLOWED_EMAILS`, `AUTH_SECRET`, `pnpm e2e:ensure-staff`, `/sign-in/e2e`.

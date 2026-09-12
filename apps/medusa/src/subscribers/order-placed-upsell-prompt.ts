@@ -1,6 +1,7 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import { sendResendTransactionalEmail } from "../lib/resend-email";
+import { safeLogIdentifier } from "../lib/safe-log";
 
 export default async function orderPlacedUpsellPrompt({
   event: { data },
@@ -66,9 +67,9 @@ export default async function orderPlacedUpsellPrompt({
     tags: [{ name: "type", value: "order_upsell" }],
   });
   if (sent.ok) {
-    logger.info?.(`[upsell] sent cross-sell email to ${email}`);
+    logger.info?.(`[upsell] sent cross-sell email to ${safeLogIdentifier(email)}`);
   } else {
-    logger.warn?.(`[upsell] ${sent.message}`);
+    logger.warn?.("[upsell] delivery rejected");
   }
 }
 

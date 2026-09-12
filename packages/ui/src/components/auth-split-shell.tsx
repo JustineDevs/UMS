@@ -21,7 +21,7 @@ export function AuthSplitShell({
   const isAdmin = variant === "admin";
   const logoSrc = isAdmin
     ? "/brand/uvs-logo-landscape.png"
-    : "/UVS/UVS_logo_landscape.png";
+    : "/brand/universal-music-store-logo-landscape.png";
   const useHeaderOffset =
     offsetHeader ?? (variant === "storefront" ? true : false);
 

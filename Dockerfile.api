@@ -1,0 +1,29 @@
+FROM node:20.19.4-slim AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@10.15.1 --activate
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/api ./apps/api
+COPY packages ./packages
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS runtime
+ENV NODE_ENV=production
+ENV HOME=/tmp
+
+RUN useradd --create-home --uid 1001 --shell /bin/bash api \
+  && chown -R api:api /app
+
+USER api
+EXPOSE 4000
+STOPSIGNAL SIGTERM
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+  CMD node -e "fetch('http://127.0.0.1:4000/healthz').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["pnpm", "exec", "tsx", "apps/api/src/index.ts"]

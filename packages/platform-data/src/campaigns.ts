@@ -145,7 +145,7 @@ export async function executeCampaign(
   supabase: SupabaseClient,
   campaignId: string,
   organizationId: string,
-  sendEmail: (to: string, subject: string, html: string) => Promise<void>,
+  sendEmail: (_to: string, _subject: string, _html: string) => Promise<void>,
 ): Promise<number> {
   const { data: campaign, error: campErr } = await supabase
     .from("campaigns")

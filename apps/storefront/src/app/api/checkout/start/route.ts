@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
-import { registerPaymentAttempt } from "@universal-music-store/platform-data";
-import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
+import {
+  recordCommerceAttribution,
+  registerPaymentAttempt,
+  updatePaymentAttemptByCorrelationId,
+} from "@universal-music-store/platform-data";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN, normalizeCommerceAttribution, type CommerceAttribution } from "@universal-music-store/sdk";
 
 import { getStorefrontSession } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { applyRateLimit, parseJsonBody } from "@/lib/cart-api-helpers";
+import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import {
   PAYMENT_PROVIDER_IDS,
   startMedusaCheckout,
@@ -13,6 +19,9 @@ import { formatMedusaCheckoutError } from "@/lib/medusa-checkout-errors";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { minorUnitDivisor } from "@/lib/medusa-money";
 import { registerCheckoutIntentRouteLogic } from "@/lib/payment-attempt-route-logic";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { checkoutAttemptCookieHeader } from "@/lib/checkout-attempt-cookie";
+import { resolveCheckoutEmail } from "@/lib/checkout-email";
 
 export const dynamic = "force-dynamic";
 
@@ -22,25 +31,177 @@ type StartBody = {
   providerId?: string;
   loyaltyPointsToRedeem?: number;
   shippingOptionId?: string;
+  attribution?: CommerceAttribution;
 };
 
 const PROVIDER_IDS = new Set<string>(Object.values(PAYMENT_PROVIDER_IDS));
 
-function jsonResponse(body: unknown, status = 200, cartId?: string): Response {
+function workerBaseUrl(): string | null {
+  const value = process.env.API_URL?.trim().replace(/\/$/, "");
+  return value || null;
+}
+
+function workerProvider(providerId: string): "stripe" | "paypal" | "xendit" | null {
+  if (providerId === PAYMENT_PROVIDER_IDS.STRIPE) return "stripe";
+  if (providerId === PAYMENT_PROVIDER_IDS.PAYPAL) return "paypal";
+  if (providerId === PAYMENT_PROVIDER_IDS.XENDIT) return "xendit";
+  return null;
+}
+
+async function stableCheckoutKey(cartId: string, provider: string, body: StartBody): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify({ cartId, provider, body })),
+  );
+  const suffix = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("").slice(0, 32);
+  return `storefront-checkout-${suffix}`;
+}
+
+async function startWorkerCheckout(input: {
+  request: Request;
+  body: StartBody;
+  cartId: string;
+  email: string;
+  provider: "stripe" | "paypal" | "xendit";
+  providerId: string;
+  baseUrl: string;
+}): Promise<Response> {
+  const configuredOrigin =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ||
+    new URL(input.request.url).origin;
+  let origin: URL;
+  try {
+    origin = new URL(configuredOrigin);
+  } catch {
+    return NextResponse.json({ error: "Checkout origin is not configured." }, { status: 503 });
+  }
+  if (origin.protocol !== "https:") {
+    return NextResponse.json(
+      { error: "Worker checkout requires an HTTPS storefront origin." },
+      { status: 503 },
+    );
+  }
+
+  const idempotencyKey = await stableCheckoutKey(
+    input.cartId,
+    input.provider,
+    input.body,
+  );
+  const updateResponse = await fetch(
+    `${input.baseUrl}/store/carts/${encodeURIComponent(input.cartId)}`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Idempotency-Key": `${idempotencyKey}-cart`,
+      },
+      body: JSON.stringify({ email: input.email }),
+      cache: "no-store",
+    },
+  );
+  if (!updateResponse.ok) {
+    return NextResponse.json(
+      { error: "The checkout cart could not be prepared." },
+      { status: updateResponse.status === 404 ? 409 : 502 },
+    );
+  }
+
+  const successUrl = new URL(
+    `/checkout/hosted-return?provider=${input.provider}&status=success`,
+    origin,
+  );
+  const cancelUrl = new URL(
+    `/checkout/hosted-return?provider=${input.provider}&status=cancel`,
+    origin,
+  );
+  if (input.provider === "stripe") {
+    successUrl.searchParams.set("token", "{CHECKOUT_SESSION_ID}");
+  }
+  const response = await fetch(`${input.baseUrl}/store/checkout/session`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify({
+      cart_id: input.cartId,
+      provider: input.provider,
+      success_url: successUrl.toString(),
+      cancel_url: cancelUrl.toString(),
+    }),
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => ({}))) as {
+    checkout?: { id?: unknown; url?: unknown };
+    amountMinor?: unknown;
+    currency?: unknown;
+    correlationId?: unknown;
+    error?: unknown;
+  };
+  if (!response.ok) {
+    return NextResponse.json(
+      { error: typeof payload.error === "string" ? payload.error : "Payment provider could not start checkout." },
+      { status: response.status },
+    );
+  }
+  const checkoutId = typeof payload.checkout?.id === "string" ? payload.checkout.id : "";
+  const checkoutUrl = typeof payload.checkout?.url === "string" ? payload.checkout.url : "";
+  const correlationId = typeof payload.correlationId === "string" ? payload.correlationId : "";
+  const amountMinor = typeof payload.amountMinor === "number" ? payload.amountMinor : 0;
+  const currencyCode = typeof payload.currency === "string" ? payload.currency.toUpperCase() : "PHP";
+  if (!checkoutId || !checkoutUrl || !correlationId || !Number.isSafeInteger(amountMinor)) {
+    return NextResponse.json({ error: "Payment provider returned an invalid checkout." }, { status: 502 });
+  }
+  const providerLabel =
+    input.provider === "stripe"
+      ? "Debit or credit card"
+      : input.provider === "paypal"
+        ? "PayPal balance or card"
+        : "GCash and bank transfer";
+  return jsonResponse(
+    {
+      checkoutUrl,
+      cartId: input.cartId,
+      providerLabel,
+      confirmedTotal: amountMinor / minorUnitDivisor(currencyCode),
+      currencyCode,
+      paymentSessionId: checkoutId,
+      providerPaymentId: checkoutId,
+      quoteFingerprint: `worker:${correlationId}`,
+      variantIds: [],
+      productIds: [],
+      checkoutActionKind: "redirect",
+      correlationId,
+      workerCheckout: true,
+    },
+    201,
+    input.cartId,
+    correlationId,
+  );
+}
+
+function jsonResponse(body: unknown, status = 200, cartId?: string, correlationId?: string): Response {
   const payload = JSON.stringify(body);
+  const headers = new Headers({
+    "Cache-Control": "no-store",
+    Connection: "close",
+    "Content-Length": String(Buffer.byteLength(payload)),
+    "Content-Type": "application/json; charset=utf-8",
+  });
+  if (cartId) {
+    headers.append(
+      "Set-Cookie",
+      `mcart_id=${encodeURIComponent(cartId)}; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax`,
+    );
+  }
+  if (correlationId) headers.append("Set-Cookie", checkoutAttemptCookieHeader(correlationId));
   return new Response(payload, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-      Connection: "close",
-      "Content-Length": String(Buffer.byteLength(payload)),
-      "Content-Type": "application/json; charset=utf-8",
-      ...(cartId
-        ? {
-            "Set-Cookie": `mcart_id=${encodeURIComponent(cartId)}; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax`,
-          }
-        : {}),
-    },
+    headers,
   });
 }
 
@@ -53,14 +214,14 @@ function normalizeLines(lines: StartBody["lines"]): MedusaCheckoutLine[] {
           ? Math.floor(line.quantity)
           : 0,
     }))
-    .filter((line) => line.variantId.length > 0 && line.quantity > 0 && line.quantity <= 99)
+    .filter((line) => line.variantId.length > 0 && line.quantity > 0 && line.quantity <= 999)
     .slice(0, 50);
 }
 
 export async function POST(req: Request) {
-  const session = await getStorefrontSession();
-  const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
-
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const rl = await applyRateLimit(req, "checkout-start", 20, 60_000);
   if (!rl.ok) return rl.response;
 
@@ -84,12 +245,55 @@ export async function POST(req: Request) {
     );
   }
 
-  const email =
-    typeof parsed.data.email === "string" && parsed.data.email.trim()
-      ? parsed.data.email.trim().toLowerCase()
-      : sessionEmail;
+  const nativeProvider = workerProvider(providerId);
+  const nativeBaseUrl = workerBaseUrl();
+  let sessionEmail = "";
+  if (nativeProvider && nativeBaseUrl) {
+    const supabase = await createSupabaseServerClient().catch(() => null);
+    const { data } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
+    sessionEmail = data.user?.email?.trim().toLowerCase() ?? "";
+  } else {
+    const session = await getStorefrontSession();
+    sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
+  }
+
+  const emailResult = resolveCheckoutEmail(sessionEmail, parsed.data.email);
+  if (!emailResult.ok && emailResult.error === "account_email_mismatch") {
+    return NextResponse.json(
+      { error: "Signed-in checkout must use the email on your account." },
+      { status: 409 },
+    );
+  }
+  const email = emailResult.ok ? emailResult.email : "";
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Enter a valid checkout email." }, { status: 400 });
+  }
+
+  if (nativeProvider && nativeBaseUrl) {
+    const cartId = await readCartIdFromCookie();
+    if (!cartId) {
+      return NextResponse.json({ error: "No active checkout cart." }, { status: 400 });
+    }
+    try {
+      return await startWorkerCheckout({
+        request: req,
+        body: parsed.data,
+        cartId,
+        email,
+        provider: nativeProvider,
+        providerId,
+        baseUrl: nativeBaseUrl,
+      });
+    } catch (error) {
+      console.error("[checkout-start] Worker checkout initialization failed", {
+        providerId,
+        name: error instanceof Error ? error.name : "unknown",
+      });
+      return NextResponse.json(
+        { error: "Payment checkout is temporarily unavailable." },
+        { status: 502 },
+      );
+    }
   }
 
   try {
@@ -107,6 +311,7 @@ export async function POST(req: Request) {
         typeof parsed.data.shippingOptionId === "string" && parsed.data.shippingOptionId.trim()
           ? parsed.data.shippingOptionId.trim()
           : undefined,
+      attribution: normalizeCommerceAttribution(parsed.data.attribution),
     });
     const trackingBase =
       process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
@@ -114,6 +319,11 @@ export async function POST(req: Request) {
     if (!sb) {
       return NextResponse.json({ error: "Payment ledger is not configured." }, { status: 503 });
     }
+    await recordCommerceAttribution(sb, {
+      cartId: result.cartId,
+      organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
+      attribution: normalizeCommerceAttribution(parsed.data.attribution),
+    });
     const registered = await registerCheckoutIntentRouteLogic({
       organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
       cartId: result.cartId,
@@ -127,6 +337,9 @@ export async function POST(req: Request) {
       variantIds: result.variantIds,
       productIds: result.productIds,
       providerSessionId: result.paymentSessionId,
+      providerPaymentId:
+        result.providerPaymentId ??
+        (providerId === PAYMENT_PROVIDER_IDS.PAYPAL ? result.paypalOrderId : undefined),
       supabaseAvailable: true,
       registerPaymentAttempt: (input) => registerPaymentAttempt(sb, input),
     });
@@ -137,11 +350,22 @@ export async function POST(req: Request) {
     if (typeof correlationId !== "string" || !correlationId) {
       return NextResponse.json({ error: "Could not register payment attempt." }, { status: 502 });
     }
+    const providerPaymentId =
+      result.providerPaymentId ??
+      (providerId === PAYMENT_PROVIDER_IDS.PAYPAL ? result.paypalOrderId : undefined);
+    if (providerPaymentId) {
+      await updatePaymentAttemptByCorrelationId(sb, correlationId, {
+        provider_payment_id: providerPaymentId,
+      });
+    }
     return jsonResponse({
       ...result,
       correlationId,
-      trackingPageUrl: buildTrackingUrl(trackingBase, result.cartId),
-    }, 200, result.cartId);
+      trackingPageUrl: buildTrackingUrl(trackingBase, result.cartId, {
+        customerEmail: email,
+        storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+      }),
+    }, 200, result.cartId, correlationId);
   } catch (error) {
     const safeError = formatMedusaCheckoutError(error);
     console.error("[checkout-start] provider initialization failed", {

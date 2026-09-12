@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
 export async function GET(req: NextRequest): Promise<NextResponse | Response> {
@@ -13,7 +12,7 @@ export async function GET(req: NextRequest): Promise<NextResponse | Response> {
     );
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

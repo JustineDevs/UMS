@@ -10,6 +10,22 @@ export {
   availableQuantityFromVariantRaw,
 } from "@/lib/inventory-quantity-utils";
 
+async function fetchVariantById(
+  variantId: string,
+  fields: string,
+): Promise<Record<string, unknown> | null> {
+  const params = new URLSearchParams({ id: variantId, limit: "1", fields });
+  const response = await medusaAdminFetch(`/admin/product-variants?${params}`, {
+    method: "GET",
+  });
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { variants?: unknown[] };
+  const variant = payload.variants?.[0];
+  return variant && typeof variant === "object"
+    ? (variant as Record<string, unknown>)
+    : null;
+}
+
 async function getStockLocationId(requested?: string): Promise<string | null> {
   try {
     const res = await medusaAdminFetch("/admin/stock-locations?limit=5");
@@ -47,15 +63,7 @@ async function resolveInventoryItemIdFromVariant(
   try {
     const fields =
       "id,*inventory_items,*inventory_items.inventory_item";
-    const res = await medusaAdminFetch(
-      `/admin/product-variants/${encodeURIComponent(variantId)}?fields=${encodeURIComponent(fields)}`,
-      { method: "GET" },
-    );
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      variant?: Record<string, unknown>;
-    };
-    return extractInventoryItemId(json.variant);
+    return extractInventoryItemId(await fetchVariantById(variantId, fields) ?? undefined);
   } catch {
     return null;
   }
@@ -143,18 +151,10 @@ async function requestCreateAndLinkInventoryItemForVariant(
 ): Promise<string | null> {
   let sku = generatedCatalogSku(variantId);
   try {
-    const vr = await medusaAdminFetch(
-      `/admin/product-variants/${encodeURIComponent(variantId)}?fields=sku`,
-      { method: "GET" },
-    );
-    if (vr.ok) {
-      const j = (await vr.json()) as {
-        variant?: { sku?: string | null };
-      };
-      const s = j.variant?.sku;
-      if (typeof s === "string" && s.trim()) {
-        sku = s.trim();
-      }
+    const variant = await fetchVariantById(variantId, "id,sku");
+    const s = variant?.sku;
+    if (typeof s === "string" && s.trim()) {
+      sku = s.trim();
     }
   } catch {
     /* use generated sku */
@@ -274,19 +274,8 @@ const VARIANT_INVENTORY_ADMIN_FIELDS =
 async function fetchProductVariantInventoryRaw(
   variantId: string,
 ): Promise<Record<string, unknown> | null> {
-  const qs = new URLSearchParams();
-  qs.set("fields", VARIANT_INVENTORY_ADMIN_FIELDS);
   try {
-    const res = await medusaAdminFetch(
-      `/admin/product-variants/${encodeURIComponent(variantId)}?${qs.toString()}`,
-      { method: "GET" },
-    );
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
-      variant?: Record<string, unknown>;
-    };
-    const v = json.variant;
-    return v ?? null;
+    return await fetchVariantById(variantId, VARIANT_INVENTORY_ADMIN_FIELDS);
   } catch {
     return null;
   }

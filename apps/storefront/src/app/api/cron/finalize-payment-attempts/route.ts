@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  claimPaymentAttemptForFinalization,
   listStuckPaymentAttempts,
   updatePaymentAttemptByCorrelationId,
 } from "@universal-music-store/platform-data";
@@ -12,17 +13,17 @@ export const dynamic = "force-dynamic";
 
 /**
  * Server-side recovery for payment attempts stuck after hosted pay (webhook lag, closed tab).
- * Schedule: Vercel cron (`apps/storefront/vercel.json`) or external worker GET with secret.
- * Auth: `Authorization: Bearer <secret>` or `x-cron-secret`. Secret is `CRON_SECRET` (Vercel)
- * or `STOREFRONT_PAYMENT_CRON_SECRET` for local parity.
+ * Schedule: external scheduler GET with secret. The deployed fallback is GitHub Actions;
+ * webhooks remain the primary payment-completion path.
+ * Auth: `Authorization: Bearer <secret>` or `x-cron-secret`. Secret is `CRON_SECRET`,
+ * with `STOREFRONT_PAYMENT_CRON_SECRET` supported for local parity.
  */
 export async function GET(req: Request) {
   const secret =
     process.env.CRON_SECRET?.trim() ||
     process.env.STOREFRONT_PAYMENT_CRON_SECRET?.trim();
   const auth = req.headers.get("authorization");
-  const token =
-    auth?.startsWith("Bearer ") ? auth.slice(7).trim() : req.headers.get("x-cron-secret")?.trim();
+  const token = auth?.replace(/^Bearer\s+/i, "").trim() || req.headers.get("x-cron-secret")?.trim();
 
   const sb = createStorefrontServiceSupabase();
   try {
@@ -32,8 +33,12 @@ export async function GET(req: Request) {
       providedSecret: token ?? "",
       supabaseAvailable: Boolean(sb),
       stuckRows: stuck,
-      finalizeMedusaCart: async (cartId) =>
-        finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12 }),
+      claimFinalizeAttempt: async (id) => {
+        if (!sb) return false;
+        return claimPaymentAttemptForFinalization(sb, id);
+      },
+      finalizeMedusaCart: async (cartId, correlationId) =>
+        finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12, correlationId }),
       updatePaymentAttempt: async (id, patch) => {
         if (!sb) {
           return;

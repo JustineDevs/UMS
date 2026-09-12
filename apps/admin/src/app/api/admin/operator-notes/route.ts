@@ -9,6 +9,7 @@ import type { EntityWorkflowType } from "@/lib/admin-workflow";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,11 @@ async function post(req: Request) {
   if (!session?.user?.email) {
     return correlatedJson(correlationId, { error: "Unauthorized" }, { status: 401 });
   }
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const parsedBody = await parseBoundedJson(req, 32 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
+    ? parsedBody.value as Record<string, unknown>
+    : {};
   const entityType = typeof body.entity_type === "string" ? body.entity_type : "";
   const entityId = typeof body.entity_id === "string" ? body.entity_id : "";
   const text = typeof body.body === "string" ? body.body : "";

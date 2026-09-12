@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";

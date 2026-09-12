@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isCmsPubliclyVisible } from "./cms-public-visibility.js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
+import { resolveCmsMediaUrls, stripResolvedCmsMediaUrls } from "./cms-media.js";
 import type {
   CmsBlock,
   CmsComponentInstance,
@@ -12,6 +13,31 @@ import type {
 } from "./cms-types.js";
 
 export type { CmsNode } from "./cms-types.js";
+
+export type CmsPublishValidation = { ok: true } | { ok: false; errors: string[] };
+
+/** Rejects structural corruption before a page can become public. Unknown component IDs are retained for migration compatibility. */
+export function validateCmsPublishTree(nodes: readonly CmsNode[]): CmsPublishValidation {
+  const errors: string[] = [];
+  const byId = new Map<string, CmsNode>();
+  for (const node of nodes) {
+    if (!node.id.trim()) errors.push("node id is required");
+    if (byId.has(node.id)) errors.push(`duplicate node id: ${node.id}`);
+    byId.set(node.id, node);
+  }
+  for (const node of nodes) {
+    if (node.parentId && !byId.has(node.parentId)) errors.push(`orphan parent: ${node.id}`);
+    const childSet = new Set<string>();
+    for (const childId of node.children) {
+      if (childSet.has(childId)) errors.push(`duplicate child link: ${node.id}/${childId}`);
+      childSet.add(childId);
+      const child = byId.get(childId);
+      if (!child) errors.push(`missing child: ${node.id}/${childId}`);
+      else if (child.parentId !== node.id) errors.push(`parent mismatch: ${childId}`);
+    }
+  }
+  return errors.length ? { ok: false, errors } : { ok: true };
+}
 
 function parseCmsNode(value: unknown, fallbackId: string): CmsNode | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -297,6 +323,14 @@ function rowToPage(r: Record<string, unknown>): CmsPageRow {
   };
 }
 
+async function resolvePageMedia(supabase: SupabaseClient, page: CmsPageRow): Promise<CmsPageRow> {
+  const [blocks, tree] = await Promise.all([
+    resolveCmsMediaUrls(supabase, page.blocks, page.organization_id ?? undefined),
+    resolveCmsMediaUrls(supabase, page.tree, page.organization_id ?? undefined),
+  ]);
+  return { ...page, blocks, tree };
+}
+
 export async function listCmsPages(
   supabase: SupabaseClient,
   opts?: { locale?: string; organizationId?: string },
@@ -310,7 +344,7 @@ export async function listCmsPages(
     console.error("[cms-pages] listCmsPages", error.message);
     return [];
   }
-  return (data ?? []).map((r) => rowToPage(r as Record<string, unknown>));
+  return Promise.all((data ?? []).map((r) => resolvePageMedia(supabase, rowToPage(r as Record<string, unknown>))));
 }
 
 export async function getCmsPageById(
@@ -327,7 +361,7 @@ export async function getCmsPageById(
     return null;
   }
   if (!data) return null;
-  return rowToPage(data as Record<string, unknown>);
+  return resolvePageMedia(supabase, rowToPage(data as Record<string, unknown>));
 }
 
 export async function getCmsPageBySlugLocalePublic(
@@ -336,12 +370,14 @@ export async function getCmsPageBySlugLocalePublic(
   locale: string,
   organizationId?: string,
 ): Promise<CmsPageRow | null> {
+  const scopedOrganizationId = organizationId?.trim();
+  if (!scopedOrganizationId) return null;
   let query = supabase
     .from("cms_pages")
     .select("*")
     .eq("slug", slug)
-    .eq("locale", locale);
-  if (organizationId) query = query.eq("organization_id", organizationId);
+    .eq("locale", locale)
+    .eq("organization_id", scopedOrganizationId);
   const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
@@ -353,7 +389,7 @@ export async function getCmsPageBySlugLocalePublic(
   if (!isCmsPubliclyVisible(page.status, page.scheduled_publish_at)) {
     return null;
   }
-  return page;
+  return resolvePageMedia(supabase, page);
 }
 
 export async function listCmsPagesForSitemapPublic(
@@ -406,7 +442,7 @@ export async function getCmsPageBySlugAdmin(
     return null;
   }
   if (!data) return null;
-  return rowToPage(data as Record<string, unknown>);
+  return resolvePageMedia(supabase, rowToPage(data as Record<string, unknown>));
 }
 
 export type UpsertCmsPageInput = {
@@ -455,6 +491,14 @@ export async function upsertCmsPage(
   const nextTree = normalizeCmsTree(
     input.tree ?? (input.blocks ? cmsBlocksToTree(input.blocks) : existing?.tree ?? []),
   );
+  if (input.status === "published") {
+    const validation = validateCmsPublishTree(nextTree);
+    if (!validation.ok) {
+      console.error("[cms-pages] publish validation failed", validation.errors);
+      return null;
+    }
+  }
+  const canonicalTree = stripResolvedCmsMediaUrls(nextTree);
   const row = {
     organization_id: input.organization_id ?? existing?.organization_id ?? null,
     slug: input.slug,
@@ -462,8 +506,8 @@ export async function upsertCmsPage(
     page_type: input.page_type ?? existing?.page_type ?? "static",
     title: input.title ?? existing?.title ?? "",
     body: input.body ?? existing?.body ?? "",
-    blocks: (input.blocks ?? (nextTree.length ? cmsTreeToBlocks(nextTree) : existing?.blocks ?? [])) as unknown as Record<string, unknown>[],
-    tree: nextTree as unknown as Record<string, unknown>[],
+    blocks: (canonicalTree.length ? cmsTreeToBlocks(canonicalTree) : existing?.blocks ?? []) as unknown as Record<string, unknown>[],
+    tree: canonicalTree as unknown as Record<string, unknown>[],
     status: input.status ?? existing?.status ?? "draft",
     published_at: input.published_at !== undefined ? input.published_at : existing?.published_at ?? null,
     scheduled_publish_at:
@@ -508,7 +552,7 @@ export async function upsertCmsPage(
     if (input.mutations?.length) {
       await appendCmsPageMutations(supabase, existing.id, nextVersion, input.organization_id, input.mutations);
     }
-    return rowToPage(data as Record<string, unknown>);
+    return resolvePageMedia(supabase, rowToPage(data as Record<string, unknown>));
   }
 
   const { data, error } = await supabase
@@ -526,7 +570,7 @@ export async function upsertCmsPage(
   if (input.mutations?.length) {
     await appendCmsPageMutations(supabase, data.id as string, nextVersion, input.organization_id, input.mutations);
   }
-  return rowToPage(data as Record<string, unknown>);
+  return resolvePageMedia(supabase, rowToPage(data as Record<string, unknown>));
 }
 
 export async function appendCmsPageMutations(
@@ -626,7 +670,7 @@ export async function getCmsPageBySlugPreview(
     return null;
   }
   if (!data) return null;
-  return rowToPage(data as Record<string, unknown>);
+  return resolvePageMedia(supabase, rowToPage(data as Record<string, unknown>));
 }
 
 /**
@@ -638,6 +682,7 @@ export async function getCmsPageAncestorTrail(
   startParentSlug: string | null | undefined,
   locale: string,
   maxDepth = 8,
+  organizationId?: string,
 ): Promise<{ label: string; href: string }[]> {
   const crumbs: { label: string; href: string }[] = [];
   let currentSlug: string | null =
@@ -649,7 +694,12 @@ export async function getCmsPageAncestorTrail(
   while (currentSlug && guard++ < maxDepth) {
     if (visited.has(currentSlug)) break;
     visited.add(currentSlug);
-    const row = await getCmsPageBySlugLocalePublic(supabase, currentSlug, locale);
+    const row = await getCmsPageBySlugLocalePublic(
+      supabase,
+      currentSlug,
+      locale,
+      organizationId,
+    );
     if (!row) break;
     const label = row.breadcrumb_label?.trim() || row.title?.trim() || row.slug;
     crumbs.unshift({ label, href: `/p/${row.slug}` });
@@ -667,6 +717,7 @@ export async function getCmsPageBreadcrumbTrail(
   slug: string,
   locale: string,
   maxDepth = 8,
+  organizationId?: string,
 ): Promise<{ label: string; href: string }[]> {
   const crumbs: { label: string; href: string }[] = [];
   let currentSlug: string | null = slug;
@@ -675,7 +726,12 @@ export async function getCmsPageBreadcrumbTrail(
   while (currentSlug && guard++ < maxDepth) {
     if (visited.has(currentSlug)) break;
     visited.add(currentSlug);
-    const row = await getCmsPageBySlugLocalePublic(supabase, currentSlug, locale);
+    const row = await getCmsPageBySlugLocalePublic(
+      supabase,
+      currentSlug,
+      locale,
+      organizationId,
+    );
     if (!row) break;
     const label =
       row.breadcrumb_label?.trim() || row.title?.trim() || row.slug;

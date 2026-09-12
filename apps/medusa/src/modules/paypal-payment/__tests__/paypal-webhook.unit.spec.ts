@@ -5,7 +5,11 @@ import {
   buildPayPalWebhookDedupId,
   claimPayPalWebhookDedup,
 } from "../../../lib/paypal-webhook-dedup";
-import { capturePayPalOrder, verifyPayPalWebhookSignature } from "../../../lib/paypal-sdk-client";
+import {
+  capturePayPalOrder,
+  createPayPalOrder,
+  verifyPayPalWebhookSignature,
+} from "../../../lib/paypal-sdk-client";
 
 jest.mock("../../../lib/paypal-webhook-dedup", () => ({
   buildPayPalWebhookDedupId: jest.fn((body: { event_type?: string; id?: string }) =>
@@ -16,8 +20,23 @@ jest.mock("../../../lib/paypal-webhook-dedup", () => ({
 
 jest.mock("../../../lib/paypal-sdk-client", () => ({
   capturePayPalOrder: jest.fn(),
+  createPayPalOrder: jest.fn(),
   verifyPayPalWebhookSignature: jest.fn(),
 }));
+
+describe("PayPal checkout currency boundary", () => {
+  it("rejects a missing currency before contacting PayPal", async () => {
+    const service = new PayPalPaymentProviderService(
+      {},
+      { clientId: "client-id", clientSecret: "client-secret", sandbox: true },
+    );
+
+    await expect(
+      service.initiatePayment({ data: { session_id: "sess_123" }, amount: 100 } as never),
+    ).rejects.toThrow("missing or invalid currency_code");
+    expect(createPayPalOrder).not.toHaveBeenCalled();
+  });
+});
 
 describe("PayPal webhook signature verification gate", () => {
   const originalEnv = process.env;
@@ -211,6 +230,65 @@ describe("PayPal webhook service", () => {
     });
 
     expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+  });
+
+  it("rejects a successful capture without a provider event ID", async () => {
+    const service = createService();
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: JSON.stringify({
+          event_type: "PAYMENT.CAPTURE.COMPLETED",
+          resource: {
+            custom_id: "medusa_ps_missing_event_id",
+            amount: { value: "20.00", currency_code: "PHP" },
+          },
+        }),
+        headers: {},
+      }),
+    ).rejects.toThrow("missing a provider event ID");
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("does not fulfill an approved order before capture completes", async () => {
+    const service = createService();
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-approved",
+        event_type: "CHECKOUT.ORDER.APPROVED",
+        resource: {
+          purchase_units: [{
+            custom_id: "medusa_ps_approved",
+            amount: { value: "20.00", currency_code: "PHP" },
+          }],
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("ignores a capture event with no positive amount or currency", async () => {
+    const service = createService();
+    const result = await service.getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        id: "WH-invalid-capture",
+        event_type: "PAYMENT.CAPTURE.COMPLETED",
+        resource: {
+          custom_id: "medusa_ps_invalid",
+          amount: { value: "0.00" },
+        },
+      }),
+      headers: {},
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+    expect(claimPayPalWebhookDedup).not.toHaveBeenCalled();
   });
 
   it("ignores supported events without session correlation", async () => {

@@ -13,7 +13,7 @@ requires tech stack:
  - PostgreSQL (Medusa DB + Supabase Postgres for legacy/auth/compliance)
  - Turborepo + pnpm
  - Tailwind CSS + shadcn/ui
- - NextAuth/Auth.js
+ - Supabase Auth SSR with Google OAuth
  - Medusa payment modules (Stripe, PayPal, and others per configuration)
  - shipment tracking provider
 ---
@@ -47,12 +47,12 @@ The implementation SHALL use the following stack:
 
 - Frontend applications: Next.js App Router (`apps/storefront`, `apps/admin`)
 - Commerce engine: **Medusa 2.x** (`apps/medusa`) with Store API and Admin API
-- Commerce database: **PostgreSQL** dedicated to Medusa (`DATABASE_URL` for Medusa only)
+- Commerce database: **PostgreSQL** dedicated to Medusa (`MEDUSA_DB_URL` for Medusa only)
 - Legacy / auxiliary database: **PostgreSQL via Supabase** for OAuth-linked users, compliance tooling, and legacy schema exports (`packages/database`)
 - Minimal API server: **Node.js + Express** (`apps/api`) for health probes and compliance endpoints only (not primary commerce HTTP)
 - Monorepo orchestration: Turborepo with pnpm workspaces
 - UI layer: Tailwind CSS with shadcn/ui
-- Authentication: NextAuth/Auth.js with Google provider (staff and customer; admin UI protected by middleware on `/admin/*`)
+- Authentication: Supabase Auth SSR with Google provider (staff and customer; admin UI protected by middleware on `/admin/*`)
 - Payments: one or more **Medusa** payment providers (for example Stripe, PayPal, Xendit, cash on delivery), selected per region and Medusa server environment variables (`medusa-config.ts`)
 - Shipment tracking: provider integration with J&T Express Philippines (Medusa subscriber + webhook hook on Medusa)
 
@@ -173,7 +173,7 @@ Supported roles SHALL include:
 - `staff`
 - `customer`
 
-Google OAuth SHALL be supported through NextAuth/Auth.js. Session and provider-link records SHALL be associated with the canonical user entity.
+Google OAuth SHALL be supported through Supabase Auth SSR. Auth sessions and provider identity records SHALL be associated with the canonical user entity.
 
 ### 8. Order Management System
 
@@ -315,7 +315,7 @@ The implementation SHALL satisfy the following when production is configured wit
 
 **Next.js (`apps/admin`, `apps/storefront`)** SHALL own:
 
-- UI, NextAuth session, **middleware** protecting `/admin/*` for staff roles
+- UI, Supabase Auth SSR session, **middleware** protecting `/admin/*` for staff roles
 - Server **Route Handlers** that call Medusa with secret keys (POS and order BFF patterns)
 
 Webhook processing MUST be idempotent where implemented; persist provider event metadata for replay safety per Medusa and provider docs.
@@ -377,7 +377,7 @@ The **as-built** slice **does not yet implement** every stakeholder cell above. 
 - **Shipping:** Automatic J&T rating by weight/dimensions + **zone tables** (Metro / provincial / international) and “free shipping at N pieces” need quote service + rules engine + tests.
 - **Notifications:** **Resend** (optional) sends **checkout-started** email with signed tracking link when `RESEND_*` is configured; **SMS** and full order-lifecycle alerts are not wired.
 - **Reorder / low stock:** Intake states **1000** minimum per SKU; wire to low-stock jobs and admin surfacing.
-- **Customer Google OAuth:** NextAuth exists; **account linking** and **order history by user** remain productized per §7–8.
+- **Customer Google OAuth:** Supabase Auth SSR is the runtime; **account linking** and **order history by user** remain productized per §7–8.
 
 ### 16. Medusa as system of record (current state)
 
@@ -391,7 +391,7 @@ The layout separates public storefront, staff tools, and the commerce engine so 
 
 ## Security Considerations
 
-Payment and shipping webhooks MUST be verified before mutating order, shipment, or inventory state (**Medusa** payment modules and tracking provider hook on Medusa). All privileged admin and POS routes MUST require authenticated staff roles (**NextAuth** session + middleware on `/admin/*` for UI; **requireStaffSession** in admin API routes), and customer routes MUST be isolated from internal operations. Sensitive credentials including OAuth secrets, payment secrets, API keys, and database connection strings MUST be stored in environment variables and never exposed in client bundles. Inventory changes SHOULD be auditable through immutable movement records and attributable to a user or system process whenever possible.
+Payment and shipping webhooks MUST be verified before mutating order, shipment, or inventory state (**Medusa** payment modules and tracking provider hook on Medusa). All privileged admin and POS routes MUST require authenticated staff roles (**Supabase Auth SSR** session + middleware on `/admin/*` for UI; **requireStaffSession** in admin API routes), and customer routes MUST be isolated from internal operations. Sensitive credentials including OAuth secrets, payment secrets, API keys, and database connection strings MUST be stored in environment variables and never exposed in client bundles. Inventory changes SHOULD be auditable through immutable movement records and attributable to a user or system process whenever possible.
 
 ## Copyright
 

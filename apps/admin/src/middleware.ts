@@ -1,26 +1,31 @@
 import { NextResponse } from "next/server";
 import { NextRequest, type NextFetchEvent } from "next/server";
-import { withAuth } from "next-auth/middleware";
+import { createServerClient } from "@supabase/ssr";
 import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
 import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
 
-const authMiddleware = withAuth({
-  pages: { signIn: "/sign-in" },
-  callbacks: {
-    authorized: ({ token, req }) => {
-      if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {
-        return true;
-      }
-      const p = req.nextUrl.pathname;
-      if (p.startsWith("/guide-demos")) {
-        const email = token?.email as string | undefined;
-        return isEmailAllowedForGuideDemos(email);
-      }
-      const r = token?.role as string | undefined;
-      return r === "admin" || r === "staff";
+async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({ request: { headers: request.headers } });
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) return response;
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request: { headers: request.headers } });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
     },
-  },
-});
+  });
+  const { data } = await supabase.auth.getUser();
+  if (!data.user && (request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/guide-demos"))) {
+    const signIn = request.nextUrl.clone(); signIn.pathname = "/sign-in"; signIn.searchParams.set("callbackUrl", request.nextUrl.pathname); return NextResponse.redirect(signIn);
+  }
+  if (data.user && request.nextUrl.pathname.startsWith("/guide-demos") && !isEmailAllowedForGuideDemos(data.user.email)) return NextResponse.redirect(new URL("/admin?denied=guide-demos", request.url));
+  return response;
+}
 
 function ensureRequestId(request: NextRequest): {
   id: string;
@@ -120,12 +125,7 @@ export default async function middleware(req: NextRequest, event: NextFetchEvent
       return res;
     }
   }
-  const response = (
-    authMiddleware as unknown as (
-      _req: NextRequest,
-      _event: NextFetchEvent,
-    ) => Response | Promise<Response>
-  )(requestWithId, event);
+  const response = await updateSupabaseSession(requestWithId);
   if (response instanceof NextResponse) {
     response.headers.set("x-request-id", requestId);
     return response;

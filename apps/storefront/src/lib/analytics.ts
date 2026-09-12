@@ -1,11 +1,11 @@
 "use client";
 
-import {
-  capturePostHogClientEvent,
-} from "@universal-music-store/sdk";
+import { capturePostHogClientEvent } from "@universal-music-store/sdk";
 import { hasAnalyticsConsent } from "@/lib/analytics-consent";
 
 type VaFn = (_action: string, _data?: Record<string, unknown>) => void;
+type GtagFn = (..._args: unknown[]) => void;
+type FbqFn = (..._args: unknown[]) => void;
 
 function va(): VaFn | undefined {
   if (typeof window === "undefined") return undefined;
@@ -14,23 +14,55 @@ function va(): VaFn | undefined {
 
 function capturePostHog(event: string, properties?: Record<string, unknown>): void {
   try {
-    if (!hasAnalyticsConsent()) {
-      return;
-    }
-    capturePostHogClientEvent(event, properties);
+    if (hasAnalyticsConsent()) capturePostHogClientEvent(event, properties);
   } catch {
-    /* ignore telemetry failures */
+    // Telemetry must never affect storefront behavior.
   }
 }
 
-/**
- * Client-safe analytics hooks.
- * Vercel Web Analytics (`window.va`) receives all events.
- * GA4 (`window.gtag`) and Meta Pixel (`window.fbq`) fire when configured.
- */
+function fireGtag(...args: unknown[]): void {
+  if (typeof window === "undefined") return;
+  const g = (window as Window & { gtag?: GtagFn }).gtag;
+  if (typeof g === "function") g(...args);
+}
+
+function fireFbq(...args: unknown[]): void {
+  if (typeof window === "undefined") return;
+  const f = (window as Window & { fbq?: FbqFn }).fbq;
+  if (typeof f === "function") f(...args);
+}
+
+function currencyCode(value: string | undefined): string {
+  return value?.trim().toUpperCase() || "PHP";
+}
+
 export function trackProductClick(payload: { slug: string; id: string }): void {
   va()?.("event", { name: "product_click", ...payload });
   capturePostHog("product_click", payload);
+}
+
+export function trackSearchSuggestionRequest(payload: {
+  queryLength: number;
+  resultCount: number;
+}): void {
+  const data = {
+    query_length: payload.queryLength,
+    result_count: payload.resultCount,
+  };
+  va()?.("event", { name: "search_suggestion_request", ...data });
+  capturePostHog("search_suggestion_request", data);
+}
+
+export function trackSearchSuggestionClick(payload: {
+  position: number;
+  resultCount: number;
+}): void {
+  const data = {
+    position: payload.position,
+    result_count: payload.resultCount,
+  };
+  va()?.("event", { name: "search_suggestion_click", ...data });
+  capturePostHog("search_suggestion_click", data);
 }
 
 export function trackProductView(payload: { slug: string; id: string }): void {
@@ -46,37 +78,29 @@ export function trackAddToCart(payload: {
   price: number;
   quantity: number;
   name: string;
+  currencyCode?: string;
 }): void {
-  va()?.("event", {
-    name: "add_to_cart",
-    slug: payload.slug,
-    variantId: payload.variantId,
-    price: payload.price,
-    quantity: payload.quantity,
-  });
+  const currency = currencyCode(payload.currencyCode);
+  va()?.("event", { name: "add_to_cart", slug: payload.slug, variantId: payload.variantId, price: payload.price, quantity: payload.quantity });
   fireGtag("event", "add_to_cart", {
-    currency: "PHP",
+    currency,
     value: payload.price * payload.quantity,
     items: [{ item_id: payload.variantId, item_name: payload.name, price: payload.price, quantity: payload.quantity }],
   });
-  fireFbq("track", "AddToCart", {
-    content_ids: [payload.variantId],
-    content_name: payload.name,
-    content_type: "product",
-    value: payload.price,
-    currency: "PHP",
-  });
-  capturePostHog("add_to_cart", payload);
+  fireFbq("track", "AddToCart", { content_ids: [payload.variantId], content_name: payload.name, content_type: "product", value: payload.price, currency });
+  capturePostHog("add_to_cart", { ...payload, currencyCode: currency });
 }
 
 export function trackBeginCheckout(payload: {
   value: number;
   itemCount: number;
+  currencyCode?: string;
 }): void {
-  va()?.("event", { name: "begin_checkout", value: payload.value, item_count: payload.itemCount });
-  fireGtag("event", "begin_checkout", { currency: "PHP", value: payload.value });
-  fireFbq("track", "InitiateCheckout", { value: payload.value, currency: "PHP", num_items: payload.itemCount });
-  capturePostHog("begin_checkout", payload);
+  const currency = currencyCode(payload.currencyCode);
+  va()?.("event", { name: "begin_checkout", value: payload.value, item_count: payload.itemCount, currency });
+  fireGtag("event", "begin_checkout", { currency, value: payload.value });
+  fireFbq("track", "InitiateCheckout", { value: payload.value, currency, num_items: payload.itemCount });
+  capturePostHog("begin_checkout", { ...payload, currencyCode: currency });
 }
 
 export function trackPurchase(payload: {
@@ -84,34 +108,11 @@ export function trackPurchase(payload: {
   value: number;
   itemCount: number;
   paymentMethod?: string;
+  currencyCode?: string;
 }): void {
-  va()?.("event", {
-    name: "purchase",
-    order_id: payload.orderId,
-    value: payload.value,
-    item_count: payload.itemCount,
-    payment_method: payload.paymentMethod,
-  });
-  fireGtag("event", "purchase", {
-    transaction_id: payload.orderId,
-    currency: "PHP",
-    value: payload.value,
-  });
-  fireFbq("track", "Purchase", { value: payload.value, currency: "PHP" });
-  capturePostHog("purchase", payload);
-}
-
-type GtagFn = (..._args: unknown[]) => void;
-type FbqFn = (..._args: unknown[]) => void;
-
-function fireGtag(...args: unknown[]): void {
-  if (typeof window === "undefined") return;
-  const g = (window as Window & { gtag?: GtagFn }).gtag;
-  if (typeof g === "function") g(...args);
-}
-
-function fireFbq(...args: unknown[]): void {
-  if (typeof window === "undefined") return;
-  const f = (window as Window & { fbq?: FbqFn }).fbq;
-  if (typeof f === "function") f(...args);
+  const currency = currencyCode(payload.currencyCode);
+  va()?.("event", { name: "purchase", order_id: payload.orderId, value: payload.value, item_count: payload.itemCount, payment_method: payload.paymentMethod, currency });
+  fireGtag("event", "purchase", { transaction_id: payload.orderId, currency, value: payload.value });
+  fireFbq("track", "Purchase", { value: payload.value, currency });
+  capturePostHog("purchase", { ...payload, currencyCode: currency });
 }

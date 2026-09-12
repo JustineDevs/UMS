@@ -36,6 +36,7 @@ import {
   buildPayPalWebhookDedupId,
   claimPayPalWebhookDedup,
 } from "../../lib/paypal-webhook-dedup";
+import { recordWebhookSecurityEvent } from "../../lib/webhook-security-metrics";
 import {
   capturePayPalAuthorization,
   createPayPalOrder,
@@ -53,6 +54,7 @@ import {
   nangoPaymentProxyConfigured,
   nangoPaymentProviderConfigured,
 } from "../../lib/nango-payment-credentials";
+import { safeLogIdentifier } from "../../lib/safe-log";
 
 export type PayPalPaymentOptions = {
   clientId: string;
@@ -71,6 +73,17 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
   static identifier = "paypal";
 
   protected readonly options_: PayPalPaymentOptions;
+
+  private providerFailure(operation: string, identifier: string, error: unknown): MedusaError {
+    console.error(
+      `[payment-provider] paypal ${operation} failed id=${safeLogIdentifier(identifier)}`,
+      error,
+    );
+    return new MedusaError(
+      MedusaError.Types.INVALID_DATA,
+      `PayPal ${operation} failed. Try again or choose another payment method.`,
+    );
+  }
 
   constructor(cradle: Record<string, unknown>, options: PayPalPaymentOptions) {
     super(cradle, options);
@@ -145,8 +158,15 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
 
     const currency = String(
       (input.context as { currency_code?: string } | undefined)?.currency_code ??
-        "php",
-    ).toUpperCase();
+        (input.data as { currency_code?: string } | undefined)?.currency_code ??
+        "",
+    ).trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "PayPal initiatePayment: missing or invalid currency_code on payment context.",
+      );
+    }
 
     const storefrontOrigin =
       process.env.STOREFRONT_PUBLIC_URL?.trim() ||
@@ -187,10 +207,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         },
       };
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        `PayPal create order failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("create order", sessionId, err);
     }
   }
 
@@ -209,7 +226,29 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
 
     try {
       const mode = this.captureMode(input);
-      const requestId = `uvs-auth-${orderId}-${Date.now()}`;
+      const existing = await getPayPalOrder(await this.sdkOptionsFor(input.data), orderId);
+      const existingStatus = String(existing.status ?? "").toUpperCase();
+      const existingCapture = existing.purchaseUnits?.[0]?.payments?.captures?.[0];
+      if (existingStatus === "COMPLETED" && existingCapture?.id) {
+        const existingAmount = existingCapture.amount?.value;
+        const capturedAmountMinor = existingAmount != null
+          ? Math.round(Number(existingAmount) * 100)
+          : undefined;
+        return {
+          status: PaymentSessionStatus.CAPTURED,
+          data: {
+            ...((input.data as Record<string, unknown>) ?? {}),
+            paypal_order_id: orderId,
+            paypal_capture_id: existingCapture.id,
+            ...(capturedAmountMinor != null && Number.isFinite(capturedAmountMinor)
+              ? { captured_amount_minor: capturedAmountMinor }
+              : {}),
+          },
+        };
+      }
+      // PayPal deduplicates retries by PayPal-Request-Id; time-based IDs turn a
+      // browser retry into a second capture/authorization attempt.
+      const requestId = `uvs-auth-${orderId}`;
       const authorization = mode === "manual"
         ? await authorizePayPalOrder(await this.sdkOptionsFor(input.data), orderId, requestId)
         : null;
@@ -242,10 +281,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       };
     } catch (err) {
       if (err instanceof MedusaError) throw err;
-      throw new MedusaError(
-        MedusaError.Types.NOT_ALLOWED,
-        `PayPal capture failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      throw this.providerFailure("capture", orderId, err);
     }
   }
 
@@ -253,6 +289,14 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     const data = (input.data as Record<string, unknown>) ?? {};
     const orderId = String(data.paypal_order_id ?? data.id ?? "").trim();
     if (!orderId) throw new MedusaError(MedusaError.Types.INVALID_DATA, "PayPal capturePayment: missing order id.");
+    if (String(data.paypal_capture_id ?? "").trim()) {
+      const expectedAmount = Number(data.amount);
+      const capturedAmount = Number(data.captured_amount_minor);
+      if (Number.isFinite(expectedAmount) && Number.isFinite(capturedAmount) && expectedAmount !== capturedAmount) {
+        throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "PayPal capture amount does not match the authorized amount.");
+      }
+      return { data };
+    }
     const currency = String(data.currency ?? "PHP").toUpperCase();
     const amount = Number(data.amount);
     // Keep the provider idempotency key stable across retries for this order.
@@ -276,7 +320,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     const data = (input.data as Record<string, unknown>) ?? {};
     const authorizationId = String(data.paypal_authorization_id ?? "").trim();
     if (!authorizationId) throw new MedusaError(MedusaError.Types.NOT_ALLOWED, "PayPal cancelPayment: no authorization to void.");
-    await voidPayPalAuthorization(await this.sdkOptionsFor(input.data), authorizationId, `uvs-void-${authorizationId}-${Date.now()}`);
+    await voidPayPalAuthorization(await this.sdkOptionsFor(input.data), authorizationId, `uvs-void-${authorizationId}`);
     return { data: { ...data, paypal_authorization_id: authorizationId, paypal_voided: true } };
   }
 
@@ -333,10 +377,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         amountMajor: major,
       });
     } catch (err) {
-      throw new MedusaError(
-        MedusaError.Types.INVALID_DATA,
-        err instanceof Error ? err.message : String(err),
-      );
+      throw this.providerFailure("refund", captureId, err);
     }
     return { data: input.data ?? {} };
   }
@@ -401,6 +442,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
         webhookId,
       );
       if (!valid) {
+        await recordWebhookSecurityEvent("paypal", "signature_failure");
         throw new MedusaError(
           MedusaError.Types.NOT_ALLOWED,
           "PayPal webhook signature invalid.",
@@ -419,20 +461,9 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     }
 
     const eventType = (body.event_type as string) ?? "";
-    const captureEvents = [
-      "PAYMENT.CAPTURE.COMPLETED",
-      "CHECKOUT.ORDER.APPROVED",
-    ];
+    const captureEvents = ["PAYMENT.CAPTURE.COMPLETED"];
     if (!captureEvents.includes(eventType)) {
       return { action: PaymentActions.NOT_SUPPORTED };
-    }
-
-    const dedupId = buildPayPalWebhookDedupId(body);
-    if (dedupId) {
-      const isFirst = await claimPayPalWebhookDedup(dedupId);
-      if (!isFirst) {
-        return { action: PaymentActions.NOT_SUPPORTED };
-      }
     }
 
     const resource = body.resource as Record<string, unknown> | undefined;
@@ -443,6 +474,7 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
     let sessionId: string | undefined;
     let amountMinor = 0;
     let paypalCaptureId: string | undefined;
+    let currencyCode = "";
 
     if (eventType === "PAYMENT.CAPTURE.COMPLETED") {
       sessionId = resource.custom_id as string | undefined;
@@ -453,22 +485,24 @@ export default class PayPalPaymentProviderService extends AbstractPaymentProvide
       const amountObj = resource.amount as
         | { value?: string; currency_code?: string }
         | undefined;
+      currencyCode = String(amountObj?.currency_code ?? "").trim().toUpperCase();
       const val = parseFloat(String(amountObj?.value ?? "0"));
-      amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
-    } else if (eventType === "CHECKOUT.ORDER.APPROVED") {
-      const units = resource.purchase_units as
-        | Array<{
-            custom_id?: string;
-            amount?: { value?: string };
-          }>
-        | undefined;
-      const first = units?.[0];
-      sessionId = first?.custom_id;
-      const val = parseFloat(String(first?.amount?.value ?? "0"));
       amountMinor = Number.isFinite(val) ? Math.round(val * 100) : 0;
     }
 
-    if (!sessionId?.trim()) {
+    if (!sessionId?.trim() || !/^[A-Z]{3}$/.test(currencyCode) || amountMinor < 1) {
+      return { action: PaymentActions.NOT_SUPPORTED };
+    }
+
+    const dedupId = buildPayPalWebhookDedupId(body);
+    if (!dedupId) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "PayPal webhook is missing a provider event ID.",
+      );
+    }
+    const isFirst = await claimPayPalWebhookDedup(dedupId);
+    if (!isFirst) {
       return { action: PaymentActions.NOT_SUPPORTED };
     }
 

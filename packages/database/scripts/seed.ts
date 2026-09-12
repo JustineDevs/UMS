@@ -8,11 +8,11 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = join(__dirname, "../../../");
 config({ path: join(repoRoot, ".env.local"), override: true });
 
-/** Legacy/app Postgres only — never Medusa’s DATABASE_URL (see apps/medusa/.env.local). */
-const databaseUrl = process.env.LEGACY_DATABASE_URL;
+/** Application/platform Postgres only — never Medusa’s MEDUSA_DB_URL. */
+const databaseUrl = process.env.APP_DB_URL;
 if (!databaseUrl) {
   console.error(
-    "LEGACY_DATABASE_URL is required (legacy Supabase pooler URI for this schema).",
+    "APP_DB_URL is required (application/platform Supabase pooler URI for this schema).",
   );
   process.exit(1);
 }
@@ -24,6 +24,15 @@ function switchPoolerPort(url: string, port: number): string {
     return u.toString();
   } catch {
     return url;
+  }
+}
+
+function isSupabasePooler(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === "pooler.supabase.com" || hostname.endsWith(".pooler.supabase.com");
+  } catch {
+    return false;
   }
 }
 
@@ -42,7 +51,7 @@ async function main(): Promise<void> {
     console.log("Seed completed.");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (databaseUrl.includes("pooler.supabase.com")) {
+    if (isSupabasePooler(databaseUrl)) {
       const currentPort = new URL(databaseUrl).port;
       const altPort = currentPort === "5432" ? 6543 : 5432;
       const altUrl = switchPoolerPort(databaseUrl, altPort);

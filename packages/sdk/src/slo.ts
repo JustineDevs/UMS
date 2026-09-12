@@ -25,6 +25,34 @@ export type SloStatus = {
   burnRate: number;
 };
 
+export type SloAlert = SloStatus & {
+  severity: "critical" | "warning" | "ok";
+};
+
+export async function deliverSloAlert(
+  endpoint: string,
+  alert: SloAlert,
+  options: { fetch?: typeof fetch; timeoutMs?: number } = {},
+): Promise<void> {
+  const url = new URL(endpoint);
+  if (url.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(url.hostname)) {
+    throw new Error("SLO alert endpoint must use HTTPS");
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 5000);
+  try {
+    const response = await (options.fetch ?? fetch)(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "slo_alert", ...alert, emittedAt: new Date().toISOString() }),
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`SLO alert delivery failed with HTTP ${response.status}`);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function evaluateSlo(definition: SloDefinition, currentValue: number): SloStatus {
   const isLatency = definition.unit === "ms";
   const isErrorRate = definition.metric.includes("error_rate");
@@ -53,6 +81,18 @@ export function evaluateSlo(definition: SloDefinition, currentValue: number): Sl
     withinBudget,
     budgetRemaining,
     burnRate,
+  };
+}
+
+export function evaluateSloAlert(
+  definition: SloDefinition,
+  currentValue: number,
+): SloAlert {
+  const status = evaluateSlo(definition, currentValue);
+  if (status.withinBudget) return { ...status, severity: "ok" };
+  return {
+    ...status,
+    severity: Math.abs(status.burnRate) >= 0.25 ? "critical" : "warning",
   };
 }
 

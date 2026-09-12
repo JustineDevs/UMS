@@ -1,6 +1,4 @@
-import { getServerSession } from "next-auth/next";
-
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
 import { findVerifiedProductPurchaseForCustomer } from "@/lib/medusa-review-verification";
 import {
@@ -20,56 +18,83 @@ import {
   storefrontReviewPostBodySchema,
   storefrontReviewsListQuerySchema,
 } from "@universal-music-store/validation";
+import {
+  reviewBodyHash,
+  reviewFormTimingIsValid,
+  validateReviewBody,
+} from "@/lib/review-content";
+import { reviewCsrfCookieName, verifyReviewCsrfToken } from "@/lib/review-csrf";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import {
+  decodeReviewCursor,
+  encodeReviewCursor,
+  PUBLIC_REVIEW_FIELDS,
+} from "@/lib/review-api-contract";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
-const PUBLIC_REVIEW_FIELDS =
-  "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,status";
+const MAX_REVIEW_BODY_BYTES = 16 * 1024;
+
+function reviewError(body: Record<string, unknown>, status: number, headers?: Record<string, string>) {
+  return Response.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store", ...headers },
+  });
+}
 
 export async function GET(req: Request) {
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-get:${ip}`, 120, 60_000);
   if (!rl.ok) {
-    return Response.json(
+    return reviewError(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      429,
+      { "Retry-After": String(rl.retryAfterSec) },
     );
   }
   const u = new URL(req.url);
   const listParsed = storefrontReviewsListQuerySchema.safeParse({
     productSlug: u.searchParams.get("productSlug")?.trim() || undefined,
     medusaProductId: u.searchParams.get("medusaProductId")?.trim() || undefined,
+    cursor: u.searchParams.get("cursor")?.trim() || undefined,
+    limit: u.searchParams.get("limit") || undefined,
   });
   if (!listParsed.success) {
-    return Response.json(
-      {
-        error: "Provide productSlug and/or medusaProductId",
-        details: listParsed.error.flatten(),
-      },
-      { status: 400 },
-    );
+    return reviewError({ error: "Provide productSlug and/or medusaProductId" }, 400);
   }
-  const { productSlug = "", medusaProductId = "" } = listParsed.data;
+  const { productSlug = "", medusaProductId = "", cursor, limit } = listParsed.data;
+  const decodedCursor = cursor ? decodeReviewCursor(cursor) : null;
+  if (cursor && !decodedCursor) {
+    return reviewError({ error: "Invalid review cursor" }, 400);
+  }
   const sb = createStorefrontAnonSupabase();
   if (!sb) {
-    return Response.json({ error: "Service unavailable" }, { status: 503 });
+    return reviewError({ error: "Service unavailable" }, 503);
   }
   let q = sb
     .from("product_reviews")
     .select(PUBLIC_REVIEW_FIELDS)
     .eq("status", "approved")
+    .eq("shadow_banned", false)
     .order("created_at", { ascending: false })
-    .limit(50);
-  if (medusaProductId && productSlug) {
+    .order("id", { ascending: false })
+    .limit(limit);
+  if (decodedCursor?.id) {
     q = q.or(
-      `medusa_product_id.eq.${medusaProductId},product_slug.eq.${productSlug}`,
+      `created_at.lt.${decodedCursor.createdAt},and(created_at.eq.${decodedCursor.createdAt},id.lt.${decodedCursor.id})`,
     );
-  } else if (medusaProductId) {
+  } else if (decodedCursor) {
+    q = q.lt("created_at", decodedCursor.createdAt);
+  }
+  // The Medusa product ID is the canonical identity. Do not interpolate the
+  // editorial slug into a PostgREST expression; slugs are display metadata.
+  if (medusaProductId) {
     q = q.eq("medusa_product_id", medusaProductId);
   } else {
     q = q.eq("product_slug", productSlug);
   }
   const { data, error } = await q;
   if (error) {
-    return Response.json({ error: "Unable to load reviews" }, { status: 503 });
+    return reviewError({ error: "Unable to load reviews" }, 503);
   }
   const rows = data ?? [];
   const seen = new Set<string>();
@@ -79,7 +104,21 @@ export async function GET(req: Request) {
     seen.add(id);
     return true;
   });
-  return Response.json({ reviews: deduped });
+  // Continue from the last row the client actually received, not a duplicate
+  // row filtered out of the public page.
+  const last = deduped.at(-1) as { created_at?: unknown; id?: unknown } | undefined;
+  const nextCursor =
+    deduped.length === limit && typeof last?.created_at === "string" && typeof last.id === "string"
+      ? encodeReviewCursor(last.created_at, last.id)
+      : null;
+  return Response.json(
+    { reviews: deduped, nextCursor },
+    {
+      headers: {
+        "Cache-Control": "public, max-age=30, s-maxage=60, stale-while-revalidate=300",
+      },
+    },
+  );
 }
 
 function displayNameFromSession(params: {
@@ -93,60 +132,70 @@ function displayNameFromSession(params: {
 }
 
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return reviewError({ error: "Cross-site mutation rejected" }, 403);
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`reviews-post:${ip}`, 15, 60_000);
   if (!rl.ok) {
-    return Response.json(
+    return reviewError(
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
-      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      429,
+      { "Retry-After": String(rl.retryAfterSec) },
     );
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const emailRaw = session?.user?.email?.trim();
   if (!emailRaw) {
-    return Response.json(
+    return reviewError(
       { error: "Sign in required to submit a review", code: "AUTH_REQUIRED" },
-      { status: 401 },
+      401,
     );
   }
   const email = emailRaw.toLowerCase();
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  const userRl = await rateLimitFixedWindow(`reviews-post-user:${email}`, 5, 10 * 60_000);
+  if (!userRl.ok) {
+    return reviewError({ error: "You have submitted too many reviews recently.", retryAfter: userRl.retryAfterSec }, 429);
   }
+
+  const bounded = await parseBoundedJson(req, MAX_REVIEW_BODY_BYTES);
+  if (bounded.tooLarge) {
+    return reviewError({ error: "Request body too large" }, 413);
+  }
+  const body: unknown = bounded.valid ? bounded.value : null;
+  if (!bounded.valid) return reviewError({ error: "Invalid JSON" }, 400);
   if (!isRecaptchaConfigured()) {
-    return Response.json({ error: "Security verification unavailable" }, { status: 503 });
+    return reviewError({ error: "Security verification unavailable" }, 503);
   }
   const recaptchaToken =
     body && typeof body === "object" && !Array.isArray(body)
       ? (body as Record<string, unknown>).recaptchaToken
       : undefined;
   if (!(await verifyRecaptchaAction(req, recaptchaToken, "review"))) {
-    return Response.json({ error: "Verification failed" }, { status: 400 });
+    return reviewError({ error: "Verification failed" }, 400);
   }
   const postParsed = storefrontReviewPostBodySchema.safeParse(body);
   if (!postParsed.success) {
-    return Response.json(
-      { error: "Invalid review payload", details: postParsed.error.flatten() },
-      { status: 400 },
-    );
+    return reviewError({ error: "Invalid review payload" }, 400);
   }
   const o = postParsed.data;
+  if (o._hp.trim()) return reviewError({ error: "Unable to submit review" }, 400);
+  if (!reviewFormTimingIsValid(o.formStartedAt)) return reviewError({ error: "Please take a moment to complete your review." }, 400);
+  const csrfCookie = req.headers.get("cookie")?.match(new RegExp(`${reviewCsrfCookieName()}=([^;]+)`))?.[1];
+  if (!verifyReviewCsrfToken(o.csrfToken, csrfCookie)) return reviewError({ error: "Security token expired. Reload and try again." }, 403);
+  const content = validateReviewBody(o.body);
+  if (!content.ok) return reviewError({ error: content.reason }, 400);
 
   const productSlug = o.productSlug;
   const medusaProductId = o.medusaProductId;
-  const reviewBody = o.body;
   const rating = o.rating;
 
   const customerId = await findOrCreateMedusaCustomerIdByEmail(email);
   if (!customerId) {
-    return Response.json(
+    return reviewError(
       { error: "Unable to resolve customer for your account" },
-      { status: 502 },
+      502,
     );
   }
 
@@ -162,11 +211,20 @@ async function handlePOST(req: Request) {
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
-    return Response.json(
+    return reviewError(
       { error: "Reviews submission is not configured" },
-      { status: 503 },
+      503,
     );
   }
+
+  const { data: duplicate } = await sb
+    .from("product_reviews")
+    .select("id")
+    .eq("body_hash", reviewBodyHash(content.normalized))
+    .in("status", ["pending", "approved", "hidden"])
+    .limit(1)
+    .maybeSingle();
+  if (duplicate) return reviewError({ error: "An identical review has already been submitted.", code: "DUPLICATE_REVIEW" }, 409);
 
   const insertRow = {
     product_slug: productSlug,
@@ -179,7 +237,10 @@ async function handlePOST(req: Request) {
         : typeof o.imageUrl === "string"
           ? o.imageUrl.trim() || null
           : null,
-    body: reviewBody,
+    body: content.cleaned,
+    body_hash: content.hash,
+    risk_score: verified.verified ? 0 : 20,
+    shadow_banned: false,
     status: "pending" as const,
     medusa_customer_id: customerId,
     customer_email: email,
@@ -198,23 +259,26 @@ async function handlePOST(req: Request) {
       msg.includes("unique") ||
       msg.includes("idx_product_reviews_one_active")
     ) {
-      return Response.json(
+      return reviewError(
         {
           error:
             "You already have a review for this product. Remove or wait for moderation on the existing one.",
           code: "DUPLICATE_REVIEW",
         },
-        { status: 409 },
+        409,
       );
     }
-    return Response.json({ error: "Unable to save review" }, { status: 503 });
+    return reviewError({ error: "Unable to save review" }, 503);
   }
 
-  return Response.json({
-    ok: true,
-    status: "pending",
-    isVerifiedBuyer: verified.verified,
-  });
+  return Response.json(
+    {
+      ok: true,
+      status: "pending",
+      isVerifiedBuyer: verified.verified,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export const POST = withBotIdProtection(handlePOST);

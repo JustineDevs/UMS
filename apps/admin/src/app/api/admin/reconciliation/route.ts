@@ -8,6 +8,9 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseReconciliationQuery } from "@/lib/reconciliation-params";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedError } from "@/lib/staff-api-response";
 
 export type ReconciliationRow = {
   date: string;
@@ -48,6 +51,15 @@ export type ReconciliationSummary = {
     idempotencyKey: string | null;
     updatedAt: string;
   }>;
+  providerSettlementRecords: Array<{
+    provider: string;
+    externalId: string;
+    status: string;
+    amountMinor: number | null;
+    currency: string | null;
+    orderId: string | null;
+    mismatchReason: string | null;
+  }>;
 };
 
 const PROVIDER_CONFIRMED_STATUSES = new Set([
@@ -79,6 +91,7 @@ function reconciliationProviders(input: string): string[] {
 }
 
 export async function GET(request: Request) {
+  const correlationId = getCorrelationId(request);
   const staff = await requireStaffApiSession("dashboard:read");
   if (!staff.ok) return staff.response;
   const sup = adminSupabaseOr503("reconciliation");
@@ -88,15 +101,13 @@ export async function GET(request: Request) {
     staff.session.user?.email,
   );
   if (!organization) {
-    return NextResponse.json(
-      { error: "Organization membership is not configured" },
-      { status: 403 },
-    );
+    return correlatedError(correlationId, 403, "Organization membership is not configured", "FORBIDDEN");
   }
 
   const { searchParams } = new URL(request.url);
-  const days = Math.min(Number(searchParams.get("days")) || 7, 90);
-  const provider = searchParams.get("provider") || "all";
+  const query = parseReconciliationQuery(searchParams);
+  if (!query.ok) return correlatedError(correlationId, 400, query.error, "VALIDATION_ERROR");
+  const { days, provider } = query.value;
 
   const rows: ReconciliationRow[] = [];
   const now = new Date();
@@ -135,11 +146,19 @@ export async function GET(request: Request) {
     artifactTypes: ["reconciliation"],
     limit: 25,
   });
-  const rowMap = new Map(rows.map((row) => [`${row.date}:${row.provider}`, row]));
-
   const dayFloor = new Date(now);
   dayFloor.setUTCDate(dayFloor.getUTCDate() - (days - 1));
   dayFloor.setUTCHours(0, 0, 0, 0);
+  let settlementQuery = sup.client
+    .from("payment_settlement_records")
+    .select("provider,external_id,status,amount_minor,currency,medusa_order_id,mismatch_reason,provider_occurred_at,updated_at")
+    .eq("organization_id", organization.id)
+    .gte("updated_at", dayFloor.toISOString())
+    .limit(500);
+  if (provider === "stripe" || provider === "paypal" || provider === "xendit") settlementQuery = settlementQuery.eq("provider", provider);
+  const { data: settlementRows } = await settlementQuery;
+  const rowMap = new Map(rows.map((row) => [`${row.date}:${row.provider}`, row]));
+  const hasSettlementRows = (settlementRows?.length ?? 0) > 0;
 
   for (const attempt of recentAttempts) {
     const stamp = attempt.finalized_at ?? attempt.updated_at ?? attempt.created_at;
@@ -158,11 +177,11 @@ export async function GET(request: Request) {
       row.medusaOrderCount += 1;
       row.medusaTotalMinor += amountMinor;
     }
-    if (
+    if (!hasSettlementRows && (
       attempt.provider_payment_id ||
       attempt.webhook_last_status ||
       PROVIDER_CONFIRMED_STATUSES.has(attempt.status)
-    ) {
+    )) {
       row.providerConfirmedCount += 1;
       row.providerConfirmedMinor += amountMinor;
     }
@@ -171,6 +190,22 @@ export async function GET(request: Request) {
     }
     if (PROBLEM_STATUSES.has(attempt.status)) {
       row.problemAttemptCount += 1;
+    }
+  }
+
+  if ((settlementRows?.length ?? 0) > 0) {
+    for (const settlement of settlementRows ?? []) {
+      const stamp = String(settlement.provider_occurred_at ?? settlement.updated_at ?? "");
+      const day = stamp.slice(0, 10);
+      const row = rowMap.get(`${day}:${settlement.provider}`);
+      if (!row) continue;
+      const amountMinor = settlement.amount_minor == null ? 0 : Number(settlement.amount_minor);
+      if (settlement.status === "matched" || settlement.status === "resolved") {
+        row.providerConfirmedCount += 1;
+        row.providerConfirmedMinor += amountMinor;
+      } else {
+        row.problemAttemptCount += 1;
+      }
     }
   }
 
@@ -234,6 +269,15 @@ export async function GET(request: Request) {
           : null,
       idempotencyKey: row.idempotency_key,
       updatedAt: row.updated_at,
+    })),
+    providerSettlementRecords: (settlementRows ?? []).map((row) => ({
+      provider: String(row.provider),
+      externalId: String(row.external_id),
+      status: String(row.status),
+      amountMinor: row.amount_minor == null ? null : Number(row.amount_minor),
+      currency: row.currency == null ? null : String(row.currency),
+      orderId: row.medusa_order_id == null ? null : String(row.medusa_order_id),
+      mismatchReason: row.mismatch_reason == null ? null : String(row.mismatch_reason),
     })),
   };
 

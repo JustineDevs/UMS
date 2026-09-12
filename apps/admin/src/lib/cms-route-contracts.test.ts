@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { cmsPageSchema } from "./cms-route-contracts.js";
-import { cmsPreviewMessageSchema } from "./cms-component-contract.js";
+import { cmsComponentCanvasMutationSchema, cmsPreviewMessageSchema } from "./cms-component-contract.js";
 import { cmsComponentDefinitionSchema } from "./cms-component-contract.js";
 
 test("cms page contract preserves deeply nested component trees", () => {
@@ -138,4 +138,25 @@ test("component canvas contract accepts sanitized source and rejects executable 
   assert.equal(cmsComponentDefinitionSchema.safeParse(base).success, true);
   assert.equal(cmsComponentDefinitionSchema.safeParse({ ...base, markup: "<script>alert(1)</script>" }).success, false);
   assert.equal(cmsComponentDefinitionSchema.safeParse({ ...base, styles: "@import url(https://evil.test/x.css);" }).success, false);
+});
+
+test("component canvas contract rejects forged or oversized mutations", () => {
+  assert.equal(cmsComponentCanvasMutationSchema.safeParse({
+    source: "cms-component-canvas-mutation",
+    id: "visual-card",
+    property: "title",
+    value: "Updated",
+  }).success, true);
+  assert.equal(cmsComponentCanvasMutationSchema.safeParse({
+    source: "cms-builder",
+    id: "visual-card",
+    property: "title",
+    value: "Updated",
+  }).success, false);
+  assert.equal(cmsComponentCanvasMutationSchema.safeParse({
+    source: "cms-component-canvas-mutation",
+    id: "visual-card",
+    property: "title",
+    value: "x".repeat(100_001),
+  }).success, false);
 });

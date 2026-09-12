@@ -1,6 +1,6 @@
 /* global describe, afterEach, beforeEach, it, expect */
 
-import { isProviderEnabled, getDisabledProviders } from "../provider-feature-flags";
+import { isProviderEnabled, getDisabledProviders } from "../provider-feature-flags.mts";
 
 describe("provider-feature-flags", () => {
   const originalEnv = { ...process.env };

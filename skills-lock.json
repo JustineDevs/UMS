@@ -262,6 +262,12 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
+    "webmcp-agents": {
+      "source": "justinedevs/collection",
+      "sourceType": "github",
+      "skillPath": "webmcp-agents/SKILL.md",
+      "computedHash": "91e4aa3d09e7aae34b28ba3873df26166bf81668cf4d82cc2da7602a7a8f1ee4"
     }
   }
 }

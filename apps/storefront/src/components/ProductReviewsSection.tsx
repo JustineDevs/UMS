@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import type { ProductReviewRow } from "@/lib/product-reviews";
 import { ProductReviewForm } from "@/components/ProductReviewForm";
 import { ProductReviewsFeedClient } from "@/components/ProductReviewsFeedClient";
 import { StarRatingDisplay } from "@/components/ReviewStarRatingDisplay";
+import { RecaptchaScript } from "@/components/RecaptchaScript";
 
 function RatingHistogram({
   reviews,
@@ -52,10 +56,11 @@ export function ProductReviewsSection({
   medusaProductId: string;
   reviews: ProductReviewRow[];
 }) {
-  const count = reviews.length;
+  const [allReviews, setAllReviews] = useState(reviews);
+  const count = allReviews.length;
   const average =
     count > 0
-      ? reviews.reduce((sum, r) => sum + r.rating, 0) / count
+      ? allReviews.reduce((sum, r) => sum + r.rating, 0) / count
       : 0;
 
   return (
@@ -64,6 +69,7 @@ export function ProductReviewsSection({
       className="mt-16 border-t border-outline-variant/20 pt-12 sm:pt-16"
       aria-labelledby="reviews-heading"
     >
+      <RecaptchaScript />
       <div className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest/60 p-6 shadow-sm sm:p-8 md:p-10 dark:bg-surface-container-lowest/30">
         <div className="mb-8 flex flex-col gap-6 sm:mb-10 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -95,13 +101,18 @@ export function ProductReviewsSection({
                 </div>
               </div>
               <div className="w-full max-w-xs">
-                <RatingHistogram reviews={reviews} total={count} />
+                <RatingHistogram reviews={allReviews} total={count} />
               </div>
             </div>
           ) : null}
         </div>
 
-        <ProductReviewsFeedClient reviews={reviews} />
+        <ProductReviewsFeedClient
+          reviews={reviews}
+          productSlug={productSlug}
+          medusaProductId={medusaProductId}
+          onReviewsChange={setAllReviews}
+        />
 
         <ProductReviewForm
           productSlug={productSlug}

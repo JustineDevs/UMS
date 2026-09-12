@@ -10,6 +10,7 @@ import type {
 } from "@universal-music-store/platform-data";
 import { useEffect, useState } from "react";
 import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
+import { parseHomePreviewMessage } from "@/components/home-preview-message";
 import type { HomepageSocialProof } from "@/lib/homepage-social-proof";
 import type { Product } from "@universal-music-store/types";
 
@@ -96,43 +97,16 @@ export function StorefrontHomePreviewBridge({
     const onMessage = (event: MessageEvent) => {
       if (event.source !== window.parent) return;
       if (event.origin !== parentOrigin) return;
-      if (event.data?.source === "cms-builder-select") {
-        const id = typeof event.data.id === "string" ? event.data.id : "";
-        document.querySelectorAll<HTMLElement>("[data-cms-id]").forEach((node) => {
-          const selected = node.dataset.cmsId === id ? "true" : "false";
-          if (node.dataset.selected !== selected) node.dataset.selected = selected;
-        });
-        const node = id
-          ? document.querySelector<HTMLElement>(`[data-cms-id="${CSS.escape(id)}"]`)
-          : null;
-        if (node) {
-          node.scrollIntoView({ block: "nearest" });
-          const rect = node.getBoundingClientRect();
-          window.parent.postMessage(
-            {
-              source: "cms-builder",
-              id,
-              label: node.dataset.cmsLabel ?? id,
-              rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-            },
-            parentOrigin,
-          );
-        }
-        return;
-      }
-      if (event.data?.source !== "cms-builder-draft" || event.data.mode !== "home") {
-        return;
-      }
-      const blocks = Array.isArray(event.data.tree)
-        ? cmsTreeToBlocks(event.data.tree as Parameters<typeof cmsTreeToBlocks>[0])
-        : Array.isArray(event.data.blocks)
-          ? event.data.blocks
-          : [];
-      setHome((current) => draftHome(blocks as CmsBlock[], current));
+      const message = parseHomePreviewMessage(event.data);
+      if (!message) return;
+      const blocks = message.tree ? cmsTreeToBlocks(message.tree) : message.blocks ?? [];
+      setHome((current) => draftHome(blocks, current));
     };
     window.addEventListener("message", onMessage);
     window.parent.postMessage({ source: "cms-preview-ready" }, parentOrigin);
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onMessage);
+    };
   }, []);
 
   return (

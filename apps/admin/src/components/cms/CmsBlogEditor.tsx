@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { CatalogMediaPickerDialog } from "@/components/catalog/CatalogMediaPickerDialog";
@@ -263,8 +263,8 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         addPlacement="main"
         onAddPlacementChange={() => undefined}
         onClose={() => setMediaPickerOpen(false)}
-        onPickMany={(urls) => {
-          const [coverImageUrl] = urls;
+        onPickMany={(media) => {
+          const coverImageUrl = media[0]?.public_url;
           if (coverImageUrl) setRow({ ...row, cover_image_url: coverImageUrl });
         }}
       />

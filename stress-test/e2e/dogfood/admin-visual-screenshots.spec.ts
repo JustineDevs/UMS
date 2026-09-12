@@ -6,7 +6,7 @@ import { test } from "@playwright/test";
 const OUT_DIR = path.join(process.cwd(), "stress-test", "dogfood-output", "screenshots");
 
 /**
- * Admin app (Next.js) on 3001. `/admin/*` uses NextAuth middleware; without a session,
+ * Admin app (Next.js) on 3001. `/admin/*` uses Supabase Auth SSR middleware; without a session,
  * requests redirect to sign-in (often with `callbackUrl` in the query). Layout is the
  * same; filenames map to the route you tried to open for traceability.
  */

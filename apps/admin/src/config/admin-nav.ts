@@ -204,6 +204,12 @@ export const ADMIN_NAV_GROUPS: {
             permission: "settings:read",
           },
           {
+            href: "/admin/settings/runtime",
+            label: "Runtime settings",
+            icon: "tune",
+            permission: "settings:read",
+          },
+          {
             href: "/admin/workflow",
             label: "Workflow",
             icon: "account_tree",

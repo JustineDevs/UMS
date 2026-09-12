@@ -9,7 +9,7 @@ export function AdminPageHeader({
   className,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }) {
@@ -17,7 +17,7 @@ export function AdminPageHeader({
     <header className={cn("flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className="min-w-0 space-y-1">
         <AdminPageTitleWithHelp title={title} />
-        {subtitle ? <p className="max-w-2xl text-sm leading-5 text-muted-foreground">{subtitle}</p> : null}
+        {subtitle ? <p suppressHydrationWarning className="max-w-2xl text-sm leading-5 text-muted-foreground">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex min-w-0 max-w-full shrink flex-wrap items-center justify-end gap-2">{actions}</div> : null}
     </header>

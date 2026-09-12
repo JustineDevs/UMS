@@ -3,6 +3,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
 import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedError } from "@/lib/staff-api-response";
 
 export const dynamic = "force-dynamic";
 function csv(value: unknown) {
@@ -20,7 +21,7 @@ export async function GET(_request: Request) {
     staff.session.user?.email,
   );
   if (!organization)
-    return new Response("Tenant scope unavailable", { status: 403 });
+    return correlatedError(cid, 403, "Tenant scope unavailable", "FORBIDDEN");
   const { data, error } = await sup.client
     .from("payment_attempts")
     .select("id,provider,status,amount_minor,currency,updated_at")
@@ -28,7 +29,7 @@ export async function GET(_request: Request) {
     .order("updated_at", { ascending: false })
     .limit(500);
   if (error)
-    return new Response("Unable to export payment attempts", { status: 502 });
+    return correlatedError(cid, 502, "Unable to export payment attempts", "SERVICE_UNAVAILABLE");
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   const lines = [
     ["id", "provider", "status", "amount_minor", "currency", "updated_at"],
@@ -43,7 +44,7 @@ export async function GET(_request: Request) {
   ].map((row) => row.map(csv).join(","));
   const body = `${lines.join("\n")}\n`;
   if (new TextEncoder().encode(body).byteLength > 5 * 1024 * 1024)
-    return new Response("Export too large", { status: 413 });
+    return correlatedError(cid, 413, "Export too large", "VALIDATION_ERROR");
   await insertStaffAuditLog(sup.client, {
     actorEmail: staff.session.user?.email ?? "unknown",
     action: "payment_attempts.export",

@@ -38,7 +38,7 @@ export async function fetchMedusaOrdersForAdmin(
     return { orders: [], total: 0, commerceUnavailable: true };
   }
   if (!res.ok) {
-    return { orders: [], total: 0 };
+    return { orders: [], total: 0, commerceUnavailable: true };
   }
   const json = (await res.json()) as {
     orders?: unknown[];
@@ -113,21 +113,8 @@ function deriveOmsStatus(order: Record<string, unknown>): string {
   if (typeof fromMeta === "string" && fromMeta.trim()) {
     return fromMeta.trim();
   }
-  if (
-    meta?.payment_provider === "cod" &&
-    meta?.cod_payment_status !== "captured" &&
-    meta?.cod_capture_complete !== true
-  ) {
-    return "pending";
-  }
-  const ps = String(order.payment_status ?? "");
-  const fs = String(order.fulfillment_status ?? "");
-  if (fs === "fulfilled" || fs === "shipped") {
-    return "shipped";
-  }
-  if (ps === "captured" || ps === "authorized") {
-    return "paid";
-  }
+  // Canonical state is written by the order ledger. Never infer OMS state from
+  // payment or fulfillment projections; legacy rows remain explicitly pending.
   return "pending";
 }
 
@@ -273,6 +260,51 @@ export async function fetchMedusaOrderJson(
   const json = (await res.json()) as unknown;
   const order = unwrapOrderPayload(json);
   return order;
+}
+
+export function normalizeMedusaOrderReference(reference: string): string {
+  return reference.trim().replace(/^#/, "");
+}
+
+/** Resolve a human-facing display number before calling the resource endpoint. */
+export async function resolveMedusaOrderReference(
+  reference: string,
+): Promise<string | null> {
+  const normalized = normalizeMedusaOrderReference(reference);
+  if (!normalized) return null;
+  if (!/^\d+$/.test(normalized)) return normalized;
+
+  const pageSize = 100;
+  for (let offset = 0; offset < 10_000; offset += pageSize) {
+    const params = new URLSearchParams({
+      limit: String(pageSize),
+      offset: String(offset),
+      order: "-created_at",
+      fields: "id,display_id",
+    });
+    let response: Response;
+    try {
+      response = await medusaAdminFetch(`/admin/orders?${params.toString()}`, {
+        method: "GET",
+      });
+    } catch {
+      return null;
+    }
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      orders?: unknown[];
+      count?: number;
+    };
+    const page = Array.isArray(body.orders) ? body.orders : [];
+    const row = page.find((candidate) => {
+      if (!candidate || typeof candidate !== "object") return false;
+      return String((candidate as { display_id?: unknown }).display_id ?? "") === normalized;
+    });
+    const id = row && typeof row === "object" ? (row as { id?: unknown }).id : null;
+    if (typeof id === "string" && id.trim()) return id.trim();
+    if (page.length < pageSize || offset + page.length >= (body.count ?? 0)) break;
+  }
+  return null;
 }
 
 export type MedusaPaymentSummary = {

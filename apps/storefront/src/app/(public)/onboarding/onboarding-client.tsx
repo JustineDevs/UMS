@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import {
   isPhilippinesMobilePhone,
   type StorefrontShippingAddress,
@@ -27,7 +27,7 @@ export function OnboardingClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextSafe = (() => {
-    const n = searchParams.get("next");
+    const n = searchParams?.get("next");
     if (typeof n === "string" && n.startsWith("/") && !n.startsWith("//")) return n;
     return "/account";
   })();

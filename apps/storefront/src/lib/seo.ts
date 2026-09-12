@@ -81,7 +81,7 @@ export const SEO_KEYWORDS = {
   ],
 } as const;
 
-export function mergeKeywords(...groups: Array<string[] | undefined>): string[] {
+function mergeKeywords(...groups: Array<string[] | undefined>): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const group of groups) {
@@ -122,6 +122,7 @@ type PageMetadataInput = {
   openGraphType?: "website" | "article";
   image?: string;
   imageAlt?: string;
+  referrer?: Metadata["referrer"];
 };
 
 export function buildPageMetadata({
@@ -133,6 +134,7 @@ export function buildPageMetadata({
   openGraphType = "website",
   image,
   imageAlt,
+  referrer,
 }: PageMetadataInput): Metadata {
   const canonical = path ? canonicalUrl(path) : undefined;
   const mergedKeywords = mergeKeywords([...SEO_KEYWORDS.sitewide], keywords);
@@ -155,6 +157,7 @@ export function buildPageMetadata({
       description,
       images: image ? [image] : undefined,
     },
+    referrer,
     robots: noindex
       ? { index: false, follow: false, googleBot: { index: false, follow: false } }
       : { index: true, follow: true, googleBot: { index: true, follow: true } },
@@ -171,7 +174,7 @@ export function buildJsonLdOrganization(options?: {
 }) {
   const base = getBaseUrl();
   const sameAs = (options?.sameAs ?? []).map((url) => url.trim()).filter(Boolean);
-  const logoPath = options?.logoPath ?? "/UVS/UVS_logo_landscape.png";
+  const logoPath = options?.logoPath ?? "/brand/universal-music-store-logo-landscape.png";
   const contactPoint =
     options?.contactEmail || options?.contactPhone
       ? [
@@ -214,33 +217,6 @@ export function buildJsonLdWebSite() {
       "query-input": "required name=search_term_string",
     },
   };
-}
-
-export function buildJsonLdWebPage(input: {
-  name: string;
-  description?: string;
-  path: string;
-  image?: string;
-  breadcrumbs?: { name: string; href: string }[];
-}) {
-  const url = canonicalUrl(input.path);
-  const schema: Record<string, unknown> = {
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    name: input.name,
-    description: input.description,
-    url,
-    isPartOf: {
-      "@type": "WebSite",
-      name: SITE_NAME,
-      url: getBaseUrl(),
-    },
-  };
-  if (input.image) schema.primaryImageOfPage = input.image;
-  if (input.breadcrumbs?.length) {
-    schema.breadcrumb = buildJsonLdBreadcrumb(input.breadcrumbs);
-  }
-  return schema;
 }
 
 export function buildJsonLdArticle(input: {

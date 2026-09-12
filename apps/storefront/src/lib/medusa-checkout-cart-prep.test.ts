@@ -6,6 +6,7 @@ import {
   medusaCartToCheckoutLines,
   reconcileMedusaCartGrandTotalMajor,
 } from "./medusa-checkout-cart-prep";
+import { inventoryLookupFailure } from "./storefront-inventory-guard";
 
 test("reconcileMedusaCartGrandTotalMajor trusts Medusa total (no subtotal+tax recomputation)", () => {
   const reconciled = reconcileMedusaCartGrandTotalMajor(
@@ -81,4 +82,17 @@ test("medusaCartToCheckoutLines extracts active cart quantities for inventory ch
       { variantId: "variant_2", quantity: 1 },
     ],
   );
+});
+
+test("inventory lookup failures fail closed for deleted variants and upstream errors", () => {
+  assert.deepEqual(inventoryLookupFailure(404), {
+    ok: false,
+    message: "A bag item is no longer available in the catalog. Remove it and add it again from the product page.",
+    code: "INVENTORY_CHECK_FAILED",
+  });
+  assert.deepEqual(inventoryLookupFailure(503), {
+    ok: false,
+    message: "Variant lookup failed (503)",
+    code: "INVENTORY_CHECK_FAILED",
+  });
 });

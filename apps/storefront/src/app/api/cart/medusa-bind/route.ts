@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import {
   applyRateLimit,
@@ -12,8 +11,13 @@ import {
 import { validateCartSessionBinding } from "@/lib/cart-session-boundary";
 import { cookies } from "next/headers";
 import { verifyCartBindToken } from "@/lib/cart-session-boundary";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { getMedusaPublishableKey } from "@/lib/storefront-medusa-env";
 
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const rl = await applyRateLimit(req, "cart-bind", 40, 60_000);
   if (!rl.ok) return rl.response;
 
@@ -28,8 +32,10 @@ async function handlePOST(req: Request) {
   const cookieCartId = await readCartIdFromCookie();
   const bindCookie = (await cookies()).get("cart_bind_nonce")?.value ?? "";
   const bindToken = typeof parsed.data.bindToken === "string" ? parsed.data.bindToken : "";
-  const ownership = validateCartSessionBinding(cartId, cookieCartId);
-  if (!cookieCartId && (!bindCookie || bindCookie !== bindToken || !verifyCartBindToken(bindToken))) {
+  const hasValidBindProof =
+    Boolean(bindCookie && bindCookie === bindToken && verifyCartBindToken(bindToken));
+  const ownership = validateCartSessionBinding(cartId, cookieCartId, hasValidBindProof);
+  if (!cookieCartId && !hasValidBindProof) {
     return NextResponse.json({ error: "Cart ownership could not be verified" }, { status: 403 });
   }
   if (ownership.status !== 200) {
@@ -37,9 +43,29 @@ async function handlePOST(req: Request) {
   }
 
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, { fields: "id,+metadata" } as never);
-    if (!cookieCartId && (cart as { metadata?: Record<string, unknown> }).metadata?.uvs_cart_bind_token !== bindToken) {
+    const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) {
+      return NextResponse.json({ error: "Worker API is not configured" }, { status: 503 });
+    }
+    const response = await fetch(
+      `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
+      {
+        cache: "no-store",
+        headers: {
+          ...(getMedusaPublishableKey()
+            ? { "x-publishable-api-key": getMedusaPublishableKey()! }
+            : {}),
+        },
+      },
+    );
+    if (!response.ok) {
+      return NextResponse.json({ error: "Invalid cart" }, { status: 400 });
+    }
+    const payload = (await response.json()) as {
+      cart?: { metadata?: Record<string, unknown> | null };
+    };
+    const metadataToken = payload.cart?.metadata?.uvs_cart_bind_token;
+    if ((!cookieCartId || cookieCartId !== cartId) && metadataToken !== bindToken) {
       return NextResponse.json({ error: "Cart ownership could not be verified" }, { status: 403 });
     }
   } catch {
@@ -48,10 +74,10 @@ async function handlePOST(req: Request) {
 
   await writeCartCookie(cartId);
 
-  if (!cookieCartId) {
-    const jar = await cookies();
-    jar.delete("cart_bind_nonce");
-  }
+  // A bind proof is single-use. Existing-cart requests do not need it because
+  // the HttpOnly cart cookie is the ongoing ownership boundary.
+  const jar = await cookies();
+  jar.delete("cart_bind_nonce");
 
   return NextResponse.json({ ok: true });
 }

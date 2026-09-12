@@ -58,20 +58,6 @@ export async function GET(req: NextRequest) {
       : undefined,
   };
 
-  const paymongo: ProviderStatus = {
-    enabled: Boolean(env.PAYMONGO_SECRET_KEY?.trim()),
-    webhookConfigured: Boolean(env.PAYMONGO_WEBHOOK_SECRET?.trim()),
-  };
-
-  const maya: ProviderStatus = {
-    enabled: Boolean(env.MAYA_SECRET_KEY?.trim()),
-    webhookConfigured: Boolean(env.MAYA_WEBHOOK_SECRET?.trim()),
-    sandboxMode: env.MAYA_SANDBOX?.trim().toLowerCase() !== "false",
-    notes: !env.MAYA_WEBHOOK_SECRET?.trim()
-      ? "MAYA_WEBHOOK_SECRET required for production signature verification."
-      : undefined,
-  };
-
   const cod: ProviderStatus = {
     enabled: true,
     webhookConfigured: true,
@@ -91,12 +77,6 @@ export async function GET(req: NextRequest) {
     if (paypal.enabled && paypal.sandboxMode) {
       warnings.push("PayPal appears to be in sandbox mode in production.");
     }
-    if (maya.enabled && !maya.webhookConfigured) {
-      warnings.push("Maya is enabled but MAYA_WEBHOOK_SECRET is not set — webhook signatures cannot be verified.");
-    }
-    if (maya.enabled && maya.sandboxMode) {
-      warnings.push("Maya appears to be in sandbox mode in production.");
-    }
     if (stripe.enabled && !stripe.webhookConfigured) {
       warnings.push("Stripe is enabled but STRIPE_WEBHOOK_SECRET is not set.");
     }
@@ -105,7 +85,7 @@ export async function GET(req: NextRequest) {
   return correlatedJson(cid, {
     environment: vercelEnv ?? nodeEnv ?? "unknown",
     isProduction,
-    providers: { stripe, paypal, paymongo, maya, cod },
+    providers: { stripe, paypal, cod },
     warnings,
     ok: warnings.length === 0,
   });

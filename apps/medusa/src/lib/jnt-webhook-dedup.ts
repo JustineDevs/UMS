@@ -6,7 +6,7 @@ let pool: pg.Pool | null = null;
 let tableEnsured = false;
 
 function getPool(): pg.Pool | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = process.env.MEDUSA_DB_URL?.trim();
   if (!url) return null;
   if (!pool) pool = new pg.Pool({ connectionString: url, max: 3 });
   return pool;
@@ -35,7 +35,7 @@ export async function claimJntWebhookDedup(dedupId: string): Promise<boolean> {
   if (!dedupId.length) return true;
   const p = getPool();
   if (!p) {
-    console.warn("[jnt-dedup] DATABASE_URL not set — webhook deduplication unavailable");
+    console.warn("[jnt-dedup] MEDUSA_DB_URL not set — webhook deduplication unavailable");
     throw new Error("JNT_DEDUP_UNAVAILABLE");
   }
   await ensureTable(p);

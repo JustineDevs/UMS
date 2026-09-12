@@ -4,7 +4,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson, tagResponse } from "@/lib/staff-api-response";
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
@@ -16,13 +16,13 @@ export async function GET(req: Request) {
   const sup = adminSupabaseOr503(correlationId);
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, staff.session.user?.email);
-  if (!organization) return correlatedJson(correlationId, { error: "Organization membership is not configured" }, { status: 403 });
+  if (!organization) return correlatedError(correlationId, 403, "Organization membership is not configured", "FORBIDDEN");
 
   let providers;
   try {
     providers = await fetchMedusaPaymentProvidersFromRegions();
   } catch {
-    return correlatedJson(correlationId, { error: "Unable to load payment providers" }, { status: 502 });
+    return correlatedError(correlationId, 502, "Unable to load payment providers", "SERVICE_UNAVAILABLE");
   }
 
   logAdminApiEvent({
@@ -35,6 +35,6 @@ export async function GET(req: Request) {
   return correlatedJson(correlationId, {
     providers,
     installmentNote:
-      "Installment and BNPL depend on your payment provider module (for example Stripe, PayMongo) and region configuration in Admin.",
+      "Installment and BNPL depend on your configured payment provider module and region configuration in Admin.",
   });
 }

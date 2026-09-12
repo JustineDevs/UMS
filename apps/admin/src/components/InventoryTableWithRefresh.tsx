@@ -279,7 +279,14 @@ export function InventoryTableWithRefresh({
                                 setError(payload?.error ?? `Unable to save stock (${response.status})`);
                                 return;
                               }
-                              const nextQuantity = adjustmentMode === "set" ? quantity : row.available + delta;
+                              const payload = (await response.clone().json().catch(() => null)) as {
+                                data?: { availableQuantity?: number | null };
+                              } | null;
+                              const nextQuantity = payload?.data?.availableQuantity;
+                              if (typeof nextQuantity !== "number") {
+                                setError("Inventory was saved but the authoritative available quantity could not be read; refresh the table.");
+                                return;
+                              }
                               setRows((current) => current.map((item) => item.variantId === row.variantId ? { ...item, available: nextQuantity } : item));
                               setEditingId(null);
                             } catch {

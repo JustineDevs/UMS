@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 const { mkdirSync } = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
-const repoRoot = path.resolve(projectRoot, "..", "..");
-const configHome = path.join(repoRoot, ".cache", "medusa-config");
+const configHome = path.join(os.tmpdir(), "uvs-medusa-config");
 const cliShimPath = path.join(__dirname, "medusa-cli-shim.cjs");
 
 mkdirSync(configHome, { recursive: true });

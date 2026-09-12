@@ -1,12 +1,13 @@
 import pg from "pg";
 
 import { logWebhookDedupDuplicate } from "./webhook-dedup-metrics.js";
+import { recordWebhookSecurityEvent } from "./webhook-security-metrics";
 
 let pool: pg.Pool | null = null;
 let tableEnsured = false;
 
 function getPool(): pg.Pool | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = process.env.MEDUSA_DB_URL?.trim();
   if (!url) return null;
   if (!pool) pool = new pg.Pool({ connectionString: url, max: 3 });
   return pool;
@@ -42,7 +43,7 @@ export async function claimXenditWebhookDedup(dedupId: string): Promise<boolean>
   const p = getPool();
   if (!p) {
     console.warn(
-      "[xendit-dedup] DATABASE_URL not set — rejecting webhook to prevent duplicate processing",
+      "[xendit-dedup] MEDUSA_DB_URL not set — rejecting webhook to prevent duplicate processing",
     );
     return false;
   }
@@ -54,6 +55,7 @@ export async function claimXenditWebhookDedup(dedupId: string): Promise<boolean>
   const first = (res.rowCount ?? 0) >= 1;
   if (!first) {
     logWebhookDedupDuplicate("xendit", dedupId);
+    await recordWebhookSecurityEvent("xendit", "dedup_duplicate");
   }
   return first;
 }

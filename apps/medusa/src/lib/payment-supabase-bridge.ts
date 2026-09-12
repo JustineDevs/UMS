@@ -66,15 +66,68 @@ export type PaymentPlatformMetrics = {
   jobsFailedRecentCount: number;
   webhookEventsUnprocessed: number;
   codDeliveredPendingCapture: number;
+  webhookSignatureFailures: number;
+  webhookDedupAnomalies: number;
 };
 
+export type PaymentPlatformAlert = {
+  code:
+    | "payment_attempts_stale_finalize"
+    | "payment_attempts_needs_review"
+    | "payment_webhook_backlog"
+    | "outbox_backlog"
+    | "background_job_failures"
+    | "cod_capture_backlog"
+    | "webhook_signature_failures"
+    | "webhook_dedup_anomalies";
+  severity: "warning" | "critical";
+  count: number;
+};
+
+export function buildPaymentPlatformAlerts(
+  metrics: PaymentPlatformMetrics,
+): PaymentPlatformAlert[] {
+  const alerts: PaymentPlatformAlert[] = [];
+  const add = (
+    code: PaymentPlatformAlert["code"],
+    count: number,
+    severity: PaymentPlatformAlert["severity"],
+  ) => {
+    if (count > 0) alerts.push({ code, count, severity });
+  };
+
+  add("payment_attempts_stale_finalize", metrics.paymentAttemptsStaleFinalize, "critical");
+  add("payment_attempts_needs_review", metrics.paymentAttemptsNeedsReview, "warning");
+  add(
+    "payment_webhook_backlog",
+    metrics.webhookEventsUnprocessed,
+    metrics.webhookEventsUnprocessed >= 10 ? "critical" : "warning",
+  );
+  add("outbox_backlog", metrics.outboxPendingCount, "warning");
+  add("background_job_failures", metrics.jobsFailedRecentCount, "critical");
+  add("cod_capture_backlog", metrics.codDeliveredPendingCapture, "warning");
+  add(
+    "webhook_signature_failures",
+    metrics.webhookSignatureFailures,
+    metrics.webhookSignatureFailures >= 3 ? "critical" : "warning",
+  );
+  add(
+    "webhook_dedup_anomalies",
+    metrics.webhookDedupAnomalies,
+    metrics.webhookDedupAnomalies >= 10 ? "critical" : "warning",
+  );
+  return alerts;
+}
+
 const STALE_STATUSES = ["paid_awaiting_order", "finalizing_order", "paid"];
+const RECENT_FAILURE_WINDOW_MS = 24 * 60 * 60 * 1_000;
 
 export async function getPaymentPlatformMetrics(
   supabase: SupabaseClient,
 ): Promise<PaymentPlatformMetrics | null> {
   try {
-    const [stale, needsReview, outbox, jobsQ, jobsF, webhooks, codRpc] = await Promise.all([
+    const recentFailureSince = new Date(Date.now() - RECENT_FAILURE_WINDOW_MS).toISOString();
+    const [stale, needsReview, outbox, jobsQ, jobsF, webhooks, security, codRpc] = await Promise.all([
       supabase
         .from("payment_attempts")
         .select("*", { count: "exact", head: true })
@@ -86,11 +139,19 @@ export async function getPaymentPlatformMetrics(
         .eq("status", "needs_review"),
       supabase.from("outbox_events").select("*", { count: "exact", head: true }).is("processed_at", null),
       supabase.from("background_jobs").select("*", { count: "exact", head: true }).eq("status", "queued"),
-      supabase.from("background_jobs").select("*", { count: "exact", head: true }).eq("status", "failed"),
+      supabase
+        .from("background_jobs")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "failed")
+        .gte("updated_at", recentFailureSince),
       supabase
         .from("payment_webhook_events")
         .select("*", { count: "exact", head: true })
         .is("processed_at", null),
+      supabase
+        .from("payment_webhook_security_events")
+        .select("event_type", { count: "exact", head: true })
+        .gte("created_at", recentFailureSince),
       supabase.rpc("count_cod_delivered_pending_capture"),
     ]);
 
@@ -98,6 +159,26 @@ export async function getPaymentPlatformMetrics(
     if (err && isMissingTableOrSchemaError(err)) return null;
     if (stale.error) throw stale.error;
     if (needsReview.error) throw needsReview.error;
+    if (security.error && !isMissingTableOrSchemaError(security.error)) throw security.error;
+
+    let webhookSignatureFailures = 0;
+    let webhookDedupAnomalies = 0;
+    if (!security.error) {
+      const [signature, dedup] = await Promise.all([
+        supabase
+          .from("payment_webhook_security_events")
+          .select("*", { count: "exact", head: true })
+          .eq("event_type", "signature_failure")
+          .gte("created_at", recentFailureSince),
+        supabase
+          .from("payment_webhook_security_events")
+          .select("*", { count: "exact", head: true })
+          .eq("event_type", "dedup_duplicate")
+          .gte("created_at", recentFailureSince),
+      ]);
+      webhookSignatureFailures = signature.count ?? 0;
+      webhookDedupAnomalies = dedup.count ?? 0;
+    }
 
     return {
       paymentAttemptsStaleFinalize: stale.count ?? 0,
@@ -111,6 +192,8 @@ export async function getPaymentPlatformMetrics(
         : typeof codRpc.data === "number"
           ? codRpc.data
           : Number(codRpc.data ?? 0) || 0,
+      webhookSignatureFailures,
+      webhookDedupAnomalies,
     };
   } catch {
     return null;

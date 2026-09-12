@@ -1,4 +1,5 @@
 import type { SubscriberArgs, SubscriberConfig } from "@medusajs/framework";
+import { safeLogIdentifier } from "../lib/safe-log";
 import { Modules } from "@medusajs/framework/utils";
 import { inngest } from "../lib/inngest/client";
 
@@ -16,6 +17,7 @@ export default async function orderFulfillmentSmsNotification({
   const { DEFAULT_PUBLIC_SITE_ORIGIN } = await import(
     "@universal-music-store/sdk"
   );
+  const { buildTrackingUrl } = await import("@universal-music-store/sdk");
   const storefrontUrl =
     process.env.STOREFRONT_PUBLIC_URL?.trim() ??
     DEFAULT_PUBLIC_SITE_ORIGIN;
@@ -29,6 +31,7 @@ export default async function orderFulfillmentSmsNotification({
       tracking_numbers?: string[];
       order?: {
         id?: string;
+        email?: string | null;
         display_id?: number;
         shipping_address?: { phone?: string | null } | null;
       } | null;
@@ -42,7 +45,14 @@ export default async function orderFulfillmentSmsNotification({
 
     const displayId = order.display_id ?? order.id ?? "";
     const trackingNumber = fulfillment.tracking_numbers?.[0]?.trim();
-    const trackingUrl = `${storefrontUrl}/track/${order.id}`;
+    const trackingUrl = order.id ? buildTrackingUrl(storefrontUrl, order.id, {
+      customerEmail: order.email ?? undefined,
+      storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+    }) : null;
+    if (!trackingUrl) {
+      console.error("[sms] fulfillment_created tracking capability unavailable; notification skipped");
+      return;
+    }
 
     if (process.env.INNGEST_EVENT_KEY) {
       await inngest.send({
@@ -59,11 +69,15 @@ export default async function orderFulfillmentSmsNotification({
       });
       const result = await sendSms({ number: phone, message });
       if (!result.ok) {
-        console.error(`[sms] fulfillment_created send failed id=${fulfillment.id} error=${result.error ?? "unknown"}`);
+        console.error(
+          `[sms] fulfillment_created send failed id=${safeLogIdentifier(fulfillment.id)} error=provider_rejected`,
+        );
       }
     }
   } catch (err) {
-    console.error("[sms] fulfillment_created subscriber error:", err);
+    console.error(
+      `[sms] fulfillment_created subscriber error: ${err instanceof Error ? err.name : "unknown"}`,
+    );
   }
 }
 

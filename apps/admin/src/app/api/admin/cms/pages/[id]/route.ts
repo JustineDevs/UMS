@@ -13,6 +13,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { cmsPageSchema } from "@/lib/cms-route-contracts";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -45,12 +46,10 @@ async function put(req: NextRequest, ctx: RouteCtx) {
   if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
+  const parsedBody = await parseBoundedJson(req, 512 * 1024);
+  if (parsedBody.tooLarge) return correlatedJson(cid, { error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid) return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
+  const body = parsedBody.value;
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, session.user.email);

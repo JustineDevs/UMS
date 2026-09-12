@@ -12,6 +12,8 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 
+const MAX_CMS_MEDIA_BODY_BYTES = 25 * 1024 * 1024 + 256 * 1024;
+
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const auth = await requireStaffApiSessionAny([
@@ -51,6 +53,11 @@ async function post(req: NextRequest) {
   const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
   if (!organization) return correlatedJson(cid, { error: "Organization membership is required" }, { status: 403 });
   const sb = sup.client;
+
+  const contentLength = Number(req.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > MAX_CMS_MEDIA_BODY_BYTES) {
+    return correlatedJson(cid, { error: "Upload is too large" }, { status: 413 });
+  }
 
   let form: FormData;
   try {

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { getPaymentAttemptByCorrelationId } from "@universal-music-store/platform-data";
+import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { publicPaymentAttemptError } from "@/lib/payment-attempt-public";
+import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ correlationId: string }> },
 ) {
   const { correlationId } = await ctx.params;
@@ -15,10 +18,24 @@ export async function GET(
     return NextResponse.json({ error: "Missing correlation id" }, { status: 400 });
   }
 
-  const cartId = await readCartIdFromCookie();
-  if (!cartId) {
-    return NextResponse.json({ error: "No active cart" }, { status: 401 });
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl) {
+    const response = await fetch(
+      `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId.trim())}`,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          ...(req.headers.get("cookie") ? { Cookie: req.headers.get("cookie")! } : {}),
+        },
+      },
+    );
+    const payload = await response.json().catch(() => ({ error: "Not found" }));
+    return NextResponse.json(payload, { status: response.ok ? 200 : response.status });
   }
+
+  const cartId = await readCartIdFromCookie();
+  const attemptCookie = await readCheckoutAttemptCookie();
 
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
@@ -29,7 +46,7 @@ export async function GET(
   }
 
   const row = await getPaymentAttemptByCorrelationId(sb, correlationId.trim());
-  if (!row || row.cart_id !== cartId) {
+  if (!row || (cartId ? row.cart_id !== cartId : attemptCookie !== correlationId.trim())) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -44,7 +61,14 @@ export async function GET(
     quoteFingerprint: row.quote_fingerprint,
     staleReason: row.stale_reason,
     medusaOrderId: row.medusa_order_id,
-    lastError: row.last_error,
+    trackingPageUrl: row.medusa_order_id
+      ? buildTrackingUrl(
+          process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN,
+          row.medusa_order_id,
+          { storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim() },
+        )
+      : null,
+    lastError: publicPaymentAttemptError(row.last_error),
     finalizeAttempts: row.finalize_attempts,
     updatedAt: row.updated_at,
   });

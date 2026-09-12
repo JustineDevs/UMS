@@ -2,7 +2,7 @@
 
 import { Button } from "@universal-music-store/ui";
 import { resetPostHogClient } from "@universal-music-store/sdk";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 
 export function SignOutButton() {
   return (
@@ -13,7 +13,7 @@ export function SignOutButton() {
         resetPostHogClient();
         void signOut({ callbackUrl: "/" });
       }}
-      className="mt-4 inline-block px-6 py-2.5 text-sm font-medium text-on-surface-variant"
+      className="mt-4 inline-flex min-h-11 items-center px-6 py-2.5 text-sm font-medium text-on-surface-variant"
     >
       Sign out
     </Button>

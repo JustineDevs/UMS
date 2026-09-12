@@ -164,8 +164,48 @@ export type StorefrontShippingAddress = z.infer<
   typeof storefrontShippingAddressSchema
 >;
 
+const DEFAULT_AVATAR_HOST_PATTERNS = [
+  "*.supabase.co",
+  "**.supabase.co",
+  "lh3.googleusercontent.com",
+] as const;
+
+function hostnameMatchesPattern(hostname: string, pattern: string): boolean {
+  const normalizedHost = hostname.toLowerCase();
+  const normalizedPattern = pattern.trim().toLowerCase();
+  if (!normalizedPattern) return false;
+  if (normalizedPattern.startsWith("**.")) {
+    const root = normalizedPattern.slice(3);
+    return normalizedHost === root || normalizedHost.endsWith(`.${root}`);
+  }
+  if (normalizedPattern.startsWith("*.")) {
+    const root = normalizedPattern.slice(2);
+    return (
+      normalizedHost.endsWith(`.${root}`) &&
+      normalizedHost.split(".").length === root.split(".").length + 1
+    );
+  }
+  return normalizedHost === normalizedPattern;
+}
+
+export function isAllowedStorefrontAvatarUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const configured =
+      typeof process !== "undefined" && process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES
+        ? process.env.NEXT_PUBLIC_IMAGE_HOSTNAMES.split(",")
+        : [];
+    const patterns = [...DEFAULT_AVATAR_HOST_PATTERNS, ...configured];
+    return patterns.some((pattern) => hostnameMatchesPattern(url.hostname, pattern));
+  } catch {
+    return false;
+  }
+}
+
 export const storefrontCustomerProfilePatchSchema = z
   .object({
+    updatedAt: z.string().datetime({ offset: true }).optional(),
     displayName: z.string().trim().max(120).optional(),
     phone: z.string().trim().max(40).optional(),
     avatarUrl: z
@@ -173,6 +213,9 @@ export const storefrontCustomerProfilePatchSchema = z
       .trim()
       .url()
       .max(500)
+      .refine((value) => value === "" || isAllowedStorefrontAvatarUrl(value), {
+        message: "Avatar URL must use an approved HTTPS image host",
+      })
       .optional()
       .or(z.literal("")),
     shippingAddresses: z

@@ -83,7 +83,7 @@ export function AdminPageHelpTip({ purpose, usage }: AdminPageHelpTipProps) {
 
 /** Help icon for pages that do not use {@link AdminPageTitleWithHelp} (e.g. POS custom header). */
 export function AdminPageHelpFromPath({ path }: { path?: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
   const help = getAdminPageHelp(path ?? pathname);
   if (!help) {
     return null;

@@ -43,8 +43,11 @@ describe("Stripe webhook state transitions", () => {
       type: "checkout.session.completed",
       data: {
         object: {
-          metadata: { session_id: "medusa_ps_123" },
+          metadata: { session_id: "medusa_ps_123", amount_minor: "15500", currency: "php" },
           amount_total: 15500,
+          currency: "php",
+          status: "complete",
+          payment_status: "paid",
         },
       },
     });
@@ -69,8 +72,11 @@ describe("Stripe webhook state transitions", () => {
       type: "checkout.session.expired",
       data: {
         object: {
-          metadata: { session_id: "medusa_ps_456" },
+          metadata: { session_id: "medusa_ps_456", amount_minor: "4200", currency: "php" },
           amount_total: 4200,
+          currency: "php",
+          status: "expired",
+          payment_status: "unpaid",
         },
       },
     });
@@ -110,8 +116,11 @@ describe("Stripe webhook state transitions", () => {
       type: "checkout.session.completed",
       data: {
         object: {
-          metadata: { session_id: "medusa_ps_dup" },
+          metadata: { session_id: "medusa_ps_dup", amount_minor: "9900", currency: "php" },
           amount_total: 9900,
+          currency: "php",
+          status: "complete",
+          payment_status: "paid",
         },
       },
     });
@@ -147,5 +156,57 @@ describe("Stripe webhook state transitions", () => {
 
     expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
     expect(claimStripeWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("rejects a signed event with mismatched amount or currency", async () => {
+    const service = createService();
+    service.stripe_.webhooks.constructEvent = jest.fn().mockReturnValue({
+      id: "evt_mismatch",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { session_id: "medusa_ps_mismatch", amount_minor: "1234", currency: "php" },
+          amount_total: 1235,
+          currency: "php",
+          status: "complete",
+          payment_status: "paid",
+        },
+      },
+    });
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: "{}",
+        headers: { "stripe-signature": "sig_test" },
+      }),
+    ).rejects.toThrow("amount or currency");
+    expect(claimStripeWebhookDedup).not.toHaveBeenCalled();
+  });
+
+  it("rejects a completed event that is not paid", async () => {
+    const service = createService();
+    service.stripe_.webhooks.constructEvent = jest.fn().mockReturnValue({
+      id: "evt_unpaid",
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { session_id: "medusa_ps_unpaid", amount_minor: "1234", currency: "php" },
+          amount_total: 1234,
+          currency: "php",
+          status: "complete",
+          payment_status: "unpaid",
+        },
+      },
+    });
+    (claimStripeWebhookDedup as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.getWebhookActionAndData({
+        data: {},
+        rawData: "{}",
+        headers: { "stripe-signature": "sig_test" },
+      }),
+    ).rejects.toThrow("not complete and paid");
   });
 });

@@ -5,7 +5,7 @@ import {
   type StorefrontPublicMetadataPayload,
   staffHasPermission,
 } from "@universal-music-store/platform-data";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useState } from "react";
 
 function labelClass() {

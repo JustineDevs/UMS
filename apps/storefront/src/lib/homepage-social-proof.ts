@@ -1,12 +1,13 @@
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { unstable_cache } from "next/cache";
 
 export type HomepageSocialProof = {
   average: number;
   count: number;
 };
 
-export async function fetchHomepageCustomerCount(): Promise<number> {
+async function fetchHomepageCustomerCountUncached(): Promise<number> {
   try {
     const res = await medusaAdminFetch("/admin/customers?limit=1&fields=id");
     if (!res.ok) {
@@ -29,7 +30,13 @@ export async function fetchHomepageCustomerCount(): Promise<number> {
   }
 }
 
-export async function fetchHomepageSocialProof(): Promise<HomepageSocialProof> {
+export const fetchHomepageCustomerCount = unstable_cache(
+  fetchHomepageCustomerCountUncached,
+  ["storefront-home-customer-count"],
+  { revalidate: 60, tags: ["storefront:home", "storefront:customer-count"] },
+);
+
+async function fetchHomepageSocialProofUncached(): Promise<HomepageSocialProof> {
   const supabase = createStorefrontServiceSupabase();
   if (!supabase) {
     return { average: 0, count: 0 };
@@ -45,6 +52,7 @@ export async function fetchHomepageSocialProof(): Promise<HomepageSocialProof> {
       .from("product_reviews")
       .select("rating", { count: "exact" })
       .eq("status", "approved")
+      .eq("shadow_banned", false)
       .order("created_at", { ascending: false })
       .range(offset, offset + pageSize - 1);
 
@@ -74,3 +82,9 @@ export async function fetchHomepageSocialProof(): Promise<HomepageSocialProof> {
     average: total > 0 ? ratingSum / total : 0,
   };
 }
+
+export const fetchHomepageSocialProof = unstable_cache(
+  fetchHomepageSocialProofUncached,
+  ["storefront-home-social-proof"],
+  { revalidate: 60, tags: ["storefront:home", "storefront:reviews"] },
+);

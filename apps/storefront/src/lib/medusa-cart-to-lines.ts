@@ -91,6 +91,7 @@ export function medusaCartToCartLines(cart: unknown): CartLine[] {
       type: type || "",
       finish: finish || "",
       price: priceMajor,
+      currencyCode: currencyCode.toUpperCase(),
       ...(thumb ? { thumbnail: thumb } : {}),
     });
   }

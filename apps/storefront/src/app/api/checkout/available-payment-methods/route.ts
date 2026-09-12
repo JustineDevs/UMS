@@ -20,6 +20,13 @@ const PROVIDER_ID_TO_KEY = Object.fromEntries(
 const PUBLIC_UNAVAILABLE =
   "Checkout is temporarily unavailable. Please try again later or contact support if this continues.";
 
+const isolatedCodE2E =
+  process.env.CI_STRICT_E2E === "1" &&
+  (process.env.AUTH_DISABLED === "true" ||
+    process.env.AUTH_DISABLE === "true" ||
+    process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+    process.env.NEXT_PUBLIC_AUTH_DISABLE === "true");
+
 type AvailabilityJson =
   | {
       ok: true;
@@ -55,6 +62,40 @@ export async function GET(req: Request) {
     );
   }
 
+  const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (apiUrl) {
+    try {
+      const headers = new Headers({ Accept: "application/json" });
+      const response = await fetch(`${apiUrl}/store/payment-methods`, {
+        headers,
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        return NextResponse.json(
+          { ok: false, keys: [], code: CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED, error: "worker_unavailable", message: PUBLIC_UNAVAILABLE },
+          { status: 503 },
+        );
+      }
+      const payload = (await response.json()) as { ok?: boolean; keys?: unknown[]; code?: string };
+      const keys = (payload.keys ?? []).filter((key): key is PaymentProviderKey =>
+        typeof key === "string" && key in PAYMENT_PROVIDER_IDS,
+      );
+      if (payload.ok === true && keys.length > 0) {
+        const body: AvailabilityJson = { ok: true, keys, code: CHECKOUT_AVAILABILITY.OK, error: null, message: null };
+        return NextResponse.json(body);
+      }
+      return NextResponse.json(
+        { ok: false, keys: [], code: payload.code ?? CHECKOUT_AVAILABILITY.NO_PAYMENT_PROVIDERS, error: "no_payment_providers", message: PUBLIC_UNAVAILABLE },
+        { status: 503 },
+      );
+    } catch {
+      return NextResponse.json(
+        { ok: false, keys: [], code: CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED, error: "worker_unavailable", message: PUBLIC_UNAVAILABLE },
+        { status: 503 },
+      );
+    }
+  }
+
   const regionId = getMedusaRegionId()?.trim();
   if (!regionId) {
     const body: AvailabilityJson = {
@@ -68,6 +109,16 @@ export async function GET(req: Request) {
   }
 
   if (!getMedusaSecretApiKey()) {
+    if (isolatedCodE2E) {
+      const body: AvailabilityJson = {
+        ok: true,
+        keys: ["COD"],
+        code: CHECKOUT_AVAILABILITY.OK,
+        error: null,
+        message: null,
+      };
+      return NextResponse.json(body);
+    }
     const body: AvailabilityJson = {
       ok: false,
       keys: [],

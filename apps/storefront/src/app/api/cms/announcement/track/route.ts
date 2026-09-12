@@ -3,10 +3,15 @@ import { incrementCmsAnnouncementMetric } from "@universal-music-store/platform-
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 const ALLOWED = new Set(["impression", "click", "dismiss"]);
 
 async function handlePOST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`cms-announcement-track:${ip}`, 30, 60_000);
   if (!rl.ok) {
@@ -23,12 +28,12 @@ async function handlePOST(req: NextRequest) {
   if (!sb) {
     return new Response(JSON.stringify({ ok: false }), { status: 503 });
   }
-  let body: { id?: string; locale?: string; metric?: string };
-  try {
-    body = (await req.json()) as typeof body;
-  } catch {
+  const parsedBody = await parseBoundedJson(req, 8 * 1024);
+  if (parsedBody.tooLarge) return new Response(JSON.stringify({ error: "Request body is too large" }), { status: 413 });
+  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
   }
+  const body = parsedBody.value as { id?: string; locale?: string; metric?: string };
   const id = typeof body.id === "string" ? body.id.trim() : "";
   const locale = typeof body.locale === "string" ? body.locale.trim() || "en" : "en";
   const metricRaw = typeof body.metric === "string" ? body.metric.trim() : "";

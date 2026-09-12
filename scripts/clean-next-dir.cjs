@@ -12,10 +12,10 @@ const path = require("node:path");
 const root = path.join(__dirname, "..");
 const rel = process.argv[2] || "apps/storefront";
 const appRoot = path.join(root, rel);
-const nextDirs = [
-  path.join(appRoot, ".next"),
-  path.join(appRoot, ".next-production"),
-];
+// Local dev uses `.next`; local production builds use the isolated output. Vercel
+// always builds `.next`, so never remove the dev directory from a local build.
+const nextOutputDir = process.env.VERCEL === "1" ? ".next" : ".next-production";
+const nextDirs = [path.join(appRoot, nextOutputDir)];
 
 const ATTEMPTS = 10;
 const BASE_DELAY_MS = 200;
@@ -61,7 +61,7 @@ function lockErrorCode(err) {
 (async () => {
   if (process.env.SKIP_NEXT_CLEAN === "1") {
     console.warn(
-      `[clean-next-dir] SKIP_NEXT_CLEAN=1 set; leaving ${rel}/.next in place.`,
+      `[clean-next-dir] SKIP_NEXT_CLEAN=1 set; leaving ${rel}/${nextOutputDir} in place.`,
     );
     return;
   }
@@ -71,7 +71,7 @@ function lockErrorCode(err) {
     const code = lockErrorCode(err);
     if (code) {
       console.warn(
-        `[clean-next-dir] Cannot remove ${rel}/.next (${code}) after ${ATTEMPTS} attempts.`,
+        `[clean-next-dir] Cannot remove ${rel}/${nextOutputDir} (${code}) after ${ATTEMPTS} attempts.`,
       );
       console.warn(
         "[clean-next-dir] Another process is likely using that folder (often `next dev`).",

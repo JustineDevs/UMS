@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 const schema = z.object({ email: z.string().trim().email().max(320) }).strict();
 
 export async function POST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const rate = await rateLimitFixedWindow(`newsletter-unsubscribe:${getRequestIp(req)}`, 10, 60_000);
   if (!rate.ok) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 8 * 1024);
+  if (body.tooLarge) return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
+  const parsed = schema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
   const sb = createStorefrontServiceSupabase();
   if (!sb) return NextResponse.json({ error: "Service unavailable" }, { status: 503 });

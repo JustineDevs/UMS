@@ -24,7 +24,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Set Function regions near your primary data source; avoid cross-region DB/service roundtrips
 - Tune Fluid Compute knobs (e.g., `maxDuration`, memory/CPU) for long I/O-heavy calls (LLMs, APIs)
 - Use Runtime Cache for fast **regional** caching + tag invalidation (don't treat it as global KV)
-- Use Cron Jobs for schedules; cron runs in UTC and triggers your production URL via HTTP GET
+- Use GitHub Actions for scheduled storefront jobs; cron runs in UTC and invokes protected production URLs via HTTP GET
 - Use Vercel Blob for uploads/media; Use Edge Config for small, globally-read config
 - If Enable Deployment Protection is enabled, use a bypass secret to directly access them
 - Add OpenTelemetry via `@vercel/otel` on Node; don't expect OTEL support on the Edge runtime
@@ -33,6 +33,34 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   needed. Always curl https://ai-gateway.vercel.sh/v1/models first; never trust model IDs from memory
 - For durable agent loops or untrusted code: use Workflow (pause/resume/state) + Sandbox; use Vercel MCP for secure infra access
 <!-- VERCEL BEST PRACTICES END -->
+
+## Branch and Deployment Topology
+
+## Backend Hosting Architecture
+- Vercel hosts the frontend.
+- Cloudflare Workers (managed by Wrangler) are the complete backend runtime.
+- The Worker-native route handlers are the commerce origin; do not add a Medusa runtime or container fallback.
+- Supabase Cloud provides PostgreSQL; do not deploy Supabase inside the Worker.
+- Upstash provides Redis; do not deploy Redis inside the Worker.
+- The topology has exactly two PostgreSQL databases: `MEDUSA_DB_URL` is the
+  Medusa commerce database (catalog, carts, orders, inventory, payments, and
+  customers), while `APP_DB_URL` is the application/platform database (CMS,
+  staff/RBAC, audit, and platform data). Do not introduce a third database or
+  use a generic database-URL alias.
+- Do not deploy the storefront or admin application to the backend origin.
+- Use the Cloudflare Worker deployment URL configured through `API_URL`; a custom DNS hostname is optional and is not a release prerequisite.
+- Do not deploy Medusa, compliance, Render, Fly.io, ECS, or any external backend origin. All backend contracts must execute in the Worker with Hyperdrive, Queues, and fetch/Web Crypto.
+
+- `dev` is the only development and integration branch; make all changes there.
+- `dev` deploys to the preview environment at `https://universalmusic-preview.vercel.app`.
+- `main` is production and deploys to `https://universalmusic.vercel.app`.
+- Never make direct production changes or deploy production from a feature branch.
+- Promote changes through a pull request from `dev` to `main` only after reviewing all CI results, PR comments, and findings.
+- Fix every review or CI finding on `dev`, rerun the required checks, and merge only when the PR is verified clean.
+- Vercel Cron is not part of this topology. Keep scheduled storefront recovery in `.github/workflows/storefront-cron.yml`; do not add a Vercel `crons` block or treat Vercel Hobby Cron limits as a payment-webhook solution.
+- Deploy the backend only with `pnpm backend:worker:deploy` after `wrangler login` and configured Hyperdrive/Queue bindings. Docker is not part of the backend deployment path.
+- Before pushing any branch, run the local Act gate with `pnpm ci:local`; a failed or skipped local gate must not be pushed.
+- Local Act validates the non-secret release workflow. Provider sandbox, security, and production-only checks still require their documented credentials or infrastructure and must not be simulated with empty secrets.
 
 <!-- CONTINUAL LEARNING -->
 - Sprint and `/sprint` backlog: Treat the user's listed sprint items as mandatory commitments—they stay under Committed unless Blocked by a concrete, named external blocker; do not downgrade to optional/stretch, silently drop items, narrow acceptance criteria, or replace implementation work with docs or placeholders without explicit Product Owner approval.

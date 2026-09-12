@@ -224,7 +224,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
     const res = await request.get(`${base()}/api/health/sop`);
     expect(res.ok()).toBeTruthy();
     const json = (await res.json()) as { commerceSource?: string };
-    expect(json.commerceSource).toBe("medusa");
+    expect(json.commerceSource).toBe("cloudflare_worker");
   });
 
   test("GET /api/shop/product without slug returns 400", async ({ request }) => {
@@ -233,6 +233,9 @@ test.describe.serial("Storefront HTTP matrix", () => {
       failOnStatusCode: false,
     });
     expect(res.status()).toBe(400);
+    expect(res.headers()["cache-control"]).toContain("no-store");
+    expect(res.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(await res.json()).toEqual({ error: "Invalid or missing slug" });
   });
 
   test("GET /api/shop/product with slug returns 200 or 404 or 503", async ({
@@ -244,6 +247,10 @@ test.describe.serial("Storefront HTTP matrix", () => {
       { failOnStatusCode: false },
     );
     expect([200, 404, 503]).toContain(res.status());
+    if (res.status() === 404 || res.status() === 503) {
+      expect(res.headers()["cache-control"]).toContain("no-store");
+      expect(res.headers()["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    }
   });
 
   test("GET /api/shop/search-suggest short query returns empty suggestions", async ({
@@ -252,6 +259,8 @@ test.describe.serial("Storefront HTTP matrix", () => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.get(`${base()}/api/shop/search-suggest?q=a`);
     expect(res.ok()).toBeTruthy();
+    expect(res.headers()["cache-control"]).toContain("public");
+    expect(res.headers()["pragma"]).toBeUndefined();
     const body = (await res.json()) as { suggestions?: unknown };
     expect(Array.isArray(body.suggestions)).toBe(true);
   });
@@ -262,6 +271,8 @@ test.describe.serial("Storefront HTTP matrix", () => {
       failOnStatusCode: false,
     });
     expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body).toEqual({ error: "Provide productSlug and/or medusaProductId" });
   });
 
   test("POST /api/reviews without session returns 401", async ({ request }) => {
@@ -304,7 +315,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
     expect(res.status()).toBe(400);
   });
 
-  test("POST /api/cart/medusa-bind bogus cart id returns 400", async ({
+  test("POST /api/cart/medusa-bind rejects unowned cart id", async ({
     request,
   }) => {
     await skipUnlessStorefrontReachable(request);
@@ -312,7 +323,9 @@ test.describe.serial("Storefront HTTP matrix", () => {
       data: { cartId: "cart_00000000000000000000000000000000" },
       failOnStatusCode: false,
     });
-    expect(res.status()).toBe(400);
+    // Ownership is checked before the Medusa lookup so callers cannot use this
+    // endpoint to probe whether another cart exists.
+    expect(res.status()).toBe(403);
   });
 
   test("POST /api/cart/abandonment invalid JSON returns 400", async ({

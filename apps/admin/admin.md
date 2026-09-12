@@ -70,7 +70,7 @@ The admin is a **staff-only** browser app. It integrates:
 
 **Typical request path**
 
-1. `GET /admin/...` matched by `middleware.ts` → NextAuth session required; JWT must have `role` `admin` or `staff`.
+1. `GET /admin/...` matched by `middleware.ts` -> Supabase Auth SSR session required; the platform user must have `role` `admin` or `staff`.
 2. Server page calls `requirePagePermission("<key>")` where implemented (see [section 13](#13-app-router-pages-every-route)); on deny → redirect `/admin?denied=<key>`.
 3. Data: **Medusa** via bridges + `medusa-admin-http` / `medusa-pos.ts`, or **Supabase** via `tryCreateSupabaseClient` + `@universal-music-store/platform-data`.
 
@@ -111,7 +111,7 @@ These match the **16** primary nav labels in `AdminSidebar.tsx`. Use this table 
 | Framework            | Next.js 15 (App Router)                                                                                            |
 | UI                   | React 18, Tailwind CSS (shared config), Google fonts: Plus Jakarta Sans (`--font-headline`), Inter (`--font-body`) |
 | Icons                | Material Symbols Outlined (linked in `app/layout.tsx`)                                                             |
-| Session              | NextAuth.js, JWT strategy, Google OAuth provider                                                                   |
+| Session              | Supabase Auth SSR, cookie sessions, Google OAuth provider                                                          |
 | Commerce client      | `@medusajs/js-sdk`, raw `fetch` via `medusaAdminFetch`                                                             |
 | Shared env / URLs    | `@universal-music-store/sdk` (`medusa-env.ts`, etc.)                                                               |
 | RBAC / platform data | `@universal-music-store/database` re-exporting `@universal-music-store/platform-data`                              |
@@ -128,7 +128,7 @@ apps/admin/
   next.config.js
   src/
     app/
-      layout.tsx                # Root: fonts, NextAuthSessionProvider, LenisProvider, VercelWebAnalytics, globals.css
+      layout.tsx                # Root: fonts, SupabaseSessionProvider, LenisProvider, VercelWebAnalytics, globals.css
       page.tsx                  # Redirects "/" -> "/admin"
       globals.css
       (dashboard)/
@@ -196,7 +196,7 @@ apps/admin/
 - Sets `metadata` (title, description, favicons).
 - Loads Material Symbols stylesheet.
 - Wraps children with:
-  - `NextAuthSessionProvider` (`components/NextAuthSessionProvider.tsx`)
+  - `SupabaseSessionProvider` (`components/SupabaseSessionProvider.tsx`)
   - `LenisProvider` (`components/LenisProvider.tsx`)
 - Renders `VercelWebAnalytics` (`components/VercelWebAnalytics.tsx`).
 - Body classes: `bg-surface text-on-surface antialiased`.
@@ -426,7 +426,7 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 
 - **`/admin/chat-orders`:** **Chat intake** list plus **`ChatIntakeForm`** for manual or internal intake posts. `chat_orders:manage`.
 
-- **`/admin/settings/payments`:** Regions and **payment providers** from Medusa, with **`PaymentProviderLabel`**. Read-focused; `settings:read`.
+- **`/admin/settings/payments`:** Regions and **payment providers** from Medusa with provider labels rendered by the settings page. Read-focused; `settings:read`.
 
 - **`/admin/settings/storefront`:** **`StorefrontHomeEditor`** — JSON or structured editor for homepage payload persisted via `/api/admin/storefront-home` (Supabase). `settings:read`.
 
@@ -464,7 +464,7 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 
 | Matcher                    | Behavior                                                              |
 | -------------------------- | --------------------------------------------------------------------- |
-| `/admin/:path*`            | NextAuth `withAuth`; `authorized`: `token.role` is `admin` or `staff` |
+| `/admin/:path*`            | Supabase Auth SSR middleware; platform role must be `admin` or `staff` |
 | `/api/admin/:path*`        | Same                                                                  |
 | `/api/integrations/:path*` | Same, except exceptions below                                         |
 
@@ -475,14 +475,14 @@ Short guide to **what appears to the right of the sidebar** for every staff dest
 | `/api/integrations/channels/webhook`   | `NextResponse.next()` — external channel partners POST here                                        |
 | `/api/integrations/chat-orders/intake` | `NextResponse.next()` only if header `x-internal-key` equals `INTERNAL_CHAT_INTAKE_KEY` (when set) |
 
-**Sign-in page configured:** `pages: { signIn: "/api/auth/signin" }` (NextAuth default route).
+**Sign-in page configured:** `/sign-in` starts Google OAuth through Supabase and returns through `/api/auth/callback`.
 
 ---
 
 ## 7. Authentication (`lib/auth.ts`)
 
 - **Provider:** Google OAuth (`GoogleProvider`).
-- **Env:** Root `.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (storefront), and `ADMIN_NEXTAUTH_URL` (e.g. `http://localhost:3001` for staff OAuth on the admin origin).
+- **Env:** Root `.env`: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `AUTH_SECRET`. Google provider credentials are configured in the Supabase project, not in application env files.
 - **Sign-in flow:** `signIn` callback uses Supabase `tryCreateSupabaseClient`, `upsertOAuthUser`, `isStaffRole`; optional allowlist `ADMIN_ALLOWED_EMAILS` (comma-separated).
 - **JWT/session:** Permissions loaded via `resolveStaffPermissionsForUserId` with **in-memory cache** (`PERMISSIONS_CACHE_TTL_MS` = 60s) keyed by email.
 - **Session object:** Includes `user.permissions` (string array) for RBAC in UI and API routes.
@@ -573,10 +573,10 @@ receipts:send
 | `customers-bridge.ts`              | CRM customer list via Medusa                                                                                             | Yes                      |
 | `analytics-bridge.ts`              | Summary + charts from order data via `fetchMedusaOrdersForAdmin`                                                         | Yes (derived)            |
 | `analytics-chart.ts`               | Chart payload building + tests                                                                                           | Medusa-derived           |
-| `auth.ts`                          | NextAuth options                                                                                                         | Supabase                 |
+| `auth.ts`                          | Supabase Auth SSR user/session resolution                                                                               | Supabase                 |
 | `require-page-permission.ts`       | Server redirect guard                                                                                                    | —                        |
 | `require-admin-supabase.ts`        | Supabase client or 503 for admin APIs                                                                                    | Supabase                 |
-| `requireStaffSession.ts`           | Staff session check helper                                                                                               | NextAuth                 |
+| `requireStaffSession.ts`           | Staff session and platform RBAC check helper                                                                             | Supabase Auth SSR        |
 | `channel-events-bridge.ts`         | Channel webhook events list                                                                                              | Supabase                 |
 | `chat-intake-bridge.ts`            | Chat order intake rows                                                                                                   | Supabase                 |
 | `channel-webhook-policy.ts`        | Webhook policy validation + tests                                                                                        | —                        |
@@ -599,11 +599,10 @@ receipts:send
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AdminSidebar.tsx`              | Fixed nav; permission-filtered links (see section 5.3)                                                                                                                   |
 | `AdminTechnicalDetails.tsx`     | Client: collapsible `<details>` for IT/developer copy                                                                                                                    |
-| `NextAuthSessionProvider.tsx`   | SessionProvider wrapper                                                                                                                                                  |
+| `SupabaseSessionProvider.tsx`   | Supabase browser session wrapper                                                                                                                                       |
 | `LenisProvider.tsx`             | Smooth scroll                                                                                                                                                            |
 | `VercelWebAnalytics.tsx`        | Vercel analytics                                                                                                                                                         |
 | `StorefrontHomeEditor.tsx`      | Client: homepage CMS JSON editor; calls `/api/admin/storefront-home`                                                                                                     |
-| `PaymentProviderLabel.tsx`      | Friendly label for payment provider id                                                                                                                                   |
 | `ChatIntakeForm.tsx`            | Chat intake form posting to integrations API                                                                                                                             |
 | `InventoryTableWithRefresh.tsx` | Client inventory table + refresh via `/api/admin/inventory`                                                                                                              |
 | `FulfillmentPanel.tsx`          | Order fulfillment; `fetch` to `/api/medusa/shipments`, `/api/integrations/couriers`                                                                                      |
@@ -657,7 +656,7 @@ Legend: **Perm** = `requirePagePermission`. **Data** = primary backend. **Medusa
 | `/admin/devices`             | Client | —                     | Device registry                                                 | `/api/admin/devices`                                   | Supabase                                                    |
 | `/admin/channels`            | RSC    | `channels:manage`     | Channel events table                                            | `fetchRecentChannelEvents`                             | Supabase                                                    |
 | `/admin/chat-orders`         | RSC    | `chat_orders:manage`  | `ChatIntakeForm` + list                                         | `fetchRecentChatIntake`                                | Supabase                                                    |
-| `/admin/settings/payments`   | RSC    | `settings:read`       | Payment tables, `PaymentProviderLabel`                          | `fetchMedusaPaymentProvidersBundle`                    | Admin API regions/products                                  |
+| `/admin/settings/payments`   | RSC    | `settings:read`       | Payment tables and provider labels                              | `fetchMedusaPaymentProvidersBundle`                    | Admin API regions/products                                  |
 | `/admin/settings/storefront` | RSC    | `settings:read`       | `StorefrontHomeEditor`                                          | `/api/admin/storefront-home`                           | Supabase                                                    |
 | `/admin/cms`                 | RSC    | `content:read`        | Hub grid of CMS sections                                        | —                                                      | —                                                           |
 | `/admin/cms/pages`           | RSC    | `content:read`        | `CmsPagesManager`                                               | `/api/admin/cms/pages`                                 | Supabase                                                    |
@@ -683,7 +682,7 @@ Paths are relative to `src/app/api/`.
 
 | Path                          | Purpose           |
 | ----------------------------- | ----------------- |
-| `auth/[...nextauth]/route.ts` | NextAuth handlers |
+| `auth/callback/route.ts` | Supabase Auth SSR code exchange |
 
 ### Staff admin — CMS
 
@@ -790,8 +789,8 @@ Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supaba
 
 | Variable                                                                                                              | Used for                                     |
 | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `NEXTAUTH_URL`, `NEXTAUTH_SECRET`                                                                                     | NextAuth session                             |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`                                                                            | Admin Google sign-in                         |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `AUTH_SECRET`                                                                    | Supabase Auth SSR session                    |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                                                    | Browser Supabase client                      |
 | `ADMIN_ALLOWED_EMAILS`                                                                                                | Optional allowlist for new staff OAuth users |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`                                                      | Staff DB, RBAC, platform APIs                |
 | `MEDUSA_BACKEND_URL`, `NEXT_PUBLIC_MEDUSA_URL`                                                                        | Medusa base URL                              |
@@ -801,6 +800,7 @@ Internal ADRs: `internal/docs/adr/0001-medusa-system-of-record.md`, `0002-supaba
 | `MEDUSA_SALES_CHANNEL_ID`, `NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID`                                                      | Sales channel                                |
 | `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID`                                                                              | Default payment provider hint                |
 | `CHANNEL_WEBHOOK_SECRET`                                                                                              | Channel webhook HMAC                         |
+| `CHANNEL_TENANT_KEY`                                                                                                  | Server-side channel event tenant scope       |
 | `INTERNAL_CHAT_INTAKE_KEY`                                                                                            | Chat intake API key                          |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                  | Distributed admin rate limiting              |
 | `ADMIN_STEP_UP_REQUIRED`, `ADMIN_STEP_UP_SECRET`                                                                      | Short-lived assertions for dangerous writes  |
@@ -1205,7 +1205,7 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 |                  |                                                                                                                                                             |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Architecture** | Read-only view of **regions** and **payment providers** configured in Medusa (which providers are enabled per region).                                      |
-| **Codebase**     | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `components/PaymentProviderLabel.tsx`, `api/admin/medusa/payment-providers/route.ts` |
+| **Codebase**     | `admin/settings/payments/page.tsx`, `lib/payment-providers-bridge.ts`, `api/admin/medusa/payment-providers/route.ts` |
 | **Medusa**       | **`medusaAdminFetch`** to list regions and payment collections / providers (see bridge).                                                                    |
 
 **Layout ASCII**
@@ -1213,7 +1213,7 @@ Browser --GET /admin/...--> middleware (staff/admin JWT)
 ```
 +-----------------------------------------------------------+
 | HEADER: Payments (settings)                               |
-| TABLES: regions x providers, <PaymentProviderLabel />     |
+| TABLES: regions x providers, provider labels                |
 +-----------------------------------------------------------+
 ```
 
@@ -1581,7 +1581,7 @@ Surfaces **which payment providers Medusa exposes per region** so staff can conf
 
 **Key components / features**
 
-- `fetchMedusaPaymentProvidersBundle`, `PaymentProviderLabel`, `/api/admin/medusa/payment-providers`.
+- `fetchMedusaPaymentProvidersBundle`, `/api/admin/medusa/payment-providers`.
 
 **MoSCoW**
 

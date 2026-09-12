@@ -52,9 +52,9 @@ Focused runs: `node stress-test/scripts/run-e2e.js --grep @layout` or pass a sin
 
 For `flows/admin-operations-flow.spec.ts` and `flows/admin-e2e-credentials.spec.ts`:
 
-1. Root `.env.local`: `ADMIN_ALLOWED_EMAILS` (first email is the actor), `NEXTAUTH_SECRET` (password on `/sign-in/e2e`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the usual admin/Medusa vars used by `pnpm run dev`.
+1. Root `.env.local`: `ADMIN_ALLOWED_EMAILS` (first email is the actor), `AUTH_SECRET` (password on `/sign-in/e2e`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the usual admin/Medusa vars used by `pnpm run dev`.
 2. Run `pnpm e2e:ensure-staff` once per environment. If the first email is **staff** in Supabase, the script sets `staff_permission_grants` to `*`. If that user is already **admin**, the script makes no changes (admin sessions already resolve to wildcard permissions).
-3. Playwright must target the admin origin: `PLAYWRIGHT_ADMIN_NEXTAUTH_URL=http://localhost:3001` (already defaulted in `playwright.config.ts` for the admin dev server).
+3. Playwright must target the admin origin: `PLAYWRIGHT_ADMIN_URL=http://localhost:3001` (already defaulted in `playwright.config.ts` for the admin dev server).
 
 ### Manual checklist
 

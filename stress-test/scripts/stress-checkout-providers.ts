@@ -13,7 +13,7 @@
  * NEXT_PUBLIC_MEDUSA_URL, sandbox keys for each provider you expect to load.
  *
  * Optional: MEDUSA_SECRET_API_KEY for Admin API verification (order list).
- * Optional: DATABASE_URL + --with-db to SELECT recent orders via pg (from apps/medusa).
+ * Optional: MEDUSA_DB_URL + --with-db to SELECT recent orders via pg (from apps/medusa).
  * Optional: STRESS_CHECKOUT_VARIANT_ID=variant_... to pin the catalog variant (e.g. from admin).
  * Optional: STRESS_CHECKOUT_PRODUCT_ID=prod_... + MEDUSA_SECRET_API_KEY resolves first variant when store list is empty.
  * Pinned prod_/variant_ ids: script can publish draft + link MEDUSA_SALES_CHANNEL_ID unless STRESS_CHECKOUT_NO_PREPARE=1.
@@ -270,8 +270,8 @@ async function queryRecentOrdersPg() {
   } catch {
     throw new Error("Could not load pg from apps/medusa/node_modules/pg");
   }
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error("DATABASE_URL is not set");
+  const connectionString = process.env.MEDUSA_DB_URL?.trim();
+  if (!connectionString) throw new Error("MEDUSA_DB_URL is not set");
   const client = new Client({ connectionString });
   await client.connect();
   try {
@@ -434,13 +434,18 @@ async function ensureProductSellableForStore(baseUrl, secret, productId, opts) {
 
 async function getProductIdForVariantAdmin(baseUrl, secret, variantId) {
   const fields = encodeURIComponent("id,product_id,*product");
+  const query = new URLSearchParams({
+    id: variantId,
+    limit: "1",
+    fields,
+  });
   const res = await fetch(
-    `${baseUrl}/admin/product-variants/${encodeURIComponent(variantId)}?fields=${fields}`,
+    `${baseUrl}/admin/product-variants?${query.toString()}`,
     { headers: { Authorization: secretApiKeyBasicAuthorization(secret) } },
   );
   if (!res.ok) return null;
   const j = await res.json();
-  const v = j.variant;
+  const v = Array.isArray(j.variants) ? j.variants[0] : null;
   const pid =
     (typeof v?.product_id === "string" ? v.product_id : null) ??
     (v?.product && typeof v.product.id === "string" ? v.product.id : null);
@@ -881,10 +886,10 @@ async function main() {
     );
   }
 
-  if (args.withDb && process.env.DATABASE_URL?.trim()) {
+  if (args.withDb && process.env.MEDUSA_DB_URL?.trim()) {
     try {
       const rows = await queryRecentOrdersPg();
-      console.log("\nDATABASE_URL: recent order rows:", rows);
+      console.log("\nMEDUSA_DB_URL: recent order rows:", rows);
       await fs.appendFile(
         reportPath,
         JSON.stringify({

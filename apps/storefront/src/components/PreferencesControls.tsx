@@ -9,7 +9,9 @@ import {
 } from "@universal-music-store/user-preferences";
 
 export function PreferencesControls() {
-  const [prefs, setPrefs] = useState<StorefrontPreferences>(defaultStorefrontPreferences);
+  const [prefs, setPrefs] = useState<StorefrontPreferences>(
+    defaultStorefrontPreferences,
+  );
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
@@ -28,6 +30,10 @@ export function PreferencesControls() {
       <h2 className="font-headline text-lg font-bold text-primary">
         Your preferences
       </h2>
+      <p className="text-xs text-on-surface-variant">
+        These settings are saved on this device only. They do not change
+        checkout currency, shipping availability, or account data.
+      </p>
 
       <div className="flex flex-col gap-1">
         <label
@@ -40,7 +46,9 @@ export function PreferencesControls() {
           id="pref-lang"
           value={prefs.language}
           onChange={(e) =>
-            update({ language: e.target.value as StorefrontPreferences["language"] })
+            update({
+              language: e.target.value as StorefrontPreferences["language"],
+            })
           }
           className="w-full max-w-xs rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary"
         >
@@ -48,8 +56,8 @@ export function PreferencesControls() {
           <option value="fil">Filipino</option>
         </select>
         <p className="text-xs text-on-surface-variant mt-1">
-          Product content and UI copy will display in your selected language when translations are
-          available.
+          Product content and UI copy will display in your selected language
+          when translations are available.
         </p>
       </div>
 
@@ -65,7 +73,8 @@ export function PreferencesControls() {
           value={prefs.measurementUnit}
           onChange={(e) =>
             update({
-              measurementUnit: e.target.value as StorefrontPreferences["measurementUnit"],
+              measurementUnit: e.target
+                .value as StorefrontPreferences["measurementUnit"],
             })
           }
           className="w-full max-w-xs rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary"
@@ -89,7 +98,9 @@ export function PreferencesControls() {
           id="pref-density"
           value={prefs.density}
           onChange={(e) =>
-            update({ density: e.target.value as StorefrontPreferences["density"] })
+            update({
+              density: e.target.value as StorefrontPreferences["density"],
+            })
           }
           className="w-full max-w-xs rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary"
         >
@@ -110,7 +121,10 @@ export function PreferencesControls() {
           className="mt-1 h-4 w-4 rounded border-outline-variant/40 text-primary focus:ring-primary"
         />
         <div>
-          <label htmlFor="pref-motion" className="text-sm font-medium text-on-surface">
+          <label
+            htmlFor="pref-motion"
+            className="text-sm font-medium text-on-surface"
+          >
             Reduce motion
           </label>
           <p className="text-xs text-on-surface-variant mt-1">
@@ -119,11 +133,14 @@ export function PreferencesControls() {
         </div>
       </div>
 
-      {saved ? (
-        <p className="text-xs text-emerald-700" role="status">
-          Preferences saved to this device.
-        </p>
-      ) : null}
+      <p
+        className="text-xs text-emerald-700"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {saved ? "Preferences saved to this device." : ""}
+      </p>
     </section>
   );
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 import {
@@ -12,7 +11,7 @@ import {
   CardTitle,
 } from "@universal-music-store/ui";
 import { AdminGoogleSignInButton } from "@/components/AdminGoogleSignInButton";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 
 const storefrontUrl =
   process.env.NEXT_PUBLIC_STOREFRONT_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
@@ -27,7 +26,7 @@ export default async function AdminSignInPage({
 }: {
   searchParams: Promise<{ callbackUrl?: string }>;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
   const role = session?.user?.role as string | undefined;
   if (role === "admin" || role === "staff") {
     redirect("/admin");

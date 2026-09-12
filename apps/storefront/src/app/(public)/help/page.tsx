@@ -51,8 +51,8 @@ const cards: { title: string; description: string; href: string }[] = [
     href: "/contact",
   },
   {
-    title: "Region & language",
-    description: "Currency (PHP), English UI, Philippines-first shipping.",
+    title: "Local preferences",
+    description: "Device-local language, layout, measurement, and motion settings.",
     href: "/preferences",
   },
 ];

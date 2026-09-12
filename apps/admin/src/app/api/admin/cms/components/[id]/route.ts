@@ -13,6 +13,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { cmsComponentActionSchema, cmsComponentWriteSchema } from "@/lib/cms-component-contract";
 import type { CmsComponentDefinition } from "@universal-music-store/platform-data";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -39,7 +40,9 @@ async function patch(req: NextRequest, ctx: Context) {
   const resolved = await context(req, ctx);
   if ("response" in resolved) return resolved.response;
   if (!resolved.auth.ok || !resolved.auth.session) return correlatedError(resolved.requestId, 401, "Unauthorized", "UNAUTHORIZED");
-  const parsed = cmsComponentWriteSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 512 * 1024);
+  if (body.tooLarge) return correlatedError(resolved.requestId, 413, "Request body is too large", "BAD_REQUEST");
+  const parsed = cmsComponentWriteSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success || parsed.data.definition.id !== resolved.id) return correlatedError(resolved.requestId, 400, "Invalid component definition", "VALIDATION_ERROR");
   const current = await getCmsComponentDefinitionForOrganization(resolved.sup.client, resolved.organization.id, resolved.id);
   if (!current || parsed.data.expectedVersion === undefined) return correlatedError(resolved.requestId, 409, "Component version required", "CONFLICT");
@@ -57,7 +60,9 @@ async function patch(req: NextRequest, ctx: Context) {
 async function post(req: NextRequest, ctx: Context) {
   const resolved = await context(req, ctx);
   if ("response" in resolved) return resolved.response;
-  const parsed = cmsComponentActionSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 8 * 1024);
+  if (body.tooLarge) return correlatedError(resolved.requestId, 413, "Request body is too large", "BAD_REQUEST");
+  const parsed = cmsComponentActionSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedError(resolved.requestId, 400, "Invalid component action", "VALIDATION_ERROR");
   const saved = await publishCmsComponentDefinition(resolved.sup.client, resolved.organization.id, resolved.id, parsed.data.expectedVersion, resolved.auth.session?.user?.email ?? undefined);
   if (!saved) return correlatedError(resolved.requestId, 409, "Component changed; reload and retry", "CONFLICT");

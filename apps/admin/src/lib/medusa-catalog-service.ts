@@ -430,7 +430,7 @@ export async function fetchCatalogProductDetail(
   }
 }
 
-export async function fetchFirstShippingProfileId(): Promise<string | null> {
+async function fetchFirstShippingProfileId(): Promise<string | null> {
   const sdk = getMedusaAdminSdk();
   if (!sdk) return null;
   try {

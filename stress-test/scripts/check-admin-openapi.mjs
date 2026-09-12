@@ -11,6 +11,10 @@ const apiRoot = path.join(root, "apps", "admin", "src", "app", "api");
 const documentPath = path.join(root, "internal", "reference", "admin-open-api.yaml");
 const documentSource = fs.readFileSync(documentPath, "utf8");
 
+if (!/    ProblemResponse:\n/.test(documentSource) || !/required: \[type, title, status, detail, error, code, requestId, retryable\]/.test(documentSource)) {
+  throw new Error("Admin OpenAPI must define the strict RFC problem response schema.");
+}
+
 function walkRoutes(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -87,6 +91,9 @@ for (let index = 0; index < operationBlocks.length; index += 2) {
   }
   if (/^      x-idempotency-required: true$/m.test(block) && !/^        - name: Idempotency-Key$/m.test(block) && !/webhook/i.test(block)) {
     throw new Error("Every non-webhook mutation must document its Idempotency-Key header.");
+  }
+  if (!/application\/problem\+json:[\s\S]*?\$ref: '#\/components\/schemas\/ProblemResponse'/.test(block)) {
+    throw new Error("Every documented admin operation must reference ProblemResponse for declared errors.");
   }
 }
 console.log("[admin-openapi] " + actual.size + " route operations match the checked-in reference");

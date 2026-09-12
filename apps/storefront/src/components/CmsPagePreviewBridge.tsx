@@ -4,6 +4,7 @@ import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { sanitizeSafeUrl } from "@universal-music-store/sdk";
 import { z } from "zod";
 import { useEffect } from "react";
+import { normalizeCmsDomStyle } from "@/lib/cms-dom-edit";
 
 type DraftBlock = {
   id: string;
@@ -165,36 +166,6 @@ function applyAccessibility(node: HTMLElement, value: unknown): HTMLElement {
   return node;
 }
 
-const editableDomStyles = new Set([
-  "display",
-  "position",
-  "width",
-  "height",
-  "margin",
-  "padding",
-  "color",
-  "background-color",
-  "font-size",
-  "font-weight",
-  "border-radius",
-  "gap",
-  "align-items",
-  "justify-content",
-  "grid-template-columns",
-  "min-width",
-  "max-width",
-  "min-height",
-  "max-height",
-  "line-height",
-  "letter-spacing",
-  "border",
-  "box-shadow",
-  "object-fit",
-  "object-position",
-  "background-size",
-  "background-position",
-]);
-
 const builderMessageSchema = z.object({
   source: z.string().max(64),
   id: z.string().max(200).optional(),
@@ -218,13 +189,27 @@ function applyDomEdit(node: HTMLElement, property: string, value: string) {
     setSafeUrl(node, value, "src");
     return node.hasAttribute("src");
   }
-  if (property.startsWith("style.") && editableDomStyles.has(property.slice(6))) {
-    const cssProperty = property.slice(6);
-    if (value.length > 200 || /[{};]/.test(value) || /url\s*\(/i.test(value)) return false;
-    node.style.setProperty(cssProperty, value);
+  const styleProperty = normalizeCmsDomStyle(property, value);
+  if (styleProperty) {
+    node.style.setProperty(styleProperty.slice(6), value);
     return true;
   }
   return false;
+}
+
+function applyDomOverrides(root: HTMLElement, value: unknown) {
+  if (!isRecord(value)) return;
+  for (const [nodeId, properties] of Object.entries(value)) {
+    if (!isRecord(properties) || nodeId.length > 200) continue;
+    const node = [
+      root,
+      ...Array.from(root.querySelectorAll<HTMLElement>("[data-cms-id]")),
+    ].find((candidate) => candidate.dataset.cmsId === nodeId);
+    if (!node) continue;
+    for (const [property, next] of Object.entries(properties)) {
+      if (typeof next === "string") applyDomEdit(node, property, next);
+    }
+  }
 }
 
 function applyDraft(root: HTMLElement, block: DraftBlock) {
@@ -269,6 +254,7 @@ function applyDraft(root: HTMLElement, block: DraftBlock) {
   if (isRecord(block.styles)) {
     for (const [key, value] of Object.entries(block.styles)) setSafeStyle(root, `--cms-${key}`, value);
   }
+  applyDomOverrides(root, props.domOverrides);
 }
 
 function enableInlineEditing() {
@@ -290,8 +276,9 @@ function decorateEditorNodes() {
       "*:not(script):not(style):not(noscript)",
     ),
   );
-  nodes.forEach((node) => {
-    if (!node.dataset.cmsId) {
+    nodes.forEach((node) => {
+      node.dataset.uvsId ??= node.dataset.cmsId;
+      if (!node.dataset.cmsId) {
       const path: number[] = [];
       let current: Element | null = node;
       while (current && current !== document.body) {
@@ -303,7 +290,8 @@ function decorateEditorNodes() {
         );
         current = current.parentElement;
       }
-      node.dataset.cmsId = `cms-dom-${path.join("-")}`;
+        node.dataset.cmsId = `cms-dom-${path.join("-")}`;
+        node.dataset.uvsId = node.dataset.cmsId;
       node.dataset.cmsGenerated = "true";
       node.dataset.cmsLabel =
         node.getAttribute("aria-label") ||
@@ -428,12 +416,13 @@ export function CmsPagePreviewBridge() {
         const value = message.data.value ?? "";
         if (!selectedNode || selectedNode.dataset.cmsId !== id || !property || value.length > 100_000) return;
         if (!applyDomEdit(selectedNode, property, value)) return;
+        const mutationProperty = normalizeCmsDomStyle(property, value) ?? property;
         window.parent.postMessage(
           {
             source: "cms-builder-dom-mutation",
             id,
             blockId: selectedNode.dataset.cmsBlockId ?? null,
-            prop: property,
+            prop: mutationProperty,
             value,
           },
           origin,

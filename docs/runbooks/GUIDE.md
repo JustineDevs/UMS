@@ -4,24 +4,23 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## Fly.io (Backend Hosting)
+## Cloudflare Workers (Backend)
 
-**URL:** https://fly.io
+**URL:** https://dash.cloudflare.com
 
-**What you get:** A production runtime for the Medusa commerce backend. The deployment produces a URL such as `https://universal-music-store-medusa.fly.dev`.
+**What you get:** The Wrangler-managed public backend at the Worker URL configured in `API_URL`. Worker-native route handlers execute commerce and compliance contracts directly.
 
-**Payment required?** Fly.io billing and machine pricing apply. Keep at least one machine running for checkout and webhook availability.
+The backend runs as a Worker with Hyperdrive and Cloudflare Queues.
 
 **Steps:**
 
-1. Install `flyctl` and sign in with `fly auth login`.
-2. From the repository root, review `fly.toml` and change `app` if the name is unavailable.
-3. Create the app without generating a second configuration: `fly apps create universal-music-store-medusa`.
-4. Set runtime secrets with `fly secrets set --app universal-music-store-medusa DATABASE_URL=... JWT_SECRET=... COOKIE_SECRET=... STORE_CORS=... ADMIN_CORS=... AUTH_CORS=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...`.
-5. Deploy from the repository root: `fly deploy --config fly.toml --remote-only`.
-6. Verify `https://universal-music-store-medusa.fly.dev/health` returns HTTP 200 before pointing Vercel at it.
+1. Install Wrangler or use `pnpm dlx wrangler` and run `wrangler login`.
+2. Configure the required Worker secrets listed in the Cloudflare deployment checklist. Do not create `MEDUSA_ORIGIN_URL` or `COMPLIANCE_ORIGIN_URL`; route handlers run in the Worker runtime.
+3. Deploy the preview Worker from the `dev` branch with `pnpm backend:worker:deploy`.
+4. Deploy production only after the reviewed `dev` to `main` pull request with `pnpm backend:worker:deploy:production`.
+5. Verify `${API_URL}/healthz` returns HTTP 200 before pointing Vercel at it.
 
-Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in `fly.toml`, Docker build arguments, or git. Fly secrets are injected at runtime.
+Do not put database URLs, JWT secrets, cookie secrets, provider keys, or Supabase service keys in Wrangler `vars` or git. Secrets are injected at runtime. The Worker must not receive direct database credentials.
 
 ---
 
@@ -107,13 +106,13 @@ Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys 
 
 | Service      | Signup fee | To get API keys      | For live transactions  |
 |-------------|------------|----------------------|------------------------|
-| Fly.io      | No         | Account and billing setup | Paid machine runtime |
+| Cloudflare Workers | Yes | Cloudflare account, domain, Hyperdrive, and Queues | Worker route, database, queue, and provider checks |
 | Stripe      | No         | Free                 | % per transaction      |
 | PayPal      | No         | Free                 | % per transaction      |
 | Xendit      | No         | Business onboarding  | % per transaction      |
 | Tracking service | No      | Free tier OK         | Paid for higher volume |
 
-Hand these credentials to your developer. They will configure them in Fly.io or Vercel without committing secrets to the repository.
+Configure these credentials in Cloudflare Workers or Vercel without committing secrets to the repository.
 
 ## Production env files
 

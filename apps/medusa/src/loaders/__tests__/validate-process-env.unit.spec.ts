@@ -34,7 +34,7 @@ describe("validateMedusaProcessEnv", () => {
   beforeEach(() => {
     process.env = {
       ...originalEnv,
-      DATABASE_URL: "postgres://localhost:5432/test",
+      MEDUSA_DB_URL: "postgres://localhost:5432/test",
       NODE_ENV: "development",
     };
   });
@@ -47,9 +47,9 @@ describe("validateMedusaProcessEnv", () => {
     expect(() => validateMedusaProcessEnv()).not.toThrow();
   });
 
-  it("throws when DATABASE_URL is missing", () => {
-    delete process.env.DATABASE_URL;
-    expect(() => validateMedusaProcessEnv()).toThrow("DATABASE_URL");
+  it("throws when MEDUSA_DB_URL is missing", () => {
+    delete process.env.MEDUSA_DB_URL;
+    expect(() => validateMedusaProcessEnv()).toThrow("MEDUSA_DB_URL");
   });
 
   it("throws when JWT_SECRET is 'supersecret' in production", () => {

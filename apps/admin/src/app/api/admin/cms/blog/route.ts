@@ -7,6 +7,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { cmsBlogSchema } from "@/lib/cms-route-contracts";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -24,7 +25,9 @@ async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const auth = await requireStaffApiSession("content:write");
   if (!auth.ok) return auth.response;
-  const parsed = cmsBlogSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 512 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = cmsBlogSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return correlatedJson(cid, { error: "Invalid blog payload" }, { status: 400 });
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;

@@ -107,7 +107,7 @@ export default async function FaqPage() {
 
       {hasCmsContent ? (
         <div className="mt-10">
-          <CmsBlocksRenderer blocks={cmsBlocks} />
+          {await CmsBlocksRenderer({ blocks: cmsBlocks })}
         </div>
       ) : (
         <dl className="mt-10 space-y-4">

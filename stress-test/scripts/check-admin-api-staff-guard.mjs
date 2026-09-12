@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fails if an apps/admin App Router API route.ts lacks an obvious auth guard pattern.
- * Allowlisted routes use NextAuth, HMAC webhooks, or internal keys instead of staff session.
+ * Allowlisted routes use Supabase Auth callbacks, HMAC webhooks, or internal keys.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -12,14 +12,15 @@ const root = process.cwd();
 const apiRoot = path.join(root, "apps", "admin", "src", "app", "api");
 
 const ALLOWLIST = new Set([
-  path.join(apiRoot, "auth", "[...nextauth]", "route.ts"),
+  path.join(apiRoot, "auth", "callback", "route.ts"),
+  path.join(apiRoot, "auth", "session", "route.ts"),
   path.join(apiRoot, "integrations", "channels", "webhook", "route.ts"),
 ]);
 
 const GUARD_RES = [
   /\brequireStaffSession\b/,
   /\brequireStaffApiSession\b/,
-  /\bgetServerSession\s*\(/,
+  /\bgetAdminSession\s*\(/,
   /\bstaffSessionAllows\b/,
   /\bINTERNAL_CHAT_INTAKE_KEY\b/,
   /\bx-internal-key\b/i,
@@ -53,7 +54,7 @@ for (const file of walkRoutes(apiRoot)) {
 
 if (failed) {
   console.error(
-    "[admin-api-guard] Add requireStaffSession, getServerSession, or documented internal/HMAC gate.",
+    "[admin-api-guard] Add requireStaffSession, getAdminSession, or documented internal/HMAC gate.",
   );
   process.exit(1);
 }

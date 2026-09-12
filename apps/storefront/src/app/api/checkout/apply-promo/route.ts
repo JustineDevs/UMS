@@ -4,6 +4,9 @@ import {
 } from "@/lib/storefront-medusa-env";
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { withBotIdProtection } from "@/lib/botid-protection";
+import { validateExistingCartBinding } from "@/lib/cart-session-boundary";
+import { isSameOriginMutation } from "@/lib/request-origin";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +37,13 @@ function parsePromoBody(body: unknown): PromoBody {
 async function handlePOST(req: Request) {
   const rl = await applyRateLimit(req, "apply-promo", 20, 60_000);
   if (!rl.ok) return rl.response;
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ ok: false, error: "Cross-site mutation rejected", code: "CROSS_SITE" }, { status: 403 });
+  }
 
-  const body = parsePromoBody(await req.json().catch(() => ({})));
+  const bounded = await parseBoundedJson(req, 4 * 1024);
+  if (bounded.tooLarge) return Response.json({ ok: false, error: "Request body is too large", code: "BODY_TOO_LARGE" }, { status: 413 });
+  const body = parsePromoBody(bounded.valid ? bounded.value : {});
   const cartId = body.cartId;
   const code = body.code;
 
@@ -43,6 +51,14 @@ async function handlePOST(req: Request) {
     return Response.json(
       { ok: false, error: "cartId and code are required", code: "MISSING_PARAMS" },
       { status: 400 },
+    );
+  }
+
+  const cookieCartId = await readCartIdFromCookie();
+  if (validateExistingCartBinding(cartId, cookieCartId).status !== 200) {
+    return Response.json(
+      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
+      { status: 403 },
     );
   }
 
@@ -88,18 +104,13 @@ async function handlePOST(req: Request) {
     const cart = json.cart as Record<string, unknown> | undefined;
     const discountAmount = extractDiscountAmount(cart);
     return Response.json({ ok: true, discountAmount });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to apply promo code";
-    return Response.json({ ok: false, error: msg, code: "REQUEST_FAILED" }, { status: 502 });
-  }
-
-  const cookieCartId = await readCartIdFromCookie();
-  if (!cookieCartId || cookieCartId !== cartId) {
+  } catch {
     return Response.json(
-      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
-      { status: 403 },
+      { ok: false, error: "The promotion service is temporarily unavailable.", code: "REQUEST_FAILED" },
+      { status: 502 },
     );
   }
+
 }
 
 /**
@@ -110,8 +121,13 @@ async function handlePOST(req: Request) {
 async function handleDELETE(req: Request) {
   const rl = await applyRateLimit(req, "remove-promo", 20, 60_000);
   if (!rl.ok) return rl.response;
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ ok: false, error: "Cross-site mutation rejected", code: "CROSS_SITE" }, { status: 403 });
+  }
 
-  const body = parsePromoBody(await req.json().catch(() => ({})));
+  const bounded = await parseBoundedJson(req, 4 * 1024);
+  if (bounded.tooLarge) return Response.json({ ok: false, error: "Request body is too large", code: "BODY_TOO_LARGE" }, { status: 413 });
+  const body = parsePromoBody(bounded.valid ? bounded.value : {});
   const cartId = body.cartId;
   const code = body.code;
 
@@ -119,6 +135,14 @@ async function handleDELETE(req: Request) {
     return Response.json(
       { ok: false, error: "cartId and code are required", code: "MISSING_PARAMS" },
       { status: 400 },
+    );
+  }
+
+  const cookieCartId = await readCartIdFromCookie();
+  if (validateExistingCartBinding(cartId, cookieCartId).status !== 200) {
+    return Response.json(
+      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
+      { status: 403 },
     );
   }
 
@@ -146,26 +170,21 @@ async function handleDELETE(req: Request) {
     );
 
     if (!res.ok) {
-      const text = await res.text();
+      await res.text();
       return Response.json(
-        { ok: false, error: `Could not remove code: ${res.status} ${text}`, code: "MEDUSA_ERROR" },
+        { ok: false, error: "The promotion could not be removed.", code: "MEDUSA_ERROR" },
         { status: 422 },
       );
     }
 
     return Response.json({ ok: true });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Failed to remove promo code";
-    return Response.json({ ok: false, error: msg, code: "REQUEST_FAILED" }, { status: 502 });
-  }
-
-  const cookieCartId = await readCartIdFromCookie();
-  if (!cookieCartId || cookieCartId !== cartId) {
+  } catch {
     return Response.json(
-      { ok: false, error: "Cart ownership could not be verified", code: "CART_MISMATCH" },
-      { status: 403 },
+      { ok: false, error: "The promotion service is temporarily unavailable.", code: "REQUEST_FAILED" },
+      { status: 502 },
     );
   }
+
 }
 
 export const POST = withBotIdProtection(handlePOST);
@@ -183,7 +202,7 @@ function mapMedusaPromoError(json: Record<string, unknown>, code: string): strin
   if (/minimum|threshold|requirement/i.test(raw)) {
     return `Your order does not meet the minimum requirement for "${code}".`;
   }
-  return raw;
+  return `Promotion code "${code}" could not be applied.`;
 }
 
 function extractDiscountAmount(cart: Record<string, unknown> | undefined): number | undefined {

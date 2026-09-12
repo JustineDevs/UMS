@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import crypto from "node:crypto";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
 import { matchesReceiptSignature } from "@/lib/payment-receipt-signature";
+import { resolvePaymentReceiptOrganizationId } from "@/lib/payment-receipt-organization";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_MULTIPART_BODY_BYTES = MAX_FILE_SIZE_BYTES + 256 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 
 /**
@@ -23,9 +25,12 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "ap
  * Stores the file in Supabase Storage bucket `payment-receipts` and inserts
  * a row into `payment_receipts` table for admin review.
  *
- * Returns: { ok: true, receiptId: string, publicUrl: string }
+ * Returns a short-lived signed URL; the stored object is never public.
  */
 async function handlePOST(req: NextRequest) {
+  if (!isSameOriginMutation(req)) {
+    return NextResponse.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`upload-payment-receipt:${ip}`, 6, 60_000);
   if (!rl.ok) {
@@ -42,12 +47,17 @@ async function handlePOST(req: NextRequest) {
     return NextResponse.json({ error: "Storage not configured" }, { status: 503 });
   }
 
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const userId: string | null =
     ((session?.user as Record<string, unknown> | undefined)?.id as string | undefined) ?? null;
   const email = session?.user?.email?.trim().toLowerCase();
   if (!session?.user || !userId || !email) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const contentLength = Number(req.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_BODY_BYTES) {
+    return NextResponse.json({ error: "Receipt upload is too large" }, { status: 413 });
   }
 
   let formData: FormData;
@@ -67,6 +77,23 @@ async function handlePOST(req: NextRequest) {
   const customerOrders = await fetchCustomerOrders(email);
   if (!customerOrders.orders.some((order) => order.id === orderId)) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+
+  const { data: paymentAttempt } = await createClient(supabaseUrl, supabaseKey)
+    .from("payment_attempts")
+    .select("id,organization_id,customer_email")
+    .eq("medusa_order_id", orderId)
+    .eq("customer_email", email)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const organizationId = resolvePaymentReceiptOrganizationId({
+    paymentAttemptOrganizationId:
+      typeof paymentAttempt?.organization_id === "string" ? paymentAttempt.organization_id : null,
+    configuredOrganizationId: process.env.DEFAULT_ORGANIZATION_ID,
+  });
+  if (!organizationId) {
+    return NextResponse.json({ error: "Store organization is not configured" }, { status: 503 });
   }
 
   const file = formData.get("receipt");
@@ -119,8 +146,10 @@ async function handlePOST(req: NextRequest) {
     .insert({
       order_id: orderId,
       user_id: userId,
+      organization_id: organizationId,
+      payment_attempt_id: paymentAttempt?.id ?? null,
+      customer_email: email,
       storage_path: storagePath,
-      public_url: "",
       mime_type: mimeType,
       file_size_bytes: file.size,
       status: "pending_review",

@@ -1,5 +1,6 @@
 import { evaluatePosSalePolicy } from "@universal-music-store/omnichannel-policy";
 import { getShiftById } from "@universal-music-store/platform-data";
+import { claimPosSaleCommand, completePosSaleCommand } from "@universal-music-store/platform-data";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { medusaAdminFetch } from "@/lib/medusa-admin-http";
 import { patchMedusaOrderMetadata } from "@/lib/medusa-order-bridge";
@@ -35,13 +36,13 @@ function pruneInflight(): void {
 async function findOrderByPosOfflineId(
   offlineSaleId: string,
   organizationId: string,
-): Promise<{ display_id: unknown; id: string } | null> {
+): Promise<{ display_id: unknown; id: string; total?: unknown } | null> {
   const pageSize = 50;
   for (let offset = 0; offset < 200; offset += pageSize) {
     const qs = new URLSearchParams();
     qs.set("limit", String(pageSize));
     qs.set("offset", String(offset));
-    qs.set("fields", "id,display_id,metadata");
+    qs.set("fields", "id,display_id,total,metadata");
     qs.set("order", "-created_at");
     const res = await medusaAdminFetch(`/admin/orders?${qs.toString()}`);
     if (!res.ok) return null;
@@ -49,6 +50,7 @@ async function findOrderByPosOfflineId(
       orders?: Array<{
         id?: string;
         display_id?: unknown;
+        total?: unknown;
         metadata?: Record<string, unknown> | null;
       }>;
     };
@@ -59,9 +61,27 @@ async function findOrderByPosOfflineId(
         o.metadata?.organization_id === organizationId &&
         o.id
       ) {
-        return { id: o.id, display_id: o.display_id };
+        return { id: o.id, display_id: o.display_id, total: o.total };
       }
     }
+    if (orders.length < pageSize) break;
+  }
+  return null;
+}
+
+async function findOrderByPosMetadata(
+  field: "pos_offline_id" | "pos_idempotency_key",
+  value: string,
+  organizationId: string,
+): Promise<{ display_id: unknown; id: string; total?: unknown } | null> {
+  const pageSize = 50;
+  for (let offset = 0; offset < 200; offset += pageSize) {
+    const qs = new URLSearchParams({ limit: String(pageSize), offset: String(offset), fields: "id,display_id,total,metadata", order: "-created_at" });
+    const res = await medusaAdminFetch(`/admin/orders?${qs.toString()}`);
+    if (!res.ok) return null;
+    const orders = ((await res.json()) as { orders?: Array<{ id?: string; display_id?: unknown; total?: unknown; metadata?: Record<string, unknown> | null }> }).orders ?? [];
+    const found = orders.find((order) => order.id && order.metadata?.[field] === value && order.metadata?.organization_id === organizationId);
+    if (found?.id) return { id: found.id, display_id: found.display_id, total: found.total };
     if (orders.length < pageSize) break;
   }
   return null;
@@ -126,6 +146,16 @@ export async function POST(req: Request) {
           idempotencyKey,
           envReady: Boolean(adminSdk && regionId && salesChannelId),
           completedReplayOrderNumber: null,
+          claimDurableCommand: async ({ idempotencyKey, offlineSaleId }) => {
+            const sup = adminSupabaseOr503(correlationId);
+            if ("response" in sup) throw new Error("SUPABASE_UNAVAILABLE");
+            return claimPosSaleCommand(sup.client, { organizationId, idempotencyKey, offlineSaleId });
+          },
+          completeDurableCommand: async ({ idempotencyKey, orderId, orderNumber }) => {
+            const sup = adminSupabaseOr503(correlationId);
+            if ("response" in sup) throw new Error("SUPABASE_UNAVAILABLE");
+            await completePosSaleCommand(sup.client, { organizationId, idempotencyKey, orderId, orderNumber });
+          },
           findExistingOrderByOfflineSaleId: async (offlineSaleId) => {
             const existing = await findOrderByPosOfflineId(
               offlineSaleId,
@@ -140,7 +170,12 @@ export async function POST(req: Request) {
                 existing.display_id != null
                   ? String(existing.display_id)
                   : existing.id,
+              totalMinor: Number(existing.total ?? 0),
             };
+          },
+          findExistingOrderByIdempotencyKey: async (key) => {
+            const existing = await findOrderByPosMetadata("pos_idempotency_key", key, organizationId);
+            return existing ? { id: existing.id, displayId: existing.display_id != null ? String(existing.display_id) : existing.id, totalMinor: Number(existing.total ?? 0) } : null;
           },
           assertStock: async (items) => assertPosCartStock(items),
           loadShiftStatus: async (shiftId) => {
@@ -205,6 +240,7 @@ export async function POST(req: Request) {
             terminalId,
             totalMinor,
             idempotencyKey,
+            paymentMethod,
           }) => {
             const sup = adminSupabaseOr503(correlationId);
             if ("response" in sup) return false;
@@ -218,6 +254,7 @@ export async function POST(req: Request) {
                 total_minor: totalMinor,
                 currency: "PHP",
                 idempotency_key: idempotencyKey ?? null,
+                payment_method: paymentMethod,
               },
               { onConflict: "organization_id,order_id" },
             );

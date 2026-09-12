@@ -8,14 +8,17 @@ import { revalidatePath, revalidateTag } from "next/cache";
 
 import {
   buildCommerceInvalidationRevalidationPlan,
+  buildCmsInvalidationRevalidationPlan,
   type CommerceInvalidationClassification,
 } from "@/lib/commerce-invalidation-plan";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 export const dynamic = "force-dynamic";
 
 type Body = {
+  scope?: "commerce" | "cms";
   classification?: string;
   productHandles?: string[];
   productIds?: string[];
@@ -57,13 +60,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const parsedBody = await parseBoundedJson(req, 32 * 1024);
+  if (parsedBody.tooLarge) return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
+  if (!parsedBody.valid) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const body = parsedBody.value as Body;
 
+  const scope = body.scope === "cms" ? "cms" : "commerce";
   const productHandles = normalizeStrings(body.productHandles);
   const productIds = normalizeStrings(body.productIds);
   const variantIds = normalizeStrings(body.variantIds);
@@ -84,11 +86,13 @@ export async function POST(req: Request) {
       ? body.reason.trim()
       : "Your order changed after a catalog update. Review the updated total before continuing.";
 
-  const plan = buildCommerceInvalidationRevalidationPlan({
-    productHandles,
-    collectionHandlesLowercase: collectionHandles,
-    classification,
-  });
+  const plan = scope === "cms"
+    ? buildCmsInvalidationRevalidationPlan()
+    : buildCommerceInvalidationRevalidationPlan({
+        productHandles,
+        collectionHandlesLowercase: collectionHandles,
+        classification,
+      });
   const revalidatedTags = new Set(plan.tags);
   const revalidatedPaths = new Set(plan.paths);
 
@@ -99,7 +103,7 @@ export async function POST(req: Request) {
     revalidatePath(path);
   }
 
-  const expiresOpenPaymentAttempts =
+  const expiresOpenPaymentAttempts = scope === "commerce" &&
     (classification === "checkout_affecting" ||
       classification === "sellability_affecting") &&
     (variantIds.length > 0 || productIds.length > 0);
@@ -144,6 +148,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
+    scope,
     classification,
     revalidatedTags: [...revalidatedTags],
     revalidatedPaths: [...revalidatedPaths],

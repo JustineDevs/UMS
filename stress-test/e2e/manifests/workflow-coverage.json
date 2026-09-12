@@ -17,7 +17,7 @@
     },
     {
       "id": "admin-authenticated-surface-pass",
-      "prerequisites": ["ADMIN_ALLOWED_EMAILS", "NEXTAUTH_SECRET", "e2e:ensure-staff"],
+      "prerequisites": ["ADMIN_ALLOWED_EMAILS", "AUTH_SECRET", "e2e:ensure-staff"],
       "steps": ["sign-in /sign-in/e2e", "visit each ADMIN_OPERATION_PATH"],
       "outputs": ["no Application error in body"],
       "tags": ["@admin", "@workflow"]

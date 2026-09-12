@@ -1,4 +1,5 @@
 import nextDynamic from "next/dynamic";
+import { unstable_cache } from "next/cache";
 import { loadStorefrontHomeContentForPublic, storefrontSocialLinks } from "@universal-music-store/platform-data";
 import Link from "next/link";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
@@ -16,6 +17,12 @@ import {
   SITE_NAME,
 } from "@/lib/seo";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
+
+const getCachedPublicHomeContent = unstable_cache(
+  loadStorefrontHomeContentForPublic,
+  ["storefront-home-content"],
+  { revalidate: 60, tags: ["storefront:home"] },
+);
 
 const HomeScrollExperience = nextDynamic(
   () =>
@@ -47,11 +54,15 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ adminPreview?: string | string[] }>;
 }) {
+  const adminPreview = (await searchParams).adminPreview;
+  const isAdminPreview =
+    adminPreview === "1" ||
+    (Array.isArray(adminPreview) && adminPreview.includes("1"));
   const [featured, home] = await Promise.all([
     fetchFeaturedProducts(4),
-    loadStorefrontHomeContentForPublic(),
+    getCachedPublicHomeContent(),
   ]);
-  if (featured.kind !== "ok") {
+  if (featured.kind !== "ok" && !isAdminPreview) {
     return (
       <main className="storefront-page-shell max-w-[1600px] pb-12">
         <div className="mx-auto max-w-2xl space-y-6 pt-8">
@@ -87,11 +98,6 @@ export default async function HomePage({
     contactPhone: publicMeta?.supportPhone ?? null,
   });
   const webJsonLd = buildJsonLdWebSite();
-  const adminPreview = (await searchParams).adminPreview;
-  const isAdminPreview =
-    adminPreview === "1" ||
-    (Array.isArray(adminPreview) && adminPreview.includes("1"));
-
   return (
     <>
       <script
@@ -104,13 +110,13 @@ export default async function HomePage({
       />
       {isAdminPreview ? (
         <StorefrontHomePreviewBridge
-          products={featured.products}
+          products={featured.kind === "ok" ? featured.products : []}
           home={home}
           socialProof={{ customerCount, reviewSummary }}
         />
       ) : (
         <HomeScrollExperience
-          products={featured.products}
+          products={featured.kind === "ok" ? featured.products : []}
           home={home}
           socialProof={{ customerCount, reviewSummary }}
         />

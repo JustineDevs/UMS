@@ -10,7 +10,7 @@ import {
   Label,
   Textarea,
 } from "@universal-music-store/ui";
-import { getRecaptchaToken } from "@/components/RecaptchaScript";
+import { getRecaptchaToken, RecaptchaScript } from "@/components/RecaptchaScript";
 
 type SubmitStatus = "idle" | "sending" | "sent" | "error";
 
@@ -75,6 +75,7 @@ export function ContactSupportForm({
 
   return (
     <div className="space-y-6 font-body text-on-surface-variant" aria-live="polite">
+      <RecaptchaScript />
       {email ? (
         <p className="text-sm">
           <span className="font-medium text-primary">Email:</span>{" "}

@@ -36,7 +36,7 @@ export type DeliveryLogisticsOverview = {
   };
 };
 
-export async function getDeliveryLogisticsOverview(): Promise<DeliveryLogisticsOverview> {
+export async function getDeliveryLogisticsOverview(organizationId: string): Promise<DeliveryLogisticsOverview> {
   const coverage = buildDeliveryLogisticsCoverageMetadata();
   const [ordersResult, sup] = await Promise.all([
     fetchMedusaOrdersForAdmin(100),
@@ -54,8 +54,8 @@ export async function getDeliveryLogisticsOverview(): Promise<DeliveryLogisticsO
   const [shipments, events] =
     "client" in sup
       ? await Promise.all([
-          listDeliveryLogisticsShipments(sup.client, { limit: 25 }),
-          listDeliveryLogisticsEvents(sup.client, { limit: 25 }),
+          listDeliveryLogisticsShipments(sup.client, { limit: 25, organizationId }),
+          listDeliveryLogisticsEvents(sup.client, { limit: 25, organizationId }),
         ])
       : [[], []];
 

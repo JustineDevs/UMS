@@ -7,6 +7,7 @@ import {
 import { profileToCodCartAddresses } from "@/lib/medusa-profile-address";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { isSameOriginMutation } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,9 @@ export const dynamic = "force-dynamic";
  * Server-validated delivery identity for COD. Client must not invent addresses.
  */
 async function handlePOST(req: Request) {
+  if (!isSameOriginMutation(req)) {
+    return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
+  }
   const ip = getRequestIp(req);
   const rl = await rateLimitFixedWindow(`cod-cart-payload:${ip}`, 20, 60_000);
   if (!rl.ok) {

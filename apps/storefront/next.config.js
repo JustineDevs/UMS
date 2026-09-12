@@ -13,7 +13,13 @@ const {
 // Repo-root env files (e.g. MEDUSA_SECRET_API_KEY for checkout totals preview)
 loadMonorepoRootEnv(__dirname);
 
-const allowedDevOrigins = ["127.0.0.1"];
+const allowedDevOrigins = [
+  "127.0.0.1",
+  ...(process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
 
 function resolvePnpmEntry(packagePrefix, relativePath) {
   const storeDir = path.join(__dirname, "../../node_modules/.pnpm");
@@ -81,6 +87,10 @@ const entitiesDecodeEntry = resolvePnpmEntry(
   "entities@",
   path.join("entities", "lib", "decode.js"),
 );
+const icebergEntry = resolvePnpmEntry(
+  "iceberg-js@",
+  path.join("iceberg-js", "dist", "index.mjs"),
+);
 
 function imageRemotePatterns() {
   const raw =
@@ -131,6 +141,7 @@ function buildCsp() {
     "https://connect.facebook.net",
     "https://www.googletagmanager.com",
     "https://www.google-analytics.com",
+    "https://www.google.com",
     "https://www.recaptcha.net",
     "https://www.gstatic.com",
     "https://va.vercel-scripts.com",
@@ -142,6 +153,7 @@ function buildCsp() {
     "https://hooks.stripe.com",
     "https://www.paypal.com",
     "https://www.sandbox.paypal.com",
+    "https://www.google.com",
     "https://www.recaptcha.net",
   ];
 
@@ -159,6 +171,7 @@ function buildCsp() {
     "https://api.stripe.com",
     "https://www.paypal.com",
     "https://www.sandbox.paypal.com",
+    "https://www.google.com",
     "https://www.google-analytics.com",
     "https://region1.google-analytics.com",
     "https://connect.facebook.net",
@@ -222,16 +235,21 @@ function previewFrameAncestors() {
   const configured = (
     process.env.ADMIN_PREVIEW_ORIGINS ??
     process.env.NEXT_PUBLIC_ADMIN_URL ??
-    process.env.ADMIN_NEXTAUTH_URL ??
+    process.env.NEXT_PUBLIC_ADMIN_URL ??
     ""
   )
     .split(",")
     .map((value) => value.trim().replace(/\/$/, ""))
     .filter((value) => /^https?:\/\//.test(value));
-  if (configured.length) return configured;
-  return process.env.NODE_ENV === "production"
-    ? []
-    : ["http://localhost:3001", "http://127.0.0.1:3001"];
+  if (process.env.NODE_ENV === "production") return configured;
+  return [...new Set([
+    ...configured,
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    // The auth-disabled local admin server is used for browser verification.
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+  ])];
 }
 
 const siteOrigin = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(
@@ -294,7 +312,52 @@ const nextConfig = {
         source: "/api/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store, max-age=0" },
+        ],
+      },
+      {
+        // This public query-keyed endpoint is the sole API cache exception.
+        source: "/api/shop/search-suggest",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=5, s-maxage=60, stale-while-revalidate=300" },
+        ],
+      },
+      {
+        // The feed route exports GET only; review submission remains no-store.
+        source: "/api/reviews/feed",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
+        ],
+      },
+      {
+        source: "/track/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
           { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/order-confirmation/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/account/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
+        ],
+      },
+      {
+        source: "/checkout/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Referrer-Policy", value: "no-referrer" },
         ],
       },
       { source: "/((?!api|_next).*)", headers: discoveryHeaders },
@@ -310,7 +373,7 @@ const nextConfig = {
     ];
   },
   webpack: (config) => {
-    config.resolve.symlinks = false;
+    config.resolve.symlinks = true;
     config.resolve.alias = {
       ...config.resolve.alias,
       "@": path.resolve(__dirname, "src"),
@@ -320,6 +383,7 @@ const nextConfig = {
       ...(opentelemetryApiEntry ? { "@opentelemetry/api": opentelemetryApiEntry } : {}),
       ...xenditRuntimeDependencies,
       ...(entitiesDecodeEntry ? { "entities/lib/decode.js": entitiesDecodeEntry } : {}),
+      ...(icebergEntry ? { "iceberg-js$": icebergEntry } : {}),
     };
     return config;
   },

@@ -4,9 +4,14 @@ import { dispatchBackInStockNotifications } from "./back-in-stock-delivery.js";
 
 test("back-in-stock dispatch records provider success and marks the subscription notified", async () => {
   const events: string[] = [];
+  const consentQuery = {
+    eq: () => consentQuery,
+    maybeSingle: async () => ({ data: null, error: null }),
+  };
   const supabase = {
     from: () => ({
       upsert: async () => ({ error: null }),
+      select: () => consentQuery,
       update: (values: unknown) => {
         events.push(`update:${JSON.stringify(values)}`);
         return { eq: async () => ({ error: null }) };

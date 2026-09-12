@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  trackSearchSuggestionClick,
+  trackSearchSuggestionRequest,
+} from "@/lib/analytics";
 
 type Suggestion = { slug: string; name: string; minPrice: number };
 
@@ -41,32 +45,48 @@ export function CatalogSearchTypeahead({
   const [items, setItems] = useState<Suggestion[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const runSuggest = useCallback(
-    async (term: string) => {
-      const t = term.trim();
-      if (t.length < 2) {
-        setItems([]);
-        return;
-      }
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/shop/search-suggest?q=${encodeURIComponent(t)}`,
-        );
-        const data = (await res.json()) as { suggestions?: Suggestion[] };
-        setItems(Array.isArray(data.suggestions) ? data.suggestions : []);
-        setActiveIndex(-1);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
+  const runSuggest = useCallback(async (term: string) => {
+    const t = term.trim();
+    if (t.length < 2) {
+      requestRef.current?.abort();
+      setItems([]);
+      setSuggestionError(false);
+      setLoading(false);
+      return;
+    }
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setLoading(true);
+    setSuggestionError(false);
+    try {
+      const res = await fetch(
+        `/api/shop/search-suggest?q=${encodeURIComponent(t)}`,
+        { signal: controller.signal },
+      );
+      if (!res.ok) throw new Error("suggestions unavailable");
+      const data = (await res.json()) as { suggestions?: Suggestion[] };
+      if (controller.signal.aborted) return;
+      const nextItems = Array.isArray(data.suggestions) ? data.suggestions : [];
+      trackSearchSuggestionRequest({
+        queryLength: t.length,
+        resultCount: nextItems.length,
+      });
+      setItems(nextItems);
+      setActiveIndex(-1);
+    } catch {
+      if (controller.signal.aborted) return;
+      setItems([]);
+      setSuggestionError(true);
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -75,6 +95,7 @@ export function CatalogSearchTypeahead({
     }, 220);
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      requestRef.current?.abort();
     };
   }, [q, runSuggest]);
 
@@ -113,6 +134,7 @@ export function CatalogSearchTypeahead({
       <input
         id="catalog-typeahead"
         type="search"
+        aria-label="Search products"
         value={q}
         onChange={(e) => {
           setQ(e.target.value);
@@ -120,16 +142,42 @@ export function CatalogSearchTypeahead({
         }}
         onFocus={() => setOpen(true)}
         role="combobox"
+        aria-busy={loading}
         aria-autocomplete="list"
         aria-haspopup="listbox"
-        aria-expanded={open && items.length > 0}
+        aria-expanded={open}
         aria-controls="catalog-typeahead-results"
-        aria-activedescendant={activeIndex >= 0 ? `catalog-suggestion-${activeIndex}` : undefined}
+        aria-activedescendant={
+          activeIndex >= 0 ? `catalog-suggestion-${activeIndex}` : undefined
+        }
         onKeyDown={(event) => {
-          if (event.key === "Escape") { setOpen(false); setActiveIndex(-1); return; }
-          if (event.key === "ArrowDown" && items.length) { event.preventDefault(); setOpen(true); setActiveIndex((i) => (i + 1) % items.length); return; }
-          if (event.key === "ArrowUp" && items.length) { event.preventDefault(); setOpen(true); setActiveIndex((i) => (i <= 0 ? items.length - 1 : i - 1)); return; }
-          if (event.key === "Enter" && activeIndex >= 0 && items[activeIndex]) { event.preventDefault(); router.push(`/shop/${items[activeIndex].slug}`); setOpen(false); }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setOpen(false);
+            setActiveIndex(-1);
+            return;
+          }
+          if (event.key === "ArrowDown" && items.length) {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex((i) => (i + 1) % items.length);
+            return;
+          }
+          if (event.key === "ArrowUp" && items.length) {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex((i) => (i <= 0 ? items.length - 1 : i - 1));
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (activeIndex >= 0 && items[activeIndex]) {
+              router.push(`/shop/${items[activeIndex].slug}`);
+            } else {
+              router.push(buildShopUrl(q));
+            }
+            setOpen(false);
+          }
         }}
         placeholder="Search products…"
         maxLength={80}
@@ -139,6 +187,21 @@ export function CatalogSearchTypeahead({
       {loading ? (
         <p className="mt-1 text-[10px] text-on-surface-variant">Searching…</p>
       ) : null}
+      {!loading && open && suggestionError ? (
+        <p className="mt-1 text-xs text-error" role="status">
+          Search suggestions are temporarily unavailable. Press Enter to view
+          catalog results.
+        </p>
+      ) : null}
+      {!loading &&
+      open &&
+      !suggestionError &&
+      q.trim().length >= 2 &&
+      items.length === 0 ? (
+        <p className="mt-1 text-xs text-on-surface-variant" role="status">
+          No matching products yet. Press Enter to view all catalog results.
+        </p>
+      ) : null}
       {open && items.length > 0 ? (
         <ul
           id="catalog-typeahead-results"
@@ -146,11 +209,22 @@ export function CatalogSearchTypeahead({
           role="listbox"
         >
           {items.map((it, index) => (
-            <li key={it.slug} id={`catalog-suggestion-${index}`} role="option" aria-selected={index === activeIndex}>
+            <li
+              key={it.slug}
+              id={`catalog-suggestion-${index}`}
+              role="option"
+              aria-selected={index === activeIndex}
+            >
               <Link
                 href={`/shop/${it.slug}`}
                 className={`block px-3 py-2 text-sm text-on-surface hover:bg-surface-container-low ${index === activeIndex ? "bg-surface-container-low" : ""}`}
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  trackSearchSuggestionClick({
+                    position: index,
+                    resultCount: items.length,
+                  });
+                  setOpen(false);
+                }}
                 onMouseEnter={() => setActiveIndex(index)}
               >
                 <span className="font-medium text-primary">{it.name}</span>

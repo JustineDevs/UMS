@@ -171,6 +171,10 @@ export function ProductEditorForm(props: Props) {
       .filter(Boolean);
     return [...main, ...gLines];
   });
+  const [unifiedMediaIds, setUnifiedMediaIds] = useState<(string | null)[]>(() => {
+    const ids = p?.storefrontMetadata.mediaIds ?? [];
+    return (p?.imageUrls ?? []).map((_, index) => ids[index] ?? null);
+  });
   const [mainImageCount, setMainImageCount] = useState(() => {
     const main =
       p?.imageUrls?.length && p.imageUrls.length > 0
@@ -234,6 +238,9 @@ export function ProductEditorForm(props: Props) {
   const [lastMutationClassification, setLastMutationClassification] =
     useState<StorefrontCatalogMutationClassification | null>(null);
   const [hotspotsJson, setHotspotsJson] = useState(sm?.hotspotsJson ?? "");
+  const [guitarSpecsJson, setGuitarSpecsJson] = useState(sm?.guitarSpecsJson ?? "");
+  const [audioDemosJson, setAudioDemosJson] = useState(sm?.audioDemosJson ?? "");
+  const [trustContentJson, setTrustContentJson] = useState(sm?.trustContentJson ?? "");
   const [variantBarcode, setVariantBarcode] = useState(
     isEdit && p?.variantBarcode ? p.variantBarcode : "",
   );
@@ -344,8 +351,11 @@ export function ProductEditorForm(props: Props) {
   );
 
   const handlePickManyFromCatalog = useCallback(
-    (urls: string[]) => {
-      const normalized = urls.map(normalizeCatalogAssetUrl).filter(Boolean);
+    (media: Array<{ id: string; public_url: string }>) => {
+      const picked = media
+        .map(({ id, public_url }) => ({ id, url: normalizeCatalogAssetUrl(public_url) }))
+        .filter((item): item is { id: string; url: string } => Boolean(item.url));
+      const normalized = picked.map((item) => item.url);
       if (normalized.length === 0) return;
       if (catalogAddPlacement === "main") {
         const insertionIndex = mainImageCountRef.current;
@@ -358,11 +368,17 @@ export function ProductEditorForm(props: Props) {
           }
           return n;
         });
+        setUnifiedMediaIds((prev) => {
+          const n = [...prev];
+          n.splice(insertionIndex, 0, ...picked.map((item) => item.id));
+          return n;
+        });
         const nextMainImageCount = insertionIndex + normalized.length;
         mainImageCountRef.current = nextMainImageCount;
         setMainImageCount(nextMainImageCount);
       } else {
         setUnifiedMedia((prev) => [...prev, ...normalized]);
+        setUnifiedMediaIds((prev) => [...prev, ...picked.map((item) => item.id)]);
       }
       toast.push(
         "Added from catalog library. Save the product to apply it.",
@@ -650,6 +666,9 @@ export function ProductEditorForm(props: Props) {
     const galleryVideoUrlsText = galleryLines.slice(1).join("\n");
 
     const storefrontMetadata = {
+      // Keep one canonical asset reference list for both the main gallery and clips.
+      // `imageUrls` remains the Medusa-compatible resolved projection.
+      mediaIds: unifiedMediaIds.filter((id): id is string => Boolean(id)),
       brand: brand.trim() || null,
       videoUrl,
       galleryVideoUrlsText,
@@ -665,14 +684,17 @@ export function ProductEditorForm(props: Props) {
       seoDescription: seoDescription.trim() || null,
       relatedHandlesText,
       hotspotsJson,
+      guitarSpecsJson,
+      audioDemosJson,
+      trustContentJson,
     };
 
-    const imageUrls = unifiedMedia
+  const imageUrls = unifiedMedia
       .slice(0, mainImageCount)
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const sharedPayload = {
+  const sharedPayload = {
       title: title.trim(),
       handle: handle.trim(),
       description: description.trim() || null,
@@ -682,7 +704,7 @@ export function ProductEditorForm(props: Props) {
       categoryIds,
       stockQuantity: stockQtyInt,
       storefrontMetadata,
-    };
+  };
 
     try {
       if (isEdit && p) {
@@ -1094,6 +1116,21 @@ export function ProductEditorForm(props: Props) {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                    Trust and value content (JSON)
+                  </label>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    Publish only verified warranty, condition, setup, authenticity, delivery, and included-item facts.
+                  </p>
+                  <textarea
+                    className="mt-2 w-full min-h-[160px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
+                    value={trustContentJson}
+                    onChange={(e) => setTrustContentJson(e.target.value)}
+                    placeholder={'{"conditionGrade":"New","setupAndInspection":"Inspected before dispatch","includedAccessories":["Gig bag"]}'}
+                    maxLength={20000}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Search listing description
                   </label>
                   <textarea
@@ -1185,6 +1222,36 @@ export function ProductEditorForm(props: Props) {
                     onChange={(e) => setHotspotsJson(e.target.value)}
                     placeholder='[{"xPct":20,"yPct":40,"productSlug":"other-handle","label":"Optional"}]'
                     maxLength={10000}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                    Guitar specifications (JSON)
+                  </label>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    Enter only verified manufacturer or catalog facts. Unknown fields are rejected.
+                  </p>
+                  <textarea
+                    className="mt-2 w-full min-h-[180px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
+                    value={guitarSpecsJson}
+                    onChange={(e) => setGuitarSpecsJson(e.target.value)}
+                    placeholder={'{"bodyShape":"Dreadnought","scaleLengthMm":648,"fretCount":20}'}
+                    maxLength={20000}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                    Audio demos (JSON)
+                  </label>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    Array of {"{ url, title, description?, durationSeconds? }"} entries. URLs must be approved media URLs.
+                  </p>
+                  <textarea
+                    className="mt-2 w-full min-h-[160px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
+                    value={audioDemosJson}
+                    onChange={(e) => setAudioDemosJson(e.target.value)}
+                    placeholder={'[{"url":"/media/demo.mp3","title":"Clean tone"}]'}
+                    maxLength={20000}
                   />
                 </div>
               </div>

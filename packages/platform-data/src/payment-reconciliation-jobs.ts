@@ -59,8 +59,9 @@ async function findProviderReconciliationJob(
 }
 
 /**
- * Records a provider reconciliation request without calling provider APIs.
- * The durable background job is keyed by tenant/provider/idempotency payload.
+ * Records a provider reconciliation request. The durable background job is
+ * keyed by tenant/provider/idempotency payload; the cron worker performs the
+ * provider API pull and persists settlement rows before completing the job.
  */
 export async function requestProviderReconciliationJob(
   supabase: SupabaseClient,

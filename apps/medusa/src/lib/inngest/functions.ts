@@ -1,5 +1,6 @@
 import { inngest } from "./client";
 import { sendSms, formatOrderPlacedSms, formatOrderShippedSms } from "../semaphore-sms-client";
+import { sendResendTransactionalEmail } from "../resend-email";
 
 type OrderPlacedData = {
   phone: string;
@@ -14,6 +15,14 @@ type FulfillmentCreatedData = {
   displayId: string | number;
   trackingNumber?: string;
   trackingUrl?: string;
+};
+
+type OrderConfirmationEmailData = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  orderId: string;
 };
 
 type CampaignSendBatchData = {
@@ -67,6 +76,34 @@ export const fulfillmentCreatedSmsJob = inngest.createFunction(
   },
 );
 
+/** Background job: deliver order confirmation email with bounded retries. */
+export const orderConfirmationEmailJob = inngest.createFunction(
+  {
+    id: "order-confirmation-email",
+    name: "Send Order Confirmation Email",
+    retries: 3,
+    trigger: { event: "universal-music-store/order.confirmation.email" },
+  } as Parameters<typeof inngest.createFunction>[0],
+  async ({ event }: { event: { data: OrderConfirmationEmailData } }) => {
+    const { from, to, subject, html, orderId } = event.data;
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (!apiKey || !from || !to || !subject || !html || !orderId) {
+      return { skipped: "invalid email payload" };
+    }
+    const result = await sendResendTransactionalEmail({
+      apiKey,
+      from,
+      to,
+      subject,
+      html,
+      tags: [{ name: "type", value: "order_confirmation" }],
+      idempotencyKey: `order-confirmation/${orderId}`,
+    });
+    if (!result.ok) throw new Error(`Order confirmation email failed: ${result.message}`);
+    return { ok: true, messageId: result.id };
+  },
+);
+
 /**
  * Background job: Send marketing campaign batch with per-step checkpointing.
  * Processes recipients individually so Inngest can resume on failure
@@ -107,5 +144,6 @@ export const campaignSendBatchJob = inngest.createFunction(
 export const allFunctions = [
   orderPlacedSmsJob,
   fulfillmentCreatedSmsJob,
+  orderConfirmationEmailJob,
   campaignSendBatchJob,
 ];

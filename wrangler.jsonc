@@ -1,0 +1,61 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ums-backend",
+  "main": "workers/backend/src/index.ts",
+  "compatibility_date": "2026-09-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+  },
+  "env": {
+    "dev": {
+      "name": "ums-backend-preview",
+      "workers_dev": true,
+      "exports": {
+        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
+        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
+      },
+      "queues": {
+        "producers": [
+          { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-dev" },
+          { "binding": "COMMERCE_DEAD_LETTER_QUEUE", "queue": "uvs-commerce-dev-dlq" }
+        ],
+        "consumers": [
+          { "queue": "uvs-commerce-dev", "max_batch_size": 10, "max_retries": 8, "dead_letter_queue": "uvs-commerce-dev-dlq" }
+        ]
+      },
+      "hyperdrive": [
+        { "binding": "MEDUSA_HYPERDRIVE", "id": "0dca18c059c348afac213abe2f7103af" },
+        { "binding": "APP_HYPERDRIVE", "id": "670f984853514e0ea8f61aa4956d2155" }
+      ],
+      "vars": {
+        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+      },
+    },
+    "production": {
+      "name": "ums-backend-production",
+      "workers_dev": true,
+      "exports": {
+        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
+        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
+      },
+      "queues": {
+        "producers": [
+          { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-production" },
+          { "binding": "COMMERCE_DEAD_LETTER_QUEUE", "queue": "uvs-commerce-production-dlq" }
+        ],
+        "consumers": [
+          { "queue": "uvs-commerce-production", "max_batch_size": 10, "max_retries": 8, "dead_letter_queue": "uvs-commerce-production-dlq" }
+        ]
+      },
+      "hyperdrive": [
+        { "binding": "MEDUSA_HYPERDRIVE", "id": "e911d409602b4d029dea7bf323801c0f" },
+        { "binding": "APP_HYPERDRIVE", "id": "801b922b54e74e0295c0e7d785b80966" }
+      ],
+      "vars": {
+        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+      },
+    }
+  }
+}

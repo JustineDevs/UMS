@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge, Card, CardContent } from "@universal-music-store/ui";
 import type { Product } from "@universal-music-store/types";
-import { BrowsePriceFreshnessCue } from "@/components/BrowsePriceFreshnessCue";
+import {
+  BrowsePriceFreshnessCue,
+  buildFreshnessSignature,
+} from "@/components/BrowsePriceFreshnessCue";
 import { QuickViewButton } from "@/components/QuickViewButton";
 import { trackProductClick } from "@/lib/analytics";
 import {
@@ -53,6 +56,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
   const imageUnavailable =
     imageUrl && isKnownUnavailableExternalImage(imageUrl);
   const firstVariant = product.variants[0];
+  const initialInventorySignature = buildFreshnessSignature(product.variants);
 
   return (
     <Card className="overflow-hidden border-0 bg-transparent shadow-none transition-shadow duration-300 hover:shadow-md">
@@ -148,6 +152,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
               <BrowsePriceFreshnessCue
                 slug={product.slug}
                 initialMinPrice={minPrice}
+                initialInventorySignature={initialInventorySignature}
               />
               <span className="block text-[9px] text-on-surface-variant uppercase tracking-wider">VAT incl.</span>
             </div>

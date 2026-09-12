@@ -4,6 +4,20 @@ import { describe, it } from "node:test";
 describe("Storefront BFF contract tests", () => {
   const MEDUSA_URL = process.env.MEDUSA_BACKEND_URL || "http://localhost:9000";
   const strict = process.env.STRICT_CONTRACT_TESTS === "1" || process.env.CI === "true";
+  const publishableKey =
+    process.env.MEDUSA_PUBLISHABLE_API_KEY ||
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
+  const regionId = process.env.MEDUSA_REGION_ID || process.env.NEXT_PUBLIC_MEDUSA_REGION_ID;
+  const salesChannelId =
+    process.env.MEDUSA_SALES_CHANNEL_ID ||
+    process.env.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID;
+
+  function storeHeaders(contentType = false): Record<string, string> {
+    return {
+      ...(contentType ? { "Content-Type": "application/json" } : {}),
+      ...(publishableKey ? { "x-publishable-api-key": publishableKey } : {}),
+    };
+  }
 
   function failOrSkip(message: string): void {
     if (strict) {
@@ -13,7 +27,9 @@ describe("Storefront BFF contract tests", () => {
   }
 
   it("GET /store/products returns expected shape", async () => {
-    const res = await fetch(`${MEDUSA_URL}/store/products?limit=1`);
+    const res = await fetch(`${MEDUSA_URL}/store/products?limit=1`, {
+      headers: storeHeaders(),
+    });
     if (!res.ok) {
       failOrSkip("Medusa not reachable for products contract test");
       return;
@@ -29,7 +45,9 @@ describe("Storefront BFF contract tests", () => {
   });
 
   it("GET /store/regions returns regions with currency", async () => {
-    const res = await fetch(`${MEDUSA_URL}/store/regions`);
+    const res = await fetch(`${MEDUSA_URL}/store/regions`, {
+      headers: storeHeaders(),
+    });
     if (!res.ok) {
       failOrSkip("Medusa not reachable for regions contract test");
       return;
@@ -44,7 +62,9 @@ describe("Storefront BFF contract tests", () => {
   });
 
   it("GET /store/collections returns expected shape", async () => {
-    const res = await fetch(`${MEDUSA_URL}/store/collections?limit=5`);
+    const res = await fetch(`${MEDUSA_URL}/store/collections?limit=5`, {
+      headers: storeHeaders(),
+    });
     if (!res.ok) {
       failOrSkip("Medusa not reachable for collections contract test");
       return;
@@ -59,8 +79,11 @@ describe("Storefront BFF contract tests", () => {
   it("POST /store/carts returns cart with id", async () => {
     const res = await fetch(`${MEDUSA_URL}/store/carts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      headers: storeHeaders(true),
+      body: JSON.stringify({
+        ...(regionId ? { region_id: regionId } : {}),
+        ...(salesChannelId ? { sales_channel_id: salesChannelId } : {}),
+      }),
     });
     if (!res.ok) {
       failOrSkip("Medusa not reachable for cart contract test");

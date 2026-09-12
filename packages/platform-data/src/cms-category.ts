@@ -4,25 +4,38 @@ import type { CmsBlock } from "./cms-types.js";
 
 export type CmsCategoryContentRow = {
   id: string;
+  collection_id: string | null;
   collection_handle: string;
   locale: string;
   intro_html: string;
   banner_url: string | null;
+  banner_alt: string | null;
   blocks: CmsBlock[];
   updated_at: string;
   organization_id?: string | null;
 };
 
-function parseBlocks(v: unknown): CmsBlock[] {
+function stableBlockId(index: number, type: string, props: Record<string, unknown>): string {
+  const input = `${index}:${type}:${JSON.stringify(props)}`;
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `blk_${(hash >>> 0).toString(36)}`;
+}
+
+export function parseCmsCategoryBlocks(v: unknown): CmsBlock[] {
   if (!Array.isArray(v)) return [];
   const out: CmsBlock[] = [];
-  for (const item of v) {
+  for (const [index, item] of v.entries()) {
     if (item && typeof item === "object" && "type" in item) {
       const r = item as Record<string, unknown>;
+      const props = r.props && typeof r.props === "object" ? (r.props as Record<string, unknown>) : {};
       out.push({
-        id: typeof r.id === "string" ? r.id : `blk_${Math.random().toString(36).slice(2, 11)}`,
+        id: typeof r.id === "string" ? r.id : stableBlockId(index, String(r.type ?? "unknown"), props),
         type: String(r.type ?? "unknown"),
-        props: r.props && typeof r.props === "object" ? (r.props as Record<string, unknown>) : {},
+        props,
       });
     }
   }
@@ -43,6 +56,7 @@ export async function listCmsCategoryContent(supabase: SupabaseClient, organizat
   }
   return (data ?? []).map((r) => ({
     id: String((r as Record<string, unknown>).id),
+    collection_id: (r as Record<string, unknown>).collection_id != null ? String((r as Record<string, unknown>).collection_id) : null,
     collection_handle: String((r as Record<string, unknown>).collection_handle ?? ""),
     locale: String((r as Record<string, unknown>).locale ?? "en"),
     intro_html: String((r as Record<string, unknown>).intro_html ?? ""),
@@ -50,7 +64,11 @@ export async function listCmsCategoryContent(supabase: SupabaseClient, organizat
       (r as Record<string, unknown>).banner_url != null
         ? String((r as Record<string, unknown>).banner_url)
         : null,
-    blocks: parseBlocks((r as Record<string, unknown>).blocks),
+    banner_alt:
+      (r as Record<string, unknown>).banner_alt != null
+        ? String((r as Record<string, unknown>).banner_alt)
+        : null,
+    blocks: parseCmsCategoryBlocks((r as Record<string, unknown>).blocks),
     updated_at: String((r as Record<string, unknown>).updated_at ?? ""),
     organization_id: (r as Record<string, unknown>).organization_id != null ? String((r as Record<string, unknown>).organization_id) : null,
   }));
@@ -60,10 +78,12 @@ export async function upsertCmsCategoryContent(
   supabase: SupabaseClient,
   input: {
     id?: string;
+    collection_id?: string;
     collection_handle: string;
     locale?: string;
     intro_html?: string;
     banner_url?: string | null;
+    banner_alt?: string | null;
     blocks?: CmsBlock[];
     organization_id?: string;
   },
@@ -71,9 +91,11 @@ export async function upsertCmsCategoryContent(
   const locale = input.locale ?? "en";
   const row = {
     collection_handle: input.collection_handle,
+    collection_id: input.collection_id ?? null,
     locale,
     intro_html: input.intro_html ?? "",
     banner_url: input.banner_url ?? null,
+    banner_alt: input.banner_alt ?? null,
     blocks: (input.blocks ?? []) as unknown as Record<string, unknown>[],
     updated_at: new Date().toISOString(),
     organization_id: input.organization_id ?? null,
@@ -93,14 +115,51 @@ export async function upsertCmsCategoryContent(
     const r = data as Record<string, unknown>;
     return {
       id: String(r.id),
+      collection_id: r.collection_id != null ? String(r.collection_id) : null,
       collection_handle: String(r.collection_handle ?? ""),
       locale: String(r.locale ?? "en"),
       intro_html: String(r.intro_html ?? ""),
       banner_url: r.banner_url != null ? String(r.banner_url) : null,
-      blocks: parseBlocks(r.blocks),
+      banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
+      blocks: parseCmsCategoryBlocks(r.blocks),
       updated_at: String(r.updated_at ?? ""),
       organization_id: r.organization_id != null ? String(r.organization_id) : null,
     };
+  }
+  if (input.collection_id) {
+    const { data: existing } = await supabase
+      .from("cms_category_content")
+      .select("id")
+      .eq("organization_id", input.organization_id ?? "")
+      .eq("collection_id", input.collection_id)
+      .eq("locale", locale)
+      .maybeSingle();
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from("cms_category_content")
+        .update(row)
+        .eq("id", String(existing.id))
+        .eq("organization_id", input.organization_id ?? "")
+        .select("*")
+        .single();
+      if (error) {
+        console.error("[cms-category] update canonical", error.message);
+        return null;
+      }
+      const r = data as Record<string, unknown>;
+      return {
+        id: String(r.id),
+        collection_id: r.collection_id != null ? String(r.collection_id) : null,
+        collection_handle: String(r.collection_handle ?? ""),
+        locale: String(r.locale ?? "en"),
+        intro_html: String(r.intro_html ?? ""),
+        banner_url: r.banner_url != null ? String(r.banner_url) : null,
+        banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
+        blocks: parseCmsCategoryBlocks(r.blocks),
+        updated_at: String(r.updated_at ?? ""),
+        organization_id: r.organization_id != null ? String(r.organization_id) : null,
+      };
+    }
   }
   const { data, error } = await supabase
     .from("cms_category_content")
@@ -114,11 +173,13 @@ export async function upsertCmsCategoryContent(
   const r = data as Record<string, unknown>;
   return {
     id: String(r.id),
+    collection_id: r.collection_id != null ? String(r.collection_id) : null,
     collection_handle: String(r.collection_handle ?? ""),
     locale: String(r.locale ?? "en"),
     intro_html: String(r.intro_html ?? ""),
     banner_url: r.banner_url != null ? String(r.banner_url) : null,
-    blocks: parseBlocks(r.blocks),
+    banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
+        blocks: parseCmsCategoryBlocks(r.blocks),
       updated_at: String(r.updated_at ?? ""),
       organization_id: r.organization_id != null ? String(r.organization_id) : null,
   };
@@ -129,14 +190,32 @@ export async function getCmsCategoryContentPublic(
   collectionHandle: string,
   locale: string,
   organizationId?: string,
+  collectionId?: string,
 ): Promise<CmsCategoryContentRow | null> {
   let query = supabase
     .from("cms_category_content")
     .select("*")
-    .eq("collection_handle", collectionHandle)
     .eq("locale", locale);
   if (organizationId) query = query.eq("organization_id", organizationId);
-  const { data, error } = await query.maybeSingle();
+  if (collectionId?.trim()) query = query.eq("collection_id", collectionId.trim());
+  else query = query.eq("collection_handle", collectionHandle);
+  let { data, error } = await query.maybeSingle();
+  if (error) {
+    if (collectionId?.trim() && isMissingTableOrSchemaError(error)) {
+      // Keep old deployments readable until migration 107 is applied.
+      let fallback = supabase
+        .from("cms_category_content")
+        .select("*")
+        .eq("collection_handle", collectionHandle)
+        .eq("locale", locale);
+      if (organizationId) fallback = fallback.eq("organization_id", organizationId);
+      const legacy = await fallback.maybeSingle();
+      if (!legacy.error && legacy.data) {
+        data = legacy.data;
+        error = null;
+      }
+    }
+  }
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     console.error("[cms-category] get public", error.message);
@@ -146,11 +225,13 @@ export async function getCmsCategoryContentPublic(
   const r = data as Record<string, unknown>;
   return {
     id: String(r.id),
+    collection_id: r.collection_id != null ? String(r.collection_id) : null,
     collection_handle: String(r.collection_handle ?? ""),
     locale: String(r.locale ?? "en"),
     intro_html: String(r.intro_html ?? ""),
     banner_url: r.banner_url != null ? String(r.banner_url) : null,
-    blocks: parseBlocks(r.blocks),
+    banner_alt: r.banner_alt != null ? String(r.banner_alt) : null,
+    blocks: parseCmsCategoryBlocks(r.blocks),
     updated_at: String(r.updated_at ?? ""),
   };
 }

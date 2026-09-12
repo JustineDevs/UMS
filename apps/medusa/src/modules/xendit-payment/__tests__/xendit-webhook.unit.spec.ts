@@ -95,6 +95,25 @@ describe("Xendit webhook contract", () => {
     });
   });
 
+  it("does not claim or fulfill a malformed paid event", async () => {
+    const result = await service().getWebhookActionAndData({
+      data: {},
+      rawData: JSON.stringify({
+        event: "payment.paid",
+        data: {
+          id: "payment-invalid",
+          reference_id: "medusa_ps:session-invalid",
+          amount: 0,
+          currency: "PHP",
+        },
+      }),
+      headers: { "x-callback-token": "callback-secret" },
+    });
+
+    expect(result).toEqual({ action: PaymentActions.NOT_SUPPORTED });
+    expect(claimXenditWebhookDedup).not.toHaveBeenCalled();
+  });
+
   it("rejects malformed JSON and ignores uncorrelated events", async () => {
     await expect(
       service().getWebhookActionAndData({

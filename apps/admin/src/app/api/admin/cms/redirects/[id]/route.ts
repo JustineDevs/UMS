@@ -8,6 +8,7 @@ import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
 import { cmsRedirectSchema } from "@/lib/cms-route-contracts";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -21,7 +22,9 @@ async function put(req: NextRequest, ctx: RouteCtx) {
   if (!staffSessionAllows(session, "content:write")) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
-  const parsed = cmsRedirectSchema.safeParse(await req.json().catch(() => null));
+  const body = await parseBoundedJson(req, 32 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const parsed = cmsRedirectSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success || (parsed.data.id && parsed.data.id !== id)) {
     return correlatedJson(cid, { error: "Invalid redirect payload" }, { status: 400 });
   }

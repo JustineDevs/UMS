@@ -1,4 +1,5 @@
 import { tryCreateSupabaseClient } from "@universal-music-store/database";
+import { getChannelTenantKey } from "./channel-tenant-scope";
 
 export type ChannelEventRow = {
   id: string;
@@ -13,9 +14,12 @@ export async function fetchRecentChannelEvents(
 ): Promise<ChannelEventRow[]> {
   const supabase = tryCreateSupabaseClient();
   if (!supabase) return [];
+  const tenantKey = getChannelTenantKey();
+  if (!tenantKey) return [];
   const { data, error } = await supabase
     .from("channel_sync_events")
     .select("id, channel, event_type, received_at, processed_at")
+    .eq("tenant_key", tenantKey)
     .order("received_at", { ascending: false })
     .limit(limit);
 

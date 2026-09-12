@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CartPageClient } from "./cart-client";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { CheckoutTrustBadges } from "@/components/CheckoutTrustBadges";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Cart",
@@ -23,6 +24,7 @@ export default function CartPage() {
       <div className="mt-10">
         <CartPageClient />
       </div>
+      <CheckoutTrustBadges />
     </main>
   );
 }

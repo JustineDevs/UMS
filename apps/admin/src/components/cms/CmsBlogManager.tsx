@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";

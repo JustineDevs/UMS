@@ -9,6 +9,19 @@ export type DeliveryLogisticsShipmentStatus =
   | "returned"
   | "cancelled";
 
+const deliveryTransitions: Record<DeliveryLogisticsShipmentStatus, readonly DeliveryLogisticsShipmentStatus[]> = {
+  planned: ["assigned", "cancelled"], assigned: ["in_transit", "cancelled"],
+  in_transit: ["delivered", "returned"], delivered: ["returned"], returned: [], cancelled: [],
+};
+export function projectDeliveryStatus(current: DeliveryLogisticsShipmentStatus, event: string): DeliveryLogisticsShipmentStatus {
+  const normalized = event.trim().toLowerCase().replaceAll("-", "_");
+  const next = normalized === "return_to_sender" || normalized === "returned" ? "returned" : normalized === "dispatch" ? "in_transit" : normalized;
+  if (!(next in deliveryTransitions)) throw new Error(`Unsupported delivery event: ${event}`);
+  if (next === current) return current;
+  if (!deliveryTransitions[current].includes(next as DeliveryLogisticsShipmentStatus)) throw new Error(`Invalid delivery transition: ${current} -> ${next}`);
+  return next as DeliveryLogisticsShipmentStatus;
+}
+
 export type DeliveryLogisticsSettlementStatus =
   | "pending"
   | "held"
@@ -18,6 +31,7 @@ export type DeliveryLogisticsSettlementStatus =
 
 export type DeliveryLogisticsShipmentRow = {
   id: string;
+  organization_id: string;
   order_id: string;
   order_display_id: string | null;
   customer_email: string;
@@ -46,6 +60,10 @@ export type DeliveryLogisticsShipmentRow = {
   updated_by_email: string | null;
   created_at: string;
   updated_at: string;
+  medusa_fulfillment_id: string | null;
+  provider_shipment_id: string | null;
+  eta_at: string | null;
+  idempotency_key: string | null;
 };
 
 export type DeliveryLogisticsEventRow = {
@@ -77,6 +95,7 @@ function rowToShipment(row: Record<string, unknown>): DeliveryLogisticsShipmentR
       : "pending";
   return {
     id: String(row.id ?? ""),
+    organization_id: String(row.organization_id ?? row.tenant_key ?? "default"),
     order_id: String(row.order_id ?? ""),
     order_display_id:
       row.order_display_id != null ? String(row.order_display_id) : null,
@@ -140,6 +159,10 @@ function rowToShipment(row: Record<string, unknown>): DeliveryLogisticsShipmentR
       row.updated_by_email != null ? String(row.updated_by_email) : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
+    medusa_fulfillment_id: row.medusa_fulfillment_id != null ? String(row.medusa_fulfillment_id) : null,
+    provider_shipment_id: row.provider_shipment_id != null ? String(row.provider_shipment_id) : null,
+    eta_at: row.eta_at != null ? String(row.eta_at) : null,
+    idempotency_key: row.idempotency_key != null ? String(row.idempotency_key) : null,
   };
 }
 
@@ -162,7 +185,7 @@ function rowToEvent(row: Record<string, unknown>): DeliveryLogisticsEventRow {
 
 export async function listDeliveryLogisticsShipments(
   supabase: SupabaseClient,
-  options: { limit?: number; status?: DeliveryLogisticsShipmentStatus } = {},
+  options: { limit?: number; status?: DeliveryLogisticsShipmentStatus; organizationId?: string } = {},
 ): Promise<DeliveryLogisticsShipmentRow[]> {
   const limit = Math.min(500, Math.max(1, options.limit ?? 100));
   let query = supabase
@@ -171,6 +194,7 @@ export async function listDeliveryLogisticsShipments(
     .order("updated_at", { ascending: false })
     .limit(limit);
   if (options.status) query = query.eq("status", options.status);
+  if (options.organizationId) query = query.eq("organization_id", options.organizationId.trim());
   const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
@@ -182,6 +206,7 @@ export async function listDeliveryLogisticsShipments(
 export async function upsertDeliveryLogisticsShipment(
   supabase: SupabaseClient,
   input: {
+    organization_id: string;
     order_id: string;
     order_display_id?: string | null;
     customer_email: string;
@@ -208,9 +233,14 @@ export async function upsertDeliveryLogisticsShipment(
     last_event_at?: string | null;
     created_by_email?: string | null;
     updated_by_email?: string | null;
+    medusa_fulfillment_id?: string | null;
+    provider_shipment_id?: string | null;
+    eta_at?: string | null;
+    idempotency_key?: string | null;
   },
 ): Promise<DeliveryLogisticsShipmentRow> {
   const payload = {
+    organization_id: input.organization_id.trim(),
     order_id: input.order_id.trim(),
     order_display_id: input.order_display_id?.trim() || null,
     customer_email: input.customer_email.trim().toLowerCase(),
@@ -237,10 +267,14 @@ export async function upsertDeliveryLogisticsShipment(
     last_event_at: input.last_event_at ?? null,
     created_by_email: input.created_by_email?.trim() || null,
     updated_by_email: input.updated_by_email?.trim() || null,
+    medusa_fulfillment_id: input.medusa_fulfillment_id?.trim() || null,
+    provider_shipment_id: input.provider_shipment_id?.trim() || null,
+    eta_at: input.eta_at ?? null,
+    idempotency_key: input.idempotency_key?.trim() || null,
   };
   const { data, error } = await supabase
     .from("delivery_logistics_shipments")
-    .upsert(payload, { onConflict: "order_id" })
+    .upsert(payload, { onConflict: "organization_id,order_id" })
     .select("*")
     .single();
   if (error) throw error;
@@ -249,7 +283,7 @@ export async function upsertDeliveryLogisticsShipment(
 
 export async function listDeliveryLogisticsEvents(
   supabase: SupabaseClient,
-  options: { shipmentId?: string; limit?: number } = {},
+  options: { shipmentId?: string; organizationId?: string; limit?: number } = {},
 ): Promise<DeliveryLogisticsEventRow[]> {
   const limit = Math.min(500, Math.max(1, options.limit ?? 100));
   let query = supabase
@@ -260,6 +294,7 @@ export async function listDeliveryLogisticsEvents(
   if (options.shipmentId) {
     query = query.eq("shipment_id", options.shipmentId.trim());
   }
+  if (options.organizationId) query = query.eq("organization_id", options.organizationId.trim());
   const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
@@ -271,40 +306,31 @@ export async function listDeliveryLogisticsEvents(
 export async function appendDeliveryLogisticsEvent(
   supabase: SupabaseClient,
   input: {
+    organization_id: string;
     shipment_id: string;
     event_type: string;
     event_status?: string | null;
     event_payload?: Record<string, unknown>;
     occurred_at?: string;
     created_by_email?: string | null;
+    idempotency_key?: string | null;
   },
 ): Promise<DeliveryLogisticsEventRow> {
-  const { data, error } = await supabase
-    .from("delivery_logistics_events")
-    .insert({
-      shipment_id: input.shipment_id.trim(),
-      event_type: input.event_type.trim(),
-      event_status: input.event_status?.trim() || null,
-      event_payload: input.event_payload ?? {},
-      occurred_at: input.occurred_at ?? new Date().toISOString(),
-      created_by_email: input.created_by_email?.trim() || null,
-    })
-    .select("*")
-    .single();
+  const shipmentId = input.shipment_id.trim();
+  const { data, error } = await supabase.rpc("append_delivery_logistics_event", {
+    p_organization_id: input.organization_id.trim(),
+    p_shipment_id: shipmentId,
+    p_event_type: input.event_type.trim(),
+    p_event_status: input.event_status?.trim() || null,
+    p_event_payload: input.event_payload ?? {},
+    p_occurred_at: input.occurred_at ?? new Date().toISOString(),
+    p_created_by_email: input.created_by_email?.trim() || null,
+    p_idempotency_key: input.idempotency_key?.trim() || null,
+  });
   if (error) throw error;
-
-  if (input.event_status || input.occurred_at) {
-    const updatePatch: Record<string, unknown> = {
-      last_event_at: input.occurred_at ?? new Date().toISOString(),
-    };
-    if (input.event_status?.trim()) {
-      updatePatch.tracking_status = input.event_status.trim();
-    }
-    await supabase
-      .from("delivery_logistics_shipments")
-      .update(updatePatch)
-      .eq("id", input.shipment_id.trim());
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") {
+    throw new Error("Delivery event transaction returned no event");
   }
-
-  return rowToEvent(data as Record<string, unknown>);
+  return rowToEvent(row as Record<string, unknown>);
 }

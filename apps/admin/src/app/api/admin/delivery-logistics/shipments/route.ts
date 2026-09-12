@@ -11,6 +11,8 @@ import {
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 function cleanText(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -26,9 +28,11 @@ export async function GET(req: NextRequest) {
 
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(sup.client, session.user.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
   const [shipments, events] = await Promise.all([
-    listDeliveryLogisticsShipments(sup.client, { limit: 50 }),
-    listDeliveryLogisticsEvents(sup.client, { limit: 50 }),
+    listDeliveryLogisticsShipments(sup.client, { limit: 50, organizationId: organization.id }),
+    listDeliveryLogisticsEvents(sup.client, { limit: 50, organizationId: organization.id }),
   ]);
   return correlatedJson(cid, { data: { shipments, events } });
 }
@@ -41,18 +45,17 @@ async function post(req: NextRequest) {
     return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return correlatedJson(cid, { error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const rec = body as Record<string, unknown>;
+  const body = await parseBoundedJson(req, 256 * 1024);
+  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
+  const rec = body.valid && body.value && typeof body.value === "object" && !Array.isArray(body.value)
+    ? body.value as Record<string, unknown>
+    : {};
   const kind = cleanText(rec.kind);
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const sb = sup.client;
+  const organization = await resolveStaffOrganization(sb, session.user.email);
+  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
   const actorEmail = session.user.email?.trim().toLowerCase() ?? null;
 
   if (kind === "shipment") {
@@ -63,6 +66,7 @@ async function post(req: NextRequest) {
     }
 
     const row = await upsertDeliveryLogisticsShipment(sb, {
+      organization_id: organization.id,
       order_id: orderId,
       order_display_id: cleanText(rec.order_display_id),
       customer_email: customerEmail,
@@ -128,6 +132,10 @@ async function post(req: NextRequest) {
       last_event_at: cleanText(rec.last_event_at),
       created_by_email: actorEmail,
       updated_by_email: actorEmail,
+      medusa_fulfillment_id: cleanText(rec.medusa_fulfillment_id),
+      provider_shipment_id: cleanText(rec.provider_shipment_id),
+      eta_at: cleanText(rec.eta_at),
+      idempotency_key: cleanText(rec.idempotency_key),
     });
 
     return correlatedJson(cid, { data: row }, { status: 201 });
@@ -140,6 +148,7 @@ async function post(req: NextRequest) {
       return correlatedJson(cid, { error: "shipment_id and event_type are required" }, { status: 400 });
     }
     const event = await appendDeliveryLogisticsEvent(sb, {
+      organization_id: organization.id,
       shipment_id: shipmentId,
       event_type: eventType,
       event_status: cleanText(rec.event_status),
@@ -149,6 +158,7 @@ async function post(req: NextRequest) {
           : {},
       occurred_at: cleanText(rec.occurred_at) ?? undefined,
       created_by_email: actorEmail,
+      idempotency_key: cleanText(rec.idempotency_key),
     });
     return correlatedJson(cid, { data: event }, { status: 201 });
   }

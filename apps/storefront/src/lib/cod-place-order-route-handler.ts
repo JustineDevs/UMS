@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getPublicOriginFromRequest } from "./finalize-medusa-cart-server";
+import {
+  getPublicOriginFromRequest,
+  secureTrackingRedirectUrl,
+} from "./finalize-medusa-cart-server";
 
 import { codPlaceOrderRouteLogic } from "./payment-attempt-route-logic";
 
@@ -41,7 +44,7 @@ export type CodPlaceOrderRouteDeps = {
     _correlationId: string,
     _patch: Record<string, unknown>,
   ) => Promise<void>;
-  finalizeMedusaCart: (_cartId: string, _publicOrigin?: string) => Promise<FinalizeResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeResult>;
   logEvent: (_payload: unknown) => void;
   nowIso: () => string;
 };
@@ -81,11 +84,25 @@ export async function handleCodPlaceOrderRequest(
     incrementFinalizeAttempts: deps.incrementFinalizeAttempts,
     claimFinalizeAttempt: deps.claimFinalizeAttempt,
     updatePaymentAttempt: deps.updatePaymentAttempt,
-    finalizeMedusaCart: (activeCartId) =>
-      deps.finalizeMedusaCart(activeCartId, getPublicOriginFromRequest(req)),
+    finalizeMedusaCart: (activeCartId, correlationId) =>
+      deps.finalizeMedusaCart(activeCartId, correlationId),
     logEvent: deps.logEvent,
     nowIso: deps.nowIso,
   });
 
+  if (result.status === 200 && "redirectUrl" in result.body) {
+    const redirectUrl = secureTrackingRedirectUrl(
+      typeof result.body.redirectUrl === "string" ? result.body.redirectUrl : undefined,
+      typeof result.body.orderId === "string" ? result.body.orderId : undefined,
+      getPublicOriginFromRequest(req),
+    );
+    if (!redirectUrl) {
+      return NextResponse.json(
+        { error: "Tracking capability is not configured" },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json({ ...result.body, redirectUrl }, { status: result.status });
+  }
   return NextResponse.json(result.body, { status: result.status });
 }

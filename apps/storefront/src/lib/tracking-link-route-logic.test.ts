@@ -43,10 +43,22 @@ test("trackingLinkRouteLogic returns a signed tracking url for the owned cart", 
     cartId: "cart_123",
     ownedCartId: "cart_123",
     rateLimited: false,
-    buildTrackingUrl: (id) => `/track/${id}?t=signed`,
+    buildTrackingUrl: () => "/track/cap_v3.opaque",
   });
   assert.equal(cartResult.status, 200);
-  assert.equal(cartResult.body.trackingPageUrl, "/track/cart_123?t=signed");
+  assert.equal(cartResult.body.trackingPageUrl, "/track/cap_v3.opaque");
+});
+
+test("trackingLinkRouteLogic rejects raw or query-token fallback URLs", () => {
+  for (const url of ["/track/cart_123", "/track/cap_v3.opaque?t=signed"]) {
+    const result = trackingLinkRouteLogic({
+      cartId: "cart_123",
+      ownedCartId: "cart_123",
+      rateLimited: false,
+      buildTrackingUrl: () => url,
+    });
+    assert.equal(result.status, 503);
+  }
 });
 
 test("trackingLinkRouteLogic rejects a cart that is not in the request cookie", () => {

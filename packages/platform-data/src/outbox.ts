@@ -120,7 +120,7 @@ export async function failOutboxEventWithBackoff(
     .eq("id", eventId);
 }
 
-export type OutboxHandler = (event: OutboxEvent) => Promise<void>;
+export type OutboxHandler = (_event: OutboxEvent) => Promise<void>;
 
 const handlers = new Map<string, OutboxHandler[]>();
 
@@ -138,7 +138,7 @@ function ensureDefaultPaymentOutboxHandlers(): void {
   for (const eventType of Object.values(PAYMENT_OUTBOX_EVENT_TYPES)) {
     const existing = handlers.get(eventType) ?? [];
     if (existing.length > 0) continue;
-    registerOutboxHandler(eventType, async () => {
+    registerOutboxHandler(eventType, async (_event) => {
       /* durable record only; domain work runs in API routes */
     });
   }

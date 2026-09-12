@@ -1,10 +1,26 @@
-import { medusaProductRawHasSellableVariant } from "./medusa-catalog-mapper";
+import { catalogProductFromMedusaRaw } from "./medusa-catalog-mapper";
 import type { createStorefrontMedusaSdk } from "./medusa-sdk";
-import { getMedusaSalesChannelId, withSalesChannelId } from "./storefront-medusa-env";
+import {
+  getMedusaSalesChannelId,
+  withSalesChannelId,
+} from "./storefront-medusa-env";
+import { fetchMedusaPages } from "./medusa-pagination";
 
 /** Minimal fields to evaluate sellability (matches storefront catalog stock rules). */
-export const MEDUSA_PRODUCT_STOCK_FIELDS =
-  "id,*variants";
+export const MEDUSA_PRODUCT_STOCK_FIELDS = "id,*variants";
+
+/** Uses the exact mapper used by product listings so counts and lists share one population. */
+export function countSellableCatalogRows(rows: readonly unknown[]): number {
+  return rows.reduce<number>(
+    (count, row) =>
+      row &&
+      typeof row === "object" &&
+      catalogProductFromMedusaRaw(row as never)
+        ? count + 1
+        : count,
+    0 as number,
+  );
+}
 
 type StorefrontSdk = ReturnType<typeof createStorefrontMedusaSdk>;
 
@@ -17,47 +33,34 @@ export async function countSellableProductsInStoreList(
   regionId: string,
   options: {
     categoryId?: string;
-    maxScan?: number;
     pageSize?: number;
     allowSalesChannelFallback?: boolean;
   } = {},
 ): Promise<number> {
-  const maxScan = options.maxScan ?? 5000;
   const pageSize = options.pageSize ?? 100;
   const allowSalesChannelFallback = options.allowSalesChannelFallback ?? true;
 
   async function scan(allowSalesChannel: boolean): Promise<number> {
-    let count = 0;
-    let offset = 0;
-    while (offset < maxScan) {
+    const { pages } = await fetchMedusaPages(pageSize, async (offset) => {
       const listParams: Record<string, unknown> = {
         region_id: regionId,
         limit: pageSize,
         offset,
         fields: MEDUSA_PRODUCT_STOCK_FIELDS,
       };
-      if (options.categoryId) {
-        listParams.category_id = options.categoryId;
-      }
+      if (options.categoryId) listParams.category_id = options.categoryId;
 
-      const { products } = await sdk.store.product.list(
+      const { products, count: total } = await sdk.store.product.list(
         (allowSalesChannel && getMedusaSalesChannelId()
           ? withSalesChannelId(listParams)
           : listParams) as Parameters<typeof sdk.store.product.list>[0],
       );
-
-      for (const p of products ?? []) {
-        if (medusaProductRawHasSellableVariant(p as never)) {
-          count += 1;
-        }
-      }
-
-      offset += pageSize;
-      if (!products?.length || products.length < pageSize) {
-        break;
-      }
-    }
-    return count;
+      return { rows: products ?? [], total };
+    });
+    return pages.reduce(
+      (count, rows) => count + countSellableCatalogRows(rows),
+      0,
+    );
   }
 
   const primary = await scan(true);

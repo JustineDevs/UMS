@@ -5,6 +5,7 @@ import { listCmsRedirects } from "@universal-music-store/platform-data";
 import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { correlatedError } from "@/lib/staff-api-response";
 
 function esc(s: string) {
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
@@ -14,12 +15,12 @@ function esc(s: string) {
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) return new Response("Unauthorized", { status: 401 });
-  if (!staffSessionAllows(session, "content:read")) return new Response("Forbidden", { status: 403 });
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
+  if (!staffSessionAllows(session, "content:read")) return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
   const organization = await resolveStaffOrganization(sup.client, session.user.email);
-  if (!organization) return new Response("Tenant scope unavailable", { status: 403 });
+  if (!organization) return correlatedError(cid, 403, "Tenant scope unavailable", "FORBIDDEN");
   const rows = await listCmsRedirects(sup.client, organization.id);
   const lines = [
     ["from_path", "to_path", "status_code", "active", "preserve_query"].join(","),

@@ -5,6 +5,7 @@ import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
 import { insertStaffAuditLog } from "@/lib/staff-audit";
+import { correlatedError } from "@/lib/staff-api-response";
 
 function csvEscape(s: string) {
   if (s.includes('"') || s.includes(",") || s.includes("\n")) {
@@ -17,10 +18,10 @@ export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) {
-    return new Response("Unauthorized", { status: 401 });
+    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   }
   if (!staffSessionAllows(session, "content:read")) {
-    return new Response("Forbidden", { status: 403 });
+    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
   const sup = adminSupabaseOr503(cid);
   if ("response" in sup) return sup.response;
@@ -29,16 +30,16 @@ export async function GET(req: NextRequest) {
     session.user.email,
   );
   if (!organization)
-    return new Response("Tenant scope unavailable", { status: 403 });
+    return correlatedError(cid, 403, "Tenant scope unavailable", "FORBIDDEN");
   const sp = req.nextUrl.searchParams;
   const formKey = sp.get("form_key")?.trim();
   const from = sp.get("from")?.trim();
   const to = sp.get("to")?.trim();
   if ([formKey, from, to].some((value) => value && value.length > 64)) {
-    return new Response("Invalid filters", { status: 400 });
+    return correlatedError(cid, 400, "Invalid filters", "VALIDATION_ERROR");
   }
   if ([from, to].some((value) => value && Number.isNaN(Date.parse(value)))) {
-    return new Response("Invalid date filter", { status: 400 });
+    return correlatedError(cid, 400, "Invalid date filter", "VALIDATION_ERROR");
   }
   let query = sup.client
     .from("cms_form_submissions")
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
   if (to) query = query.lte("created_at", to);
   const { data, error } = await query;
   if (error)
-    return new Response("Unable to export form submissions", { status: 502 });
+    return correlatedError(cid, 502, "Unable to export form submissions", "SERVICE_UNAVAILABLE");
   const rows = (data ?? []) as Array<Record<string, unknown>>;
   const lines = [
     [
@@ -79,7 +80,7 @@ export async function GET(req: NextRequest) {
   }
   const body = lines.join("\n");
   if (new TextEncoder().encode(body).byteLength > 5 * 1024 * 1024) {
-    return new Response("Export too large", { status: 413 });
+    return correlatedError(cid, 413, "Export too large", "VALIDATION_ERROR");
   }
   await insertStaffAuditLog(sup.client, {
     actorEmail: session.user.email ?? "unknown",

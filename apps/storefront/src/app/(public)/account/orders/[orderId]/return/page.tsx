@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getServerSession } from "next-auth/next";
 
 import { OrderReturnForm, type ReturnLine } from "@/components/OrderReturnForm";
-import { authOptions } from "@/lib/auth";
+import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import { fetchWorkerCustomerOrderDetail } from "@/lib/medusa-account-orders";
 
 export const metadata: Metadata = {
   title: "Request a return",
   robots: { index: false, follow: false, googleBot: { index: false, follow: false } },
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 type OrderRow = {
   id?: string;
@@ -29,7 +33,7 @@ export default async function OrderReturnPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const session = await getServerSession(authOptions);
+  const session = await getStorefrontSession();
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!userEmail) {
     redirect(`/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`);
@@ -39,20 +43,25 @@ export default async function OrderReturnPage({
     notFound();
   }
 
-  const res = await medusaAdminFetch(
-    `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email,*items,*items.id,*items.title,*items.quantity,*items.returned_quantity`,
-  );
-  if (!res.ok) {
-    notFound();
+  const workerDetail = await fetchWorkerCustomerOrderDetail(orderId);
+  let order: OrderRow | undefined;
+  if (workerDetail) {
+    if (workerDetail.error !== null || !workerDetail.order) notFound();
+    order = workerDetail.order;
+  } else {
+    const res = await medusaAdminFetch(
+      `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email,*items,*items.id,*items.title,*items.quantity,*items.returned_quantity`,
+    );
+    if (!res.ok) notFound();
+    const json = (await res.json()) as { order?: OrderRow };
+    order = json.order;
   }
-  const json = (await res.json()) as { order?: OrderRow };
-  const order = json.order;
   if (!order?.id) {
     notFound();
   }
-  const orderEmail = order.email?.trim().toLowerCase();
-  if (!orderEmail || orderEmail !== userEmail) {
-    notFound();
+  if (!workerDetail) {
+    const orderEmail = order.email?.trim().toLowerCase();
+    if (!orderEmail || orderEmail !== userEmail) notFound();
   }
 
   const lines: ReturnLine[] = (order.items ?? [])

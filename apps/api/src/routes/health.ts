@@ -64,11 +64,11 @@ healthRouter.get("/", async (_req, res) => {
     checkSupabase(),
   ]);
 
-  const allOk = medusa.ok && supabaseOk;
-  const status = allOk ? "ok" : "degraded";
-
+  // `/health` is the liveness endpoint: the process is serving requests even
+  // when a dependency is unavailable. `/health/ready` owns dependency gating.
   res.status(200).json({
-    status,
+    status: "ok",
+    ready: medusa.ok && supabaseOk,
     medusa: medusa.ok ? "ok" : "unavailable",
     supabase: supabaseOk ? "ok" : "unavailable",
     timestamp: new Date().toISOString(),

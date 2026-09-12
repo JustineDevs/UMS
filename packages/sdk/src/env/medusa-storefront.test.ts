@@ -1,6 +1,10 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { getMedusaStoreBaseUrl } from "../medusa-env.js";
+import {
+  getMedusaPublishableKey,
+  getMedusaRegionId,
+  getMedusaStoreBaseUrl,
+} from "../medusa-env.js";
 import {
   assertMedusaStorefrontEnvProduction,
   listMissingMedusaStorefrontEnv,
@@ -44,6 +48,20 @@ describe("medusa-storefront env", () => {
     delete process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
     delete process.env.MEDUSA_PUBLISHABLE_API_KEY;
     assert.doesNotThrow(() => assertMedusaStorefrontEnvProduction());
+  });
+
+  it("falls back to the public key when the server key is present but empty", () => {
+    process.env.MEDUSA_PUBLISHABLE_API_KEY = "  ";
+    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY = "pk_fallback";
+
+    assert.equal(getMedusaPublishableKey(), "pk_fallback");
+  });
+
+  it("falls back to the public region when the server region is present but empty", () => {
+    process.env.MEDUSA_REGION_ID = "  ";
+    process.env.NEXT_PUBLIC_MEDUSA_REGION_ID = "reg_fallback";
+
+    assert.equal(getMedusaRegionId(), "reg_fallback");
   });
 
   it("assertMedusaStorefrontEnvProduction: throws when production and publishable key missing", () => {

@@ -32,7 +32,7 @@ const links: { href: string; label: string }[] = [
   { href: "/privacy", label: "Privacy policy" },
   { href: "/cookies", label: "Cookies" },
   { href: "/accessibility", label: "Accessibility" },
-  { href: "/preferences", label: "Region & language" },
+  { href: "/preferences", label: "Local preferences" },
   { href: "/blog", label: "Blog" },
   { href: "/variant-guide", label: "Variant guide" },
   { href: "/warranty", label: "Warranty" },

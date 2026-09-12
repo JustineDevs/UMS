@@ -37,7 +37,7 @@ export function CmsAnnouncementStack({
   if (!bars.length) return null;
 
   return (
-    <div className="flex w-full flex-col">
+    <div className="pointer-events-none flex w-full flex-col [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
       {bars.map((b) => (
         <CmsAnnouncementBar
           key={`${b.id}:${b.locale}`}

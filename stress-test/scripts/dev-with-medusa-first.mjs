@@ -19,7 +19,7 @@ const composeProjectName =
   process.env.MEDUSA_DOCKER_PROJECT_NAME?.trim() ||
   "universal-music-store-medusa";
 
-const requiredEnv = ["DATABASE_URL", "NEXT_PUBLIC_MEDUSA_URL"];
+const requiredEnv = ["MEDUSA_DB_URL", "NEXT_PUBLIC_MEDUSA_URL"];
 const runtimeDir = join(root, ".uvs-dev-runtime");
 const runtimeLockPath = join(runtimeDir, "dev-supervisor.json");
 // The admin compiles the shared workspace graph plus route-specific dashboards. Keep
@@ -151,6 +151,9 @@ function dockerComposeArgs(args) {
     "compose",
     "-f",
     composeFile,
+    ...(existsSync(join(root, ".env.local"))
+      ? ["--env-file", join(root, ".env.local")]
+      : []),
     "--project-name",
     composeProjectName,
     ...args,
