@@ -202,11 +202,26 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
-      await addButton.evaluate((element) => {
-        // The storefront header is fixed; placing the CTA at the viewport
-        // bottom keeps it clear of the header's hit-test area.
-        element.scrollIntoView({ block: "end", inline: "nearest" });
-      });
+      // Keep the real click point outside the fixed header's hit-test area.
+      // A plain scrollIntoView can leave the CTA underneath the header when
+      // the page is close to a scroll boundary.
+      for (let scrollAttempt = 0; scrollAttempt < 3; scrollAttempt += 1) {
+        const [buttonBox, headerBox] = await Promise.all([
+          addButton.boundingBox(),
+          page.locator('[data-cms-id="storefront-header"]').boundingBox(),
+        ]);
+        if (!buttonBox) break;
+        const headerBottom = headerBox ? headerBox.y + headerBox.height : 0;
+        const viewportHeight = page.viewportSize()?.height ?? 800;
+        if (buttonBox.y >= headerBottom + 12 && buttonBox.y + buttonBox.height <= viewportHeight - 12) {
+          break;
+        }
+        const delta = buttonBox.y < headerBottom + 12
+          ? -(headerBottom + 24 - buttonBox.y)
+          : buttonBox.y + buttonBox.height - (viewportHeight - 12);
+        await page.mouse.wheel(0, delta);
+        await page.waitForTimeout(100);
+      }
       await addButton.click();
       await page.waitForTimeout(800);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
