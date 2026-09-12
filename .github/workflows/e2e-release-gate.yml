@@ -69,7 +69,6 @@ jobs:
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
           CI_STRICT_E2E: "1"
-          AUTH_DISABLED: "true"
       - name: Run PSP full matrix (when secrets present)
         if: env.HAS_PSP_SECRETS == 'true'
         run: pnpm test:e2e:psp-full -- --project=chromium
@@ -78,7 +77,6 @@ jobs:
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
           CI_STRICT_E2E: "1"
-          AUTH_DISABLED: "true"
           E2E_STRIPE_API_KEY: ${{ secrets.E2E_STRIPE_API_KEY }}
           E2E_STRIPE_WEBHOOK_SECRET: ${{ secrets.E2E_STRIPE_WEBHOOK_SECRET }}
           E2E_PAYPAL_CLIENT_ID: ${{ secrets.E2E_PAYPAL_CLIENT_ID }}

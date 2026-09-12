@@ -17,6 +17,7 @@ function toSession(user: User): Session {
 
 export async function getStorefrontSession(): Promise<Session | null> {
   if (isStorefrontAuthDisabled()) return { user: { id: "e2e-test-user", email: "e2e-test@example.com", name: "Local QA" }, expires: "2099-12-31T23:59:59.999Z" };
+  if (!process.env.SUPABASE_URL?.trim() || !process.env.SUPABASE_ANON_KEY?.trim()) return null;
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;

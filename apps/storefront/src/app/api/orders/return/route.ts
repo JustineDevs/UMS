@@ -93,6 +93,8 @@ export async function POST(req: Request) {
   const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
   if (workerBaseUrl) {
     try {
+      const session = await getStorefrontSession();
+      if (!session?.user?.email?.trim()) return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
       const supabase = await createSupabaseServerClient();
       const [{ data: userData }, { data: sessionData }] = await Promise.all([
         supabase.auth.getUser(),

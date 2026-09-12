@@ -28,6 +28,7 @@ async function enrich(user: User): Promise<Session> {
 
 export async function getAdminSession(): Promise<Session | null> {
   if (authDisabled) return localAdminSession();
+  if (!process.env.SUPABASE_URL?.trim() || !process.env.SUPABASE_ANON_KEY?.trim()) return null;
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
