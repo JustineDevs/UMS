@@ -16,6 +16,10 @@ import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import {
+  isIsolatedCodE2E,
+  registerIsolatedCodAttempt,
+} from "@/lib/isolated-cod-e2e-ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +116,7 @@ export async function POST(req: Request) {
   );
 
   const sb = createStorefrontServiceSupabase();
+  const isolatedCodE2E = isIsolatedCodE2E() && provider === "cod";
   const result = await registerCheckoutIntentRouteLogic({
     organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
     cartId,
@@ -125,12 +130,18 @@ export async function POST(req: Request) {
     providerSessionId: body.providerSessionId,
     providerPaymentId: body.providerPaymentId,
     idempotencyKey: body.idempotencyKey,
-    supabaseAvailable: Boolean(sb),
+    supabaseAvailable: Boolean(sb) || isolatedCodE2E,
     registerPaymentAttempt: async (input) => {
-      if (!sb) {
-        throw new Error("Payment ledger is not configured");
+      if (sb) {
+        return registerPaymentAttempt(sb, input);
       }
-      return registerPaymentAttempt(sb, input);
+      if (isolatedCodE2E) {
+        return registerIsolatedCodAttempt({
+          cartId: input.cartId,
+          quoteFingerprint: input.quoteFingerprint ?? "",
+        });
+      }
+      throw new Error("Payment ledger is not configured");
     },
   });
 

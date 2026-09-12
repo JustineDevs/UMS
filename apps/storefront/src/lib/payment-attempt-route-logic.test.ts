@@ -10,6 +10,13 @@ import {
   registerCheckoutIntentRouteLogic,
   type FinalizeMedusaCartResult,
 } from "./payment-attempt-route-logic";
+import {
+  claimIsolatedCodAttempt,
+  getIsolatedCodAttempt,
+  isIsolatedCodE2E,
+  registerIsolatedCodAttempt,
+  updateIsolatedCodAttempt,
+} from "./isolated-cod-e2e-ledger";
 
 function okResult(orderId = "order_123"): FinalizeMedusaCartResult {
   return {
@@ -87,6 +94,58 @@ test("registerCheckoutIntentRouteLogic requires quote fingerprint", async () => 
 
   assert.equal(result.status, 400);
   assert.deepEqual(result.body, { error: "quoteFingerprint is required" });
+});
+
+test("isolated COD ledger is limited to strict auth-disabled E2E and is idempotent", () => {
+  const previous = {
+    nodeEnv: process.env.NODE_ENV,
+    strict: process.env.CI_STRICT_E2E,
+    authDisabled: process.env.AUTH_DISABLED,
+  };
+  try {
+    process.env.NODE_ENV = "test";
+    process.env.CI_STRICT_E2E = "1";
+    process.env.AUTH_DISABLED = "true";
+    assert.equal(isIsolatedCodE2E(), true);
+
+    const first = registerIsolatedCodAttempt({
+      cartId: "cart_isolated_1",
+      quoteFingerprint: "quote_isolated_1",
+    });
+    const replay = registerIsolatedCodAttempt({
+      cartId: "cart_isolated_1",
+      quoteFingerprint: "quote_isolated_1",
+    });
+    assert.equal(replay.correlationId, first.correlationId);
+    assert.equal(replay.reused, true);
+    assert.equal(claimIsolatedCodAttempt(first.correlationId), true);
+    assert.equal(claimIsolatedCodAttempt(first.correlationId), false);
+
+    updateIsolatedCodAttempt(first.correlationId, {
+      status: "completed",
+      medusa_order_id: "order_isolated_1",
+    });
+    assert.deepEqual(getIsolatedCodAttempt(first.correlationId), {
+      cart_id: "cart_isolated_1",
+      correlation_id: first.correlationId,
+      provider: "cod",
+      status: "completed",
+      quote_fingerprint: "quote_isolated_1",
+      finalize_attempts: 0,
+      claimed: true,
+      medusa_order_id: "order_isolated_1",
+    });
+
+    process.env.NODE_ENV = "production";
+    assert.equal(isIsolatedCodE2E(), false);
+  } finally {
+    if (previous.nodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous.nodeEnv;
+    if (previous.strict === undefined) delete process.env.CI_STRICT_E2E;
+    else process.env.CI_STRICT_E2E = previous.strict;
+    if (previous.authDisabled === undefined) delete process.env.AUTH_DISABLED;
+    else process.env.AUTH_DISABLED = previous.authDisabled;
+  }
 });
 
 test("reconcileCheckoutIntentQuote rejects stale browser quotes before payment registration", () => {

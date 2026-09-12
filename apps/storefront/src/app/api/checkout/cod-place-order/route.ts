@@ -17,6 +17,13 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
 import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import {
+  claimIsolatedCodAttempt,
+  getIsolatedCodAttempt,
+  incrementIsolatedCodFinalizeAttempts,
+  isIsolatedCodE2E,
+  updateIsolatedCodAttempt,
+} from "@/lib/isolated-cod-e2e-ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -40,12 +47,15 @@ export async function POST(req: Request) {
   }
 
   const sb = createStorefrontServiceSupabase();
+  const isolatedCodE2E = isIsolatedCodE2E();
   const response = await handleCodPlaceOrderRequest(req, {
     applyRateLimit: async (request) =>
       applyRateLimit(request, "cod-place-order", 30, 60_000),
     readCartIdFromCookie,
-    getPaymentAttemptRow: async (id) =>
-      sb ? getPaymentAttemptByCorrelationId(sb, id) : null,
+    getPaymentAttemptRow: async (id) => {
+      if (sb) return getPaymentAttemptByCorrelationId(sb, id);
+      return isolatedCodE2E ? getIsolatedCodAttempt(id) : null;
+    },
     readCurrentQuoteFingerprint: async (activeCartId) => {
       try {
         const preview = await readMedusaCartTotalsPreview(activeCartId);
@@ -55,16 +65,25 @@ export async function POST(req: Request) {
       }
     },
     incrementFinalizeAttempts: async (id) => {
+      if (isolatedCodE2E && !sb) {
+        incrementIsolatedCodFinalizeAttempts(id);
+        return;
+      }
       if (!sb) {
         throw new Error("Payment ledger is not configured");
       }
       await incrementFinalizeAttempts(sb, id);
     },
     claimFinalizeAttempt: async (id) => {
+      if (isolatedCodE2E && !sb) return claimIsolatedCodAttempt(id);
       if (!sb) throw new Error("Payment ledger is not configured");
       return claimPaymentAttemptForFinalization(sb, id);
     },
     updatePaymentAttempt: async (id, patch) => {
+      if (isolatedCodE2E && !sb) {
+        updateIsolatedCodAttempt(id, patch);
+        return;
+      }
       if (!sb) {
         return;
       }
