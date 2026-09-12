@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { finalizeNativeOrder, finalizeNativeOrderAcrossDatabases } from "./order-finalization.ts";
+import { finalizeNativeOrder, finalizeNativeOrderAcrossDatabases, handleNativeOrderFinalizationRequest } from "./order-finalization.ts";
 import type { WorkerDatabaseClient } from "./database.ts";
 
 function client(handler: (text: string, values: readonly unknown[]) => unknown): WorkerDatabaseClient {
@@ -97,4 +97,20 @@ test("reconciles a committed commerce order before retrying the cart", async () 
   assert.deepEqual(result, { orderId: "order_existing", replayed: true });
   assert.ok(commerceQueries.some((query) => query.includes("worker_payment_correlation_id")));
   assert.ok(appQueries.some((query) => query.includes("SET medusa_order_id = $2")));
+});
+
+test("returns a retryable conflict while another finalization lease is active", async () => {
+  const app = client((text) => {
+    if (text.includes("SET checkout_state = 'finalizing'")) return { rows: [], rowCount: 0 };
+    return { rows: [{ medusa_order_id: null }], rowCount: 1 };
+  });
+  const commerce = client(() => ({ rows: [], rowCount: 0 }));
+  const response = await handleNativeOrderFinalizationRequest(
+    new Request("https://api.test/store/checkout-intents/00000000-0000-4000-8000-000000000005/finalize", { method: "POST" }),
+    commerce,
+    "00000000-0000-4000-8000-000000000005",
+    app,
+  );
+  assert.equal(response.status, 409);
+  assert.deepEqual(await response.json(), { error: "payment_finalization_in_progress", code: "FINALIZE_IN_PROGRESS" });
 });

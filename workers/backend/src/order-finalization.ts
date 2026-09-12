@@ -375,7 +375,14 @@ export async function handleNativeOrderFinalizationRequest(
     return json(result, result.replayed ? 200 : 201);
   } catch (error) {
     const code = error instanceof Error ? error.message : "order_finalization_failed";
-    const status = code === "payment_not_settled" ? 409 : code === "payment_attempt_not_found" ? 404 : 422;
-    return json({ error: code }, status);
+    const status = code === "payment_not_settled" || code === "payment_finalization_in_progress"
+      ? 409
+      : code === "payment_attempt_not_found"
+        ? 404
+        : 422;
+    return json(
+      { error: code, ...(code === "payment_finalization_in_progress" ? { code: "FINALIZE_IN_PROGRESS" } : {}) },
+      status,
+    );
   }
 }

@@ -27,6 +27,16 @@ export function SupabaseSessionProvider({ children }: { children: React.ReactNod
       setState({ data: { user: { id: "e2e-test-user", email: "e2e-test@example.com", name: "E2E Tester" }, expires: "2099-01-01T00:00:00.000Z" }, status: "authenticated" });
       return;
     }
+    // Isolated browser checks and local development may intentionally omit
+    // Supabase. Treat that as a signed-out browser, not a permanently loading
+    // session, so public flows remain usable and protected routes return 401.
+    if (
+      !process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+      !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim()
+    ) {
+      setState({ data: null, status: "unauthenticated" });
+      return;
+    }
     const supabase = createSupabaseBrowserClient();
     void supabase.auth.getUser().then(({ data }) => {
       const session = mapUser(data.user);

@@ -10,7 +10,10 @@ import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { handleFinalizeCheckoutIntentRequest } from "@/lib/finalize-checkout-intent-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
-import { getPublicOriginFromRequest } from "@/lib/finalize-medusa-cart-server";
+import {
+  getPublicOriginFromRequest,
+  secureTrackingRedirectUrl,
+} from "@/lib/finalize-medusa-cart-server";
 import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
@@ -90,6 +93,20 @@ export async function POST(
       },
     );
     const payload = await response.json().catch(() => ({ error: "Order finalization failed" }));
+    if (response.ok && typeof payload?.orderId === "string") {
+      const redirectUrl = secureTrackingRedirectUrl(
+        typeof payload?.redirectUrl === "string" ? payload.redirectUrl : undefined,
+        payload.orderId,
+        getPublicOriginFromRequest(req),
+      );
+      if (!redirectUrl) {
+        return Response.json(
+          { error: "Tracking capability is not configured" },
+          { status: 503 },
+        );
+      }
+      return Response.json({ ...payload, redirectUrl }, { status: response.status });
+    }
     return Response.json(payload, { status: response.status });
   }
   const sb = createStorefrontServiceSupabase();
