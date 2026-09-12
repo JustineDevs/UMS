@@ -58,13 +58,16 @@ export function ProductVariantProvider({
           credentials: "include",
           cache: "no-store",
         });
-        const payload = (await response.json().catch(() => null)) as { ok?: boolean } | null;
+        const payload = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          code?: string;
+        } | null;
         if (cancelled) return;
         if (!response.ok && response.status !== 200) return;
         setUnavailableIds((current) => {
           const next = new Set(current);
           if (payload?.ok === true) next.delete(variantId);
-          else next.add(variantId);
+          else if (payload?.code === "INSUFFICIENT_STOCK") next.add(variantId);
           return next;
         });
       } catch {

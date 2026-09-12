@@ -37,8 +37,13 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
     searchParams?.toString() ?? "",
   );
   const [checked, setChecked] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const [guardError, setGuardError] = useState<string | null>(null);
   const redirecting = useRef(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -103,6 +108,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   }, [status, session, pathname, router, searchParams]);
 
   if (
+    hydrated &&
     status === "authenticated" &&
     !checked &&
     !guestCheckout &&

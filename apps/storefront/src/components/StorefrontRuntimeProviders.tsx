@@ -15,7 +15,10 @@ import { WishlistSyncOnLogin } from "@/components/WishlistSyncOnLogin";
 import { MedusaCartProvider } from "@/context/MedusaCartContext";
 
 const botIdDisabledForLocalAuthBypass =
-  process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true";
+  process.env.AUTH_DISABLED === "true" ||
+  process.env.AUTH_DISABLE === "true" ||
+  process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+  process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
 
 export function StorefrontRuntimeProviders({
   children,
