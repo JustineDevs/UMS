@@ -461,7 +461,9 @@ export async function handleBackendRequest(
     }
   }
   if (paymentMethodsMatch) {
-    const nativeResponse = handlePaymentMethodsRequest(request, env);
+    const nativeResponse = hasConfiguredDatabaseForRole(env, "app")
+      ? await withWorkerDatabase(env as BackendEnv & WorkerDatabaseEnv, (database) => handlePaymentMethodsRequest(request, env, database), "app")
+      : await handlePaymentMethodsRequest(request, env);
     const headers = responseHeaders(nativeResponse.headers, origin);
     headers.set("X-Request-ID", id);
     return new Response(nativeResponse.body, { status: nativeResponse.status, headers });

@@ -3,6 +3,7 @@ import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 /** Contact and social links shown on the storefront (footer, contact page). */
 export type StorefrontPublicMetadataPayload = {
+  storeName: string;
   instagramUrl: string;
   facebookUrl: string;
   tiktokUrl: string;
@@ -13,9 +14,17 @@ export type StorefrontPublicMetadataPayload = {
   messengerUrl: string;
   supportEmail: string;
   supportPhone: string;
+  shippingPolicyUrl: string;
+  returnsPolicyUrl: string;
+  termsUrl: string;
+  privacyUrl: string;
+  cookiesUrl: string;
+  accessibilityUrl: string;
+  warrantyPdfUrl: string;
 };
 
 export const EMPTY_STOREFRONT_PUBLIC_METADATA: StorefrontPublicMetadataPayload = {
+  storeName: "",
   instagramUrl: "",
   facebookUrl: "",
   tiktokUrl: "",
@@ -26,6 +35,13 @@ export const EMPTY_STOREFRONT_PUBLIC_METADATA: StorefrontPublicMetadataPayload =
   messengerUrl: "",
   supportEmail: "",
   supportPhone: "",
+  shippingPolicyUrl: "",
+  returnsPolicyUrl: "",
+  termsUrl: "",
+  privacyUrl: "",
+  cookiesUrl: "",
+  accessibilityUrl: "",
+  warrantyPdfUrl: "",
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -43,6 +59,7 @@ export function mergeStorefrontPublicMetadataPayload(
   const d = EMPTY_STOREFRONT_PUBLIC_METADATA;
   if (!isRecord(partial)) return { ...d };
   return {
+    storeName: pickStr(partial, "storeName").trim(),
     instagramUrl: pickStr(partial, "instagramUrl").trim(),
     facebookUrl: pickStr(partial, "facebookUrl").trim(),
     tiktokUrl: pickStr(partial, "tiktokUrl").trim(),
@@ -53,6 +70,13 @@ export function mergeStorefrontPublicMetadataPayload(
     messengerUrl: pickStr(partial, "messengerUrl").trim(),
     supportEmail: pickStr(partial, "supportEmail").trim(),
     supportPhone: pickStr(partial, "supportPhone").trim(),
+    shippingPolicyUrl: pickStr(partial, "shippingPolicyUrl").trim(),
+    returnsPolicyUrl: pickStr(partial, "returnsPolicyUrl").trim(),
+    termsUrl: pickStr(partial, "termsUrl").trim(),
+    privacyUrl: pickStr(partial, "privacyUrl").trim(),
+    cookiesUrl: pickStr(partial, "cookiesUrl").trim(),
+    accessibilityUrl: pickStr(partial, "accessibilityUrl").trim(),
+    warrantyPdfUrl: pickStr(partial, "warrantyPdfUrl").trim(),
   };
 }
 
@@ -102,6 +126,7 @@ export function resolveStorefrontPublicMetadataWithEnv(
 ): StorefrontPublicMetadataPayload {
   const env = (key: string) => process.env[key]?.trim() ?? "";
   return {
+    storeName: cms.storeName || env("STORE_NAME"),
     instagramUrl: cms.instagramUrl || env("NEXT_PUBLIC_INSTAGRAM_URL"),
     facebookUrl: cms.facebookUrl || env("NEXT_PUBLIC_FACEBOOK_URL"),
     tiktokUrl: cms.tiktokUrl || env("NEXT_PUBLIC_TIKTOK_URL"),
@@ -112,6 +137,13 @@ export function resolveStorefrontPublicMetadataWithEnv(
     messengerUrl: cms.messengerUrl || env("NEXT_PUBLIC_MESSENGER_URL"),
     supportEmail: cms.supportEmail || env("NEXT_PUBLIC_SUPPORT_EMAIL"),
     supportPhone: cms.supportPhone || env("NEXT_PUBLIC_SUPPORT_PHONE"),
+    shippingPolicyUrl: cms.shippingPolicyUrl || env("NEXT_PUBLIC_SHIPPING_POLICY_URL") || "/shipping",
+    returnsPolicyUrl: cms.returnsPolicyUrl || env("NEXT_PUBLIC_RETURNS_POLICY_URL") || "/returns",
+    termsUrl: cms.termsUrl || env("NEXT_PUBLIC_TERMS_URL") || "/terms",
+    privacyUrl: cms.privacyUrl || env("NEXT_PUBLIC_PRIVACY_URL") || "/privacy",
+    cookiesUrl: cms.cookiesUrl || env("NEXT_PUBLIC_COOKIES_URL") || "/cookies",
+    accessibilityUrl: cms.accessibilityUrl || env("NEXT_PUBLIC_ACCESSIBILITY_URL") || "/accessibility",
+    warrantyPdfUrl: cms.warrantyPdfUrl || env("NEXT_PUBLIC_WARRANTY_PDF_URL"),
   };
 }
 

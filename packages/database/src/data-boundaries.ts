@@ -101,6 +101,11 @@ export const LEGACY_TABLE_BINDINGS: Record<string, LegacyTableBinding> = {
     kind: "platform",
     notes: "Public site copy; no product rows.",
   },
+  platform_runtime_settings: {
+    surfaces: ["storefront", "admin", "api"],
+    kind: "platform",
+    notes: "Tenant-scoped non-secret operational configuration; provider credentials remain deployment secrets.",
+  },
   pos_devices: {
     surfaces: ["admin", "api"],
     kind: "platform",

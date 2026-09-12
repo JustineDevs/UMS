@@ -8,9 +8,28 @@ import {
 export type ComplianceEnv = WorkerDatabaseEnv & {
   INTERNAL_API_KEY?: string;
   DATA_RETENTION_DAYS?: string;
+  DEFAULT_ORGANIZATION_ID?: string;
   /** Test-only seam; runtime bindings always use createWorkerDatabaseClient. */
   databaseFactory?: (role: "app" | "medusa") => WorkerDatabaseClient;
 };
+
+async function configuredRetentionDays(env: ComplianceEnv): Promise<number> {
+  const fallback = Number.parseInt(env.DATA_RETENTION_DAYS ?? "730", 10);
+  const organizationId = env.DEFAULT_ORGANIZATION_ID?.trim();
+  if (!organizationId) return Number.isInteger(fallback) && fallback > 0 ? fallback : 730;
+  try {
+    return await withComplianceDatabase(env, "app", async (database) => {
+      const result = await database.query<{ payload?: { retentionDays?: unknown } }>(
+        `SELECT payload FROM public.platform_runtime_settings WHERE organization_id = $1 LIMIT 1`,
+        [organizationId],
+      );
+      const value = result.rows[0]?.payload?.retentionDays;
+      return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 3650 ? value : fallback;
+    });
+  } catch {
+    return Number.isInteger(fallback) && fallback > 0 ? fallback : 730;
+  }
+}
 
 type QueryRow = Record<string, unknown>;
 
@@ -313,7 +332,7 @@ export async function handleComplianceRequest(
     let body: unknown = {};
     try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400); }
     const rawDays = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>).days : undefined;
-    const configured = Number.parseInt(env.DATA_RETENTION_DAYS ?? "730", 10);
+    const configured = await configuredRetentionDays(env);
     const days = typeof rawDays === "number" ? rawDays : Number.parseInt(String(rawDays ?? configured), 10);
     if (!Number.isInteger(days) || days < 1 || days > 3650) return json({ error: "invalid_retention_days" }, 400);
     const result = await withComplianceDatabase(env, "app", (database) => retention(database, days));

@@ -82,6 +82,8 @@ tags:
     description: "Operations for Admin / Reviews."
   - name: "Admin / Roles"
     description: "Operations for Admin / Roles."
+  - name: "Admin / Runtime Settings"
+    description: "Operations for Admin / Runtime Settings."
   - name: "Admin / Segments"
     description: "Operations for Admin / Segments."
   - name: "Admin / Shifts"
@@ -8261,6 +8263,96 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemResponse'
+  /admin/runtime-settings:
+    get:
+      operationId: get_admin_runtime_settings
+      summary: "Read Admin / Runtime Settings"
+      description: "Admin / Runtime Settings. Contract metadata is derived from the route handler and checked against its runtime controls."
+      tags: ["Admin / Runtime Settings"]
+      x-source: "import { withAdminMutationIdempotency } from \"@/lib/admin-mutation-idempotency\";\nimport { adminSupabaseOr503 } from \"@/lib/require-admin-supabase\";\nimport { requireStaffApiSession } from \"@/lib/requireStaffSession\";\nimport { resolveStaffOrganization } from \"@/lib/staff-organization\";\nimport { getCorrelationId } from \"@/lib/request-correlation\";\nimport { correlatedError, correlatedJson, tagResponse } from \"@/lib/staff-api-response\";\nimport { parseBoundedJson } from \"@/lib/bounded-request-body\";\nimport { logAdminApiEvent } from \"@/lib/admin-api-log\";\nimport {\n  getPlatformRuntimeSettings,\n  mergePlatformRuntimeSettings,\n  upsertPlatformRuntimeSettings,\n  upsertStorefrontPublicMetadata,\n  mergeStorefrontPublicMetadataPayload,\n} from \"@universal-music-store/platform-data\";\n\nexport async function GET(req: Request) {\n  const correlationId = getCorrelationId(req);\n  const staff = await requireStaffApiSession(\"settings:read\");\n  if (!staff.ok) return tagResponse(staff.response, correlationId);\n  const supabase = adminSupabaseOr503(correlationId);\n  if (\"response\" in supabase) return supabase.response;\n  const organization = await resolveStaffOrganization(supabase.client, staff.session.user?.email);\n  if (!organization) return correlatedError(correlationId, 403, \"Organization membership is not configured\", \"FORBIDDEN\");\n  try {\n    const data = await getPlatformRuntimeSettings(supabase.client, organization.id);\n    logAdminApiEvent({ route: \"GET /api/admin/runtime-settings\", correlationId, phase: \"ok\", detail: { organizationId: organization.id } });\n    return correlatedJson(correlationId, { data });\n  } catch {\n    return correlatedError(correlationId, 503, \"Runtime settings are unavailable\", \"SERVICE_UNAVAILABLE\");\n  }\n}\n\nasync function put(req: Request) {\n  const correlationId = getCorrelationId(req);\n  const staff = await requireStaffApiSession(\"settings:write\");\n  if (!staff.ok) return tagResponse(staff.response, correlationId);\n  const body = await parseBoundedJson(req, 64 * 1024);\n  if (body.tooLarge) return correlatedError(correlationId, 413, \"Payload too large\", \"BAD_REQUEST\");\n  if (!body.valid) return correlatedError(correlationId, 400, \"Invalid JSON body\", \"BAD_REQUEST\");\n  const supabase = adminSupabaseOr503(correlationId);\n  if (\"response\" in supabase) return supabase.response;\n  const organization = await resolveStaffOrganization(supabase.client, staff.session.user?.email);\n  if (!organization) return correlatedError(correlationId, 403, \"Organization membership is not configured\", \"FORBIDDEN\");\n  try {\n    const data = await upsertPlatformRuntimeSettings(\n      supabase.client,\n      organization.id,\n      mergePlatformRuntimeSettings(body.value),\n      staff.session.user?.email ?? \"unknown\",\n    );\n    await upsertStorefrontPublicMetadata(supabase.client, mergeStorefrontPublicMetadataPayload({\n      storeName: data.storeName,\n      supportEmail: data.supportEmail,\n      supportPhone: data.supportPhone,\n      shippingPolicyUrl: data.policyLinks.shipping,\n      returnsPolicyUrl: data.policyLinks.returns,\n      termsUrl: data.policyLinks.terms,\n      privacyUrl: data.policyLinks.privacy,\n      cookiesUrl: data.policyLinks.cookies,\n      accessibilityUrl: data.policyLinks.accessibility,\n      warrantyPdfUrl: data.policyLinks.warrantyPdf,\n    }));\n    logAdminApiEvent({ route: \"PUT /api/admin/runtime-settings\", correlationId, phase: \"ok\", detail: { organizationId: organization.id } });\n    return correlatedJson(correlationId, { data });\n  } catch {\n    return correlatedError(correlationId, 503, \"Runtime settings could not be saved\", \"SERVICE_UNAVAILABLE\");\n  }\n}\n\nexport const PUT = withAdminMutationIdempotency(\"/admin/runtime-settings:PUT\", put);\n"
+      x-permission: "settings:read"
+      x-tenant-scoped: true
+      x-idempotency-required: false
+      x-idempotency-persisted: true
+      security:
+        - AdminSession: []
+        - StaffApiKey: []
+      responses:
+        "200":
+          description: Operation completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/get_admin_runtime_settingsResponse'
+        "400":
+          description: Invalid request.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        "401":
+          description: Authentication or permission required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        "500":
+          description: Internal operation failure.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+    put:
+      operationId: put_admin_runtime_settings
+      summary: "Update Admin / Runtime Settings"
+      description: "Admin / Runtime Settings. Contract metadata is derived from the route handler and checked against its runtime controls."
+      tags: ["Admin / Runtime Settings"]
+      x-source: "import { withAdminMutationIdempotency } from \"@/lib/admin-mutation-idempotency\";\nimport { adminSupabaseOr503 } from \"@/lib/require-admin-supabase\";\nimport { requireStaffApiSession } from \"@/lib/requireStaffSession\";\nimport { resolveStaffOrganization } from \"@/lib/staff-organization\";\nimport { getCorrelationId } from \"@/lib/request-correlation\";\nimport { correlatedError, correlatedJson, tagResponse } from \"@/lib/staff-api-response\";\nimport { parseBoundedJson } from \"@/lib/bounded-request-body\";\nimport { logAdminApiEvent } from \"@/lib/admin-api-log\";\nimport {\n  getPlatformRuntimeSettings,\n  mergePlatformRuntimeSettings,\n  upsertPlatformRuntimeSettings,\n  upsertStorefrontPublicMetadata,\n  mergeStorefrontPublicMetadataPayload,\n} from \"@universal-music-store/platform-data\";\n\nexport async function GET(req: Request) {\n  const correlationId = getCorrelationId(req);\n  const staff = await requireStaffApiSession(\"settings:read\");\n  if (!staff.ok) return tagResponse(staff.response, correlationId);\n  const supabase = adminSupabaseOr503(correlationId);\n  if (\"response\" in supabase) return supabase.response;\n  const organization = await resolveStaffOrganization(supabase.client, staff.session.user?.email);\n  if (!organization) return correlatedError(correlationId, 403, \"Organization membership is not configured\", \"FORBIDDEN\");\n  try {\n    const data = await getPlatformRuntimeSettings(supabase.client, organization.id);\n    logAdminApiEvent({ route: \"GET /api/admin/runtime-settings\", correlationId, phase: \"ok\", detail: { organizationId: organization.id } });\n    return correlatedJson(correlationId, { data });\n  } catch {\n    return correlatedError(correlationId, 503, \"Runtime settings are unavailable\", \"SERVICE_UNAVAILABLE\");\n  }\n}\n\nasync function put(req: Request) {\n  const correlationId = getCorrelationId(req);\n  const staff = await requireStaffApiSession(\"settings:write\");\n  if (!staff.ok) return tagResponse(staff.response, correlationId);\n  const body = await parseBoundedJson(req, 64 * 1024);\n  if (body.tooLarge) return correlatedError(correlationId, 413, \"Payload too large\", \"BAD_REQUEST\");\n  if (!body.valid) return correlatedError(correlationId, 400, \"Invalid JSON body\", \"BAD_REQUEST\");\n  const supabase = adminSupabaseOr503(correlationId);\n  if (\"response\" in supabase) return supabase.response;\n  const organization = await resolveStaffOrganization(supabase.client, staff.session.user?.email);\n  if (!organization) return correlatedError(correlationId, 403, \"Organization membership is not configured\", \"FORBIDDEN\");\n  try {\n    const data = await upsertPlatformRuntimeSettings(\n      supabase.client,\n      organization.id,\n      mergePlatformRuntimeSettings(body.value),\n      staff.session.user?.email ?? \"unknown\",\n    );\n    await upsertStorefrontPublicMetadata(supabase.client, mergeStorefrontPublicMetadataPayload({\n      storeName: data.storeName,\n      supportEmail: data.supportEmail,\n      supportPhone: data.supportPhone,\n      shippingPolicyUrl: data.policyLinks.shipping,\n      returnsPolicyUrl: data.policyLinks.returns,\n      termsUrl: data.policyLinks.terms,\n      privacyUrl: data.policyLinks.privacy,\n      cookiesUrl: data.policyLinks.cookies,\n      accessibilityUrl: data.policyLinks.accessibility,\n      warrantyPdfUrl: data.policyLinks.warrantyPdf,\n    }));\n    logAdminApiEvent({ route: \"PUT /api/admin/runtime-settings\", correlationId, phase: \"ok\", detail: { organizationId: organization.id } });\n    return correlatedJson(correlationId, { data });\n  } catch {\n    return correlatedError(correlationId, 503, \"Runtime settings could not be saved\", \"SERVICE_UNAVAILABLE\");\n  }\n}\n\nexport const PUT = withAdminMutationIdempotency(\"/admin/runtime-settings:PUT\", put);\n"
+      x-permission: "settings:read"
+      x-tenant-scoped: true
+      x-idempotency-required: true
+      x-idempotency-persisted: true
+      security:
+        - AdminSession: []
+        - StaffApiKey: []
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 200
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/put_admin_runtime_settingsRequest'
+      responses:
+        "200":
+          description: Operation completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/put_admin_runtime_settingsResponse'
+        "400":
+          description: Invalid request.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        "401":
+          description: Authentication or permission required.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
+        "500":
+          description: Internal operation failure.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemResponse'
   /admin/segments:
     get:
       operationId: get_admin_segments
@@ -10456,6 +10548,10 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /admin/roles. Runtime source: apps/admin/src/app/api/admin/roles/route.ts."
+    get_admin_runtime_settingsResponse:
+      type: object
+      additionalProperties: false
+      description: "Response contract for GET /admin/runtime-settings. Runtime source: apps/admin/src/app/api/admin/runtime-settings/route.ts."
     get_admin_segments_id_membersResponse:
       type: object
       additionalProperties: false
@@ -11952,6 +12048,14 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for PUT /admin/employees/{id}/pin. Runtime source: apps/admin/src/app/api/admin/employees/[id]/pin/route.ts."
+    put_admin_runtime_settingsRequest:
+      type: object
+      additionalProperties: false
+      description: "Validated request payload for PUT /admin/runtime-settings. Runtime source: apps/admin/src/app/api/admin/runtime-settings/route.ts."
+    put_admin_runtime_settingsResponse:
+      type: object
+      additionalProperties: false
+      description: "Response contract for PUT /admin/runtime-settings. Runtime source: apps/admin/src/app/api/admin/runtime-settings/route.ts."
     put_admin_storefront_homeRequest:
       type: object
       additionalProperties: false

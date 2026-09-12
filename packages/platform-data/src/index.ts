@@ -48,6 +48,15 @@ export function tryCreateSupabaseClient(): SupabaseClient | null {
 
 export { isMissingTableOrSchemaError } from "./supabase-errors.js";
 export {
+  defaultPlatformRuntimeSettings,
+  getPlatformRuntimeSettings,
+  mergePlatformRuntimeSettings,
+  upsertPlatformRuntimeSettings,
+  RUNTIME_PAYMENT_PROVIDERS,
+  type PlatformRuntimeSettings,
+  type RuntimePaymentProvider,
+} from "./runtime-settings.js";
+export {
   assertPaymentCheckoutTransition,
   isPaymentCheckoutState,
 } from "./payment-state-machine.js";

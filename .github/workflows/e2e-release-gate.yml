@@ -87,10 +87,18 @@ jobs:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
-          API_URL: ${{ vars.WORKER_API_URL }}
+          # This suite uses the local Medusa fixture IDs created above. A
+          # remote Worker database cannot resolve those ephemeral IDs; remote
+          # Worker availability is verified by the smoke below instead.
+          API_URL: ""
           CI_STRICT_E2E: "1"
           AUTH_DISABLED: "true"
           NEXT_PUBLIC_AUTH_DISABLED: "true"
+      - name: Smoke deployed Worker
+        if: ${{ vars.WORKER_API_URL != '' }}
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 2 "${WORKER_API_URL}/healthz"
+        env:
+          WORKER_API_URL: ${{ vars.WORKER_API_URL }}
       - name: Run PSP full matrix (when secrets present)
         if: env.HAS_PSP_SECRETS == 'true'
         run: pnpm test:e2e:psp-full -- --project=chromium
