@@ -3,9 +3,7 @@ import { sanitizeCmsHtml } from "@universal-music-store/validation";
 export type Viewport = "desktop" | "tablet" | "mobile";
 
 export function removeHelpers(html: string, keepHelperAttributes = false): string {
-  let result = html
-    .replace(/<[^>]+?data-uvs-helpers.+?>/gi, "")
-    .replace(/<[^>]+?uvs-new-section.+?>.+?<\/newsection>/gims, "")
+  let result = sanitizeCmsHtml(html)
     .replaceAll("uvs-hidden", "")
     .replaceAll("data-uvsjs-editor", "");
   if (!keepHelperAttributes) result = result.replace(/\s+data-uvs-\w+(=["'].*?["'])?/gi, "");
@@ -13,7 +11,7 @@ export function removeHelpers(html: string, keepHelperAttributes = false): strin
 }
 
 export function serializeHtml(html: string, keepHelperAttributes = false): string {
-  return sanitizeCmsHtml(removeHelpers(html.replace(/<script\b[^>]*src=["'](?:chrome|moz)-extension:\/\/[^>]*>[\s\S]*?<\/script>/gi, ""), keepHelperAttributes));
+  return removeHelpers(html, keepHelperAttributes);
 }
 
 export function getDocumentTag(html: string, tag: "head" | "body"): string {

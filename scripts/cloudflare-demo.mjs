@@ -56,6 +56,11 @@ function startGateway() {
       request.url || "/",
       `http://${request.headers.host || "localhost"}`,
     );
+    if (!incoming.pathname.startsWith("/") || incoming.pathname.startsWith("//")) {
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(JSON.stringify({ error: "invalid_local_path" }));
+      return;
+    }
     const target = new URL(
       incoming.pathname + incoming.search,
       targetFor(incoming.pathname),
