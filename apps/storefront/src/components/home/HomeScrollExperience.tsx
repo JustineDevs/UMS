@@ -131,7 +131,7 @@ const PARTNERS: Partner[] = [
     name: "Lyric",
     href: "https://www.lyric.ph/",
     logo: "/UVS/partners/Lyric/Lyric.png",
-    imageClassName: "scale-[1.8]",
+    imageClassName: "md:scale-[1.8]",
   },
   {
     name: "Marshall",
@@ -152,25 +152,25 @@ const PARTNERS: Partner[] = [
     name: "Severo",
     href: "https://www.facebook.com/SeveroGuitars/",
     logo: "/UVS/partners/Severo/Severo-guitars.png",
-    imageClassName: "scale-[1.45]",
+    imageClassName: "md:scale-[1.45]",
   },
   {
     name: "Squier by Fender",
     href: "https://www.fender.com/collections/squier",
     logo: "/UVS/partners/Squeir by Fender/squier-by-fender-logo.png",
-    imageClassName: "scale-[1.5]",
+    imageClassName: "md:scale-[1.5]",
   },
   {
     name: "Thomson",
     href: "https://www.thomson.ph/",
     logo: "/UVS/partners/Thomson/thomson-logo(0).png",
-    imageClassName: "scale-[1.6]",
+    imageClassName: "md:scale-[1.6]",
   },
   {
     name: "Yamaha",
     href: "https://www.yamaha.com/",
     logo: "/UVS/partners/Yamaha/yamaha-logo.png",
-    imageClassName: "scale-[1.45]",
+    imageClassName: "md:scale-[1.45]",
   },
 ];
 
