@@ -12,6 +12,7 @@ import { validateCartSessionBinding } from "@/lib/cart-session-boundary";
 import { cookies } from "next/headers";
 import { verifyCartBindToken } from "@/lib/cart-session-boundary";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { getMedusaPublishableKey } from "@/lib/storefront-medusa-env";
 
 async function handlePOST(req: Request) {
   if (!isSameOriginMutation(req)) {
@@ -48,7 +49,14 @@ async function handlePOST(req: Request) {
     }
     const response = await fetch(
       `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
-      { cache: "no-store" },
+      {
+        cache: "no-store",
+        headers: {
+          ...(getMedusaPublishableKey()
+            ? { "x-publishable-api-key": getMedusaPublishableKey()! }
+            : {}),
+        },
+      },
     );
     if (!response.ok) {
       return NextResponse.json({ error: "Invalid cart" }, { status: 400 });

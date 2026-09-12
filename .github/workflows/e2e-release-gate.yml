@@ -97,7 +97,10 @@ jobs:
           # This suite uses the local Medusa fixture IDs created above. A
           # remote Worker database cannot resolve those ephemeral IDs; remote
           # Worker availability is verified by the smoke below instead.
-          API_URL: ""
+          # The storefront binding route verifies the freshly-created local
+          # cart. Point it at the local Medusa service for this isolated suite;
+          # production uses the Worker API origin instead.
+          API_URL: http://localhost:9000
           CI_STRICT_E2E: "1"
           AUTH_DISABLED: "true"
           NEXT_PUBLIC_AUTH_DISABLED: "true"
