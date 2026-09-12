@@ -27,6 +27,15 @@ function switchPoolerPort(url: string, port: number): string {
   }
 }
 
+function isSupabasePooler(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === "pooler.supabase.com" || hostname.endsWith(".pooler.supabase.com");
+  } catch {
+    return false;
+  }
+}
+
 const sql = readFileSync(join(__dirname, "../supabase/seed.sql"), "utf-8");
 
 async function runSeed(connectionString: string): Promise<void> {
@@ -42,7 +51,7 @@ async function main(): Promise<void> {
     console.log("Seed completed.");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (databaseUrl.includes("pooler.supabase.com")) {
+    if (isSupabasePooler(databaseUrl)) {
       const currentPort = new URL(databaseUrl).port;
       const altPort = currentPort === "5432" ? 6543 : 5432;
       const altUrl = switchPoolerPort(databaseUrl, altPort);

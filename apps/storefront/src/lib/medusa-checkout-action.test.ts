@@ -71,7 +71,7 @@ test("resolveCheckoutAction: Stripe prefers hosted checkout_url over client_secr
   });
   assert.equal(a.kind, "redirect");
   if (a.kind === "redirect") {
-    assert.ok(a.url.includes("checkout.stripe.com"));
+    assert.equal(new URL(a.url).hostname, "checkout.stripe.com");
     assert.equal(a.providerPaymentId, "cs_test");
   }
 });

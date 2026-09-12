@@ -1,3 +1,5 @@
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
+
 export type Viewport = "desktop" | "tablet" | "mobile";
 
 export function removeHelpers(html: string, keepHelperAttributes = false): string {
@@ -11,7 +13,7 @@ export function removeHelpers(html: string, keepHelperAttributes = false): strin
 }
 
 export function serializeHtml(html: string, keepHelperAttributes = false): string {
-  return removeHelpers(html.replace(/<script\b[^>]*src=["'](?:chrome|moz)-extension:\/\/[^>]*>[\s\S]*?<\/script>/gi, ""), keepHelperAttributes);
+  return sanitizeCmsHtml(removeHelpers(html.replace(/<script\b[^>]*src=["'](?:chrome|moz)-extension:\/\/[^>]*>[\s\S]*?<\/script>/gi, ""), keepHelperAttributes));
 }
 
 export function getDocumentTag(html: string, tag: "head" | "body"): string {

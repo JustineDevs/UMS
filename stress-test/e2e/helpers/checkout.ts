@@ -6,6 +6,15 @@ import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
+function isTrustedProviderHost(value: string, hosts: readonly string[]): boolean {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase();
+    return hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+  } catch {
+    return false;
+  }
+}
+
 export async function enablePublicTunnelBypass(page: Page): Promise<void> {
   if (process.env.E2E_TUNNEL_BYPASS_HEADER === "1") {
     await page.route(/https:\/\/[^/]+\.loca\.lt(?:\/|$)/, async (route) => {
@@ -545,7 +554,7 @@ export async function clickContinueToStripeHostedCheckout(page: Page): Promise<v
 
 /** Accepts either direct navigation or the optional intermediate handoff UI. */
 export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
-  if (page.url().includes("checkout.stripe.com")) return;
+  if (isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
   const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
   const winner = await Promise.race([
     page
@@ -557,7 +566,7 @@ export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
       .then(() => "handoff" as const)
       .catch(() => null),
   ]);
-  if (winner === "redirect" || page.url().includes("checkout.stripe.com")) return;
+  if (winner === "redirect" || isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
   if (winner === "handoff") {
     await clickContinueToStripeHostedCheckout(page);
     return;
@@ -582,7 +591,7 @@ export async function fillStripeHostedCheckoutTestCard(
   let filled = false;
   for (const frame of page.frames()) {
     const url = frame.url();
-    if (!url.includes("stripe") && !url.includes("js.stripe.com")) continue;
+    if (!isTrustedProviderHost(url, ["js.stripe.com", "checkout.stripe.com"])) continue;
     const numberLoc = frame.locator(
       'input[autocomplete="cc-number"], input[name="cardnumber"], input[data-elements-stable-field-name="cardNumber"]',
     );

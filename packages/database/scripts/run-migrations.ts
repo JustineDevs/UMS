@@ -173,6 +173,15 @@ function switchPoolerPort(url: string, port: number): string {
   }
 }
 
+function isSupabasePooler(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === "pooler.supabase.com" || hostname.endsWith(".pooler.supabase.com");
+  } catch {
+    return false;
+  }
+}
+
 async function connectWithPoolerFallback(): Promise<{
   client: pg.Client;
   url: string;
@@ -191,7 +200,7 @@ async function connectWithPoolerFallback(): Promise<{
     return { client, url: databaseUrl! };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (!databaseUrl!.includes("pooler.supabase.com")) {
+    if (!isSupabasePooler(databaseUrl!)) {
       throw err;
     }
     const currentPort = new URL(databaseUrl!).port;

@@ -1,4 +1,5 @@
 import type { PropertyDefinition } from "./property-system";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
 
 export type DomMutation =
   | { type: "attribute"; target: HTMLElement; name: string; before: string | null; after: string | null }
@@ -30,7 +31,9 @@ export function applyDomMutation(mutation: DomMutation, direction: "before" | "a
     return;
   }
   if (mutation.type === "html") {
-    mutation.target.innerHTML = direction === "before" ? mutation.before : mutation.after;
+    mutation.target.innerHTML = sanitizeCmsHtml(
+      direction === "before" ? mutation.before : mutation.after,
+    );
     return;
   }
   if (mutation.type === "insert") {

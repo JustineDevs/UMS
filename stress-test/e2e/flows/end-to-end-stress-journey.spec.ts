@@ -141,7 +141,14 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
             } else {
               await clickPayButton(page);
               if (provider === "paypal") {
-                const paypalRedirect = page.url().includes("paypal.com");
+                const paypalRedirect = (() => {
+                  try {
+                    const hostname = new URL(page.url()).hostname.toLowerCase();
+                    return hostname === "paypal.com" || hostname.endsWith(".paypal.com");
+                  } catch {
+                    return false;
+                  }
+                })();
                 if (paypalRedirect) {
                   await expect(page).toHaveURL(/paypal\.com/, { timeout: 30_000 });
                 } else {
