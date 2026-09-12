@@ -61,10 +61,11 @@ function startGateway() {
       response.end(JSON.stringify({ error: "invalid_local_path" }));
       return;
     }
-    const target = new URL(
-      incoming.pathname + incoming.search,
-      targetFor(incoming.pathname),
-    );
+    // The upstream origin is selected only from the fixed local allowlist.
+    // Copying the request path/query cannot change the destination host.
+    const target = new URL(targetFor(incoming.pathname));
+    target.pathname = incoming.pathname;
+    target.search = incoming.search;
     const headers = {
       ...request.headers,
       host: target.host,
