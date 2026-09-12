@@ -62,8 +62,8 @@ jobs:
           echo "MEDUSA_PUBLISHABLE_API_KEY=$MEDUSA_PUBLISHABLE_API_KEY" >> "$GITHUB_ENV"
           echo "MEDUSA_REGION_ID=$MEDUSA_REGION_ID" >> "$GITHUB_ENV"
           echo "MEDUSA_SALES_CHANNEL_ID=$MEDUSA_SALES_CHANNEL_ID" >> "$GITHUB_ENV"
-          E2E_MEDUSA_SECRET_OUTPUT="$RUNNER_TEMP/medusa-e2e-secret" \
-            pnpm --filter medusa run seed:ph
+          export E2E_MEDUSA_SECRET_OUTPUT="$RUNNER_TEMP/medusa-e2e-secret"
+          pnpm --filter medusa run seed:ph
           test -s "$E2E_MEDUSA_SECRET_OUTPUT"
           printf 'MEDUSA_SECRET_API_KEY=%s\n' "$(cat "$E2E_MEDUSA_SECRET_OUTPUT")" >> "$GITHUB_ENV"
         env:
