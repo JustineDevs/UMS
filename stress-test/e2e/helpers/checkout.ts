@@ -202,6 +202,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
+      await addButton.evaluate((element) => {
+        element.scrollIntoView({ block: "center", inline: "nearest" });
+      });
       // Keep the real click point outside the fixed header's hit-test area.
       // A plain scrollIntoView can leave the CTA underneath the header when
       // the page is close to a scroll boundary.
@@ -211,6 +214,10 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
           page.locator('[data-cms-id="storefront-header"]').boundingBox(),
         ]);
         if (!buttonBox) break;
+        if (await addButton.isDisabled()) {
+          log(`stress catalog: skip ${slug} (became unavailable during hydration)`);
+          return null;
+        }
         const headerBottom = headerBox ? headerBox.y + headerBox.height : 0;
         const viewportHeight = page.viewportSize()?.height ?? 800;
         if (buttonBox.y >= headerBottom + 12 && buttonBox.y + buttonBox.height <= viewportHeight - 12) {
@@ -391,6 +398,7 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
 
   const addToCartBtn = page.getByRole("button", { name: /add to (cart|bag)/i });
   if (await addToCartBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await expect(addToCartBtn).toBeEnabled({ timeout: 10_000 });
     await addToCartBtn.click();
     await page.waitForTimeout(1_000);
   }
