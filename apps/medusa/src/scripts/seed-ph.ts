@@ -1,3 +1,5 @@
+import { writeFile } from "node:fs/promises";
+
 import { CreateInventoryLevelInput, ExecArgs } from "@medusajs/framework/types";
 import { ContainerRegistrationKeys, Modules } from "@medusajs/framework/utils";
 import {
@@ -14,6 +16,7 @@ const STOCK_LOCATION_NAME = "Warehouse PH";
 const FULFILLMENT_SET_NAME = "PH Warehouse delivery";
 const SHIPPING_OPTION_STANDARD = "Standard PH";
 const LEGACY_LOC_META_KEY = "legacy_inventory_location_code";
+const E2E_SECRET_OUTPUT_ENV = "E2E_MEDUSA_SECRET_OUTPUT";
 
 type CoreFlowsModule = typeof import("@medusajs/medusa/core-flows");
 
@@ -520,4 +523,25 @@ async function runPhilippinesSeed({ container }: ExecArgs) {
   logger.info(
     `PH seed done: sales_channel=${webPhChannels[0].id} region=${region.id} stock_location=${stockLocation.id} legacy_loc=${legacyLocationCode}`,
   );
+
+  const e2eSecretOutput = process.env[E2E_SECRET_OUTPUT_ENV]?.trim();
+  if (e2eSecretOutput) {
+    const { result } = await createApiKeysWorkflow(container).run({
+      input: {
+        api_keys: [
+          {
+            title: "CI E2E browser suite",
+            type: "secret",
+            created_by: "ci",
+          },
+        ],
+      },
+    });
+    const token = (result?.[0] as { token?: unknown } | undefined)?.token;
+    if (typeof token !== "string" || token.length === 0) {
+      throw new Error("Medusa did not return the generated E2E secret token");
+    }
+    await writeFile(e2eSecretOutput, token, { encoding: "utf8", mode: 0o600 });
+    logger.info("Created disposable Medusa E2E secret for browser tests.");
+  }
 }
