@@ -5,7 +5,7 @@ const linkClass =
 
 export function StorefrontUtilityBar() {
   return (
-    <div className="pointer-events-auto border-b border-on-primary/15 bg-primary text-on-primary">
+    <div className="pointer-events-none border-b border-on-primary/15 bg-primary text-on-primary [&_a]:pointer-events-auto">
       <div className="mx-auto flex w-full max-w-[1600px] items-center justify-end gap-x-3 overflow-x-auto px-[clamp(0.75rem,3vw,2rem)] py-1 sm:gap-x-4">
         <span className="sr-only">Utility links</span>
         <Link href="/track" className={linkClass}>
