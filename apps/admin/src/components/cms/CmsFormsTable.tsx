@@ -4,7 +4,7 @@ import {
   CMS_FORM_KEYS,
   staffHasPermission,
 } from "@universal-music-store/platform-data";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 

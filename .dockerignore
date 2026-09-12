@@ -22,3 +22,16 @@
 **/build
 **/*.log
 **/*.tsbuildinfo
+**/.git
+**/.omx
+**/.agents
+**/.codex
+**/.claude
+**/.cursor
+**/stress-test
+**/docs
+**/internal
+**/*.har
+**/*.trace
+**/*.webm
+**/*.mp4

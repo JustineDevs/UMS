@@ -16,8 +16,9 @@ import { isSameOriginMutation } from "@/lib/request-origin";
 export const dynamic = "force-dynamic";
 
 /**
- * Server-side Medusa pricing preview (shipping + catalog + tax + loyalty).
- * Uses the same env resolution as other server routes (MEDUSA_BACKEND_URL vs public URL).
+ * Server-side Worker pricing preview for every checkout method.
+ * The Worker is the only commerce authority; legacy Medusa pricing is not a
+ * fallback when the Worker API is configured.
  */
 export async function POST(req: Request) {
   if (!isSameOriginMutation(req)) {
@@ -30,6 +31,22 @@ export async function POST(req: Request) {
       { error: "Too many requests", retryAfter: rl.retryAfterSec },
       { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
     );
+  }
+
+  const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (apiUrl) {
+    try {
+      const response = await fetch(`${apiUrl}/store/checkout/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: await req.clone().text(),
+        cache: "no-store",
+      });
+      const payload = await response.text();
+      return new Response(payload, { status: response.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    } catch {
+      return Response.json({ error: "Checkout preview is temporarily unavailable." }, { status: 503 });
+    }
   }
 
   return handleMedusaTotalsPreviewRequest(req, {

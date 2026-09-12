@@ -108,7 +108,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none in this pass)
 
-**Behavior Implemented:** `apps/storefront/src/app/api/cron/finalize-payment-attempts/route.ts` implements secret check and finalize delegation. `render.yaml` includes cron curl example. Root and `apps/storefront/vercel.json` have **no** `crons` block for Vercel-native scheduling.
+**Behavior Implemented:** `apps/storefront/src/app/api/cron/finalize-payment-attempts/route.ts` implements secret check and finalize delegation. Scheduled recovery is executed by the repository GitHub Actions workflow; the Cloudflare Worker remains the backend origin. Root and `apps/storefront/vercel.json` have **no** `crons` block for Vercel-native scheduling.
 
 **Scheduling decision:** Vercel Cron is intentionally not used. Scheduled storefront recovery runs from `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`; webhook delivery remains provider-driven and immediate.
 

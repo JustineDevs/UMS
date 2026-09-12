@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 
 import { NextResponse } from "next/server";
 import { getStorefrontSession } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { accountOrderMatchesCustomer } from "@/lib/medusa-account-orders";
 import { findMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
@@ -55,13 +56,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const session = await getStorefrontSession();
-  const email = session?.user?.email?.trim().toLowerCase();
-  if (!email) {
-    return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
-  }
-  const customerId = await findMedusaCustomerIdByEmail(email);
-
   const bounded = await parseBoundedJson(req, MAX_RETURN_BODY_BYTES);
   if (bounded.tooLarge) {
     return jsonNoStore({ error: "Request body is too large" }, { status: 413 });
@@ -84,6 +78,64 @@ export async function POST(req: Request) {
     );
   }
   const normalizedItems = normalizeReturnRequestLines(items);
+
+  const nativePayload: Record<string, unknown> = {
+    orderId,
+    items: normalizedItems.map((it) => ({
+      item_id: it.item_id,
+      quantity: it.quantity,
+      ...(it.reason_id ? { reason_id: it.reason_id } : {}),
+      ...(it.note ? { note: it.note } : {}),
+    })),
+  };
+  if (note) nativePayload.note = note;
+
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl) {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const [{ data: userData }, { data: sessionData }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ]);
+      const email = userData.user?.email?.trim().toLowerCase();
+      const accessToken = sessionData.session?.access_token?.trim();
+      if (!email || !accessToken) return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
+      const idempotencyKey = createHash("sha256")
+        .update(`order-return:${email}:${orderId}:${JSON.stringify(nativePayload)}`)
+        .digest("hex");
+      const response = await fetch(`${workerBaseUrl}/store/orders/return`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+          Accept: "application/json",
+        },
+        body: JSON.stringify(nativePayload),
+        cache: "no-store",
+      });
+      const responseBody = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+      return jsonNoStore(responseBody, { status: response.status });
+    } catch (err) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker return request failed", {
+        correlationId,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+      return jsonNoStore(
+        accountMutationFailure("Return request failed. Please try again or contact support.", correlationId),
+        { status: 503 },
+      );
+    }
+  }
+
+  const session = await getStorefrontSession();
+  const email = session?.user?.email?.trim().toLowerCase();
+  if (!email) {
+    return jsonNoStore({ error: "Unauthorized" }, { status: 401 });
+  }
+  const customerId = await findMedusaCustomerIdByEmail(email);
 
   const orderRes = await medusaAdminFetch(
     `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email,customer_id,status,*items,*items.id,*items.quantity,*items.returned_quantity`,

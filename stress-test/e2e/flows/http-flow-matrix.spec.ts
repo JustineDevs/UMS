@@ -224,7 +224,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
     const res = await request.get(`${base()}/api/health/sop`);
     expect(res.ok()).toBeTruthy();
     const json = (await res.json()) as { commerceSource?: string };
-    expect(json.commerceSource).toBe("medusa");
+    expect(json.commerceSource).toBe("cloudflare_worker");
   });
 
   test("GET /api/shop/product without slug returns 400", async ({ request }) => {

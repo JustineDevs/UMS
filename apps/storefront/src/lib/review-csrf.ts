@@ -4,7 +4,7 @@ const COOKIE = "review_csrf";
 const MAX_AGE_MS = 30 * 60 * 1000;
 
 function secret(): string {
-  return process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim() || "development-review-csrf";
+  return process.env.AUTH_SECRET?.trim() || "development-review-csrf";
 }
 
 export function reviewCsrfCookieName(): string {

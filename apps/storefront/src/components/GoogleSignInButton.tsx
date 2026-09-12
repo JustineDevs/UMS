@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@universal-music-store/ui";
-import { signIn } from "next-auth/react";
+import { signIn } from "@/lib/auth-client";
 import { cn } from "@universal-music-store/ui";
 
 type Props = {

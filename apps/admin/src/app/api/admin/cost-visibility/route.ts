@@ -22,8 +22,7 @@ export async function GET() {
   const items: CostLineItem[] = [
     { service: "Vercel (Storefront)", category: "hosting", monthlyCostPhp: 0, note: "Free tier / Pro plan" },
     { service: "Vercel (Admin)", category: "hosting", monthlyCostPhp: 0, note: "Free tier / Pro plan" },
-    { service: "Render (Medusa)", category: "hosting", monthlyCostPhp: 0, note: "Starter plan" },
-    { service: "Render (API)", category: "hosting", monthlyCostPhp: 0, note: "Starter plan" },
+    { service: "Cloudflare Workers + Containers", category: "hosting", monthlyCostPhp: 0, note: "Workers Paid plan; usage-based Containers" },
     { service: "Supabase (Database)", category: "database", monthlyCostPhp: 0, note: "Free tier / Pro plan" },
     { service: "Supabase (Auth)", category: "database", monthlyCostPhp: 0, note: "Included" },
     { service: "Redis Cloud", category: "cache", monthlyCostPhp: 0, note: "If used" },

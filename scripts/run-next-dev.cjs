@@ -139,7 +139,7 @@ const appEnv = {
   ...process.env,
   NODE_ENV: normalizedNodeEnv,
   BABEL_ENV: normalizedNodeEnv,
-  ...(normalizedNodeEnv === "development" ? { NEXTAUTH_URL: localAuthOrigin } : {}),
+  ...(normalizedNodeEnv === "development" ? { NEXT_PUBLIC_SITE_URL: localAuthOrigin } : {}),
 };
 
 const result = spawnSync(

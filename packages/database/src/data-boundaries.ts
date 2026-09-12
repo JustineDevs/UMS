@@ -1,15 +1,15 @@
 /**
  * Medusa vs Supabase (legacy) boundaries for this monorepo.
  *
- * - **Medusa Postgres** (`apps/medusa` `DATABASE_URL`): authoritative commerce — catalog, cart, order,
+ * - **Medusa Postgres** (`apps/medusa` `MEDUSA_DB_URL`): authoritative commerce — catalog, cart, order,
  *   payment sessions/collections, inventory, regions, Medusa customers, fulfillments.
- * - **Supabase** (`LEGACY_DATABASE_URL`): platform only — staff identity/RBAC, CMS, audit, POS ops,
+ * - **Supabase** (`APP_DB_URL`): platform only — staff identity/RBAC, CMS, audit, POS ops,
  *   bridges (`medusa_*` reference columns), analytics events — **not** a second commerce catalog or order store.
  *
  * Do not add legacy tables that duplicate Medusa first-class entities. See `check-commerce-migration-boundary.mjs`.
  * If a legacy database ever contained mistaken copies of Medusa `public` tables (same names as
  * `internal/docs/exclusive/medusadb/schema.sql`), migration `015_drop_accidental_medusa_core_tables_from_legacy.sql`
- * drops them when applied via `LEGACY_DATABASE_URL` only.
+ * drops them when applied via `APP_DB_URL` only.
  */
 
 /** Commerce domains owned solely by Medusa (not recreated in Supabase). */

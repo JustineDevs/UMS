@@ -2,7 +2,7 @@
  * Admin authentication fixture for e2e tests.
  *
  * Uses the /sign-in/e2e shortcut route which is only active when NODE_ENV=development.
- * Credentials come from ADMIN_ALLOWED_EMAILS (first entry) and NEXTAUTH_SECRET.
+ * Credentials come from ADMIN_ALLOWED_EMAILS (first entry) and AUTH_SECRET.
  * Run `pnpm e2e:ensure-staff` to upsert the Supabase user before running these tests.
  */
 import type { Page } from "@playwright/test";
@@ -17,7 +17,7 @@ function getAdminEmail(): string | undefined {
 }
 
 function getAdminPassword(): string | undefined {
-  return process.env.NEXTAUTH_SECRET?.trim() || undefined;
+  return process.env.AUTH_SECRET?.trim() || undefined;
 }
 
 export type SignInResult = "ok" | "skip_no_env" | "skip_no_ui";

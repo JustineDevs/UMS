@@ -5,7 +5,7 @@
  *
  * Server-side catalog fetches run in Node (Next.js RCS), not in the visitor's browser.
  * If MEDUSA_BACKEND_URL is still http://localhost:9000 (copied from local .env.local) but
- * NEXT_PUBLIC_MEDUSA_URL is a non-loopback URL (e.g. deployed Medusa on Render), we prefer
+ * NEXT_PUBLIC_MEDUSA_URL is a non-loopback URL (e.g. the Cloudflare Worker backend gateway), we prefer
  * the public URL so hosted storefronts do not call the host's own localhost.
  */
 function stripTrailingSlash(raw: string): string {

@@ -8,11 +8,11 @@ const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const repoRoot = join(__dirname, "../../../");
 config({ path: join(repoRoot, ".env.local"), override: true });
 
-/** Legacy/app Postgres only — never Medusa’s DATABASE_URL (see apps/medusa/.env.local). */
-const databaseUrl = process.env.LEGACY_DATABASE_URL;
+/** Application/platform Postgres only — never Medusa’s MEDUSA_DB_URL. */
+const databaseUrl = process.env.APP_DB_URL;
 if (!databaseUrl) {
   console.error(
-    "LEGACY_DATABASE_URL is required (legacy Supabase pooler URI for this schema).",
+    "APP_DB_URL is required (application/platform Supabase pooler URI for this schema).",
   );
   process.exit(1);
 }

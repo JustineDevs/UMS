@@ -1,8 +1,7 @@
-type AuthSecretEnv = {
-  NEXTAUTH_SECRET?: string;
+type AuthSecretEnv = Record<string, string | undefined> & {
   AUTH_SECRET?: string;
 };
 
 export function getAdminAuthSecret(env: AuthSecretEnv = process.env): string | undefined {
-  return env.NEXTAUTH_SECRET?.trim() || env.AUTH_SECRET?.trim() || undefined;
+  return env.AUTH_SECRET?.trim() || undefined;
 }

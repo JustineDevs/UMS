@@ -54,7 +54,7 @@ export function isStaffRbacStrictEnv(): boolean {
   );
 }
 
-/** Minimal session shape for RBAC (NextAuth session, RSC props, etc.). */
+/** Minimal session shape for RBAC (Supabase Auth SSR session, RSC props, etc.). */
 export type StaffSessionLike = {
   user?: { permissions?: string[]; role?: string };
 } | null | undefined;

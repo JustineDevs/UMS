@@ -2,6 +2,7 @@ import { medusaAdminFetch } from "./medusa-admin-fetch";
 import { medusaMinorToMajor } from "./medusa-money";
 import { findMedusaCustomerIdByEmail } from "./medusa-customer-resolve";
 import { getMedusaSecretApiKey } from "./storefront-medusa-env";
+import { createSupabaseServerClient } from "./supabase/server";
 
 export type AccountOrder = {
   id: string;
@@ -47,6 +48,158 @@ type AdminOrderListRow = {
   created_at?: string;
   items?: Array<{ quantity?: unknown }>;
 };
+
+export type AccountOrderDetail = {
+  id: string;
+  customer_id?: string | null;
+  display_id?: string | number;
+  email?: string | null;
+  status?: string;
+  total?: number;
+  subtotal?: number;
+  tax_total?: number;
+  shipping_total?: number;
+  discount_total?: number;
+  currency_code?: string;
+  created_at?: string;
+  updated_at?: string;
+  payment_status?: string | null;
+  fulfillment_status?: string | null;
+  metadata?: Record<string, unknown> | null;
+  shipping_address?: Record<string, string | null> | null;
+  items?: Array<{
+    id: string;
+    title?: string | null;
+    quantity?: number;
+    unit_price?: number;
+    total?: number;
+    variant?: { sku?: string | null } | null;
+    thumbnail?: string | null;
+  }>;
+  fulfillments?: Array<{
+    id?: string;
+    status?: string;
+    provider_id?: string;
+    shipped_at?: string | null;
+    tracking_numbers?: string[] | null;
+    labels?: Array<{ tracking_number?: string | null } | null> | null;
+  }>;
+};
+
+async function fetchWorkerCustomerOrders(): Promise<{ orders: AccountOrder[]; error: string | null } | null> {
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token?.trim();
+    if (!accessToken) return { orders: [], error: "Sign in to view your order history." };
+    const response = await fetch(`${base}/store/customers/me/orders?limit=100`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return { orders: [], error: "Order history is temporarily unavailable." };
+    const body = (await response.json()) as { orders?: unknown[] };
+    const orders = (Array.isArray(body.orders) ? body.orders : []).flatMap((raw): AccountOrder[] => {
+      if (!raw || typeof raw !== "object") return [];
+      const row = raw as Record<string, unknown>;
+      const id = typeof row.id === "string" ? row.id : "";
+      if (!id) return [];
+      const currency = String(row.currency_code ?? "PHP").toUpperCase();
+      const totalMinor = Number(row.total ?? 0);
+      return [{
+        id,
+        displayId: row.display_id == null ? id : String(row.display_id),
+        status: String(row.status ?? "unknown"),
+        total: Number.isFinite(totalMinor) ? medusaMinorToMajor(totalMinor, currency) : 0,
+        currency,
+        createdAt: typeof row.created_at === "string" ? row.created_at : "",
+        itemCount: Math.max(0, Math.floor(Number(row.item_count ?? 0))),
+      }];
+    });
+    return { orders, error: null };
+  } catch {
+    return { orders: [], error: "Order history is temporarily unavailable." };
+  }
+}
+
+export async function fetchWorkerCustomerOrderDetail(
+  orderId: string,
+): Promise<{ order: AccountOrderDetail; error: null } | { order: null; error: string } | null> {
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!base) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getSession();
+    const accessToken = data.session?.access_token?.trim();
+    if (!accessToken) return { order: null, error: "Sign in to view this order." };
+    const response = await fetch(
+      `${base}/store/customers/me/orders/${encodeURIComponent(orderId)}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+        cache: "no-store",
+      },
+    );
+    if (response.status === 404) return { order: null, error: "not_found" };
+    if (!response.ok) return { order: null, error: "Order details are temporarily unavailable." };
+    const body = (await response.json()) as { order?: Record<string, unknown> };
+    const raw = body.order;
+    if (!raw || typeof raw.id !== "string") return { order: null, error: "not_found" };
+    const currency = String(raw.currency_code ?? "PHP").toUpperCase();
+    const minor = (value: unknown): number | undefined => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? medusaMinorToMajor(parsed, currency) : undefined;
+    };
+    const address = raw.shipping_address;
+    const items = Array.isArray(raw.items)
+      ? raw.items.flatMap((value) => {
+          if (!value || typeof value !== "object") return [];
+          const item = value as Record<string, unknown>;
+          const id = typeof item.id === "string" ? item.id : "";
+          if (!id) return [];
+          const quantity = Number(item.quantity);
+          const unitPrice = minor(item.unit_price);
+          return [{
+            id,
+            title: typeof item.title === "string" ? item.title : null,
+            quantity: Number.isFinite(quantity) ? quantity : 0,
+            unit_price: unitPrice,
+            total: unitPrice == null || !Number.isFinite(quantity) ? undefined : unitPrice * quantity,
+            variant: item.variant && typeof item.variant === "object"
+              ? { sku: typeof (item.variant as Record<string, unknown>).sku === "string" ? (item.variant as Record<string, unknown>).sku as string : null }
+              : null,
+            thumbnail: typeof item.thumbnail === "string" ? item.thumbnail : null,
+          }];
+        })
+      : [];
+    return {
+      order: {
+        id: raw.id,
+        customer_id: typeof raw.customer_id === "string" ? raw.customer_id : null,
+        display_id: raw.display_id == null ? undefined : String(raw.display_id),
+        email: typeof raw.email === "string" ? raw.email : null,
+        status: typeof raw.status === "string" ? raw.status : "unknown",
+        total: minor(raw.total),
+        subtotal: minor(raw.subtotal),
+        tax_total: minor(raw.tax_total),
+        shipping_total: minor(raw.shipping_total),
+        discount_total: minor(raw.discount_total),
+        currency_code: currency,
+        created_at: typeof raw.created_at === "string" ? raw.created_at : undefined,
+        updated_at: typeof raw.updated_at === "string" ? raw.updated_at : undefined,
+        payment_status: typeof raw.payment_status === "string" ? raw.payment_status : null,
+        fulfillment_status: typeof raw.fulfillment_status === "string" ? raw.fulfillment_status : null,
+        metadata: raw.metadata && typeof raw.metadata === "object" ? raw.metadata as Record<string, unknown> : null,
+        shipping_address: address && typeof address === "object" ? address as Record<string, string | null> : null,
+        items,
+        fulfillments: Array.isArray(raw.fulfillments) ? raw.fulfillments as AccountOrderDetail["fulfillments"] : [],
+      },
+      error: null,
+    };
+  } catch {
+    return { order: null, error: "Order details are temporarily unavailable." };
+  }
+}
 
 export function normalizeAccountEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -165,6 +318,8 @@ export async function fetchCustomerOrders(
   email: string,
   sessionCustomerId?: string | null,
 ): Promise<{ orders: AccountOrder[]; error: string | null }> {
+  const workerOrders = await fetchWorkerCustomerOrders();
+  if (workerOrders) return workerOrders;
   const secret = getMedusaSecretApiKey();
   if (!secret) {
     return { orders: [], error: "Commerce admin key is not configured." };

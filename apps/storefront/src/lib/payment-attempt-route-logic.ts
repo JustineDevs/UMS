@@ -77,7 +77,7 @@ type FinalizeCheckoutIntentInput = {
     _correlationId: string,
     _patch: Record<string, unknown>,
   ) => Promise<void>;
-  finalizeMedusaCart: (_cartId: string) => Promise<FinalizeMedusaCartResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeMedusaCartResult>;
   logEvent: (_payload: unknown) => void;
   nowIso: () => string;
 };
@@ -93,7 +93,7 @@ type CodPlaceOrderInput = {
     _correlationId: string,
     _patch: Record<string, unknown>,
   ) => Promise<void>;
-  finalizeMedusaCart: (_cartId: string) => Promise<FinalizeMedusaCartResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeMedusaCartResult>;
   logEvent: (_payload: unknown) => void;
   nowIso: () => string;
 };
@@ -244,7 +244,7 @@ type InternalReconcileInput = {
   correlationId: string;
   row: PaymentAttemptRouteRow | null;
   supabaseAvailable: boolean;
-  finalizeMedusaCart: (_cartId: string) => Promise<FinalizeMedusaCartResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeMedusaCartResult>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
@@ -258,7 +258,7 @@ type FinalizePaymentAttemptsCronInput = {
   supabaseAvailable: boolean;
   stuckRows: Array<{ correlation_id: string; cart_id: string }>;
   claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
-  finalizeMedusaCart: (_cartId: string) => Promise<FinalizeMedusaCartResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeMedusaCartResult>;
   updatePaymentAttempt: (
     _correlationId: string,
     _patch: Record<string, unknown>,
@@ -657,7 +657,7 @@ export async function internalReconcilePaymentAttemptRouteLogic(
     return { status: 404, body: { error: "Not found" } };
   }
 
-  const result = await input.finalizeMedusaCart(input.row.cart_id);
+  const result = await input.finalizeMedusaCart(input.row.cart_id, input.correlationId);
   if (!result.ok) {
     await input.updatePaymentAttempt(input.correlationId, {
       status: "paid_awaiting_order",
@@ -710,7 +710,7 @@ export async function finalizePaymentAttemptsCronRouteLogic(
       ? await input.claimFinalizeAttempt(row.correlation_id)
       : true;
     if (!claimed) continue;
-    const result = await input.finalizeMedusaCart(row.cart_id);
+    const result = await input.finalizeMedusaCart(row.cart_id, row.correlation_id);
     if (result.ok) {
       completed += 1;
       await input.updatePaymentAttempt(row.correlation_id, {

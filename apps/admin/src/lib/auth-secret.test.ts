@@ -2,11 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { getAdminAuthSecret } from "./auth-secret";
 
-test("admin auth accepts the documented secret aliases", () => {
+test("admin auth accepts the Supabase SSR signing secret", () => {
   assert.equal(
-    getAdminAuthSecret({ NEXTAUTH_SECRET: " next-auth ", AUTH_SECRET: "auth" }),
-    "next-auth",
+    getAdminAuthSecret({ AUTH_SECRET: " auth " }),
+    "auth",
   );
-  assert.equal(getAdminAuthSecret({ AUTH_SECRET: " auth " }), "auth");
-  assert.equal(getAdminAuthSecret({ NEXTAUTH_SECRET: " ", AUTH_SECRET: " " }), undefined);
+  assert.equal(getAdminAuthSecret({ AUTH_SECRET: " " }), undefined);
 });

@@ -35,8 +35,8 @@ export async function POST(req: Request) {
     correlationId,
     row,
     supabaseAvailable: Boolean(sb),
-    finalizeMedusaCart: async (cartId) =>
-      finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12 }),
+    finalizeMedusaCart: async (cartId, correlationId) =>
+      finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12, correlationId }),
     updatePaymentAttempt: async (id, patch) => {
       if (!sb) {
         return;

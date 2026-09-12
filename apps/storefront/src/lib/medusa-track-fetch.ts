@@ -47,6 +47,53 @@ export function trackReadFailure(status: number): TrackReadResult {
   return { ok: false, data: null, status, correlationId: randomUUID() };
 }
 
+export async function fetchWorkerTrackByToken(token: string): Promise<TrackReadResult> {
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!base || !token.trim()) return trackReadFailure(503);
+  try {
+    const response = await fetch(`${base}/store/tracking/${encodeURIComponent(token)}`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return trackReadFailure(response.status);
+    const body = (await response.json()) as {
+      order?: { order_number?: unknown; status?: unknown; updated_at?: unknown };
+      shipments?: unknown;
+      capabilityScope?: TrackPayload["capabilityScope"];
+    };
+    if (!body.order || typeof body.order !== "object") return trackReadFailure(502);
+    const shipments = Array.isArray(body.shipments)
+      ? body.shipments.flatMap((value): TrackPayload["shipments"] => {
+          if (!value || typeof value !== "object") return [];
+          const row = value as Record<string, unknown>;
+          if (typeof row.id !== "string") return [];
+          return [{
+            id: row.id,
+            ...(typeof row.tracking_number === "string" ? { tracking_number: formatTrackingNumber(row.tracking_number) } : {}),
+            ...(typeof row.status === "string" ? { status: row.status } : {}),
+            ...(typeof row.carrier_slug === "string" ? { carrier_slug: row.carrier_slug } : {}),
+            ...(typeof row.updated_at === "string" ? { updated_at: row.updated_at } : {}),
+          }];
+        })
+      : [];
+    return {
+      ok: true,
+      status: response.status,
+      data: {
+        order: {
+          ...(typeof body.order.order_number === "string" ? { order_number: body.order.order_number } : {}),
+          ...(typeof body.order.status === "string" ? { status: body.order.status } : {}),
+          ...(typeof body.order.updated_at === "string" ? { updated_at: body.order.updated_at } : {}),
+        },
+        shipments,
+        ...(body.capabilityScope ? { capabilityScope: body.capabilityScope } : {}),
+      },
+    };
+  } catch {
+    return trackReadFailure(503);
+  }
+}
+
 export function trackingCapabilityScopeMatches(
   capability: ResolvedTrackingCapability | null,
   actual: TrackPayload["capabilityScope"] | undefined,

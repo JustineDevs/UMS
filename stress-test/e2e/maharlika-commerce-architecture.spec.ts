@@ -74,7 +74,7 @@ test.describe("@architecture @smoke Universal Music Store commerce architecture 
     const res = await request.get("/api/health/sop");
     expect(res.ok()).toBeTruthy();
     const json = (await res.json()) as { commerceSource?: string };
-    expect(json.commerceSource).toBe("medusa");
+    expect(json.commerceSource).toBe("cloudflare_worker");
   });
 
   test("9. Region payment providers: availability API is stable when Medusa misconfigured", async ({

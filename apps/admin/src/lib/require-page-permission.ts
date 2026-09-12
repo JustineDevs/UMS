@@ -1,11 +1,10 @@
 import { staffHasPermission, staffPermissionListForSession } from "@universal-music-store/database";
-import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
-import { authOptions } from "./auth";
+import { getAdminSession } from "./auth";
 
 export async function requirePagePermission(permissionKey: string): Promise<void> {
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return;
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
   if (!session?.user) {
     redirect("/sign-in");
   }
@@ -19,7 +18,7 @@ export async function requirePagePermission(permissionKey: string): Promise<void
 /** User needs at least one of the listed permissions (e.g. content or catalog read). */
 export async function requireAnyPagePermission(permissionKeys: readonly string[]): Promise<void> {
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return;
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
   if (!session?.user) {
     redirect("/sign-in");
   }

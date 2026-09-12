@@ -83,31 +83,6 @@ const xenditRuntimeDependencies = [
   return aliases;
 }, {});
 
-const nextAuthRuntimeDependencies = [
-  "@babel/runtime",
-  "@panva/hkdf",
-  "cookie",
-  "jose",
-  "oauth",
-  "openid-client",
-  "preact",
-  "preact-render-to-string",
-  "uuid",
-].reduce((aliases, name) => {
-  try {
-    const nextAuthEntry = require.resolve("next-auth");
-    aliases[`${name}$`] =
-      name === "jose"
-        ? resolvePnpmEntry("jose@", path.join("jose", "dist", "browser", "index.js"))
-        : name === "@panva/hkdf"
-          ? resolvePnpmEntry("@panva+hkdf@", path.join("@panva", "hkdf", "dist", "web", "index.js"))
-        : require.resolve(name, { paths: [path.dirname(nextAuthEntry)] });
-  } catch {
-    // Keep development startup resilient when an optional package is absent.
-  }
-  return aliases;
-}, {});
-
 const entitiesDecodeEntry = resolvePnpmEntry(
   "entities@",
   path.join("entities", "lib", "decode.js"),
@@ -260,7 +235,7 @@ function previewFrameAncestors() {
   const configured = (
     process.env.ADMIN_PREVIEW_ORIGINS ??
     process.env.NEXT_PUBLIC_ADMIN_URL ??
-    process.env.ADMIN_NEXTAUTH_URL ??
+    process.env.NEXT_PUBLIC_ADMIN_URL ??
     ""
   )
     .split(",")
@@ -407,7 +382,6 @@ const nextConfig = {
       ...(botIdClientCoreEntry ? { "botid/client/core": botIdClientCoreEntry } : {}),
       ...(opentelemetryApiEntry ? { "@opentelemetry/api": opentelemetryApiEntry } : {}),
       ...xenditRuntimeDependencies,
-      ...nextAuthRuntimeDependencies,
       ...(entitiesDecodeEntry ? { "entities/lib/decode.js": entitiesDecodeEntry } : {}),
       ...(icebergEntry ? { "iceberg-js$": icebergEntry } : {}),
     };

@@ -5,7 +5,7 @@ export type WebhookSecurityEvent = "signature_failure" | "dedup_duplicate";
 let pool: pg.Pool | null = null;
 
 function getPool(): pg.Pool | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = process.env.MEDUSA_DB_URL?.trim();
   if (!url) return null;
   pool ??= new pg.Pool({ connectionString: url, max: 3 });
   return pool;

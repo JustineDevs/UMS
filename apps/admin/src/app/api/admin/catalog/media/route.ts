@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     data,
     catalogSourceUnavailable,
     // The browser session can hydrate after this request (and local auth has
-    // no NextAuth cookie), so expose the server's already-authorized result.
+    // no browser Supabase cookie), so expose the server's already-authorized result.
     canWrite: staffSessionAllows(auth.session, "catalog:write"),
   });
 }

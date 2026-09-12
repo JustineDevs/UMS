@@ -10,7 +10,7 @@ import {
   type CmsMutationRecord,
   type StorefrontHomePayload,
 } from "@universal-music-store/platform-data";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useEffect, useMemo, useState } from "react";
 import { StorefrontPublicMetadataEditor } from "@/components/StorefrontPublicMetadataEditor";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";

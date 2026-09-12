@@ -1,18 +1,35 @@
 import { type NextFetchEvent, NextRequest, NextResponse } from "next/server";
-import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
+import { createServerClient } from "@supabase/ssr";
 import { tryCmsRedirect } from "@/lib/cms-redirect";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 
-const authMiddleware = withAuth({
-  pages: { signIn: "/sign-in" },
-  callbacks: {
-    authorized: ({ token, req }) => {
-      const p = req.nextUrl.pathname;
-      if (p.startsWith("/account")) return !!token;
-      return true;
+async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
+  let response = NextResponse.next({ request: { headers: request.headers } });
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) return response;
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request: { headers: request.headers } });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      },
     },
-  },
-});
+  });
+  await supabase.auth.getUser();
+  if (request.nextUrl.pathname.startsWith("/account")) {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      const signIn = request.nextUrl.clone();
+      signIn.pathname = "/sign-in";
+      signIn.searchParams.set("callbackUrl", request.nextUrl.pathname);
+      return NextResponse.redirect(signIn);
+    }
+  }
+  return response;
+}
 
 function isAuthDisabledForQa(): boolean {
   if (process.env.NODE_ENV === "production") return false;
@@ -94,9 +111,7 @@ export default async function middleware(
     return redirect;
   }
 
-  const res = isAuthDisabledForQa()
-    ? null
-    : await authMiddleware(requestWithId as NextRequestWithAuth, event);
+  const res = isAuthDisabledForQa() ? null : await updateSupabaseSession(requestWithId);
   if (res instanceof NextResponse) {
     res.headers.set("x-request-id", requestId);
     return res;

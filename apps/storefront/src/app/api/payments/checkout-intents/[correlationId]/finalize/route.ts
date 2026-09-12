@@ -10,11 +10,10 @@ import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { handleFinalizeCheckoutIntentRequest } from "@/lib/finalize-checkout-intent-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import { getPublicOriginFromRequest } from "@/lib/finalize-medusa-cart-server";
 import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
-import { isAuthorizedMedusaPaymentSession } from "@/lib/payment-session-verification";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { isPaidStripeCheckoutSession } from "@/lib/stripe-checkout-verification";
 import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
@@ -30,8 +29,9 @@ async function verifyMedusaPaymentSession(
     currency?: string | null;
   },
   cartId: string,
+  request: Request,
+  correlationId: string,
 ): Promise<boolean> {
-  const sessionId = row.provider_session_id?.trim();
   if (row.provider === "stripe" && row.provider_payment_id) {
     return isPaidStripeCheckoutSession({
       sessionId: row.provider_payment_id,
@@ -40,22 +40,28 @@ async function verifyMedusaPaymentSession(
       apiKey: process.env.STRIPE_API_KEY,
     });
   }
-  if (!sessionId) return false;
-  const sdk = createStorefrontMedusaSdk();
-  const { cart } = await sdk.store.cart.retrieve(cartId, {
-    fields: "+payment_collection,*payment_collection.payment_sessions",
-  } as never);
-  const sessions = (cart as { payment_collection?: { payment_sessions?: unknown[] } })
-    .payment_collection?.payment_sessions;
-  if (!Array.isArray(sessions)) return false;
-  const session = sessions.find((candidate) => {
-    if (!candidate || typeof candidate !== "object") return false;
-    const record = candidate as Record<string, unknown>;
-    return record.id === sessionId ||
-      (typeof record.provider_id === "string" &&
-        record.provider_id.toLowerCase().includes(row.provider.toLowerCase()));
-  });
-  return isAuthorizedMedusaPaymentSession(session, row);
+  if (!correlationId.trim()) return false;
+  const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!apiUrl) return false;
+  const response = await fetch(
+    `${apiUrl}/store/checkout-intents/${encodeURIComponent(correlationId)}`,
+    {
+      cache: "no-store",
+      headers: {
+        ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie")! } : {}),
+      },
+    },
+  );
+  if (!response.ok) return false;
+  const payload = (await response.json().catch(() => ({}))) as {
+    provider?: unknown;
+    status?: unknown;
+  };
+  return payload.provider === row.provider &&
+    typeof payload.status === "string" &&
+    new Set(["authorized", "captured", "completed", "paid", "succeeded"]).has(
+      payload.status.toLowerCase(),
+    );
 }
 
 /**
@@ -70,6 +76,22 @@ export async function POST(
     return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
   }
   const { correlationId } = await ctx.params;
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl) {
+    const response = await fetch(
+      `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId ?? "")}/finalize`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          ...(req.headers.get("cookie") ? { Cookie: req.headers.get("cookie")! } : {}),
+        },
+        cache: "no-store",
+      },
+    );
+    const payload = await response.json().catch(() => ({ error: "Order finalization failed" }));
+    return Response.json(payload, { status: response.status });
+  }
   const sb = createStorefrontServiceSupabase();
   const response = await handleFinalizeCheckoutIntentRequest(req, correlationId ?? "", {
     applyRateLimit: async (request) =>
@@ -97,17 +119,18 @@ export async function POST(
       return claimPaymentAttemptForFinalization(sb, id);
     },
     verifyProviderPayment: async (row, activeCartId) =>
-      verifyMedusaPaymentSession(row!, activeCartId),
+      verifyMedusaPaymentSession(row!, activeCartId, req, correlationId),
     updatePaymentAttempt: async (id, patch) => {
       if (!sb) {
         return;
       }
       await updatePaymentAttemptByCorrelationId(sb, id, patch);
     },
-    finalizeMedusaCart: async (activeCartId, publicOrigin) =>
+    finalizeMedusaCart: async (activeCartId, correlationId) =>
       finalizeMedusaCartFromServer(activeCartId, {
         maxCompleteAttempts: 2,
-        publicOrigin,
+        publicOrigin: getPublicOriginFromRequest(req),
+        correlationId,
       }),
     logEvent: (payload) =>
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),

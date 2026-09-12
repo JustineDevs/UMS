@@ -11,6 +11,7 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import {
   fetchMedusaTrackByCartId,
   fetchMedusaTrackByOrderId,
+  fetchWorkerTrackByToken,
   trackFreshness,
   trackingCapabilityScopeMatches,
   trackReadFailure,
@@ -35,8 +36,12 @@ export const metadata: Metadata = buildPageMetadata({
 
 async function fetchPublicTrack(
   capability: ResolvedTrackingCapability,
+  encodedCapability: string,
 ): Promise<TrackReadResult> {
   if (capability.id.startsWith("order_")) {
+    if (process.env.API_URL?.trim()) {
+      return fetchWorkerTrackByToken(encodedCapability);
+    }
     return fetchMedusaTrackByOrderId(capability.id, {
       includeCustomerEmail: Boolean(capability.scope?.customerEmailHash),
     });
@@ -153,7 +158,10 @@ export default async function TrackPage({
     );
   }
 
-  const { ok, data, status, correlationId } = await fetchPublicTrack(capability);
+  const { ok, data, status, correlationId } = await fetchPublicTrack(
+    capability,
+    encodedId.slice(4),
+  );
 
   if (
     data &&

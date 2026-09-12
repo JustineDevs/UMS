@@ -2,7 +2,7 @@
 
 import { staffHasPermission, type CmsAnnouncementRow } from "@universal-music-store/platform-data";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 

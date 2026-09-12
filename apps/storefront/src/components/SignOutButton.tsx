@@ -2,7 +2,7 @@
 
 import { Button } from "@universal-music-store/ui";
 import { resetPostHogClient } from "@universal-music-store/sdk";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 
 export function SignOutButton() {
   return (

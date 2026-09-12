@@ -1,7 +1,7 @@
 "use client";
 
 import { staffHasPermission } from "@universal-music-store/platform-data";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, ExternalLink, Trash2 } from "lucide-react";
 import { CatalogMediaPreview } from "./CatalogMediaPreview";

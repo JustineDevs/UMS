@@ -27,6 +27,35 @@ export async function GET(req: Request) {
   const provider = providerParam as "stripe" | "paypal" | "xendit";
   const providerOrderId = searchParams.get("provider_order_id")?.trim() ?? "";
 
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl && attemptCookie) {
+    const response = await fetch(
+      `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(attemptCookie)}`,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          ...(req.headers.get("cookie") ? { Cookie: req.headers.get("cookie")! } : {}),
+        },
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) {
+      const body = payload as { provider?: unknown; correlationId?: unknown };
+      if (body.provider !== provider) return NextResponse.json({ found: false });
+      return NextResponse.json({
+        found: true,
+        correlationId: body.correlationId,
+        status: (payload as { status?: unknown }).status,
+        checkoutState: (payload as { checkoutState?: unknown }).checkoutState,
+        medusaOrderId: (payload as { medusaOrderId?: unknown }).medusaOrderId,
+      });
+    }
+    if (response.status !== 404) {
+      return NextResponse.json({ error: "Unable to recover payment status" }, { status: 503 });
+    }
+  }
+
   const sb = createStorefrontServiceSupabase();
   if (!sb) {
     return NextResponse.json(

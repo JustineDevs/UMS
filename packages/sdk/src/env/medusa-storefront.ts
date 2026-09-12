@@ -7,7 +7,7 @@ import {
 } from "../medusa-env.js";
 
 const STOREFRONT_DEPLOY_ENV_HINT =
-  "Configure these on the host (Vercel/Render env UI), not only local .env.local files. See repo docs for the Medusa storefront env checklist.";
+  "Configure these on Vercel and the Wrangler-managed backend, not only local .env.local files. See repo docs for the Medusa storefront env checklist.";
 
 export function listMissingMedusaStorefrontEnv(): string[] {
   const missing: string[] = [];

@@ -15,8 +15,7 @@ import {
   correlatedError,
   tagResponse,
 } from "@/lib/staff-api-response";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { parseAdminJson, verifySignedRequest } from "@/lib/admin-api-security";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { resolveStaffOrganization } from "@/lib/staff-organization";
@@ -56,7 +55,7 @@ export async function POST(req: Request) {
     if (!staff.ok) {
       return tagResponse(staff.response, correlationId);
     }
-    const session = await getServerSession(authOptions);
+    const session = await getAdminSession();
     const perms = session?.user?.permissions;
     if (!staffHasPermission(perms ?? [], "chat_orders:manage")) {
       return correlatedError(

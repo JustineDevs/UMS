@@ -6,7 +6,7 @@ import { BotIdClient } from "botid/client";
 import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
 import { CartSyncOnSignIn } from "@/components/CartSyncOnSignIn";
 import { CookieConsentBanner } from "@/components/CookieConsentBanner";
-import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
+import { SupabaseSessionProvider } from "@/components/SupabaseSessionProvider";
 import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { PostHogAnalytics } from "@/components/PostHogAnalytics";
 import { SmoothScrollProvider } from "@/components/SmoothScrollProvider";
@@ -23,7 +23,7 @@ export function StorefrontRuntimeProviders({
   children: React.ReactNode;
 }) {
   return (
-    <NextAuthSessionProvider>
+    <SupabaseSessionProvider>
       <MedusaCartProvider>
         <PostHogAnalytics />
         {!botIdDisabledForLocalAuthBypass ? (
@@ -58,6 +58,6 @@ export function StorefrontRuntimeProviders({
         <CookieConsentBanner />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
       </MedusaCartProvider>
-    </NextAuthSessionProvider>
+    </SupabaseSessionProvider>
   );
 }

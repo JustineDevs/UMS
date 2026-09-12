@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import {
   applyRateLimit,
@@ -43,10 +42,21 @@ async function handlePOST(req: Request) {
   }
 
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, { fields: "id,+metadata" } as never);
-    const metadataToken = (cart as { metadata?: Record<string, unknown> }).metadata
-      ?.uvs_cart_bind_token;
+    const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) {
+      return NextResponse.json({ error: "Worker API is not configured" }, { status: 503 });
+    }
+    const response = await fetch(
+      `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
+      { cache: "no-store" },
+    );
+    if (!response.ok) {
+      return NextResponse.json({ error: "Invalid cart" }, { status: 400 });
+    }
+    const payload = (await response.json()) as {
+      cart?: { metadata?: Record<string, unknown> | null };
+    };
+    const metadataToken = payload.cart?.metadata?.uvs_cart_bind_token;
     if ((!cookieCartId || cookieCartId !== cartId) && metadataToken !== bindToken) {
       return NextResponse.json({ error: "Cart ownership could not be verified" }, { status: 403 });
     }

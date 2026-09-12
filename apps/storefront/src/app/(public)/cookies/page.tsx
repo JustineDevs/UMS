@@ -28,7 +28,7 @@ export default function CookiesPage() {
             Essential
           </h2>
           <p>
-            Required for security (e.g. CSRF/session tokens with NextAuth),
+            Required for security (including Supabase Auth SSR session tokens),
             checkout flow continuity, and load balancing. These cannot be
             disabled without breaking core features.
           </p>

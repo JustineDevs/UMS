@@ -8,10 +8,9 @@ import {
   type AdminNavItem,
 } from "@/config/admin-nav";
 import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
-import { authOptions } from "@/lib/auth";
+import { getAdminSession } from "@/lib/auth";
 import { GUIDE_DEMO_CATALOG } from "@/lib/guide-demos-catalog";
 import { requirePagePermission } from "@/lib/require-page-permission";
-import { getServerSession } from "next-auth/next";
 
 export const metadata: Metadata = {
   title: "Admin guide",
@@ -119,7 +118,7 @@ function NavTree({ items }: { items: readonly AdminNavItem[] }) {
 
 export default async function AdminDocsPage() {
   await requirePagePermission("dashboard:read");
-  const session = await getServerSession(authOptions);
+  const session = await getAdminSession();
   const canAccessGuideDemos = isEmailAllowedForGuideDemos(
     session?.user?.email ?? null,
   );

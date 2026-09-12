@@ -54,7 +54,7 @@ The following areas show **implemented request handlers and UI wiring** in the c
 
 ### Gap E — Payment recovery cron not in Vercel config
 
-- Route `GET /api/cron/finalize-payment-attempts` is implemented; **`apps/storefront/vercel.json` has no `crons` array** (Render example exists in `render.yaml`).
+- Route `GET /api/cron/finalize-payment-attempts` is implemented; **`apps/storefront/vercel.json` has no `crons` array**. GitHub Actions remains the scheduler; the public backend is a Wrangler-managed Worker.
 
 **Fix direction:** Use the existing GitHub Actions scheduler in `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`. Vercel Cron is intentionally excluded because this topology does not use it.
 

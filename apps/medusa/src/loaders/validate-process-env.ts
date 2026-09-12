@@ -147,12 +147,12 @@ function warnPartialOptionalProvider(
 
 export function validateMedusaProcessEnv(): void {
   const db = z.object({
-    DATABASE_URL: devOk,
+    MEDUSA_DB_URL: devOk,
   });
   const r = db.safeParse(process.env);
   if (!r.success) {
     throw new Error(
-      `Medusa: DATABASE_URL is required — ${r.error.message}`,
+      `Medusa: MEDUSA_DB_URL is required — ${r.error.message}`,
     );
   }
 

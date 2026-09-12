@@ -9,8 +9,7 @@ import { cookies } from "next/headers";
 import { medusaCartIdSchema } from "@universal-music-store/validation";
 
 import { MEDUSA_CART_COOKIE } from "./cart-cookie";
-import { createStorefrontMedusaSdk } from "./medusa-sdk";
-import { medusaCartToCartLines } from "./medusa-cart-to-lines";
+import { medusaMinorToMajor } from "./medusa-money";
 import {
   getRequestIp,
   rateLimitFixedWindow,
@@ -138,22 +137,49 @@ export async function parseJsonBody<T = unknown>(
   }
 }
 
-const FULL_LINE_FIELDS =
-  "*items,*items.unit_price,*items.quantity,*items.variant,*items.variant.product,*items.variant.options,*items.product";
-
 /**
- * Retrieves a Medusa cart and maps it to display-ready CartLine[].
- * Returns null if the SDK is not configured or the cart does not exist.
+ * Retrieves a Worker cart and maps its flat commerce rows to CartLine[].
+ * The Worker is the only commerce origin; the legacy fields argument is retained
+ * for callers while the native contract owns the selected data.
  */
 export async function retrieveCartLines(
   cartId: string,
 ): Promise<CartLine[] | null> {
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, {
-      fields: FULL_LINE_FIELDS,
-    } as never);
-    return medusaCartToCartLines(cart);
+    const cart = await retrieveWorkerCart(cartId);
+    if (!cart) return null;
+    const currencyCode = typeof cart.currency_code === "string"
+      ? cart.currency_code.toUpperCase()
+      : "PHP";
+    const items = Array.isArray(cart.items) ? cart.items : [];
+    return items.flatMap((raw) => {
+      if (!raw || typeof raw !== "object") return [];
+      const item = raw as Record<string, unknown>;
+      const variantId = typeof item.variant_id === "string" ? item.variant_id : "";
+      if (!variantId) return [];
+      const minor = typeof item.unit_price === "number" || typeof item.unit_price === "string"
+        ? Number(item.unit_price)
+        : 0;
+      const thumbnail = typeof item.thumbnail === "string" && item.thumbnail.trim()
+        ? item.thumbnail.trim()
+        : undefined;
+      return [{
+        variantId,
+        quantity: typeof item.quantity === "number" && Number.isFinite(item.quantity)
+          ? Math.max(1, Math.floor(item.quantity))
+          : 1,
+        slug: typeof item.product_handle === "string" ? item.product_handle : "item",
+        name: typeof item.title === "string" ? item.title : "Item",
+        sku: typeof item.variant_sku === "string" && item.variant_sku.trim()
+          ? item.variant_sku
+          : variantId.slice(-8),
+        type: "",
+        finish: "",
+        price: Number.isFinite(minor) ? medusaMinorToMajor(minor, currencyCode) : 0,
+        currencyCode,
+        ...(thumbnail ? { thumbnail } : {}),
+      } satisfies CartLine];
+    });
   } catch {
     return null;
   }
@@ -166,14 +192,34 @@ export async function retrieveCartRaw(
   cartId: string,
   fields: string,
 ): Promise<Record<string, unknown> | null> {
+  void fields;
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, {
-      fields,
-    } as never);
-    return cart as unknown as Record<string, unknown>;
+    return await retrieveWorkerCart(cartId);
   } catch (error) {
-    if (isMedusaNotFoundError(error)) return null;
+    if (error instanceof Error && error.message === "cart_not_found") return null;
     throw error;
   }
+}
+
+type WorkerCart = {
+  id: string;
+  region_id?: string | null;
+  sales_channel_id?: string | null;
+  currency_code?: string | null;
+  email?: string | null;
+  metadata?: Record<string, unknown> | null;
+  items?: Array<Record<string, unknown>>;
+};
+
+async function retrieveWorkerCart(cartId: string): Promise<WorkerCart | null> {
+  const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!baseUrl) throw new Error("worker_api_not_configured");
+  const response = await fetch(
+    `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
+    { headers: { Accept: "application/json" }, cache: "no-store" },
+  );
+  if (response.status === 404) throw new Error("cart_not_found");
+  if (!response.ok) throw new Error(`worker_cart_${response.status}`);
+  const payload = (await response.json()) as { cart?: WorkerCart };
+  return payload.cart ?? null;
 }

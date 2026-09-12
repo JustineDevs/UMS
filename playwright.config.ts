@@ -33,8 +33,8 @@ function nextDevServerEnv(): NodeJS.ProcessEnv {
 }
 
 /**
- * Root `.env.local` usually sets NEXTAUTH_URL to the storefront (3000). Admin on 3001 must use
- * its own URL or NextAuth cookies/session never match and sign-in stays on /sign-in.
+ * Storefront and admin use separate Supabase Auth callback origins. Playwright starts each app
+ * on its own origin so browser cookies and callback URLs remain isolated.
  */
 function storefrontInvalidationSecretForE2E(): string {
   return (
@@ -48,8 +48,8 @@ function storefrontDevServerEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: "development",
-    NEXTAUTH_URL:
-      process.env.PLAYWRIGHT_STOREFRONT_NEXTAUTH_URL ?? "http://localhost:3000",
+    NEXT_PUBLIC_SITE_URL:
+      process.env.PLAYWRIGHT_STOREFRONT_URL ?? "http://localhost:3000",
     STOREFRONT_INTERNAL_INVALIDATION_SECRET: inv,
     // Survives if dotenv clears the primary key; route reads this in invalidate-commerce-state
     __PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET: inv,
@@ -60,7 +60,7 @@ function adminDevServerEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: "development",
-    NEXTAUTH_URL: process.env.PLAYWRIGHT_ADMIN_NEXTAUTH_URL ?? "http://localhost:3001",
+    NEXT_PUBLIC_SITE_URL: process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001",
   };
 }
 

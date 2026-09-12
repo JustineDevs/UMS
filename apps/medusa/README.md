@@ -51,7 +51,7 @@ Use the default Medusa **`pnpm seed`** only for the upstream **EU** demo dataset
 
 ### Database backup and restore (staging / dev)
 
-- **Backup:** use your host’s automated backups or `pg_dump` against the same `DATABASE_URL` Medusa uses (respect pooler vs direct connection policy).
+- **Backup:** use your host’s automated backups or `pg_dump` against the same `MEDUSA_DB_URL` Medusa uses (respect pooler vs direct connection policy).
 - **Restore:** restore into a clean Postgres, then run Medusa migrations as required before serving traffic; re-run `seed:ph` only on empty DB when you need the PH baseline.
 - **Dev:** snapshot before risky bulk `import:legacy-*` runs; document restore steps in incident or ops notes (`SOP-MEDUSA-ENV-AND-LEGACY` §6.3).
 

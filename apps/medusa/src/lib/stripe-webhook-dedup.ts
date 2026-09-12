@@ -7,7 +7,7 @@ let pool: pg.Pool | null = null;
 let tableEnsured = false;
 
 function getPool(): pg.Pool | null {
-  const url = process.env.DATABASE_URL?.trim();
+  const url = process.env.MEDUSA_DB_URL?.trim();
   if (!url) return null;
   if (!pool) pool = new pg.Pool({ connectionString: url, max: 3 });
   return pool;
@@ -38,7 +38,7 @@ export async function claimStripeWebhookDedup(dedupId: string): Promise<boolean>
   const p = getPool();
   if (!p) {
     console.warn(
-      "[stripe-dedup] DATABASE_URL not set, rejecting to prevent duplicate processing",
+      "[stripe-dedup] MEDUSA_DB_URL not set, rejecting to prevent duplicate processing",
     );
     return false;
   }

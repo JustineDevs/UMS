@@ -122,3 +122,4 @@ bruno/
 **/__pycache__/
 **/__MACOSX/
 .env*
+.dev.vars*

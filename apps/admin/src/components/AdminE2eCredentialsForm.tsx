@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signInWithPassword } from "@/lib/auth-client";
 import { Button, Input, Label } from "@universal-music-store/ui";
-import { sanitizeSameOriginUrl } from "@universal-music-store/sdk";
 
 type Props = {
   callbackUrl: string;
@@ -12,7 +11,7 @@ type Props = {
 };
 
 /**
- * Local dev E2E only (see isAdminE2eCredentialsConfigured). Password must match NEXTAUTH_SECRET.
+ * Local dev E2E only (see isAdminE2eCredentialsConfigured). Password must match AUTH_SECRET.
  */
 export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
   const [email, setEmail] = useState(defaultEmail ?? "");
@@ -28,29 +27,13 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
     const submittedEmail = String(formData.get("email") ?? email).trim();
     const submittedPassword = String(formData.get("password") ?? password);
     try {
-      const res = await signIn("e2e-credentials", {
-        email: submittedEmail,
-        password: submittedPassword,
-        callbackUrl,
-        redirect: false,
-      });
-      if (!res?.ok) {
+      const res = await signInWithPassword(submittedEmail, submittedPassword, callbackUrl);
+      if (!res.ok) {
         setError(
-          res?.error === "CredentialsSignin"
-            ? "Email, password, or staff access did not match. Use the first allowed email, NEXTAUTH_SECRET as password, and run pnpm e2e:ensure-staff."
-            : (res?.error?.trim() ||
-                "Sign-in did not complete. Confirm the email is allowed, the password matches your test secret, and this account has staff access."),
+          "Email, password, or staff access did not match. Use the first allowed email, AUTH_SECRET as password, and run pnpm e2e:ensure-staff.",
         );
         return;
       }
-      const raw =
-        typeof res.url === "string" && res.url.length > 0 ? res.url : callbackUrl;
-      const target = sanitizeSameOriginUrl(raw, window.location.origin);
-      if (!target) {
-        setError("Sign-in returned an invalid redirect.");
-        return;
-      }
-      window.location.assign(target);
     } finally {
       setBusy(false);
     }
@@ -66,7 +49,7 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
         E2E staff sign-in (credentials)
       </p>
       <p className="text-xs text-on-surface-variant">
-        Use the first email in ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET as the password.
+        Use the first email in ADMIN_ALLOWED_EMAILS and AUTH_SECRET as the password.
       </p>
       {error ? (
         <p className="text-sm text-error" role="alert">

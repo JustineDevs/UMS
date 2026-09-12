@@ -1,13 +1,5 @@
-/**
- * Shared auth utilities used by both storefront and admin NextAuth configurations.
- * Provides common Google provider setup, JWT/session callback builders,
- * and session validation helpers for SSO alignment.
- */
+/** Shared, framework-neutral authentication helpers for the storefront and admin. */
 
-/**
- * Reads and validates Google OAuth credentials from environment.
- * Logs a dev warning when credentials are missing.
- */
 export function loadGoogleCredentials(appLabel: string): {
   clientId: string;
   clientSecret: string;
@@ -16,13 +8,11 @@ export function loadGoogleCredentials(appLabel: string): {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
   const configured = Boolean(clientId && clientSecret);
-
   if (process.env.NODE_ENV === "development" && !configured) {
     console.warn(
-      `[${appLabel} auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Google sign-in will not work. Check root .env.local.`,
+      `[${appLabel} auth] GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is empty. Check the local environment.`,
     );
   }
-
   return { clientId, clientSecret, configured };
 }
 
@@ -41,10 +31,6 @@ export type SharedSession = {
   authenticatedAt?: number;
 };
 
-/**
- * Standard JWT callback that maps user fields into the token.
- * Both apps share the same core fields: email, name, image.
- */
 export function buildSharedJwtCallback() {
   return buildSharedJwtCallbackWithResolver();
 }
@@ -79,21 +65,15 @@ export function buildSharedJwtCallbackWithResolver(options?: {
           const medusaCustomerId = await options.resolveCustomerId(user.email);
           if (medusaCustomerId) token.medusaCustomerId = medusaCustomerId;
         } catch {
-          // Authentication remains available when the commerce identity service is temporarily unavailable.
+          // Authentication remains available if the commerce identity lookup is unavailable.
         }
       }
     }
-    if (!token.id && account?.providerAccountId) {
-      token.id = account.providerAccountId;
-    }
+    if (!token.id && account?.providerAccountId) token.id = account.providerAccountId;
     return token;
   };
 }
 
-/**
- * Standard session callback that hydrates session.user from the JWT token.
- * Admin extends this with RBAC lookup; storefront uses as-is.
- */
 export function buildSharedSessionCallback() {
   return async function sessionCallback({
     session,
@@ -102,52 +82,31 @@ export function buildSharedSessionCallback() {
     session: SharedSession;
     token: Record<string, unknown>;
   }) {
-    if (typeof token.authenticatedAt === "number") {
-      session.authenticatedAt = token.authenticatedAt;
-    }
+    if (typeof token.authenticatedAt === "number") session.authenticatedAt = token.authenticatedAt;
     if (session.user) {
-      session.user.id =
-        (token.id as string | undefined) ?? (token.sub as string | undefined) ?? session.user.id;
-      if (typeof token.medusaCustomerId === "string") {
-        session.user.medusaCustomerId = token.medusaCustomerId;
-      }
+      session.user.id = (token.id as string | undefined) ?? (token.sub as string | undefined) ?? session.user.id;
+      if (typeof token.medusaCustomerId === "string") session.user.medusaCustomerId = token.medusaCustomerId;
       session.user.email = (token.email as string | undefined) ?? undefined;
       session.user.name = (token.name as string | undefined) ?? undefined;
       session.user.image = (token.picture as string | undefined) ?? undefined;
-      if (token.role) {
-        session.user.role = token.role as string;
-      }
+      if (token.role) session.user.role = token.role as string;
     }
     return session;
   };
 }
 
-/**
- * Validates that a session has a signed-in user with an email.
- * Returns the normalized email or null for unauthenticated requests.
- */
 export function extractSessionEmail(
   session: { user?: { email?: string | null } } | null,
 ): string | null {
-  const raw = session?.user?.email?.trim().toLowerCase();
-  if (!raw || !raw.includes("@")) return null;
-  return raw;
+  const email = session?.user?.email?.trim().toLowerCase();
+  return email && email.includes("@") ? email : null;
 }
 
-/**
- * Checks whether a session user has a role that grants staff-level access.
- * This is a lightweight check shared between admin and storefront.
- */
-export function isSessionStaff(
-  session: { user?: { role?: string } } | null,
-): boolean {
+export function isSessionStaff(session: { user?: { role?: string } } | null): boolean {
   const role = session?.user?.role;
   return role === "admin" || role === "staff";
 }
 
-/**
- * Normalizes email for consistent lookup/cache across both apps.
- */
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }

@@ -22,7 +22,7 @@ export async function GET(req: Request): Promise<Response> {
   const apiUrl = process.env.API_URL?.trim() || "http://localhost:4000";
   const headers: Record<string, string> = { Accept: "application/json" };
   const internalKey = process.env.INTERNAL_API_KEY?.trim();
-  if (internalKey) headers.Authorization = `Bearer ${internalKey}`;
+  if (internalKey) headers["X-Internal-API-Key"] = internalKey;
 
   try {
     const response = await fetch(`${apiUrl.replace(/\/$/, "")}/compliance/export?email=${encodeURIComponent(email)}`, {

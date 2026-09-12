@@ -27,11 +27,11 @@ For doc context commands, use **docs/** and **.cursor/llm** as canonical roots (
 | Layer | Technology |
 |-------|------------|
 | Frontend | Next.js App Router, Tailwind CSS, shadcn/ui |
-| API | Node.js + Express |
-| Database | PostgreSQL via Supabase |
-| Auth | NextAuth/Auth.js with Google provider |
-| Payments | Stripe, PayPal, Paymongo (GCash), Maya, cash on delivery (Medusa) |
-| Shipping | Shipment tracking + J&T Express Philippines |
+| API | Cloudflare Workers (Worker-native route handlers) |
+| Database | Two PostgreSQL databases: `MEDUSA_DB_URL` for Medusa commerce and `APP_DB_URL` for application/platform data |
+| Auth | Supabase Auth SSR with Google provider |
+| Payments | Stripe, PayPal, Xendit, cash on delivery (Medusa) |
+| Shipping | Pancake POS logistics bridge |
 
 ## Critical Rules
 

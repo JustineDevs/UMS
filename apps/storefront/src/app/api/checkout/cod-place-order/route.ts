@@ -11,6 +11,7 @@ import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
 import { handleCodPlaceOrderRequest } from "@/lib/cod-place-order-route-handler";
 import { finalizeMedusaCartFromServer } from "@/lib/finalize-medusa-cart-server";
+import { getPublicOriginFromRequest } from "@/lib/finalize-medusa-cart-server";
 import { readMedusaCartTotalsPreview } from "@/lib/medusa-checkout-cart-prep";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
@@ -69,10 +70,11 @@ export async function POST(req: Request) {
       }
       await updatePaymentAttemptByCorrelationId(sb, id, patch).catch(() => {});
     },
-    finalizeMedusaCart: async (activeCartId, publicOrigin) =>
+    finalizeMedusaCart: async (activeCartId, correlationId) =>
       finalizeMedusaCartFromServer(activeCartId, {
         maxCompleteAttempts: 4,
-        publicOrigin,
+        publicOrigin: getPublicOriginFromRequest(req),
+        correlationId,
       }),
     logEvent: (payload) =>
       logCheckoutCompletionEvent(payload as Parameters<typeof logCheckoutCompletionEvent>[0]),

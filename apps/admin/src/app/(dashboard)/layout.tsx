@@ -1,5 +1,5 @@
 import { AdminDashboardChrome } from "@/components/AdminDashboardChrome";
-import { NextAuthSessionProvider } from "@/components/NextAuthSessionProvider";
+import { SupabaseSessionProvider } from "@/components/SupabaseSessionProvider";
 import { adminCommandPaletteEnabled } from "@/lib/flags";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 
@@ -12,7 +12,7 @@ export default async function DashboardLayout({
   const localAuthBypass =
     process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
   return (
-    <NextAuthSessionProvider>
+    <SupabaseSessionProvider>
       <NuqsAdapter>
         <AdminDashboardChrome
           commandPaletteEnabled={commandPaletteEnabled}
@@ -21,6 +21,6 @@ export default async function DashboardLayout({
           {children}
         </AdminDashboardChrome>
       </NuqsAdapter>
-    </NextAuthSessionProvider>
+    </SupabaseSessionProvider>
   );
 }

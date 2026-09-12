@@ -42,13 +42,13 @@ test.describe("@admin Admin operations E2E", () => {
     if (login === "skip_no_ui") {
       test.skip(
         true,
-        "E2E credentials UI missing. Use /sign-in/e2e with ADMIN_ALLOWED_EMAILS + NEXTAUTH_SECRET. Run pnpm e2e:ensure-staff.",
+        "E2E credentials UI missing. Use /sign-in/e2e with ADMIN_ALLOWED_EMAILS + AUTH_SECRET. Run pnpm e2e:ensure-staff.",
       );
     }
     if (login === "skip_no_env") {
       test.skip(
         true,
-        "Set ADMIN_ALLOWED_EMAILS and NEXTAUTH_SECRET in root .env.local (Playwright loads via playwright.config).",
+        "Set ADMIN_ALLOWED_EMAILS and AUTH_SECRET in root .env.local (Playwright loads via playwright.config).",
       );
     }
 

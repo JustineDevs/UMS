@@ -6,6 +6,7 @@ import { z } from "zod";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { resolveWishlistCustomerId } from "@/lib/wishlist-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,33 @@ function json(value: unknown, status = 200): Response {
       "Referrer-Policy": "no-referrer",
     },
   });
+}
+
+function workerBaseUrl(): string | null {
+  const value = process.env.API_URL?.trim().replace(/\/$/, "");
+  return value || null;
+}
+
+async function proxyWorkerSync(req: Request, body: string): Promise<Response> {
+  const baseUrl = workerBaseUrl();
+  if (!baseUrl) throw new Error("worker_api_not_configured");
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token?.trim();
+  if (!token) return json({ error: "Not authenticated" }, 401);
+  const response = await fetch(`${baseUrl}/store/wishlist/sync`, {
+    method: req.method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "Idempotency-Key": `storefront-wishlist-sync-${crypto.randomUUID()}`,
+    },
+    body,
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+  return json(payload, response.status);
 }
 
 /**
@@ -48,6 +76,15 @@ export async function POST(req: Request) {
   if (body.tooLarge) return json({ error: "Request body too large" }, 413);
   const parsed = syncSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return json({ error: "Invalid saved items" }, 400);
+  if (workerBaseUrl()) {
+    try {
+      return await proxyWorkerSync(req, JSON.stringify(parsed.data));
+    } catch (error) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker wishlist sync failed", { correlationId, error: error instanceof Error ? error.message : "unknown" });
+      return json({ error: "Unable to synchronize saved items", correlationId }, 503);
+    }
+  }
   const resolved = await Promise.all(
     parsed.data.items.map(async ({ medusaProductId }) => {
       const product = await fetchProductById(medusaProductId);

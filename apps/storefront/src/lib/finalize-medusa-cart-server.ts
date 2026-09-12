@@ -1,7 +1,5 @@
 import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
-
 export type MedusaCartCompleteResult =
   | {
       ok: true;
@@ -23,6 +21,7 @@ export type FinalizeMedusaCartOptions = {
    */
   maxCompleteAttempts?: number;
   publicOrigin?: string;
+  correlationId?: string;
 };
 
 export function getPublicOriginFromRequest(req: Request): string {
@@ -68,15 +67,10 @@ export function secureTrackingRedirectUrl(
   });
 }
 
-type CompleteResponse = {
-  type?: string;
-  order?: { id?: string };
-  error?: { message?: string } | string;
-};
-
 /**
- * Server-only: completes the Medusa cart and builds tracking URL. Used by API routes and cron recovery.
- * Retries belong here only for transient Medusa lag; heavy recovery is cron/worker-driven.
+ * Server-only compatibility wrapper around Worker-native order finalization.
+ * The legacy cart-complete SDK path is intentionally removed: finalization must
+ * be authorized by the APP payment-attempt correlation and committed by the Worker.
  */
 export async function finalizeMedusaCartFromServer(
   cartId: string,
@@ -87,43 +81,43 @@ export async function finalizeMedusaCartFromServer(
     Math.min(20, options?.maxCompleteAttempts ?? 3),
   );
 
-  const sdk = createStorefrontMedusaSdk();
-  const storeCart = sdk.store.cart as unknown as {
-    complete?: (_id: string, _body?: unknown) => Promise<CompleteResponse>;
-  };
-  if (typeof storeCart.complete !== "function") {
+  const correlationId = options?.correlationId?.trim();
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!correlationId || !workerBaseUrl) {
     return {
       ok: false,
-      status: 501,
-      error: "Cart completion is not available",
+      status: 503,
+      error: workerBaseUrl
+        ? "Payment finalization correlation is required"
+        : "Worker API is not configured",
       attempts: 0,
     };
   }
 
-  let completed = await storeCart.complete(cartId, {});
-  let attempts = 1;
-  while (
-    attempts < maxAttempts &&
-    (completed?.type !== "order" || !completed.order?.id)
-  ) {
-    await new Promise((r) => setTimeout(r, 280 + attempts * 120));
-    completed = await storeCart.complete(cartId, {});
+  let orderId: string | undefined;
+  let errorMessage = "Order not ready";
+  let attempts = 0;
+  while (attempts < maxAttempts) {
     attempts += 1;
+    const response = await fetch(
+      `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId)}/finalize`,
+      { method: "POST", cache: "no-store" },
+    );
+    const payload = (await response.json().catch(() => ({}))) as {
+      orderId?: unknown;
+      error?: unknown;
+    };
+    orderId = typeof payload.orderId === "string" ? payload.orderId : undefined;
+    errorMessage = typeof payload.error === "string" ? payload.error : errorMessage;
+    if (response.ok && orderId) break;
+    if (response.status === 409 || response.status === 422) break;
+    if (attempts < maxAttempts) await new Promise((r) => setTimeout(r, 280 + attempts * 120));
   }
 
-  if (completed?.type !== "order" || !completed.order?.id) {
-    const errMsg =
-      typeof completed?.error === "string"
-        ? completed.error
-        : completed?.error &&
-            typeof completed.error === "object" &&
-            "message" in completed.error
-          ? String((completed.error as { message?: string }).message)
-          : "Order not ready";
-    return { ok: false, status: 409, error: errMsg, attempts };
+  if (!orderId) {
+    return { ok: false, status: 409, error: errorMessage, attempts };
   }
 
-  const orderId = completed.order.id;
   const base =
     options?.publicOrigin?.trim() ||
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||

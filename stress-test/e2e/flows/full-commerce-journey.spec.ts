@@ -16,7 +16,7 @@ test.describe("@workflow @checkout Full commerce journey (guest)", () => {
     const res = await request.get("/api/health/sop");
     expect(res.ok(), `/api/health/sop ${res.status()}`).toBeTruthy();
     const json = (await res.json()) as { commerceSource?: string };
-    expect(json.commerceSource).toBe("medusa");
+    expect(json.commerceSource).toBe("cloudflare_worker");
   });
 
   test("shop to first PDP and add-to-bag when catalog exists", async ({ page }) => {

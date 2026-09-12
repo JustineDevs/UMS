@@ -47,6 +47,31 @@ export async function POST(request: Request) {
   if (!parsed.success)
     return Response.json({ error: "Invalid cart lines" }, { status: 400 });
 
+  const workerApiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerApiUrl) {
+    try {
+      const response = await fetch(`${workerApiUrl}/store/cart/reconcile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(parsed.data),
+        cache: "no-store",
+      });
+      return new Response(await response.text(), {
+        status: response.status,
+        headers: {
+          "Content-Type": response.headers.get("Content-Type") ?? "application/json",
+          "Cache-Control": "no-store",
+          "Referrer-Policy": "no-referrer",
+        },
+      });
+    } catch {
+      return Response.json(
+        { error: "Catalog reconciliation is temporarily unavailable" },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+  }
+
   const resolved = await Promise.all(
     parsed.data.lines.map(async (line) => {
       const inventoryVariant = await fetchMedusaAdminVariant(

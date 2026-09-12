@@ -47,7 +47,7 @@ export type FinalizeCheckoutIntentRouteDeps = {
     _correlationId: string,
     _patch: Record<string, unknown>,
   ) => Promise<void>;
-  finalizeMedusaCart: (_cartId: string, _publicOrigin?: string) => Promise<FinalizeResult>;
+  finalizeMedusaCart: (_cartId: string, _correlationId?: string) => Promise<FinalizeResult>;
   logEvent: (_payload: unknown) => void;
   nowIso: () => string;
 };
@@ -86,8 +86,8 @@ export async function handleFinalizeCheckoutIntentRequest(
         ? () => deps.verifyProviderPayment!(row, cartId)
         : undefined,
     updatePaymentAttempt: deps.updatePaymentAttempt,
-    finalizeMedusaCart: (activeCartId) =>
-      deps.finalizeMedusaCart(activeCartId, getPublicOriginFromRequest(req)),
+    finalizeMedusaCart: (activeCartId, correlationId) =>
+      deps.finalizeMedusaCart(activeCartId, correlationId),
     logEvent: deps.logEvent,
     nowIso: deps.nowIso,
   });

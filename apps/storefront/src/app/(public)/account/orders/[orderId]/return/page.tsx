@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { OrderReturnForm, type ReturnLine } from "@/components/OrderReturnForm";
 import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
+import { fetchWorkerCustomerOrderDetail } from "@/lib/medusa-account-orders";
 
 export const metadata: Metadata = {
   title: "Request a return",
@@ -42,20 +43,25 @@ export default async function OrderReturnPage({
     notFound();
   }
 
-  const res = await medusaAdminFetch(
-    `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email,*items,*items.id,*items.title,*items.quantity,*items.returned_quantity`,
-  );
-  if (!res.ok) {
-    notFound();
+  const workerDetail = await fetchWorkerCustomerOrderDetail(orderId);
+  let order: OrderRow | undefined;
+  if (workerDetail) {
+    if (workerDetail.error !== null || !workerDetail.order) notFound();
+    order = workerDetail.order;
+  } else {
+    const res = await medusaAdminFetch(
+      `/admin/orders/${encodeURIComponent(orderId)}?fields=id,email,*items,*items.id,*items.title,*items.quantity,*items.returned_quantity`,
+    );
+    if (!res.ok) notFound();
+    const json = (await res.json()) as { order?: OrderRow };
+    order = json.order;
   }
-  const json = (await res.json()) as { order?: OrderRow };
-  const order = json.order;
   if (!order?.id) {
     notFound();
   }
-  const orderEmail = order.email?.trim().toLowerCase();
-  if (!orderEmail || orderEmail !== userEmail) {
-    notFound();
+  if (!workerDetail) {
+    const orderEmail = order.email?.trim().toLowerCase();
+    if (!orderEmail || orderEmail !== userEmail) notFound();
   }
 
   const lines: ReturnLine[] = (order.items ?? [])

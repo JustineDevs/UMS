@@ -1,8 +1,7 @@
-import { getServerSession } from "next-auth/next";
-import type { Session } from "next-auth";
+import type { Session } from "./auth";
 import { NextResponse } from "next/server";
 import { checkStaffRole, staffSessionAllows } from "@universal-music-store/database";
-import { authOptions } from "./auth";
+import { getAdminSession } from "./auth";
 import { adminSupabaseOr503 } from "./require-admin-supabase";
 import { resolveStaffOrganization } from "./staff-organization";
 
@@ -27,7 +26,7 @@ function localAdminSession(): Session {
 
 /** Resolve the same staff session used by shared guards for legacy handlers. */
 export async function getStaffSession(): Promise<Session | null> {
-  return authDisabled ? localAdminSession() : getServerSession(authOptions);
+  return authDisabled ? localAdminSession() : getAdminSession();
 }
 
 async function authorizeStaffSession(

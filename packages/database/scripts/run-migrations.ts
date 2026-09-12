@@ -1,5 +1,5 @@
 /**
- * Legacy Supabase / platform Postgres migrations (NOT Medusa `DATABASE_URL`).
+ * Application/platform Postgres migrations (NOT Medusa `MEDUSA_DB_URL`).
  *
  * Medusa-style behavior:
  * - Each file in MIGRATION_FILES runs at most once per database.
@@ -10,7 +10,7 @@
  * - Subsequent runs: only pending files run.
  * ` pnpm --filter @universal-music-store/database migrate`
  * Append new `supabase/migrations/*.sql` names to MIGRATION_FILES in numeric order.
- * Uses LEGACY_DATABASE_URL from repo root `.env.local`.
+ * Uses APP_DB_URL from repo root `.env.local`.
  *
  * Flags:
  *   --status   List applied vs pending and exit (exit 1 if any pending).
@@ -149,13 +149,13 @@ const MIGRATION_FILES = [
 
 const MIGRATIONS_TABLE = "legacy_platform_schema_migrations";
 
-const databaseUrl = process.env.LEGACY_DATABASE_URL;
+const databaseUrl = process.env.APP_DB_URL;
 if (!databaseUrl?.trim()) {
   console.error(
-    "LEGACY_DATABASE_URL is required (Supabase Postgres pooler URI).",
+    "APP_DB_URL is required (application/platform Supabase Postgres pooler URI).",
   );
   console.error(
-    "Set it in the repo root .env.local (see .env.example). Not the same as Medusa DATABASE_URL.",
+    "Set it in the repo root .env.local (see .env.example). Not the same as Medusa MEDUSA_DB_URL.",
   );
   process.exit(1);
 }

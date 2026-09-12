@@ -6,7 +6,10 @@ import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { getStorefrontSession } from "@/lib/auth";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { findMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
-import { accountOrderMatchesDetail } from "@/lib/medusa-account-orders";
+import {
+  accountOrderMatchesDetail,
+  fetchWorkerCustomerOrderDetail,
+} from "@/lib/medusa-account-orders";
 
 export const metadata: Metadata = {
   title: "Order details",
@@ -50,8 +53,8 @@ type OrderRow = {
   currency_code?: string;
   created_at?: string;
   updated_at?: string;
-  payment_status?: string;
-  fulfillment_status?: string;
+  payment_status?: string | null;
+  fulfillment_status?: string | null;
   metadata?: Record<string, unknown> | null;
   shipping_address?: {
     first_name?: string | null;
@@ -75,7 +78,7 @@ function formatMoney(amount: number | undefined, currency = "PHP") {
   })}`;
 }
 
-function formatStatus(value: string | undefined) {
+function formatStatus(value: string | null | undefined) {
   return (value ?? "unknown").replace(/_/g, " ");
 }
 
@@ -101,32 +104,32 @@ export default async function AccountOrderPage({
     notFound();
   }
 
-  const sessionCustomerId =
-    typeof (session.user as Record<string, unknown>).medusaCustomerId === "string"
-      ? String((session.user as Record<string, unknown>).medusaCustomerId).trim()
-      : "";
-  const customerId = sessionCustomerId || (await findMedusaCustomerIdByEmail(userEmail));
-  if (!customerId) {
-    notFound();
+  const workerDetail = await fetchWorkerCustomerOrderDetail(orderId);
+  let order: OrderRow | undefined;
+  if (workerDetail) {
+    if (workerDetail.error !== null || !workerDetail.order) notFound();
+    order = workerDetail.order;
+  } else {
+    const sessionCustomerId =
+      typeof (session.user as Record<string, unknown>).medusaCustomerId === "string"
+        ? String((session.user as Record<string, unknown>).medusaCustomerId).trim()
+        : "";
+    const customerId = sessionCustomerId || (await findMedusaCustomerIdByEmail(userEmail));
+    if (!customerId) notFound();
+
+    const res = await medusaAdminFetch(
+      `/admin/orders/${encodeURIComponent(orderId)}?fields=id,customer_id,display_id,email,status,total,subtotal,tax_total,shipping_total,discount_total,currency_code,created_at,updated_at,payment_status,fulfillment_status,shipping_address,*items,*items.id,*items.title,*items.quantity,*items.unit_price,*items.total,*items.variant,+metadata,*fulfillments,*fulfillments.id,*fulfillments.status,*fulfillments.provider_id,*fulfillments.shipped_at,*fulfillments.tracking_numbers,*fulfillments.labels`,
+    );
+    if (!res.ok) notFound();
+    const json = (await res.json()) as { order?: OrderRow };
+    order = json.order;
+    const orderEmail = order?.email?.trim().toLowerCase();
+    if (!order?.id || !orderEmail || !accountOrderMatchesDetail(order, customerId, userEmail)) {
+      notFound();
+    }
   }
 
-  const res = await medusaAdminFetch(
-    `/admin/orders/${encodeURIComponent(orderId)}?fields=id,customer_id,display_id,email,status,total,subtotal,tax_total,shipping_total,discount_total,currency_code,created_at,updated_at,payment_status,fulfillment_status,shipping_address,*items,*items.id,*items.title,*items.quantity,*items.unit_price,*items.total,*items.variant,+metadata,*fulfillments,*fulfillments.id,*fulfillments.status,*fulfillments.provider_id,*fulfillments.shipped_at,*fulfillments.tracking_numbers,*fulfillments.labels`,
-  );
-  if (!res.ok) {
-    notFound();
-  }
-
-  const json = (await res.json()) as { order?: OrderRow };
-  const order = json.order;
-  if (!order?.id) {
-    notFound();
-  }
-
-  const orderEmail = order.email?.trim().toLowerCase();
-  if (!orderEmail || !accountOrderMatchesDetail(order, customerId, userEmail)) {
-    notFound();
-  }
+  if (!order?.id) notFound();
 
   const currency = String(order.currency_code ?? "PHP").toUpperCase();
   const displayId =

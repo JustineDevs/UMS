@@ -2,11 +2,6 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getStorefrontSession } from "@/lib/auth";
 import type { CartLine } from "@/lib/cart";
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
-import {
-  getMedusaRegionId,
-  withSalesChannelId,
-} from "@/lib/storefront-medusa-env";
 import { extractSessionEmail } from "@universal-music-store/sdk";
 import {
   applyRateLimit,
@@ -15,7 +10,6 @@ import {
   writeCartCookie,
   retrieveCartLines,
   retrieveCartRaw,
-  isMedusaNotFoundError,
 } from "@/lib/cart-api-helpers";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { cartMergePostBodySchema } from "@universal-music-store/validation";
@@ -28,8 +22,63 @@ import { parseBoundedJson } from "@/lib/bounded-request-body";
 
 const MAX_CART_MERGE_BODY_BYTES = 64 * 1024;
 
+function workerBaseUrl(): string | null {
+  const value = process.env.API_URL?.trim().replace(/\/$/, "");
+  return value || null;
+}
+
+async function workerRequest(
+  path: string,
+  init: RequestInit & { idempotencyKey?: string } = {},
+): Promise<Record<string, unknown>> {
+  const baseUrl = workerBaseUrl();
+  if (!baseUrl) throw new Error("worker_api_not_configured");
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+  if (init.body != null) headers.set("Content-Type", "application/json");
+  headers.set("Idempotency-Key", init.idempotencyKey ?? `storefront-cart-merge-${randomUUID()}`);
+  const response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: "no-store" });
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(typeof payload.error === "string" ? payload.error : `worker_cart_${response.status}`);
+  }
+  return payload;
+}
+
+async function createWorkerCart(): Promise<string | null> {
+  const payload = await workerRequest("/store/carts", {
+    method: "POST",
+    body: JSON.stringify({ currency_code: "php" }),
+  });
+  const cart = payload.cart;
+  return cart && typeof cart === "object" && typeof (cart as { id?: unknown }).id === "string"
+    ? (cart as { id: string }).id
+    : null;
+}
+
+async function updateWorkerLine(cartId: string, lineId: string, quantity: number): Promise<void> {
+  await workerRequest(
+    `/store/carts/${encodeURIComponent(cartId)}/line-items/${encodeURIComponent(lineId)}`,
+    { method: "PUT", body: JSON.stringify({ quantity }) },
+  );
+}
+
+async function addWorkerLine(cartId: string, variantId: string, quantity: number): Promise<void> {
+  await workerRequest(
+    `/store/carts/${encodeURIComponent(cartId)}/line-items`,
+    { method: "POST", body: JSON.stringify({ variant_id: variantId, quantity }) },
+  );
+}
+
+async function updateWorkerCart(cartId: string, body: Record<string, unknown>): Promise<void> {
+  await workerRequest(
+    `/store/carts/${encodeURIComponent(cartId)}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
 /**
- * Merges guest session lines into the customer's Medusa cart (combine quantities per variant).
+ * Merges guest session lines into the customer's Worker cart (combine quantities per variant).
  */
 export async function POST(req: Request) {
   const rl = await applyRateLimit(req, "cart-merge", 20, 60_000);
@@ -66,21 +115,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "mergeKey is required for an idempotent cart merge" }, { status: 400 });
   }
 
-  const regionId = getMedusaRegionId()?.trim();
-  if (!regionId) {
-    return NextResponse.json({ error: "Store region not configured" }, { status: 503 });
-  }
-
-  const sdk = createStorefrontMedusaSdk();
   let targetCartId = await readCartIdFromCookie();
 
   const createCart = async () => {
-    const { cart: created } = await sdk.store.cart.create(
-      withSalesChannelId({ region_id: regionId }) as Parameters<
-        typeof sdk.store.cart.create
-      >[0],
-    );
-    return created?.id ?? null;
+    return createWorkerCart();
   };
 
   let existing: Record<string, unknown> | null;
@@ -96,7 +134,7 @@ export async function POST(req: Request) {
       "*items,*items.id,*items.variant_id,*items.quantity,+metadata",
     );
     if (!existing) {
-      // A stale cookie is normal after a Medusa reset or cart expiry. Replace it
+      // A stale cookie is normal after a database reset or cart expiry. Replace it
       // instead of turning login/cart merge into a 500.
       targetCartId = await createCart();
       if (!isValidCartId(targetCartId)) {
@@ -105,7 +143,7 @@ export async function POST(req: Request) {
       existing = {};
     }
   } catch (error) {
-    if (isMedusaNotFoundError(error)) {
+    if (error instanceof Error && error.message === "cart_not_found") {
       return NextResponse.json({ error: "No target cart" }, { status: 503 });
     }
     console.error(
@@ -252,16 +290,16 @@ export async function POST(req: Request) {
       const matches = existingByVariant.get(variantId) ?? [];
       const first = matches.shift();
       if (first) {
-        await sdk.store.cart.updateLineItem(targetCartId, first.id, { quantity });
+        await updateWorkerLine(targetCartId, first.id, quantity);
         for (const duplicate of matches) {
-          await sdk.store.cart.deleteLineItem(targetCartId, duplicate.id);
+          await updateWorkerLine(targetCartId, duplicate.id, 0);
         }
       } else {
-        await sdk.store.cart.createLineItem(targetCartId, { variant_id: variantId, quantity });
+        await addWorkerLine(targetCartId, variantId, quantity);
       }
     }
 
-    await sdk.store.cart.update(targetCartId, {
+    await updateWorkerCart(targetCartId, {
       email,
       ...(mergeKey
         ? { metadata: { ...existingMetadata, storefront_guest_merge_key: mergeKey } }
@@ -298,11 +336,11 @@ export async function POST(req: Request) {
       try {
         for (const operation of operations) {
           if (operation.type === "update") {
-            await sdk.store.cart.updateLineItem(targetCartId, operation.lineId, { quantity: operation.quantity });
+            await updateWorkerLine(targetCartId, operation.lineId, operation.quantity);
           } else if (operation.type === "delete") {
-            await sdk.store.cart.deleteLineItem(targetCartId, operation.lineId);
+            await updateWorkerLine(targetCartId, operation.lineId, 0);
           } else {
-            await sdk.store.cart.createLineItem(targetCartId, { variant_id: operation.variantId, quantity: operation.quantity });
+            await addWorkerLine(targetCartId, operation.variantId, operation.quantity);
           }
         }
       } catch {

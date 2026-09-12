@@ -29,7 +29,7 @@ Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa p
 
 1. Create or open a [Stripe](https://stripe.com) account.
 2. Obtain **Secret key** and **Webhook signing secret** from the Stripe Dashboard.
-3. Register Medusa webhook URL: `https://your-medusa-backend.example.com/hooks/payment/stripe` (exact path follows your Medusa route setup).
+3. Register the Cloudflare backend webhook URL: `${API_URL}/webhooks/stripe` (the Worker verifies and persists the event directly).
 
 ### Environment (Medusa)
 
@@ -41,7 +41,7 @@ Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa se
 
 1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
-3. Register PayPal webhooks at `https://your-medusa-backend.example.com/hooks/payment/paypal`.
+3. Register PayPal webhooks at `${API_URL}/hooks/payment/paypal`.
 
 ### Environment (Medusa)
 
@@ -79,7 +79,7 @@ Customers select **"GCash / Xendit"** on checkout when that provider is enabled.
 
 ### Webhooks
 
-Register: `https://your-medusa-backend.example.com/hooks/payment/xendit`
+Register: `${API_URL}/hooks/payment/xendit`
 
 The provider suffix is `xendit`, not `xendit_xendit`. The same service exposes
 Stripe at `/hooks/payment/stripe` and PayPal at `/hooks/payment/paypal`. Do not

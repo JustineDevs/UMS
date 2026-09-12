@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import type { CmsNavigationPayload } from "@universal-music-store/platform-data";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import {

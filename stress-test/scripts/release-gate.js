@@ -15,8 +15,8 @@
  *  - Provider sandbox connectivity, screenshots, and advisory jobs are separate and must not be confused with paid-order truth.
  *
  * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
- * For admin E2E credentials (local dev): root .env.local ADMIN_ALLOWED_EMAILS (first email) + NEXTAUTH_SECRET; run `pnpm e2e:ensure-staff`.
- * Playwright sets NEXTAUTH_URL per app (storefront 3000, admin 3001) so admin sign-in works even when root .env.local only lists the storefront URL.
+ * For admin E2E credentials (local dev): root .env.local ADMIN_ALLOWED_EMAILS (first email) + AUTH_SECRET; run `pnpm e2e:ensure-staff`.
+ * Playwright sets each app's public origin (storefront 3000, admin 3001) so Supabase Auth callbacks and cookies remain isolated.
  *
  * Full run report (`pnpm release-gate:full`): raw logs are written under stress-test/release-gate-logs/
  *   - release-gate-full-latest.log (overwritten each run)

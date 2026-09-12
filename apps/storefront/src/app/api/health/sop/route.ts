@@ -1,43 +1,40 @@
 import { NextResponse } from "next/server";
 import { listMissingPostHogEnv } from "@universal-music-store/sdk";
-import { listMissingMedusaStorefrontEnv } from "@/lib/medusa-sop-env";
-import { getMedusaStoreBaseUrl } from "@/lib/storefront-medusa-env";
 
 export const dynamic = "force-dynamic";
 
 /**
- * SOP-6: quick JSON probe for storefront + Medusa reachability (no secrets in response).
+ * SOP-6: quick JSON probe for storefront + Worker reachability (no secrets in response).
  */
 export async function GET() {
   const timestamp = new Date().toISOString();
 
-  const missingEnv = listMissingMedusaStorefrontEnv();
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "") ?? "";
   const missingObservabilityEnv = listMissingPostHogEnv();
-  const baseUrl = getMedusaStoreBaseUrl();
-  let medusaReachable = false;
-  try {
-    const res = await fetch(`${baseUrl}/health`, {
-      cache: "no-store",
-      next: { revalidate: 0 },
-    });
-    medusaReachable = res.ok;
-  } catch {
-    medusaReachable = false;
+  let workerReachable = false;
+  if (workerBaseUrl) {
+    try {
+      const res = await fetch(`${workerBaseUrl}/healthz`, {
+        cache: "no-store",
+        next: { revalidate: 0 },
+      });
+      workerReachable = res.ok;
+    } catch {
+      workerReachable = false;
+    }
   }
 
-  const degraded =
-    missingEnv.length > 0 || missingObservabilityEnv.length > 0 || !medusaReachable;
+  const degraded = !workerBaseUrl || missingObservabilityEnv.length > 0 || !workerReachable;
 
   /** Always 200; use `status` for SOP readiness (avoids 503 during Medusa cold start in E2E). */
   return NextResponse.json(
     {
       status: degraded ? "degraded" : "ok",
-      commerceSource: "medusa",
-      medusa: {
-        baseUrl,
-        healthReachable: medusaReachable,
+      commerceSource: "cloudflare_worker",
+      worker: {
+        configured: Boolean(workerBaseUrl),
+        healthReachable: workerReachable,
       },
-      missingEnv,
       missingObservabilityEnv,
       timestamp,
     },

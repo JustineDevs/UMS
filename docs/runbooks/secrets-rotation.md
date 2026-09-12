@@ -7,7 +7,7 @@ Payment provider credentials for Medusa live in the **Medusa server environment*
 1. Create a new restricted API key or roll the existing secret key in the Stripe Dashboard.
 2. Update `STRIPE_API_KEY` (and `STRIPE_WEBHOOK_SECRET` if the webhook endpoint secret changed).
 3. Restart Medusa.
-4. Verify webhooks still reach `https://<medusa-host>/hooks/payment/stripe`.
+4. Verify webhooks still reach `${API_URL}/webhooks/stripe` and the Worker records the event.
 
 ## PayPal
 
@@ -36,7 +36,7 @@ Update the tracking webhook signing secret in env; restart services that consume
 3. Copy the new key value.
 4. Update every environment that uses this key:
    - Vercel: `vercel env rm SUPABASE_SERVICE_ROLE_KEY production && vercel env add SUPABASE_SERVICE_ROLE_KEY production`
-   - Render: rotate the variable in the service Environment settings, then trigger a deploy or restart the affected service.
+   - Cloudflare Workers: rotate with `wrangler secret put <NAME> --env dev` from the approved `dev` checkout, then deploy the Worker.
    - Local `.env.local`: replace the value; do not commit to git.
 5. Deploy or restart the affected services (admin, storefront server functions).
 6. Verify the old key returns 401 on any test request.

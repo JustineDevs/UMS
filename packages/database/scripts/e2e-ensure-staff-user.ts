@@ -35,6 +35,11 @@ async function main(): Promise<void> {
   }
   const email = normalizeEmail(firstFromList);
   const supabase = createClient(url, key);
+  const password = process.env.AUTH_SECRET?.trim();
+  if (!password) {
+    console.error("AUTH_SECRET is required to provision the Supabase E2E password.");
+    process.exit(1);
+  }
 
   async function ensureOrganizationMembership(userId: string): Promise<void> {
     const organizationId = "e2e-admin";
@@ -80,6 +85,17 @@ async function main(): Promise<void> {
     .select("id")
     .eq("email", email)
     .maybeSingle();
+
+  const { data: authUsers, error: authListError } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: 1000,
+  });
+  if (authListError) throw authListError;
+  const authUser = authUsers.users.find((candidate) => candidate.email?.toLowerCase() === email);
+  const authResult = authUser
+    ? await supabase.auth.admin.updateUserById(authUser.id, { password, email_confirm: true })
+    : await supabase.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name: "E2E Staff" } });
+  if (authResult.error) throw authResult.error;
 
   if (existingUser?.id) {
     const { data: roleRow } = await supabase

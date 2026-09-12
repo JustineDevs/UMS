@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";

@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_wishlists_product
 
 ALTER TABLE public.wishlists ENABLE ROW LEVEL SECURITY;
 
--- Service role has full access; app-layer NextAuth session guard enforces user scoping.
+-- Service role has full access; app-layer Supabase Auth SSR guard enforces user scoping.
 DROP POLICY IF EXISTS wishlists_service_role ON public.wishlists;
 CREATE POLICY wishlists_service_role
   ON public.wishlists

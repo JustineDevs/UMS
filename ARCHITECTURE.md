@@ -5,7 +5,7 @@
 - Smoke harness: `pnpm test:e2e:critical`
 - Result: `16 passed, 2 skipped`
 - Key regressions fixed during this pass:
-  - `next-auth` shim resolution now uses static re-exports instead of runtime file-system lookup.
+  - Supabase Auth SSR is the only application authentication runtime.
   - Admin auth middleware now exports `withAuth` correctly.
   - Storefront and admin unauthenticated API surfaces now return `401` instead of `500`.
 
@@ -23,7 +23,7 @@ This repository is a monorepo ecommerce platform with:
 
 - Frontend: Next.js App Router, React, TypeScript
 - UI system: `packages/ui` primitives plus app-specific chrome and shells
-- Auth: `next-auth`
+- Auth: Supabase Auth SSR with Google OAuth
 - Commerce data: Medusa + shared platform-data helpers
 - Analytics/guardrails: PostHog, Vercel Analytics, BotId protection, consent banner
 
@@ -50,7 +50,7 @@ flowchart LR
 
 - `apps/storefront/src/app/layout.tsx`
   - Global metadata, fonts, theme color, canonical base, robots, icons, manifest
-  - Installs `NextAuthSessionProvider`, `MedusaCartProvider`, analytics, BotId client protection
+  - Installs `SupabaseSessionProvider`, `MedusaCartProvider`, analytics, BotId client protection
   - Adds cart sync, wishlist sync, onboarding guard, smooth scrolling, cookie consent
 - `apps/storefront/src/app/(public)/layout.tsx`
   - Wraps public routes in `StorefrontPublicChrome`
@@ -112,7 +112,7 @@ flowchart LR
   - Customer registration
 - `/account`
   - Account dashboard
-  - Uses `NextAuthSessionProvider`, account profile panel, and order history state
+  - Uses Supabase Auth SSR session state, account profile panel, and order history state
 - `/account/orders/[orderId]`
   - Order detail
 - `/account/orders/[orderId]/return`
@@ -319,7 +319,7 @@ CMS and catalog:
 
 Auth and utilities:
 
-- `NextAuthSessionProvider`, `AdminGoogleSignInButton`, `AdminPreferenceSync`
+- `SupabaseSessionProvider`, `AdminGoogleSignInButton`, `AdminPreferenceSync`
 - `LenisProvider`, `PostHogAnalytics`, `VercelWebAnalytics`
 - `AdminE2eCredentialsForm`, `ChatIntakeForm`
 
@@ -329,7 +329,7 @@ Auth and utilities:
   - title: `Staff admin`
   - description: internal console for orders, inventory, POS, and settings
 - Sign-in pages are `noindex` and `nofollow`
-- Dashboard routes are gated by `next-auth` session and role checks
+- Dashboard routes are gated by Supabase Auth SSR sessions and platform role checks
 - CMS/operations pages rely more on app chrome and task labels than SEO metadata
 
 ## Shared UI and Design System
@@ -382,7 +382,7 @@ These primitives are the basis for forms, lists, dialogs, command palettes, chec
 2. Middleware restricts `/admin`, `/api/admin/*`, and integration endpoints.
 3. Overview dashboard exposes recent commerce health.
 4. Operators move through orders, inventory, catalog, CMS, CRM, POS, and settings.
-5. Pages commonly load data via `getServerSession(authOptions)` plus app-specific service/bridge helpers.
+5. Pages commonly load data via Supabase Auth SSR user resolution plus app-specific service/bridge helpers.
 
 ## Route and UX Coverage Notes
 

@@ -33,6 +33,30 @@ export async function assertStorefrontLinesStock(
 
   for (const [variantId, need] of qtyByVariant) {
     try {
+      const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+      if (workerBaseUrl) {
+        const response = await fetch(
+          `${workerBaseUrl}/store/inventory/${encodeURIComponent(variantId)}`,
+          { headers: { Accept: "application/json" }, cache: "no-store" },
+        );
+        if (!response.ok) return inventoryLookupFailure(response.status);
+        const payload = (await response.json()) as {
+          availability?: { manageInventory?: unknown; availableQuantity?: unknown };
+        };
+        const availability = payload.availability;
+        if (!availability) return inventoryLookupFailure(502);
+        if (availability.manageInventory === false) continue;
+        const available = Math.floor(Number(availability.availableQuantity));
+        if (!Number.isFinite(available)) return inventoryLookupFailure(502);
+        if (available < need) {
+          return {
+            ok: false,
+            message: `Insufficient stock for ${variantId}: need ${need}, available ${available}`,
+            code: "INSUFFICIENT_STOCK",
+          };
+        }
+        continue;
+      }
       const v = await fetchMedusaAdminVariant(variantId);
       if (!v) return inventoryLookupFailure(404);
       const manage = Boolean(v.manage_inventory);

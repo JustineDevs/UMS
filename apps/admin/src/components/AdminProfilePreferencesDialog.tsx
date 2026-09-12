@@ -13,7 +13,7 @@ import {
   Label,
 } from "@universal-music-store/ui";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useState } from "react";
 
 export function AdminProfilePreferencesDialog() {

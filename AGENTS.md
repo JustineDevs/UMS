@@ -38,11 +38,18 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 
 ## Backend Hosting Architecture
 - Vercel hosts the frontend.
-- Alibaba Cloud ECS hosts only the backend runtime: API, Medusa, and Caddy.
-- Supabase Cloud provides PostgreSQL; do not deploy Supabase locally on ECS.
-- Upstash provides Redis; do not deploy Redis locally on ECS.
-- Do not deploy the storefront or admin application to ECS.
-- Use `api.uvs.jstn.site` for the ECS backend and preserve the existing `api.jstn.site` record.
+- Cloudflare Workers (managed by Wrangler) are the complete backend runtime.
+- The Worker-native route handlers are the commerce origin; do not add a Medusa runtime or container fallback.
+- Supabase Cloud provides PostgreSQL; do not deploy Supabase inside the Worker.
+- Upstash provides Redis; do not deploy Redis inside the Worker.
+- The topology has exactly two PostgreSQL databases: `MEDUSA_DB_URL` is the
+  Medusa commerce database (catalog, carts, orders, inventory, payments, and
+  customers), while `APP_DB_URL` is the application/platform database (CMS,
+  staff/RBAC, audit, and platform data). Do not introduce a third database or
+  use a generic database-URL alias.
+- Do not deploy the storefront or admin application to the backend origin.
+- Use the Cloudflare Worker deployment URL configured through `API_URL`; a custom DNS hostname is optional and is not a release prerequisite.
+- Do not deploy Medusa, compliance, Render, Fly.io, ECS, or any external backend origin. All backend contracts must execute in the Worker with Hyperdrive, Queues, and fetch/Web Crypto.
 
 - `dev` is the only development and integration branch; make all changes there.
 - `dev` deploys to the preview environment at `https://universalmusic-preview.vercel.app`.
@@ -51,6 +58,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Promote changes through a pull request from `dev` to `main` only after reviewing all CI results, PR comments, and findings.
 - Fix every review or CI finding on `dev`, rerun the required checks, and merge only when the PR is verified clean.
 - Vercel Cron is not part of this topology. Keep scheduled storefront recovery in `.github/workflows/storefront-cron.yml`; do not add a Vercel `crons` block or treat Vercel Hobby Cron limits as a payment-webhook solution.
+- Deploy the backend only with `pnpm backend:worker:deploy` after `wrangler login` and configured Hyperdrive/Queue bindings. Docker is not part of the backend deployment path.
 - Before pushing any branch, run the local Act gate with `pnpm ci:local`; a failed or skipped local gate must not be pushed.
 - Local Act validates the non-secret release workflow. Provider sandbox, security, and production-only checks still require their documented credentials or infrastructure and must not be simulated with empty secrets.
 

@@ -1,4 +1,4 @@
-import type { Session } from "next-auth";
+import type { StorefrontSession as Session } from "@/lib/auth-client";
 import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
 
 export async function resolveWishlistCustomerId(

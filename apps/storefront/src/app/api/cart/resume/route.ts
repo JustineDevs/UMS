@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
 import {
-  getMedusaPublishableKey,
-  getMedusaRegionId,
-} from "@/lib/storefront-medusa-env";
-import {
   applyRateLimit,
   readCartIdFromCookie,
   isValidCartId,
@@ -56,7 +52,9 @@ export async function GET(req: Request) {
     });
   }
 
-  if (!getMedusaPublishableKey()?.trim() || !getMedusaRegionId()?.trim()) {
+  // The Worker is the commerce authority after the backend cutover. Do not
+  // gate its cart read on legacy Medusa client configuration.
+  if (!process.env.API_URL?.trim()) {
     return NextResponse.json({
       lines: [],
       cartId,

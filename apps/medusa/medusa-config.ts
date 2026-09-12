@@ -146,7 +146,7 @@ if (process.env.NODE_ENV === "production" && !redisUrl) {
 
 export default defineConfig({
   projectConfig: {
-    databaseUrl: process.env.DATABASE_URL,
+    databaseUrl: process.env.MEDUSA_DB_URL,
     ...(redisUrl ? { redisUrl } : {}),
     http: {
       storeCors: process.env.STORE_CORS!,

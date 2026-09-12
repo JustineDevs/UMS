@@ -37,8 +37,8 @@ export async function GET(req: Request) {
         if (!sb) return false;
         return claimPaymentAttemptForFinalization(sb, id);
       },
-      finalizeMedusaCart: async (cartId) =>
-        finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12 }),
+      finalizeMedusaCart: async (cartId, correlationId) =>
+        finalizeMedusaCartFromServer(cartId, { maxCompleteAttempts: 12, correlationId }),
       updatePaymentAttempt: async (id, patch) => {
         if (!sb) {
           return;

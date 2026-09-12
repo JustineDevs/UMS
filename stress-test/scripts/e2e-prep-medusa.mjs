@@ -4,7 +4,7 @@
  * if the store API already returns at least one product for the configured region,
  * seed steps are skipped (no duplicate seed runs).
  *
- * Requires apps/medusa/.env.local (DATABASE_URL) when seed runs. For the HTTP probe,
+ * Requires apps/medusa/.env.local (MEDUSA_DB_URL) when seed runs. For the HTTP probe,
  * Medusa must be listening (e.g. pnpm --filter medusa dev); if the probe cannot
  * run, falls through to `medusa exec` seed (works with Medusa stopped).
  *

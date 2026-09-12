@@ -1,6 +1,6 @@
 # Vercel Deployment (Storefront)
 
-This runbook covers **only the Next.js storefront** on Vercel. Production also requires a reachable **Medusa** backend on Render, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the storefront **payment recovery** cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. The Render deployment contract is in `render.yaml`.
+This runbook covers **only the Next.js storefront** on Vercel. Production also requires the reachable **Cloudflare Worker backend** configured by `API_URL`, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the storefront **payment recovery** cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. The backend deployment contract is in `wrangler.jsonc`.
 
 ## Required Environment Variables
 
@@ -8,7 +8,7 @@ Set these in Vercel → Project → Settings → Environment Variables. Without 
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_MEDUSA_URL` | Medusa backend base URL (HTTPS in production) | `https://ums-6455.onrender.com` |
+| `NEXT_PUBLIC_MEDUSA_URL` | Cloudflare Workers backend gateway (the deployed Worker URL) | `${API_URL}` |
 | `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key | From `medusa seed:ph` output |
 | `NEXT_PUBLIC_MEDUSA_REGION_ID` | Medusa region ID | From Medusa admin or seed |
 

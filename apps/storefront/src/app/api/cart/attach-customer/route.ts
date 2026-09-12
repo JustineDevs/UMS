@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getStorefrontSession } from "@/lib/auth";
-import { createStorefrontMedusaSdk } from "@/lib/medusa-sdk";
 import {
   applyRateLimit,
   applyUserRateLimit,
@@ -43,23 +42,40 @@ export async function POST(req: Request) {
   }
 
   try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, {
-      fields: "id,email,+metadata",
-    } as never);
-    if (!cartEmailMatchesOwner((cart as { email?: unknown }).email, email)) {
+    const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) throw new Error("worker_api_not_configured");
+    const read = await fetch(
+      `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
+      { headers: { Accept: "application/json" }, cache: "no-store" },
+    );
+    if (read.status === 404) {
+      return NextResponse.json({ ok: false, skipped: true });
+    }
+    if (!read.ok) throw new Error(`worker_cart_${read.status}`);
+    const payload = (await read.json()) as { cart?: { email?: unknown } };
+    if (!cartEmailMatchesOwner(payload.cart?.email, email)) {
       return NextResponse.json(
         { error: "Cart ownership could not be verified" },
         { status: 403 },
       );
     }
-    await sdk.store.cart.update(cartId, { email });
+    const update = await fetch(
+      `${baseUrl}/store/carts/${encodeURIComponent(cartId)}`,
+      {
+        method: "PUT",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          "Idempotency-Key": `storefront-cart-attach-${crypto.randomUUID()}`,
+        },
+        body: JSON.stringify({ email }),
+        cache: "no-store",
+      },
+    );
+    if (!update.ok) throw new Error(`worker_cart_update_${update.status}`);
     return NextResponse.json({ ok: true, cartId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("MEDUSA_SECRET_API_KEY")) {
-      return NextResponse.json({ ok: false, skipped: true });
-    }
     console.error("[cart/attach-customer] unhandled:", msg.slice(0, 300));
     return NextResponse.json(
       { ok: false, error: "internal_error" },

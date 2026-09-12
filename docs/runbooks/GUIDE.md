@@ -4,22 +4,23 @@ Step-by-step guide for non-technical users. Each section explains where to go, w
 
 ---
 
-## Render (Backend Hosting)
+## Cloudflare Workers (Backend)
 
-**URL:** https://render.com
+**URL:** https://dash.cloudflare.com
 
-**What you get:** The existing Render `UMS` web service for the Medusa commerce backend. The service URL is `https://ums-6455.onrender.com`.
+**What you get:** The Wrangler-managed public backend at the Worker URL configured in `API_URL`. Worker-native route handlers execute commerce and compliance contracts directly.
 
-**Payment required?** Render's free plan may sleep during inactivity. Use a paid plan for uninterrupted checkout and webhook availability.
+The backend runs as a Worker with Hyperdrive and Cloudflare Queues.
 
 **Steps:**
 
-1. Use the existing Render service in workspace `tea-d6vp73tm5p6s73afirag`; do not create a second service from the Blueprint.
-2. Keep its repository at `https://github.com/JustineDevs/UMS` on the `dev` branch.
-3. Enter every variable marked `sync: false` in the existing service environment.
-4. Verify `https://ums-6455.onrender.com/health` returns HTTP 200 before pointing Vercel at it.
+1. Install Wrangler or use `pnpm dlx wrangler` and run `wrangler login`.
+2. Configure the required Worker secrets listed in the Cloudflare deployment checklist. Do not create `MEDUSA_ORIGIN_URL` or `COMPLIANCE_ORIGIN_URL`; route handlers run in the Worker runtime.
+3. Deploy the preview Worker from the `dev` branch with `pnpm backend:worker:deploy`.
+4. Deploy production only after the reviewed `dev` to `main` pull request with `pnpm backend:worker:deploy:production`.
+5. Verify `${API_URL}/healthz` returns HTTP 200 before pointing Vercel at it.
 
-Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys in Render build arguments or git. Secrets are injected at runtime.
+Do not put database URLs, JWT secrets, cookie secrets, provider keys, or Supabase service keys in Wrangler `vars` or git. Secrets are injected at runtime. The Worker must not receive direct database credentials.
 
 ---
 
@@ -105,13 +106,13 @@ Do not put database URLs, JWT secrets, cookie secrets, or Supabase service keys 
 
 | Service      | Signup fee | To get API keys      | For live transactions  |
 |-------------|------------|----------------------|------------------------|
-| Render      | No         | Account and Git provider setup | Paid plan for always-on runtime |
+| Cloudflare Workers | Yes | Cloudflare account, domain, Hyperdrive, and Queues | Worker route, database, queue, and provider checks |
 | Stripe      | No         | Free                 | % per transaction      |
 | PayPal      | No         | Free                 | % per transaction      |
 | Xendit      | No         | Business onboarding  | % per transaction      |
 | Tracking service | No      | Free tier OK         | Paid for higher volume |
 
-Configure these credentials in Render or Vercel without committing secrets to the repository.
+Configure these credentials in Cloudflare Workers or Vercel without committing secrets to the repository.
 
 ## Production env files
 

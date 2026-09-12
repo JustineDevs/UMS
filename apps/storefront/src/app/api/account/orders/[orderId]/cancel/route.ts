@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStorefrontSession } from "@/lib/auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { medusaAdminFetch } from "@/lib/medusa-admin-fetch";
 import { fetchCustomerOrders } from "@/lib/medusa-account-orders";
 import { withBotIdProtection } from "@/lib/botid-protection";
@@ -29,14 +30,57 @@ async function handlePOST(
     );
   }
 
+  const { orderId } = await params;
+  const trimmedId = orderId.trim();
+
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl) {
+    try {
+      const supabase = await createSupabaseServerClient();
+      const [{ data: userData }, { data: sessionData }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ]);
+      const userEmail = userData.user?.email?.trim();
+      const accessToken = sessionData.session?.access_token?.trim();
+      if (!userEmail || !accessToken) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const idempotencyKey = buildOrderCancellationIdempotencyKey(userEmail, trimmedId);
+      const response = await fetch(
+        `${workerBaseUrl}/store/customers/me/orders/${encodeURIComponent(trimmedId)}/cancel`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": idempotencyKey,
+            Accept: "application/json",
+          },
+          body: "{}",
+          cache: "no-store",
+        },
+      );
+      const body = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+      return NextResponse.json(body, { status: response.status });
+    } catch (err) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker cancel order failed", {
+        correlationId,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+      return NextResponse.json(
+        accountMutationFailure("Could not cancel the order right now.", correlationId),
+        { status: 503 },
+      );
+    }
+  }
+
   const session = await getStorefrontSession();
   const userEmail = session?.user?.email?.trim();
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const { orderId } = await params;
-  const trimmedId = orderId.trim();
 
   const { orders, error: ordersError } = await fetchCustomerOrders(userEmail);
   if (ordersError) {

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { resolveWishlistCustomerId } from "@/lib/wishlist-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,58 @@ function json(value: unknown, status = 200) {
   });
 }
 
+function workerBaseUrl(): string | null {
+  const value = process.env.API_URL?.trim().replace(/\/$/, "");
+  return value || null;
+}
+
+async function workerAuthHeaders(): Promise<Headers | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token?.trim();
+  if (!token) return null;
+  return new Headers({
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
+  });
+}
+
+async function proxyWorkerWishlist(
+  request: Request,
+  body?: string,
+): Promise<Response> {
+  const baseUrl = workerBaseUrl();
+  if (!baseUrl) throw new Error("worker_api_not_configured");
+  const headers = await workerAuthHeaders();
+  if (!headers) return json({ error: "Not authenticated" }, 401);
+  if (body !== undefined) {
+    headers.set("Content-Type", "application/json");
+    headers.set("Idempotency-Key", `storefront-wishlist-${crypto.randomUUID()}`);
+  }
+  const response = await fetch(`${baseUrl}/store/wishlist`, {
+    method: request.method,
+    headers,
+    body,
+    cache: "no-store",
+  });
+  const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+  return json(payload, response.status);
+}
+
 /**
  * GET /api/wishlist
  * Returns the server-side wishlist for the authenticated customer.
  */
 export async function GET(_req: Request) {
+  if (workerBaseUrl()) {
+    try {
+      return await proxyWorkerWishlist(_req);
+    } catch (error) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker wishlist read failed", { correlationId, error: error instanceof Error ? error.message : "unknown" });
+      return json({ error: "Saved items are temporarily unavailable", correlationId }, 503);
+    }
+  }
   const session = await getStorefrontSession();
   const customerId = await resolveWishlistCustomerId(session);
   if (!session?.user || !customerId?.trim()) {
@@ -91,6 +139,15 @@ export async function POST(req: Request) {
   if (body.tooLarge) return json({ error: "Request body too large" }, 413);
   const parsed = wishlistIdentitySchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return json({ error: "Invalid wishlist item" }, 400);
+  if (workerBaseUrl()) {
+    try {
+      return await proxyWorkerWishlist(req, JSON.stringify(parsed.data));
+    } catch (error) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker wishlist add failed", { correlationId, error: error instanceof Error ? error.message : "unknown" });
+      return json({ error: "Unable to update saved items", correlationId }, 503);
+    }
+  }
   const productId = parsed.data.medusaProductId;
   const product = await fetchProductById(productId);
   if (product.kind !== "ok") return json({ error: "Product not found" }, 404);
@@ -149,6 +206,15 @@ export async function DELETE(req: Request) {
   if (body.tooLarge) return json({ error: "Request body too large" }, 413);
   const parsed = wishlistIdentitySchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return json({ error: "Invalid wishlist item" }, 400);
+  if (workerBaseUrl()) {
+    try {
+      return await proxyWorkerWishlist(req, JSON.stringify(parsed.data));
+    } catch (error) {
+      const correlationId = crypto.randomUUID();
+      console.error("Worker wishlist remove failed", { correlationId, error: error instanceof Error ? error.message : "unknown" });
+      return json({ error: "Unable to update saved items", correlationId }, 503);
+    }
+  }
   const productId = parsed.data.medusaProductId;
 
   const sb = createStorefrontServiceSupabase();

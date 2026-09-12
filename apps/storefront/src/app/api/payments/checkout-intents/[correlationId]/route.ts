@@ -10,12 +10,28 @@ import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ correlationId: string }> },
 ) {
   const { correlationId } = await ctx.params;
   if (!correlationId?.trim()) {
     return NextResponse.json({ error: "Missing correlation id" }, { status: 400 });
+  }
+
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerBaseUrl) {
+    const response = await fetch(
+      `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId.trim())}`,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          ...(req.headers.get("cookie") ? { Cookie: req.headers.get("cookie")! } : {}),
+        },
+      },
+    );
+    const payload = await response.json().catch(() => ({ error: "Not found" }));
+    return NextResponse.json(payload, { status: response.ok ? 200 : response.status });
   }
 
   const cartId = await readCartIdFromCookie();

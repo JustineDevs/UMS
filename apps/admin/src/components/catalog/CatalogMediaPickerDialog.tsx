@@ -2,7 +2,7 @@
 
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CatalogMediaPreview } from "./CatalogMediaPreview";
 

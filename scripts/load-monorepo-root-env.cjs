@@ -48,9 +48,9 @@ function loadMonorepoRootEnv(fromConfigDir) {
   const envFilePath = path.join(root, envFileName);
   const invalidationKey = "STOREFRONT_INTERNAL_INVALIDATION_SECRET";
   const invalidationBefore = process.env[invalidationKey];
-  // The app launcher owns NEXTAUTH_URL in local development so admin and storefront
-  // never generate callbacks or cookies for each other's origin.
-  const runtimeNextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+  // The app launcher owns the local public origin so admin and storefront never
+  // generate callbacks or cookies for each other's Supabase Auth origin.
+  const runtimePublicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const runtimeSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const runtimeStorefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL?.trim();
   const runtimePublicStorefrontUrl = process.env.PUBLIC_STOREFRONT_URL?.trim();
@@ -58,8 +58,8 @@ function loadMonorepoRootEnv(fromConfigDir) {
   // also required by local multi-service verification, where the same bundle
   // is pointed at an explicitly selected Medusa port.
   applyRootEnvFile(envFilePath, false);
-  if (runtimeNextAuthUrl) {
-    process.env.NEXTAUTH_URL = runtimeNextAuthUrl;
+  if (runtimePublicSiteUrl) {
+    process.env.NEXT_PUBLIC_SITE_URL = runtimePublicSiteUrl;
   }
   if (runtimeSiteUrl) {
     process.env.NEXT_PUBLIC_SITE_URL = runtimeSiteUrl;

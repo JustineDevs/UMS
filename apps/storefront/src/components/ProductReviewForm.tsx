@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/auth-client";
 import { useEffect, useRef, useState } from "react";
 import { REVIEW_STAR_PATH } from "@/components/ReviewStarRatingDisplay";
 import { getRecaptchaToken } from "@/components/RecaptchaScript";

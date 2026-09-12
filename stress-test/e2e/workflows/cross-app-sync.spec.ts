@@ -15,7 +15,7 @@ test.describe("@cross-app @workflow admin orders shell when staff auth works", (
     test.setTimeout(180_000);
     const r = await assertAdminOrdersShellWhenAuthenticated(page);
     if (r === "skip_no_ui" || r === "skip_no_env") {
-      test.skip(true, "Configure ADMIN_ALLOWED_EMAILS + NEXTAUTH_SECRET and e2e:ensure-staff.");
+      test.skip(true, "Configure ADMIN_ALLOWED_EMAILS + AUTH_SECRET and e2e:ensure-staff.");
     }
     expect(r).toBe("ok");
   });

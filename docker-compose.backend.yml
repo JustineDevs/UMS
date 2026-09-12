@@ -1,3 +1,5 @@
+# Local-only backend integration stack. Production exposes the Worker gateway;
+# this compose file is not a production deployment definition.
 services:
   api:
     build:
@@ -27,8 +29,8 @@ services:
       dockerfile: Dockerfile.medusa
       target: runtime
       args:
-        DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be configured}
-        MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-https://api.uvs.jstn.site}
+        MEDUSA_DB_URL: ${MEDUSA_DB_URL:?MEDUSA_DB_URL must be configured}
+        MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:?MEDUSA_BACKEND_URL must be configured}
     env_file:
       - .env.production
     environment:
@@ -37,14 +39,14 @@ services:
       XDG_CONFIG_HOME: /tmp/medusa-config
       APPDATA: /tmp/medusa-config
       LOCALAPPDATA: /tmp/medusa-config
-      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:-https://api.uvs.jstn.site}
-      PUBLIC_STOREFRONT_URL: ${PUBLIC_STOREFRONT_URL:-https://store.uvs.jstn.site}
-      NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:-https://store.uvs.jstn.site}
-      STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:-https://store.uvs.jstn.site}
-      ADMIN_CORS: ${ADMIN_CORS:-https://admin.uvs.jstn.site}
-      AUTH_CORS: ${AUTH_CORS:-https://admin.uvs.jstn.site}
-      STORE_CORS: ${STORE_CORS:-https://store.uvs.jstn.site}
-      STOREFRONT_ORIGIN: ${STOREFRONT_ORIGIN:-https://store.uvs.jstn.site}
+      MEDUSA_BACKEND_URL: ${MEDUSA_BACKEND_URL:?MEDUSA_BACKEND_URL must be configured}
+      PUBLIC_STOREFRONT_URL: ${PUBLIC_STOREFRONT_URL:?PUBLIC_STOREFRONT_URL must be configured}
+      NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:?NEXT_PUBLIC_STOREFRONT_URL must be configured}
+      STOREFRONT_PUBLIC_URL: ${STOREFRONT_PUBLIC_URL:?STOREFRONT_PUBLIC_URL must be configured}
+      ADMIN_CORS: ${ADMIN_CORS:?ADMIN_CORS must be configured}
+      AUTH_CORS: ${AUTH_CORS:?AUTH_CORS must be configured}
+      STORE_CORS: ${STORE_CORS:?STORE_CORS must be configured}
+      STOREFRONT_ORIGIN: ${STOREFRONT_ORIGIN:?STOREFRONT_ORIGIN must be configured}
     expose:
       - "9000"
     restart: unless-stopped
@@ -57,28 +59,6 @@ services:
       start_period: 120s
       retries: 5
 
-  caddy:
-    image: caddy:2-alpine
-    depends_on:
-      api:
-        condition: service_healthy
-      medusa:
-        condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./deploy/backend/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    restart: unless-stopped
-    networks:
-      - uvs-backend
-
 networks:
   uvs-backend:
     driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:

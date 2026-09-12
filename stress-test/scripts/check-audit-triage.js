@@ -19,7 +19,14 @@ function main() {
   const audit = spawnSync("pnpm", ["audit", "--json"], {
     cwd: root,
     encoding: "utf8",
+    // pnpm includes the full advisory tree in JSON output. The default
+    // spawnSync buffer truncates large workspaces before JSON.parse runs.
+    maxBuffer: 32 * 1024 * 1024,
   });
+  if (audit.error) {
+    console.error(`audit: pnpm failed to execute: ${audit.error.message}`);
+    process.exit(1);
+  }
   const out = (audit.stdout || audit.stderr || "{}").trim();
   let data;
   try {

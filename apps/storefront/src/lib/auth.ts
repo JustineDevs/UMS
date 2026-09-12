@@ -1,73 +1,29 @@
-import type { NextAuthOptions } from "next-auth";
-import type { Session } from "next-auth";
-import { getServerSession } from "next-auth/next";
-import GoogleProvider from "next-auth/providers/google";
-import {
-  loadGoogleCredentials,
-  buildSharedJwtCallbackWithResolver,
-  buildSharedSessionCallback,
-} from "@universal-music-store/sdk";
-import { getAuthSecret } from "@/lib/auth-secret";
+import type { User } from "@supabase/supabase-js";
 import { findOrCreateMedusaCustomerIdByEmail } from "@/lib/medusa-customer-resolve";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const google = loadGoogleCredentials("storefront");
+export type Session = { user: { id?: string; email?: string; name?: string | null; image?: string | null }; expires: string; authenticatedAt?: number };
 
-const sharedJwt = buildSharedJwtCallbackWithResolver({
-  resolveCustomerId: findOrCreateMedusaCustomerIdByEmail,
-});
-const sharedSession = buildSharedSessionCallback();
-
-export const authOptions: NextAuthOptions = {
-  debug: process.env.NEXTAUTH_DEBUG === "true",
-  providers: [
-    GoogleProvider({
-      clientId: google.clientId,
-      clientSecret: google.clientSecret,
-    }),
-  ],
-  secret: getAuthSecret(),
-  session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
-  pages: { signIn: "/sign-in" },
-  cookies: {
-    sessionToken: {
-      name: "ums.storefront-session-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NEXTAUTH_URL?.startsWith("https://") ?? false,
-      },
-    },
-  },
-  callbacks: {
-    jwt: sharedJwt as NextAuthOptions["callbacks"] extends { jwt?: infer J } ? J : never,
-    session: sharedSession as NextAuthOptions["callbacks"] extends { session?: infer S } ? S : never,
-  },
-};
-
-/**
- * Local browser QA may expose the bypass flag to the client so its session
- * provider can render the same identity. Never let a public flag disable auth
- * in a production server process.
- */
 export function isStorefrontAuthDisabled(): boolean {
-  const serverFlags = [process.env.AUTH_DISABLED, process.env.AUTH_DISABLE];
-  if (serverFlags.some((value) => value === "true")) return true;
   if (process.env.NODE_ENV === "production") return false;
-  return [
-    process.env.NEXT_PUBLIC_AUTH_DISABLED,
-    process.env.NEXT_PUBLIC_AUTH_DISABLE,
-  ].some((value) => value === "true");
+  return [process.env.AUTH_DISABLED, process.env.AUTH_DISABLE].some((value) => value === "true");
 }
 
-/** Explicit auth-disabled mode is reserved for controlled browser QA. */
+function toSession(user: User): Session {
+  const metadata = user.user_metadata as Record<string, unknown>;
+  const authenticatedAt = user.last_sign_in_at ? Date.parse(user.last_sign_in_at) / 1000 : undefined;
+  return { user: { id: user.id, email: user.email, name: typeof metadata.full_name === "string" ? metadata.full_name : typeof metadata.name === "string" ? metadata.name : null, image: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null }, expires: new Date(Date.now() + 3600_000).toISOString(), ...(authenticatedAt && Number.isFinite(authenticatedAt) ? { authenticatedAt } : {}) };
+}
+
 export async function getStorefrontSession(): Promise<Session | null> {
-  if (isStorefrontAuthDisabled()) {
-    return {
-      user: { name: "Local QA", email: "e2e-test@example.com" },
-      authenticatedAt: Math.floor(Date.now() / 1000),
-      expires: "2099-12-31T23:59:59.999Z",
-    } as Session;
+  if (isStorefrontAuthDisabled()) return { user: { id: "e2e-test-user", email: "e2e-test@example.com", name: "Local QA" }, expires: "2099-12-31T23:59:59.999Z" };
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  const session = toSession(data.user);
+  if (session.user.email) {
+    const customerId = await findOrCreateMedusaCustomerIdByEmail(session.user.email).catch(() => null);
+    if (customerId) session.user.id = customerId;
   }
-  return getServerSession(authOptions);
+  return session;
 }
