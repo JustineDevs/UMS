@@ -125,6 +125,7 @@ function misconfigured(detail: string): CommerceFetchFailure {
 function catalogEnvCacheFingerprint(): string {
   const raw = [
     "v2",
+    process.env.API_URL?.trim() ?? "",
     getMedusaStoreBaseUrl(),
     getMedusaPublishableKey() ?? "",
     getMedusaRegionId() ?? "",
@@ -768,11 +769,9 @@ export async function fetchFeaturedProducts(
 ): Promise<FeaturedProductsResult> {
   const cached = unstable_cache(
     async () => {
-      const primary = await fetchMedusaProductsPage(
-        limit,
-        { sort: "newest" },
-        true,
-      );
+      const primary = process.env.API_URL?.trim()
+        ? await fetchWorkerProducts(limit, { sort: "newest" })
+        : await fetchMedusaProductsPage(limit, { sort: "newest" }, true);
       if (primary.kind !== "ok") {
         return primary;
       }
