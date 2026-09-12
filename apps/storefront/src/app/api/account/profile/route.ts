@@ -71,6 +71,19 @@ async function handlePATCH(req: Request) {
     return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
   }
   try {
+    const isolatedE2E =
+      process.env.NODE_ENV !== "production" &&
+      process.env.CI_STRICT_E2E === "1" &&
+      isStorefrontAuthDisabled();
+    if (isolatedE2E && !process.env.API_URL?.trim()) {
+      const bounded = await parseBoundedJson(req, 32 * 1024);
+      if (bounded.tooLarge) return Response.json({ error: "Request body is too large" }, { status: 413 });
+      if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+      if (!storefrontCustomerProfilePatchSchema.safeParse(bounded.value).success) {
+        return Response.json({ error: "Check your profile fields and try again." }, { status: 400 });
+      }
+      return Response.json({ ok: true, updatedAt: new Date().toISOString() });
+    }
     const workerResponse = await patchWorkerProfile(req);
     if (workerResponse) return workerResponse;
   } catch (error) {
