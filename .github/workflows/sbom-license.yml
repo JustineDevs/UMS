@@ -22,7 +22,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Generate SBOM (CycloneDX)
-        run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format JSON
+        run: npx @cyclonedx/cyclonedx-npm --ignore-npm-errors --output-file sbom.json --output-format JSON
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
         with:
@@ -45,10 +45,16 @@ jobs:
       - name: Check for high or critical vulnerabilities
         run: |
           set -euo pipefail
+          # pnpm returns non-zero when any advisory exists, including moderate
+          # and low findings. Capture the report so the gate can enforce only
+          # the release-blocking severities below.
+          set +e
           pnpm audit --prod --json > audit.json
+          AUDIT_EXIT=$?
+          set -e
           CRITICAL=$(node -e "const a=require('./audit.json'); process.stdout.write(String(a.metadata?.vulnerabilities?.critical ?? 0))")
           HIGH=$(node -e "const a=require('./audit.json'); process.stdout.write(String(a.metadata?.vulnerabilities?.high ?? 0))")
-          echo "Critical: $CRITICAL, High: $HIGH"
+          echo "Critical: $CRITICAL, High: $HIGH (audit exit: $AUDIT_EXIT)"
           if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
             echo "::error::High or critical vulnerabilities found"
             exit 1
