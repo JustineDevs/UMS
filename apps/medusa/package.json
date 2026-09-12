@@ -16,6 +16,7 @@
     "build": "node ./scripts/run-build.cjs",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "seed:ph": "medusa exec ./src/scripts/seed-ph.ts",
+    "e2e:secret": "medusa exec ./src/scripts/create-e2e-secret.ts",
     "seed:categories": "medusa exec ./src/scripts/ensure-product-categories.ts",
     "exec:reconcile-payments": "medusa exec ./src/scripts/reconcile-pending-payments.ts",
     "import:legacy-catalog": "medusa exec ./src/scripts/import-legacy-catalog-jsonl.ts",
