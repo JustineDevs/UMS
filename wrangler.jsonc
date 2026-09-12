@@ -12,6 +12,10 @@
     "dev": {
       "name": "ums-backend-preview",
       "workers_dev": true,
+      "exports": {
+        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
+        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
+      },
       "queues": {
         "producers": [
           { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-dev" },
@@ -32,6 +36,10 @@
     "production": {
       "name": "ums-backend-production",
       "workers_dev": true,
+      "exports": {
+        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
+        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
+      },
       "queues": {
         "producers": [
           { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-production" },

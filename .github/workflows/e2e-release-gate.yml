@@ -87,6 +87,7 @@ jobs:
           MEDUSA_BACKEND_URL: http://localhost:9000
           NEXT_PUBLIC_MEDUSA_URL: http://localhost:9000
           E2E_BASE_URL: http://localhost:3000
+          API_URL: ${{ vars.WORKER_API_URL }}
           CI_STRICT_E2E: "1"
           AUTH_DISABLED: "true"
           NEXT_PUBLIC_AUTH_DISABLED: "true"
