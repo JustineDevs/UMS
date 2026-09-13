@@ -695,8 +695,8 @@ export async function handleBackendRequest(
         customerOrdersMatch ||
         customerOrderDetailMatch ||
         trackingMatch ||
-        customerReceiptMatch ||
-        customerProfileMatch)) ||
+        customerReceiptMatch)) ||
+      customerProfileMatch ||
       paymentAttemptMatch ||
       paymentFinalizationMatch ||
       cartLineMatch ||
