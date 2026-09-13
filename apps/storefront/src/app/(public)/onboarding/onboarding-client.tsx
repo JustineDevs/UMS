@@ -159,6 +159,7 @@ export function OnboardingClient() {
             className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            name="name"
             autoComplete="name"
           />
         </label>
@@ -177,6 +178,7 @@ export function OnboardingClient() {
             className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            name="tel"
             placeholder="+63… or 09…"
             autoComplete="tel"
           />
@@ -193,6 +195,8 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.fullName}
               onChange={(e) => setAddr({ ...addr, fullName: e.target.value })}
+              name="shipping-name"
+              autoComplete="shipping name"
             />
           </label>
           <label className="block text-xs font-medium text-on-surface-variant">
@@ -202,6 +206,8 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.line1}
               onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
+              name="shipping-address-line1"
+              autoComplete="shipping address-line1"
             />
           </label>
           <label className="block text-xs font-medium text-on-surface-variant">
@@ -211,6 +217,8 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.barangay ?? ""}
               onChange={(e) => setAddr({ ...addr, barangay: e.target.value })}
+              name="shipping-address-level3"
+              autoComplete="shipping address-level3"
               placeholder="Required for couriers (e.g. J&T)"
             />
           </label>
@@ -221,6 +229,8 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.city}
               onChange={(e) => setAddr({ ...addr, city: e.target.value })}
+              name="shipping-address-level2"
+              autoComplete="shipping address-level2"
             />
           </label>
           <label className="block text-xs font-medium text-on-surface-variant">
@@ -230,6 +240,8 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.province}
               onChange={(e) => setAddr({ ...addr, province: e.target.value })}
+              name="shipping-address-level1"
+              autoComplete="shipping address-level1"
             />
           </label>
         </fieldset>
