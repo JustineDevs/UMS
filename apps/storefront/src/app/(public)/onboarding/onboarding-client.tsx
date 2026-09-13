@@ -7,6 +7,7 @@ import {
   isPhilippinesMobilePhone,
   type StorefrontShippingAddress,
 } from "@universal-music-store/validation";
+import { PhilippineAddressFields } from "@/components/PhilippineAddressFields";
 import { useEffect, useState } from "react";
 
 function emptyAddress(): StorefrontShippingAddress {
@@ -99,7 +100,6 @@ export function OnboardingClient() {
       return;
     }
     if (
-      !addr.fullName.trim() ||
       !addr.line1.trim() ||
       !addr.barangay?.trim() ||
       !addr.city.trim() ||
@@ -120,7 +120,7 @@ export function OnboardingClient() {
         shippingAddresses: [
           {
             ...addr,
-            fullName: addr.fullName.trim(),
+            fullName: dn,
             phone: phone.trim(),
           },
         ],
@@ -153,7 +153,7 @@ export function OnboardingClient() {
 
       <form onSubmit={(e) => void submit(e)} className="mt-8 space-y-5">
         <label className="block text-xs font-medium text-on-surface-variant">
-          Name
+          Full name
           <input
             required
             className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
@@ -188,62 +188,7 @@ export function OnboardingClient() {
           <legend className="px-1 text-xs font-bold uppercase tracking-wider text-primary">
             Primary delivery address
           </legend>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            Recipient name
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.fullName}
-              onChange={(e) => setAddr({ ...addr, fullName: e.target.value })}
-              name="shipping-name"
-              autoComplete="shipping name"
-            />
-          </label>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            Street address
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.line1}
-              onChange={(e) => setAddr({ ...addr, line1: e.target.value })}
-              name="shipping-address-line1"
-              autoComplete="shipping address-line1"
-            />
-          </label>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            Barangay
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.barangay ?? ""}
-              onChange={(e) => setAddr({ ...addr, barangay: e.target.value })}
-              name="shipping-address-level3"
-              autoComplete="shipping address-level3"
-              placeholder="Required for couriers (e.g. J&T)"
-            />
-          </label>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            City or municipality
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.city}
-              onChange={(e) => setAddr({ ...addr, city: e.target.value })}
-              name="shipping-address-level2"
-              autoComplete="shipping address-level2"
-            />
-          </label>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            Province
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.province}
-              onChange={(e) => setAddr({ ...addr, province: e.target.value })}
-              name="shipping-address-level1"
-              autoComplete="shipping address-level1"
-            />
-          </label>
+          <PhilippineAddressFields address={addr} onChange={setAddr} />
         </fieldset>
 
         {err ? (

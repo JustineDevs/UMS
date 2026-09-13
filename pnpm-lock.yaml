@@ -409,6 +409,10 @@ importers:
       zod:
         specifier: ^3.23.8
         version: 3.25.76
+    optionalDependencies:
+      '@swc/core-win32-x64-msvc':
+        specifier: 1.15.18
+        version: 1.15.18
     devDependencies:
       '@jest/globals':
         specifier: ^29.7.0
@@ -470,16 +474,15 @@ importers:
       yalc:
         specifier: ^1.0.0-pre.53
         version: 1.0.0-pre.53
-    optionalDependencies:
-      '@swc/core-win32-x64-msvc':
-        specifier: 1.15.18
-        version: 1.15.18
 
   apps/storefront:
     dependencies:
       '@babel/runtime':
         specifier: ^7.29.7
         version: 7.29.7
+      '@ianlabicani/geoph-lite':
+        specifier: ^2.0.0
+        version: 2.0.0
       '@medusajs/js-sdk':
         specifier: 2.17.2
         version: 2.17.2
@@ -2327,6 +2330,10 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
+
+  '@ianlabicani/geoph-lite@2.0.0':
+    resolution: {integrity: sha512-vQhfNA592heavzvFuvssucQ8sXKwFL7PExDpZJHgLKPh1Ae1oNtH3fx9BDHQiFvMDd1xTMWZN+eELWoCfRRiHw==}
+    engines: {node: '>=20.10'}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -13591,6 +13598,8 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@ianlabicani/geoph-lite@2.0.0': {}
 
   '@img/colour@1.1.0': {}
 
