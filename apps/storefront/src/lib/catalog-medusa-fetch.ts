@@ -929,6 +929,13 @@ type CategorySummary = {
 };
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
+  // Worker-native catalog is authoritative after the backend cutover. The
+  // Worker currently exposes products but not Medusa's category-count query;
+  // return an empty sidecar instead of probing the retired Medusa runtime and
+  // showing a false outage banner over a healthy product response.
+  if (process.env.API_URL?.trim()) {
+    return { kind: "ok", summaries: [], fetchedAt: new Date().toISOString() };
+  }
   const key = catalogEnvCacheFingerprint();
   const inFlight = categorySummariesInFlight.get(key);
   if (inFlight) return inFlight;
@@ -953,6 +960,30 @@ export async function fetchCategorySummaries(): Promise<CategorySummariesResult>
 export async function fetchVariantFacets(
   category: string | undefined,
 ): Promise<VariantFacetsResult> {
+  // Facets are optional sidecar data. Do not make Worker-only storefronts
+  // depend on the legacy Medusa client while the Worker catalog is empty or
+  // has no facet metadata to expose yet.
+  if (process.env.API_URL?.trim()) {
+    return {
+      kind: "ok",
+      facets: {
+        types: [],
+        finishes: [],
+        brands: [],
+        pickupConfigs: [],
+        bodyWoods: [],
+        conditions: [],
+        skillLevels: [],
+        shippingSpeeds: [],
+      },
+      quality: {
+        rawProducts: 0,
+        mappedProducts: 0,
+        facetValuesSeen: 0,
+        invalidFacetValues: 0,
+      },
+    };
+  }
   const normalizedCategory = category?.trim() || undefined;
   const key = `${catalogEnvCacheFingerprint()}:${normalizedCategory ?? "__all__"}`;
   const inFlight = variantFacetsInFlight.get(key);
