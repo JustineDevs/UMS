@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
 import { createSupabaseBrowserClient } from "./supabase/client";
 
 export type StorefrontSession = {
@@ -10,15 +9,6 @@ export type StorefrontSession = {
 };
 type SessionState = { data: StorefrontSession | null; status: "loading" | "authenticated" | "unauthenticated" };
 const SessionContext = createContext<SessionState>({ data: null, status: "loading" });
-
-function mapUser(user: User | null): StorefrontSession | null {
-  if (!user) return null;
-  const metadata = user.user_metadata as Record<string, unknown>;
-  return {
-    user: { id: user.id, email: user.email, name: typeof metadata.full_name === "string" ? metadata.full_name : typeof metadata.name === "string" ? metadata.name : null, image: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null },
-    expires: new Date(Date.now() + 3600_000).toISOString(),
-  };
-}
 
 export function SupabaseSessionProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<SessionState>({ data: null, status: "loading" });
@@ -37,16 +27,25 @@ export function SupabaseSessionProvider({ children }: { children: React.ReactNod
       setState({ data: null, status: "unauthenticated" });
       return;
     }
-    const supabase = createSupabaseBrowserClient();
-    void supabase.auth.getUser().then(({ data }) => {
-      const session = mapUser(data.user);
-      setState({ data: session, status: session ? "authenticated" : "unauthenticated" });
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      const mapped = mapUser(session?.user ?? null);
-      setState({ data: mapped, status: mapped ? "authenticated" : "unauthenticated" });
-    });
-    return () => listener.subscription.unsubscribe();
+    // Resolve the session through our same-origin server route. This keeps the
+    // browser from making a cross-origin Supabase user request, while the
+    // server still validates the real Supabase session from its httpOnly
+    // cookies. OAuth and sign-out continue to use the browser client below.
+    void fetch("/api/auth/session", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`Session request failed (${response.status})`);
+        return (await response.json()) as { user?: StorefrontSession["user"] | null; expires?: string };
+      })
+      .then((payload) => {
+        const session = payload.user && payload.expires
+          ? { user: payload.user, expires: payload.expires }
+          : null;
+        setState({ data: session, status: session ? "authenticated" : "unauthenticated" });
+      })
+      .catch(() => setState({ data: null, status: "unauthenticated" }));
   }, []);
   return <SessionContext.Provider value={state}>{children}</SessionContext.Provider>;
 }

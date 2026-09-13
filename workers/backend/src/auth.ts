@@ -75,7 +75,11 @@ export async function verifyWorkerBearerToken(
     )
       return null;
     if (config.supabaseUrl) {
-      if (parsedHeader.alg !== "RS256" || typeof parsedHeader.kid !== "string") return null;
+      if (
+        (parsedHeader.alg !== "RS256" && parsedHeader.alg !== "ES256") ||
+        typeof parsedHeader.kid !== "string"
+      )
+        return null;
       const issuer = `${config.supabaseUrl.replace(/\/$/, "")}/auth/v1`;
       if (claims.iss !== issuer) return null;
       const audience = claims.aud;
@@ -102,15 +106,27 @@ export async function verifyWorkerBearerToken(
       }
       const jwk = (await keysPromise).find((candidate) => candidate.kid === parsedHeader.kid);
       if (!jwk) return null;
+      const algorithm =
+        parsedHeader.alg === "ES256"
+          ? { name: "ECDSA", namedCurve: "P-256" as const }
+          : { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" as const };
+      if (
+        (parsedHeader.alg === "ES256" && (jwk.kty !== "EC" || jwk.crv !== "P-256")) ||
+        (parsedHeader.alg === "RS256" && jwk.kty !== "RSA") ||
+        (jwk.alg !== undefined && jwk.alg !== parsedHeader.alg)
+      )
+        return null;
       const key = await crypto.subtle.importKey(
         "jwk",
         jwk,
-        { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+        algorithm,
         false,
         ["verify"],
       );
       const valid = await crypto.subtle.verify(
-        { name: "RSASSA-PKCS1-v1_5" },
+        parsedHeader.alg === "ES256"
+          ? { name: "ECDSA", hash: "SHA-256" }
+          : { name: "RSASSA-PKCS1-v1_5" },
         key,
         signature as unknown as BufferSource,
         encoder.encode(`${parts[0]}.${parts[1]}`),

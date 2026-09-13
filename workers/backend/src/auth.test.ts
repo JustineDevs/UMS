@@ -80,3 +80,27 @@ test("verifies Supabase Auth JWTs through the issuer JWKS", async () => {
   assert.equal(claims?.sub, "user_1");
   assert.equal(fetchCount, 1);
 });
+
+test("verifies Supabase ES256 Auth JWTs through the issuer JWKS", async () => {
+  const keyPair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const publicJwk = await crypto.subtle.exportKey("jwk", keyPair.publicKey);
+  publicJwk.kid = "supabase-es256-test";
+  publicJwk.alg = "ES256";
+  const issuer = "https://auth-es256.example.test/auth/v1";
+  const header = encode({ alg: "ES256", typ: "JWT", kid: publicJwk.kid });
+  const payload = encode({ sub: "user_es256", aud: "authenticated", iss: issuer, exp: 2_000_000_000 });
+  const signature = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" },
+    keyPair.privateKey,
+    new TextEncoder().encode(`${header}.${payload}`),
+  )))).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const claims = await verifyWorkerBearerToken(`Bearer ${header}.${payload}.${signature}`, {
+    supabaseUrl: "https://auth-es256.example.test",
+    fetch: async () => new Response(JSON.stringify({ keys: [publicJwk] }), { status: 200 }),
+  }, 1_000_000_000);
+  assert.equal(claims?.sub, "user_es256");
+});
