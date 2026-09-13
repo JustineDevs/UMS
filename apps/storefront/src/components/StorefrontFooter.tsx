@@ -234,9 +234,9 @@ export function StorefrontFooter({
             Connect
           </h2>
           <nav data-cms-id="footer-social-links" data-cms-label="Social links" className="flex flex-col gap-2.5 md:gap-3" aria-label="Social">
-            {socialLinks.map((s) => (
+            {socialLinks.map((s, index) => (
               <a
-                key={s.href}
+                key={`${s.href}-${s.label}-${index}`}
                 href={s.href}
                 target="_blank"
                 rel="noopener noreferrer"
