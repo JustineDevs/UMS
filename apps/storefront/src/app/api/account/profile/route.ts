@@ -58,7 +58,15 @@ async function patchWorkerProfile(req: Request): Promise<Response | null> {
   });
   const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
   if (!response.ok) {
-    return Response.json({ error: "Unable to save profile." }, { status: response.status >= 500 ? 503 : response.status });
+    const error = payload && typeof payload === "object" ? payload as { error?: unknown; code?: unknown; reauthUrl?: unknown } : {};
+    return Response.json(
+      {
+        error: typeof error.error === "string" ? error.error : "Unable to save profile.",
+        ...(typeof error.code === "string" ? { code: error.code } : {}),
+        ...(typeof error.reauthUrl === "string" ? { reauthUrl: error.reauthUrl } : {}),
+      },
+      { status: response.status >= 500 ? 503 : response.status },
+    );
   }
   const updatedAt = payload && typeof payload === "object" && "profile" in payload
     ? (payload.profile as { updated_at?: unknown } | null)?.updated_at

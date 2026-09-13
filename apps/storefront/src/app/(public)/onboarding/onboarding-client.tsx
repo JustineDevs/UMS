@@ -128,7 +128,11 @@ export function OnboardingClient() {
     });
     setSaving(false);
     if (!r.ok) {
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      const j = (await r.json().catch(() => ({}))) as { error?: string; code?: string; reauthUrl?: string };
+      if (j.code === "RECENT_AUTH_REQUIRED" && j.reauthUrl) {
+        router.replace(`/sign-in?callbackUrl=${encodeURIComponent(`/onboarding?next=${nextSafe}`)}&reauth=1`);
+        return;
+      }
       setErr(j.error ?? "Could not save. Try again.");
       return;
     }
