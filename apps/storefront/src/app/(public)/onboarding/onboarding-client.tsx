@@ -110,11 +110,6 @@ export function OnboardingClient() {
       );
       return;
     }
-    if (!isPhilippinesMobilePhone(addr.phone)) {
-      setErr("Delivery contact needs a valid Philippine mobile number.");
-      return;
-    }
-
     setSaving(true);
     const r = await fetch("/api/account/profile", {
       method: "PATCH",
@@ -122,7 +117,13 @@ export function OnboardingClient() {
       body: JSON.stringify({
         displayName: dn,
         phone: phone.trim(),
-        shippingAddresses: [{ ...addr, fullName: addr.fullName.trim() }],
+        shippingAddresses: [
+          {
+            ...addr,
+            fullName: addr.fullName.trim(),
+            phone: phone.trim(),
+          },
+        ],
       }),
     });
     setSaving(false);
@@ -192,15 +193,6 @@ export function OnboardingClient() {
               className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
               value={addr.fullName}
               onChange={(e) => setAddr({ ...addr, fullName: e.target.value })}
-            />
-          </label>
-          <label className="block text-xs font-medium text-on-surface-variant">
-            Recipient mobile
-            <input
-              required
-              className="mt-1 w-full rounded border border-outline-variant/30 bg-surface-container-lowest px-3 py-2 text-sm"
-              value={addr.phone}
-              onChange={(e) => setAddr({ ...addr, phone: e.target.value })}
             />
           </label>
           <label className="block text-xs font-medium text-on-surface-variant">
