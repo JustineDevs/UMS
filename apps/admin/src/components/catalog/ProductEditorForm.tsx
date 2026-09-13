@@ -255,6 +255,7 @@ export function ProductEditorForm(props: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [uploadingCatalogImage, setUploadingCatalogImage] = useState(false);
   const [uploadingCatalogVideo, setUploadingCatalogVideo] = useState(false);
   const [uploadingBulk, setUploadingBulk] = useState(false);
@@ -847,7 +848,7 @@ export function ProductEditorForm(props: Props) {
 
   async function remove() {
     if (!isEdit || !p) return;
-    if (!window.confirm("Delete this product? This cannot be undone.")) return;
+    setDeleteConfirmOpen(false);
     setDeleting(true);
     setError(null);
     try {
@@ -1748,7 +1749,7 @@ export function ProductEditorForm(props: Props) {
                 type="button"
                 disabled={deleting || saving}
                 className="ml-auto rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive transition hover:bg-destructive/15 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-destructive/30 disabled:opacity-50 motion-reduce:transition-none"
-                onClick={() => void remove()}
+                onClick={() => setDeleteConfirmOpen(true)}
               >
                 {deleting ? "Deleting…" : "Delete product"}
               </button>
@@ -1756,6 +1757,39 @@ export function ProductEditorForm(props: Props) {
           </div>
         </div>
       </div>
+      {deleteConfirmOpen && isEdit && p ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-product-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
+            <h2 id="delete-product-title" className="text-lg font-semibold text-foreground">
+              Delete {p.title}?
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This permanently removes the product from the local catalog and storefront.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-input px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                onClick={() => setDeleteConfirmOpen(false)}
+              >
+                Keep product
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => void remove()}
+              >
+                Delete product
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <CatalogMediaPickerDialog
         open={catalogPickerOpen}
         addPlacement={catalogAddPlacement}

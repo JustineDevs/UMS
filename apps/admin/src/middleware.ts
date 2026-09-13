@@ -6,6 +6,11 @@ import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
 
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
+  // Keep the documented local-auth development mode consistent with the page/session layer.
+  // Never allow this bypass in production, even if a stale environment value is present.
+  if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {
+    return response;
+  }
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return response;

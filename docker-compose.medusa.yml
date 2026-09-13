@@ -11,6 +11,10 @@ services:
       CI: "true"
       HOME: /tmp/medusa-config
       NODE_ENV: ${MEDUSA_DOCKER_ENV:-development}
+      # Keep local Medusa eventing in-process. Never consume the shared Upstash
+      # quota during browser verification or seed-data cleanup.
+      REDIS_URL: ""
+      MEDUSA_REDIS_URL: ""
       PAYPAL_ENVIRONMENT: ${PAYPAL_ENVIRONMENT:-sandbox}
       STRIPE_CHECKOUT_SUCCESS_URL: ${STRIPE_CHECKOUT_SUCCESS_URL:?STRIPE_CHECKOUT_SUCCESS_URL must be configured}
       STRIPE_CHECKOUT_CANCEL_URL: ${STRIPE_CHECKOUT_CANCEL_URL:?STRIPE_CHECKOUT_CANCEL_URL must be configured}

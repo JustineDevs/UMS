@@ -484,11 +484,13 @@ async function deleteHandler(req: Request, ctx: RouteParams) {
   );
 
   const actorEmail = session.user.email?.trim();
+  const localAdminMode =
+    process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
   let stripeCatalogArchive: { state: string; reason?: string } = {
     state: "unavailable",
   };
   const supForProjection = adminSupabaseOr503(correlationId);
-  if ("client" in supForProjection) {
+  if (!localAdminMode && "client" in supForProjection) {
     const projectionRows = await listCatalogProviderProjections(
       supForProjection.client,
       { medusaProductId: productId },
@@ -584,7 +586,7 @@ async function deleteHandler(req: Request, ctx: RouteParams) {
     return jsonFromAdminOperationResult(correlationId, result, 502);
   }
 
-  if (actorEmail) {
+  if (actorEmail && !localAdminMode) {
     const sup = adminSupabaseOr503(correlationId);
     if ("client" in sup) {
       await insertStaffAuditLog(sup.client, {

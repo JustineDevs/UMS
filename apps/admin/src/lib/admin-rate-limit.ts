@@ -26,8 +26,12 @@ export async function checkAdminRateLimit(
   limit = 60,
   windowSeconds = 60,
 ): Promise<RateLimitResult> {
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  // Local browser verification must not share production's Upstash bucket.
+  // A stale/shared development identity would otherwise make destructive local
+  // admin checks appear broken with a 429 before the route is reached.
+  const useRemoteLimiter = process.env.NODE_ENV === "production";
+  const url = useRemoteLimiter ? process.env.UPSTASH_REDIS_REST_URL?.trim() : undefined;
+  const token = useRemoteLimiter ? process.env.UPSTASH_REDIS_REST_TOKEN?.trim() : undefined;
   if (!url || !token) return localRateLimit(key, limit, windowSeconds * 1000);
   try {
     const controller = new AbortController();
