@@ -772,13 +772,10 @@ export async function fetchFeaturedProducts(
       const primary = process.env.API_URL?.trim()
         ? await fetchWorkerProducts(limit, { sort: "newest" })
         : await fetchMedusaProductsPage(limit, { sort: "newest" }, true);
-      if (primary.kind !== "ok") {
-        return primary;
-      }
-      if (primary.products.length > 0 || !getMedusaSalesChannelId()) {
-        return primary;
-      }
-      return fetchMedusaProductsPage(limit, { sort: "newest" }, false);
+      // An empty Worker catalog is a valid fresh-database state. Never turn it
+      // into a legacy Medusa probe: that creates a false outage when Medusa's
+      // sales-channel configuration is absent or intentionally retired.
+      return primary;
     },
     [
       "storefront-featured-products",
