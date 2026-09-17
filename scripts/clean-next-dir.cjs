@@ -10,7 +10,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.join(__dirname, "..");
-const rel = process.argv[2] || "apps/storefront";
+const rel = process.argv[2] || "apps/web";
 const appRoot = path.join(root, rel);
 // Local dev uses `.next`; local production builds use the isolated output. Vercel
 // always builds `.next`, so never remove the dev directory from a local build.

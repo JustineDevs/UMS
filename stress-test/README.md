@@ -28,7 +28,6 @@ From project root:
 ### Full stress-test (all phases)
 
 - `pnpm stress-test` — Lint → Security → Audit → Unit/Medusa → E2E → Dogfood
-- `pnpm stress-test:quick` — Same but skips E2E and dogfood (no dev servers needed)
 
 ### Individual phases
 
@@ -41,7 +40,6 @@ From project root:
 - `pnpm test:e2e:matrix` — `e2e/components` + `e2e/layouts`
 - `pnpm test:e2e:chaos` — Network chaos / resilience spec
 - `pnpm test:e2e:cross-app` — Cross-app HTTP + optional admin orders shell
-- `pnpm test:e2e:parallel` — Same runner with `--workers=4`
 - `pnpm test:e2e:ui` — Run Playwright UI mode
 - `pnpm test:e2e:report` — Open last HTML report
 - `pnpm dogfood:screenshots` — Capture full-page screenshots (storefront + admin)
@@ -54,7 +52,8 @@ For `flows/admin-operations-flow.spec.ts` and `flows/admin-e2e-credentials.spec.
 
 1. Root `.env.local`: `ADMIN_ALLOWED_EMAILS` (first email is the actor), `AUTH_SECRET` (password on `/sign-in/e2e`), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and the usual admin/Medusa vars used by `pnpm run dev`.
 2. Run `pnpm e2e:ensure-staff` once per environment. If the first email is **staff** in Supabase, the script sets `staff_permission_grants` to `*`. If that user is already **admin**, the script makes no changes (admin sessions already resolve to wildcard permissions).
-3. Playwright must target the admin origin: `PLAYWRIGHT_ADMIN_URL=http://localhost:3001` (already defaulted in `playwright.config.ts` for the admin dev server).
+3. Set `E2E_ADMIN_AUTH=1` only for the authenticated admin pass. Ordinary smoke/API-health runs leave it unset so they do not contact or mutate a remote Supabase project.
+4. Playwright must target the admin origin: `PLAYWRIGHT_WEB_URL=http://127.0.0.1:3000` (already defaulted in `playwright.config.ts` for the unified web server).
 
 ### Manual checklist
 
@@ -62,8 +61,8 @@ See `stress-test/checklist.md` for design-with-taste, core-engineering, OWASP re
 
 ## Output locations
 
-| Output            | Path                               |
-|-------------------|------------------------------------|
-| Test results      | `stress-test/test-results/`         |
-| HTML report       | `stress-test/playwright-report/`    |
+| Output              | Path                                      |
+| ------------------- | ----------------------------------------- |
+| Test results        | `stress-test/test-results/`               |
+| HTML report         | `stress-test/playwright-report/`          |
 | Dogfood screenshots | `stress-test/dogfood-output/screenshots/` |

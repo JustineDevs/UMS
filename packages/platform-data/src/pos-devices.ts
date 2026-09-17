@@ -14,7 +14,7 @@ export type PosDevice = {
   created_at: string;
 };
 
-export function mergeDeviceConfig(
+function mergeDeviceConfig(
   prev: Record<string, unknown>,
   incoming: Record<string, unknown>,
 ): Record<string, unknown> {

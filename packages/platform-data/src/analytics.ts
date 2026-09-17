@@ -23,13 +23,6 @@ export type SalesTrend = {
   avg_order_value: number;
 };
 
-export type TopProduct = {
-  product_id: string;
-  product_title: string;
-  units_sold: number;
-  revenue: number;
-};
-
 /** Analytics buckets are UTC; timezone conversion belongs at presentation boundaries. */
 export function utcMonthWindow(now: Date, monthsAgo: number): {
   start: Date;

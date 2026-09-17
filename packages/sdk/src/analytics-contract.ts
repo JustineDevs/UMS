@@ -1,4 +1,4 @@
-export type PrivacyTier = "public" | "internal" | "pii" | "financial";
+type PrivacyTier = "public" | "internal" | "pii" | "financial";
 
 export type MetricWindow = {
   /** UTC, inclusive start and exclusive end. */
@@ -23,7 +23,6 @@ export function createCanonicalMetricContract(input: Omit<CanonicalMetricContrac
   }
   return { ...input, currency };
 }
-
 export type CommerceAttribution = {
   source?: string;
   medium?: string;
@@ -41,15 +40,14 @@ export function normalizeCommerceAttribution(input?: CommerceAttribution): Comme
     referralCode: clean(input?.referralCode),
   };
 }
-
-export type AnalyticsEventDef = {
+type AnalyticsEventDef = {
   name: string;
   source: "storefront" | "admin" | "api" | "medusa" | "pos";
   privacyTier: PrivacyTier;
   properties: Record<string, { type: string; required: boolean; pii: boolean }>;
 };
 
-export const ANALYTICS_EVENT_SCHEMA: AnalyticsEventDef[] = [
+const ANALYTICS_EVENT_SCHEMA: AnalyticsEventDef[] = [
   {
     name: "page_view",
     source: "storefront",
@@ -172,28 +170,4 @@ export function createAnalyticsEvent(
     sessionId,
     properties,
   };
-}
-
-export function redactPiiFields(event: AnalyticsEvent): AnalyticsEvent {
-  const schema = ANALYTICS_EVENT_SCHEMA.find((s) => s.name === event.name);
-  if (!schema) return event;
-
-  const redacted = { ...event, properties: { ...event.properties } };
-  for (const [key, def] of Object.entries(schema.properties)) {
-    if (def.pii && redacted.properties[key]) {
-      redacted.properties[key] = "[REDACTED]";
-    }
-  }
-  return redacted;
-}
-
-export function filterByPrivacyTier(events: AnalyticsEvent[], maxTier: PrivacyTier): AnalyticsEvent[] {
-  const tierOrder: PrivacyTier[] = ["public", "internal", "pii", "financial"];
-  const maxIndex = tierOrder.indexOf(maxTier);
-
-  return events.filter((event) => {
-    const schema = ANALYTICS_EVENT_SCHEMA.find((s) => s.name === event.name);
-    if (!schema) return false;
-    return tierOrder.indexOf(schema.privacyTier) <= maxIndex;
-  });
 }

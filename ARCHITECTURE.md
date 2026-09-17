@@ -13,8 +13,8 @@
 
 This repository is a monorepo ecommerce platform with:
 
-- `apps/storefront`: customer-facing shop, account, checkout, content, wishlist, reviews
-- `apps/admin`: staff dashboard, catalog, inventory, orders, CMS, POS, settings
+- `apps/web`: customer-facing shop, account, checkout, content, wishlist, reviews
+- `apps/web`: staff dashboard, catalog, inventory, orders, CMS, POS, settings
 - `apps/api`: support API and health endpoints
 - `apps/medusa`: commerce backend
 - `packages/*`: shared UI, SDK, validation, database, and business-domain packages
@@ -31,8 +31,8 @@ This repository is a monorepo ecommerce platform with:
 
 ```mermaid
 flowchart LR
-  Browser[Browser] --> Storefront[apps/storefront]
-  Browser --> Admin[apps/admin]
+  Browser[Browser] --> Storefront[apps/web]
+  Browser --> Admin[apps/web]
   Storefront --> API[apps/api]
   Storefront --> Medusa[apps/medusa]
   Admin --> Medusa
@@ -48,18 +48,18 @@ flowchart LR
 
 ### Layouts
 
-- `apps/storefront/src/app/layout.tsx`
+- `apps/web/src/app/layout.tsx`
   - Global metadata, fonts, theme color, canonical base, robots, icons, manifest
   - Installs `SupabaseSessionProvider`, `MedusaCartProvider`, analytics, BotId client protection
   - Adds cart sync, wishlist sync, onboarding guard, smooth scrolling, cookie consent
-- `apps/storefront/src/app/(public)/layout.tsx`
+- `apps/web/src/app/(public)/layout.tsx`
   - Wraps public routes in `StorefrontPublicChrome`
 
 ### Page Routes
 
 #### Home and discovery
 
-- `/` -> `apps/storefront/src/app/(public)/page.tsx`
+- `/` -> `apps/web/src/app/(public)/page.tsx`
   - Home landing with CMS-driven sections and featured commerce content
   - Metadata: canonical home URL, site-wide metadata inherited from root
 - `/shop` -> `.../(public)/shop/page.tsx`
@@ -196,9 +196,9 @@ Content and utility:
 
 ### Layouts
 
-- `apps/admin/src/app/layout.tsx`
+- `apps/web/src/app/layout.tsx`
   - Root admin metadata, fonts, session provider, analytics, Lenis scrolling
-- `apps/admin/src/app/(dashboard)/layout.tsx`
+- `apps/web/src/app/(dashboard)/layout.tsx`
   - Wraps dashboard routes in `AdminDashboardChrome`
 
 ### Page Routes
@@ -392,7 +392,7 @@ These primitives are the basis for forms, lists, dialogs, command palettes, chec
   - authenticated admin operations across dashboard, orders, inventory, catalog, POS, CMS, settings, CRM, devices, loyalty, employees, campaigns, analytics, offline queue, receipts, audit, chat orders, and finance reconciliation
   - guest storefront commerce flow across `/`, `/shop`, `/shop/[slug]`, `/checkout`, and `/sign-in`
   - storefront API hardening
-- Route coverage manifests live in `stress-test/e2e/manifests/` and map smoke tags to the key storefront/admin entry points.
+- Route coverage manifests live in `stress-test/e2e/manifests/` and map smoke tags to the key public/admin entry points in the unified web app.
 - Component coverage manifests capture the main UI primitives and test IDs used by the harness.
 
 ## Remaining Coverage Gap
@@ -405,11 +405,11 @@ These primitives are the basis for forms, lists, dialogs, command palettes, chec
 ## Where to Edit
 
 - Storefront navigation, checkout, product, and auth UX:
-  - `apps/storefront/src/app/`
-  - `apps/storefront/src/components/`
+  - `apps/web/src/app/`
+  - `apps/web/src/components/`
 - Admin dashboard, catalog, CMS, inventory, and POS UX:
-  - `apps/admin/src/app/`
-  - `apps/admin/src/components/`
+  - `apps/web/src/app/`
+  - `apps/web/src/components/`
 - Shared primitives and visual language:
   - `packages/ui/src/components/ui/`
 - Shared commerce rules and data contracts:

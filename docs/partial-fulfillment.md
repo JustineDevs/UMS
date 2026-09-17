@@ -8,7 +8,7 @@ Use the order detail workflow to create fulfillments that include a subset of li
 
 ## In this monorepo
 
-- **Staff admin** (`apps/admin`): order and fulfillment UIs call Medusa admin APIs. Use the standard Medusa flow for multiple fulfillments per order.
+- **Staff admin** (`apps/web`): order and fulfillment UIs call Medusa admin APIs. Use the standard Medusa flow for multiple fulfillments per order.
 - **Storefront**: customers see high-level status on the account and tracking pages. Detailed per-shipment line breakdowns are optional and depend on what you expose from Medusa in emails or tracking metadata.
 
 ## Returns

@@ -1,6 +1,6 @@
 /**
  * Load the repo-root env file into `process.env` before Next reads config.
- * Used by apps/storefront and apps/admin `next.config.*` only.
+ * Used by the unified web app `next.config.*` only.
  *
  * Kept under `scripts/` (not `stress-test/`) so production and CI builds never depend on test-only paths.
  */
@@ -48,8 +48,8 @@ function loadMonorepoRootEnv(fromConfigDir) {
   const envFilePath = path.join(root, envFileName);
   const invalidationKey = "STOREFRONT_INTERNAL_INVALIDATION_SECRET";
   const invalidationBefore = process.env[invalidationKey];
-  // The app launcher owns the local public origin so admin and storefront never
-  // generate callbacks or cookies for each other's Supabase Auth origin.
+  // The app launcher owns the local public origin so the unified web app never
+  // generates callbacks or cookies for a stale Supabase Auth origin.
   const runtimePublicSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const runtimeSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   const runtimeStorefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL?.trim();

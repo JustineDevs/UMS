@@ -141,6 +141,16 @@ const appEnv = {
   BABEL_ENV: normalizedNodeEnv,
   ...(normalizedNodeEnv === "development" ? { NEXT_PUBLIC_SITE_URL: localAuthOrigin } : {}),
 };
+const webHeapMb = Number(process.env.UVS_DEV_WEB_MAX_OLD_SPACE_MB || 1536);
+if (!Number.isInteger(webHeapMb) || webHeapMb < 256) {
+  console.error("UVS_DEV_WEB_MAX_OLD_SPACE_MB must be an integer of at least 256 MB");
+  process.exit(1);
+}
+const existingNodeOptions = (appEnv.NODE_OPTIONS || "")
+  .replace(/(?:^|\s)--max-old-space-size=\S+/g, "")
+  .replace(/\s+/g, " ")
+  .trim();
+appEnv.NODE_OPTIONS = `${existingNodeOptions} --max-old-space-size=${webHeapMb}`.trim();
 
 const result = spawnSync(
   process.execPath,

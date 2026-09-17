@@ -5,14 +5,20 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", ".medusa/server/**", ".medusa/admin/**"]
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        ".next-production/**",
+        "!.next-production/cache/**",
+        "dist/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "outputs": []
     },
     "typecheck": {
       "dependsOn": ["^build"]

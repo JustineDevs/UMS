@@ -3,11 +3,12 @@
  *
  * Uses the /sign-in/e2e shortcut route which is only active when NODE_ENV=development.
  * Credentials come from ADMIN_ALLOWED_EMAILS (first entry) and AUTH_SECRET.
+ * The fixture is opt-in via E2E_ADMIN_AUTH=1 so routine local runs stay offline.
  * Run `pnpm e2e:ensure-staff` to upsert the Supabase user before running these tests.
  */
 import type { Page } from "@playwright/test";
 
-const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
 function getAdminEmail(): string | undefined {
@@ -23,7 +24,7 @@ function getAdminPassword(): string | undefined {
 export type SignInResult = "ok" | "skip_no_env" | "skip_no_ui";
 
 /**
- * Signs into the admin app at /sign-in/e2e.
+ * Signs into the unified web app's admin surface at /sign-in/e2e.
  * Returns "ok" on success, "skip_no_env" when credentials are missing,
  * or "skip_no_ui" when the e2e route is not accessible.
  */
@@ -80,7 +81,7 @@ export async function signInAsAdmin(page: Page): Promise<SignInResult> {
 }
 
 /**
- * Signs into the admin app and returns the session cookies for use in API requests.
+ * Signs into the unified web app's admin surface and returns session cookies for API requests.
  */
 async function signInAsAdminAndGetCookies(
   page: Page,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * HTTP matrix: defaults to PLAYWRIGHT_SKIP_WEBSERVER=1 so a local `pnpm dev` on 3000/3001
+ * HTTP matrix: defaults to PLAYWRIGHT_SKIP_WEBSERVER=1 so a local `pnpm dev` on 3000
  * does not collide with Playwright trying to spawn another Next dev (EADDRINUSE).
  * Opt in to auto webServers: PLAYWRIGHT_SKIP_WEBSERVER=0 pnpm test:http-flow
  * or use pnpm test:http-flow:with-webservers.

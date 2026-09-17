@@ -23,7 +23,7 @@ test("CMS category admin lists only the authenticated tenant", async () => {
   const bearer = await token({ organization_id: "org_1", permissions: ["content:read"] });
   const response = await handleCmsAdminCategoryRequest(new Request("https://api.example/admin/cms/category-content", { headers: { Authorization: `Bearer ${bearer}` } }), database, { CMS_ADMIN_JWT_SECRET: "admin-secret" });
   assert.equal(response.status, 200);
-  assert.deepEqual(queries[0]?.values, ["org_1"]);
+  assert.deepEqual(queries[0]?.values, ["org_1", 100]);
   assert.equal((await response.json() as { data: Array<{ organization_id: string }> }).data[0]?.organization_id, "org_1");
 });
 

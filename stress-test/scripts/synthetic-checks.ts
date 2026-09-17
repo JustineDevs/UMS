@@ -17,7 +17,7 @@ const CHECKS = [
   { name: "Storefront Product List", url: "/shop", expectedStatus: 200 },
   { name: "Storefront Search", url: "/api/shop/search-suggest?q=test", expectedStatus: 200 },
   { name: "Medusa Health", url: "http://localhost:9000/health", expectedStatus: 200 },
-  { name: "Admin Health", url: "http://localhost:3001/api/admin/integration-health", expectedStatus: 200 },
+  { name: "Admin Health", url: "http://127.0.0.1:3000/api/admin/integration-health", expectedStatus: 200 },
   { name: "API Health", url: "http://localhost:4000/health", expectedStatus: 200 },
 ];
 

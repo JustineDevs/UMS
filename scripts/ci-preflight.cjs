@@ -46,7 +46,16 @@ if (process.env.PREFLIGHT_SKIP_RUNTIME_CHECK !== "1") {
   const code = run(
     "turbo: lint + typecheck + test",
     "pnpm",
-    ["exec", "turbo", "run", "lint", "typecheck", "test", "--continue"],
+    [
+      "exec",
+      "turbo",
+      "run",
+      "lint",
+      "typecheck",
+      "test",
+      "--continue",
+      "--concurrency=2",
+    ],
   );
   if (code !== 0) {
     process.exit(code);

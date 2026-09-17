@@ -63,12 +63,14 @@ const Tabs = ({
   defaultValue,
   onValueChange,
   orientation = "horizontal",
+  className,
   children,
 }: React.PropsWithChildren<{
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   orientation?: "horizontal" | "vertical";
+  className?: string;
 }>) => {
   const [currentValue, setValue] = useControllableValue({ value, defaultValue, onValueChange });
   const triggerRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
@@ -79,7 +81,7 @@ const Tabs = ({
     [currentValue, orientation, setValue],
   );
 
-  return <TabsContext.Provider value={context}>{children}</TabsContext.Provider>;
+  return <TabsContext.Provider value={context}><div className={className}>{children}</div></TabsContext.Provider>;
 };
 Tabs.displayName = "Tabs";
 

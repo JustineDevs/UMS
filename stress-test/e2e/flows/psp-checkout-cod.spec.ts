@@ -20,7 +20,7 @@ import {
 } from "../helpers/checkout";
 import { signInAsAdmin } from "../fixtures/admin-auth";
 
-const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 let createdCodOrderId: string | null = null;
@@ -77,36 +77,6 @@ test.describe("@checkout @cod COD checkout flow", () => {
               typeof (line as { price?: unknown }).price === "number",
           )
         : [];
-    });
-    const lineSubtotalsByVariantId = Object.fromEntries(
-      cartLines.map((line) => [line.variantId, line.price * line.quantity]),
-    );
-    const subtotal = cartLines.reduce(
-      (sum, line) => sum + line.price * line.quantity,
-      0,
-    );
-    const taxTotal = Math.round(subtotal * 0.12 * 100) / 100;
-    await page.route("**/api/checkout/medusa-totals-preview", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          subtotal,
-          taxTotal,
-          shippingTotal: 0,
-          discountTotal: 0,
-          total: subtotal + taxTotal,
-          currencyCode: "PHP",
-          lineSubtotalsByVariantId,
-          quoteFingerprint: "e2e-double-click-quote",
-          variantIds: cartLines.map((line) => line.variantId),
-          productIds: [],
-          shippingMethodIds: [],
-          regionId: null,
-          shippingOptions: [],
-          appliedShippingOptionId: null,
-        }),
-      });
     });
     await navigateToCheckout(page);
     await fillCheckoutShippingInfo(page);

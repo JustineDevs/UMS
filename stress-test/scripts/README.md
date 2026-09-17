@@ -25,7 +25,7 @@ node stress-test/scripts/check-audit-triage.js
 
 ## `kill-project-ports.js`
 
-**Purpose:** Frees ports **3000** (storefront), **3001** (admin), **4000** (API), **9000** (Medusa). Helps when a previous `pnpm dev` left orphan Node processes (common on Windows).
+**Purpose:** Frees ports **3000** (storefront), **3000** (admin), **4000** (API), **9000** (Medusa). Helps when a previous `pnpm dev` left orphan Node processes (common on Windows).
 
 **When to use:** `EADDRINUSE`, “port already in use”, or stale servers after closing the terminal.
 
@@ -52,7 +52,7 @@ Then start dev again: `pnpm dev`.
 pnpm release-gate
 
 # Full: same gates + Playwright E2E (ensure apps are up if your tests need them)
-pnpm release-gate:full
+pnpm release-gate --include-e2e
 # same as:
 node stress-test/scripts/release-gate.js --include-e2e
 ```
@@ -80,7 +80,7 @@ node stress-test/scripts/check-test-runtime.cjs swc
 
 **Purpose:** Runs Playwright with cache and temp directories under `stress-test/` so Playwright does not write under system install paths (reduces permission errors in some setups).
 
-**When to use:** Local E2E runs, or when `release-gate:full` / `stress-test` runs the E2E phase.
+**When to use:** Local E2E runs, or when `release-gate --include-e2e` / `stress-test` runs the E2E phase.
 
 ```bash
 node stress-test/scripts/run-e2e.js
@@ -93,7 +93,7 @@ node stress-test/scripts/run-e2e.js path/to/spec.ts
 node stress-test/scripts/run-e2e.js dogfood --project=chromium
 ```
 
-If your suite expects storefront/admin/API/Medusa, start `pnpm dev` (or the stack your tests document) before running E2E.
+If your suite expects public/admin/API/Medusa, start `pnpm dev` (or the stack your tests document) before running E2E; public and admin routes share the unified web runtime.
 
 ---
 
@@ -119,7 +119,6 @@ pnpm stress-test
 | `--no-dogfood` | Dogfood screenshots |
 
 ```bash
-pnpm stress-test:quick    # same as --no-e2e --no-dogfood
 node stress-test/scripts/stress-test.js --no-e2e --no-dogfood
 ```
 
@@ -134,7 +133,7 @@ E2E and dogfood usually need the dev stack running unless your Playwright config
 | Unstick ports | `pnpm kill-ports` |
 | Audit policy / triage only | `node stress-test/scripts/check-audit-triage.js` |
 | Ship checklist (lint + build + security + audit + tests) | `pnpm release-gate` |
-| Same + E2E | `pnpm release-gate:full` |
+| Same + E2E | `pnpm release-gate --include-e2e` |
 | Maximum local QA (includes audit phase + E2E + dogfood) | `pnpm stress-test` |
 | Playwright only (with project-local cache) | `node stress-test/scripts/run-e2e.js` |
 

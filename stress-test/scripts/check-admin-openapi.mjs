@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const apiRoot = path.join(root, "apps", "admin", "src", "app", "api");
+const apiRoot = path.join(root, "apps", "web", "src", "app", "api");
 const documentPath = path.join(root, "internal", "reference", "admin-open-api.yaml");
 const documentSource = fs.readFileSync(documentPath, "utf8");
 
@@ -39,6 +39,7 @@ function routeOperations() {
     if (mutations.length && /^\/admin\//.test(route) && !/webhook/i.test(route) && !/(withAdminMutationIdempotency|claimAdminIdempotency)/.test(source)) {
       throw new Error(`Mutation ${route} has no durable idempotency boundary.`);
     }
+    if (!/^\/admin\//.test(route)) continue;
     for (const match of source.matchAll(/export\s+(?:(?:async\s+)?function|const)\s+(GET|POST|PUT|PATCH|DELETE)\b/g)) {
       result.add(route + " " + match[1].toLowerCase());
     }
@@ -69,7 +70,9 @@ const result = new Set();
       continue;
     }
     const methodMatch = /^    (get|post|put|patch|delete):$/.exec(line);
-    if (methodMatch && currentPath) result.add(currentPath + " " + methodMatch[1]);
+    if (methodMatch && currentPath && /^\/admin\//.test(currentPath)) {
+      result.add(currentPath + " " + methodMatch[1]);
+    }
   }
   return result;
 }

@@ -7,13 +7,13 @@ function base64Url(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-async function capability(secret: string, id: string, expiresAt = Math.floor(Date.now() / 1000) + 300): Promise<string> {
+async function capability(secret: string, id: string, purpose = "track", expiresAt = Math.floor(Date.now() / 1000) + 300): Promise<string> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
   const key = await crypto.subtle.importKey("raw", digest, { name: "AES-GCM" }, false, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plaintext = new TextEncoder().encode(JSON.stringify({
-    version: "v3", purpose: "track", audience: "public-tracking", keyVersion: "v1",
+    version: "v3", purpose, audience: "public-tracking", keyVersion: "v1",
     id, issuedAt, expiresAt,
   }));
   const encrypted = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext));
@@ -51,6 +51,25 @@ test("tracking returns a redacted native commerce projection for a valid capabil
   const body = (await response.json()) as { order: { order_number: string; status: string }; shipments: unknown[] };
   assert.deepEqual(body.order, { order_number: "42", status: "paid", updated_at: "2026-01-01T00:00:00Z" });
   assert.deepEqual(body.shipments, []);
+});
+
+test("tracking keeps confirmation fields behind a confirmation capability", async () => {
+  const confirmationToken = await capability("secret", "order_1", "confirmation");
+  const response = await handleTrackingRequest(
+    new Request("https://api.example/store/tracking/token"),
+    {
+      async query<Row>() {
+        return { rows: [{ id: "order_1", display_id: 42, updated_at: "2026-01-01T00:00:00Z", payment_status: "captured", fulfillment_status: "not_fulfilled", email: "buyer@example.com", total: 599700, subtotal: 599700, items: [{ id: "item_1", title: "Canary", quantity: 1, unit_price: 599700 }] , metadata: {} }] as Row[], rowCount: 1 };
+      },
+      async end() {},
+    },
+    { TRACKING_HMAC_SECRET: "secret", TRACKING_HMAC_KEY_VERSION: "v1" },
+    confirmationToken,
+  );
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { confirmationOrder?: { email?: string; items?: unknown[] } };
+  assert.equal(body.confirmationOrder?.email, "buyer@example.com");
+  assert.deepEqual(body.confirmationOrder?.items, [{ id: "item_1", title: "Canary", quantity: 1, unit_price: 599700 }]);
 });
 
 test("tracking rejects an expired capability", async () => {

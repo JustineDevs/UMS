@@ -158,6 +158,22 @@ export async function handleCatalogProductsRequest(
   });
 }
 
+export async function handleSocialProofRequest(
+  request: Request,
+  database: WorkerDatabaseClient,
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const result = await database.query<{ customer_count: string | number }>(
+    `SELECT COUNT(*) AS customer_count FROM public.customer WHERE deleted_at IS NULL`,
+  );
+  return cacheableJson({ customerCount: Number(result.rows[0]?.customer_count ?? 0) });
+}
+
 export async function handleCatalogSearchSuggestionsRequest(
   request: Request,
   database: WorkerDatabaseClient,

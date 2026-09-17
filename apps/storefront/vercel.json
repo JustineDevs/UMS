@@ -1,6 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile --config.node-linker=hoisted",
-  "buildCommand": "cd ../.. && pnpm exec turbo run build --filter=@universal-music-store/storefront"
-}

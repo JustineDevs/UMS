@@ -11,14 +11,14 @@
  *
  * Truth contract:
  *  - `release-gate` proves static and logic-level regression resistance only.
- *  - `release-gate:full` adds the explicit browser suites in `pnpm test:e2e:critical`.
+ *  - `release-gate --include-e2e` adds the explicit browser suites in `pnpm test:e2e:critical`.
  *  - Provider sandbox connectivity, screenshots, and advisory jobs are separate and must not be confused with paid-order truth.
  *
- * Optional DB prep: `pnpm e2e:prep:medusa` skips Medusa seed when the store API already has products; `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
+ * Optional DB prep: `pnpm e2e:ensure-staff` no-ops if the staff user already exists.
  * For admin E2E credentials (local dev): root .env.local ADMIN_ALLOWED_EMAILS (first email) + AUTH_SECRET; run `pnpm e2e:ensure-staff`.
- * Playwright sets each app's public origin (storefront 3000, admin 3001) so Supabase Auth callbacks and cookies remain isolated.
+ * Playwright uses the unified web origin on port 3000; route-specific middleware keeps admin and storefront access separate.
  *
- * Full run report (`pnpm release-gate:full`): raw logs are written under stress-test/release-gate-logs/
+ * Full run report (`pnpm release-gate --include-e2e`): raw logs are written under stress-test/release-gate-logs/
  *   - release-gate-full-latest.log (overwritten each run)
  *   - release-gate-full-<ISO-timestamp>.log (history)
  * Disable file report: --no-report
@@ -37,9 +37,9 @@ const noReport = process.argv.includes("--no-report");
 const recordReport = includeE2e && !noReport;
 
 const nodeMajor = parseInt(process.version.slice(1).split(".")[0], 10);
-if (nodeMajor !== 20) {
+if (nodeMajor < 20 || nodeMajor > 24) {
   console.error(
-    `\n🛑 Release gate requires Node 20. Current: ${process.version}. Use nvm use 20 or .nvmrc.\n`,
+    `\n🛑 Release gate supports Node 20 through 24. Current: ${process.version}. Use a supported Node runtime.\n`,
   );
   process.exit(1);
 }
@@ -177,7 +177,7 @@ function main() {
   } else {
     emitLine("");
     emitLine(
-      "✅ Release gate passed for static + logic blockers only. Run pnpm release-gate:full for browser business-proof before ship.",
+      "✅ Release gate passed for static + logic blockers only. Run pnpm release-gate --include-e2e for browser business-proof before ship.",
     );
   }
 

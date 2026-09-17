@@ -24,17 +24,16 @@ if (!process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim()) {
     "playwright-e2e-invalidation-secret";
 }
 
-/**
- * Root `.env.local` often sets NODE_ENV=production for deploy docs. `next dev` must run as
- * development or it looks for `.next/required-server-files.json` and fails with ENOENT.
- */
-function nextDevServerEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, NODE_ENV: "development" };
+function boundedNodeOptions(heapMb: number): string {
+  const existing = (process.env.NODE_OPTIONS ?? "")
+    .replace(/(?:^|\s)--max-old-space-size=\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `${existing} --max-old-space-size=${heapMb}`.trim();
 }
 
 /**
- * Storefront and admin use separate Supabase Auth callback origins. Playwright starts each app
- * on its own origin so browser cookies and callback URLs remain isolated.
+ * Admin and storefront share one web origin. Route-specific auth remains enforced by middleware.
  */
 function storefrontInvalidationSecretForE2E(): string {
   return (
@@ -48,19 +47,12 @@ function storefrontDevServerEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     NODE_ENV: "development",
+    NODE_OPTIONS: boundedNodeOptions(2048),
     NEXT_PUBLIC_SITE_URL:
       process.env.PLAYWRIGHT_STOREFRONT_URL ?? "http://localhost:3000",
     STOREFRONT_INTERNAL_INVALIDATION_SECRET: inv,
     // Survives if dotenv clears the primary key; route reads this in invalidate-commerce-state
     __PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET: inv,
-  };
-}
-
-function adminDevServerEnv(): NodeJS.ProcessEnv {
-  return {
-    ...process.env,
-    NODE_ENV: "development",
-    NEXT_PUBLIC_SITE_URL: process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001",
   };
 }
 
@@ -78,8 +70,15 @@ const tunnelBypass = process.env.PLAYWRIGHT_TUNNEL_BYPASS?.trim();
 const storefrontWebServerUrl =
   process.env.PLAYWRIGHT_STOREFRONT_WEBSERVER_URL ??
   new URL("/api/health", baseURL).toString();
+const workerPort = process.env.CLOUDFLARE_DEV_PORT ?? "8787";
 
 const reuseDevServer = !process.env.CI;
+const configuredWorkers = Number(
+  process.env.PLAYWRIGHT_WORKERS || (process.env.CI ? 2 : 1),
+);
+if (!Number.isInteger(configuredWorkers) || configuredWorkers < 1) {
+  throw new Error("PLAYWRIGHT_WORKERS must be a positive integer");
+}
 
 const skipPlaywrightWebServer =
   shellPlaywrightSkipWebServer === "1" || shellPlaywrightSkipWebServer === "true";
@@ -94,10 +93,10 @@ const e2eTrace =
 export default defineConfig({
   testDir: "./stress-test/e2e",
   outputDir: "./stress-test/test-results",
-  fullyParallel: true,
+  fullyParallel: process.env.PLAYWRIGHT_FULLY_PARALLEL === "1",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  workers: configuredWorkers,
   reporter: [
     ["html", { open: "never", outputFolder: "stress-test/playwright-report" }],
     ["list"],
@@ -133,49 +132,34 @@ export default defineConfig({
   ],
   webServer: skipPlaywrightWebServer
     ? undefined
-    : [
+      : [
         {
-          command: "pnpm --filter medusa dev",
-          url: process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000/health",
+          command:
+            `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --port ${workerPort}`,
+          url: process.env.PLAYWRIGHT_WORKER_URL ?? `http://127.0.0.1:${workerPort}/healthz`,
           reuseExistingServer: reuseDevServer,
           timeout: 180_000,
           stdout: "pipe",
           stderr: "pipe",
-        },
-        {
-          command: "pnpm --filter @universal-music-store/api dev",
-          url: process.env.PLAYWRIGHT_API_URL ?? "http://localhost:4000/health",
-          reuseExistingServer: reuseDevServer,
-          timeout: 120_000,
-          stdout: "pipe",
-          stderr: "pipe",
           env: {
             ...process.env,
-            INTERNAL_API_KEY: process.env.INTERNAL_API_KEY ?? "e2e-internal-key",
+            NODE_ENV: "development",
+            CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_MEDUSA_HYPERDRIVE:
+              process.env.MEDUSA_DB_URL ?? "",
+            CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE:
+              process.env.APP_DB_URL ?? "",
           },
         },
         {
-          command: "pnpm --filter @universal-music-store/storefront dev",
+          command: "pnpm --filter @universal-music-store/web dev",
           url: storefrontWebServerUrl,
-          /**
-           * Do not reuse a manually started storefront: it often lacks
-           * `STOREFRONT_INTERNAL_INVALIDATION_SECRET`, which breaks commerce invalidation HTTP tests.
-           * Free port 3000 before running Playwright, or set `PLAYWRIGHT_SKIP_WEBSERVER=1` and align `.env.local`.
-           */
-          reuseExistingServer: false,
+          // Reuse the single web Next.js server from `pnpm dev` when
+          // possible. Set PLAYWRIGHT_SKIP_WEBSERVER=1 for a fully external stack.
+          reuseExistingServer: reuseDevServer,
           timeout: 240_000,
           stdout: "pipe",
           stderr: "pipe",
           env: storefrontDevServerEnv(),
-        },
-        {
-          command: "pnpm --filter @universal-music-store/admin dev",
-          url: "http://localhost:3001",
-          reuseExistingServer: reuseDevServer,
-          timeout: 240_000,
-          stdout: "pipe",
-          stderr: "pipe",
-          env: adminDevServerEnv(),
         },
       ],
   /** Per-test ceiling must exceed PDP / shop waits (see stress-test/e2e/helpers/storefront.ts). */

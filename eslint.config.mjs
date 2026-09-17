@@ -52,14 +52,34 @@ export default [
       "no-unused-vars": "off",
     },
   },
+  {
+    files: ["apps/web/src/lib/visual-builder/**/*.ts"],
+    rules: {
+      // Adapter methods intentionally keep the source builder's callback
+      // signatures even when a concrete port does not need every argument.
+      "no-unused-vars": [
+        "warn",
+        { args: "none", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
+    files: ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
+    rules: {
+      // Shared UI primitives preserve framework callback signatures for consumers;
+      // unused callback arguments are not runtime defects.
+      "no-unused-vars": [
+        "warn",
+        { args: "none", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
   ...(nextPlugin
     ? [
         {
           files: [
-            "apps/storefront/**/*.ts",
-            "apps/storefront/**/*.tsx",
-            "apps/admin/**/*.ts",
-            "apps/admin/**/*.tsx",
+            "apps/web/**/*.ts",
+            "apps/web/**/*.tsx",
           ],
           plugins: { "@next/next": nextPlugin },
           rules: {

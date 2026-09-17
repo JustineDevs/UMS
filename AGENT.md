@@ -6,7 +6,7 @@ You are working on the **Universal Music Store Platform**, a composable commerce
 
 - **Purpose**: Unified online and in-store sales for a music retail business in the Philippines.
 - **Architecture**: Monorepo (Turborepo + pnpm) with one shared source of truth for products, variants, inventory, orders, payments, and shipments.
-- **Apps**: `apps/storefront`, `apps/admin`, `apps/api`, `apps/medusa`.
+- **Apps**: `apps/web`, `workers/backend`, `apps/terminal-agent`.
 - **Packages**: `types`, `validation`, `rate-limits`, `database`, `config`, `sdk`, `ui`, `platform-data`.
 
 ## Canonical Documentation
@@ -28,9 +28,9 @@ For doc context commands, use **docs/** and **.cursor/llm** as canonical roots (
 |-------|------------|
 | Frontend | Next.js App Router, Tailwind CSS, shadcn/ui |
 | API | Cloudflare Workers (Worker-native route handlers) |
-| Database | Two PostgreSQL databases: `MEDUSA_DB_URL` for Medusa commerce and `APP_DB_URL` for application/platform data |
+| Database | Two PostgreSQL databases accessed by the Worker through `MEDUSA_HYPERDRIVE` and `APP_HYPERDRIVE` |
 | Auth | Supabase Auth SSR with Google provider |
-| Payments | Stripe, PayPal, Xendit, cash on delivery (Medusa) |
+| Payments | Stripe, PayPal, Xendit, and cash on delivery (Worker-native) |
 | Shipping | Pancake POS logistics bridge |
 
 ## Critical Rules
@@ -61,10 +61,9 @@ For doc context commands, use **docs/** and **.cursor/llm** as canonical roots (
 
 ```
 apps/
-├── storefront   # Home, shop, PDP, cart, checkout, track, account
-├── admin        # Dashboard, inventory, orders, POS
-├── api          # Health, compliance (internal key)
-└── medusa       # Commerce backend (Medusa 2)
+├── web          # Storefront and admin UI
+├── terminal-agent
+└── workers      # Worker-native backend routes
 packages/
 ├── types, validation, rate-limits, database, config, sdk
 └── ui             # Shared shadcn-style primitives (@universal-music-store/ui)

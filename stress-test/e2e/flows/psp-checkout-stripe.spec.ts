@@ -29,7 +29,7 @@ import {
 import { signInAsAdmin } from "../fixtures/admin-auth";
 import { STRIPE_SUCCESS_CARD, STRIPE_DECLINE_CARD } from "../fixtures/sandbox-cards";
 
-const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
 function isStripeTestKey(): void {
   const key = process.env.E2E_STRIPE_API_KEY?.trim() ?? process.env.STRIPE_API_KEY?.trim();

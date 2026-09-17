@@ -1,0 +1,69 @@
+type RateLimitResult = { allowed: boolean; remaining: number; resetAt: number };
+
+type Bucket = { count: number; resetAt: number };
+const localBuckets = new Map<string, Bucket>();
+export const MAX_LOCAL_BUCKETS = 10_000;
+
+function localRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+  const now = Date.now();
+  const current = localBuckets.get(key);
+  const bucket = !current || current.resetAt <= now
+    ? { count: 0, resetAt: now + windowMs }
+    : current;
+  bucket.count += 1;
+  localBuckets.set(key, bucket);
+  if (localBuckets.size > MAX_LOCAL_BUCKETS) {
+    for (const [entryKey, entry] of localBuckets) {
+      if (entry.resetAt <= now) localBuckets.delete(entryKey);
+    }
+    while (localBuckets.size > MAX_LOCAL_BUCKETS) {
+      const oldestKey = localBuckets.keys().next().value as string | undefined;
+      if (oldestKey === undefined) break;
+      localBuckets.delete(oldestKey);
+    }
+  }
+  return { allowed: bucket.count <= limit, remaining: Math.max(0, limit - bucket.count), resetAt: bucket.resetAt };
+}
+
+export function getLocalAdminRateLimitBucketCount(): number {
+  return localBuckets.size;
+}
+
+/** Uses Upstash REST when configured; bounded memory is only a development fallback. */
+export async function checkAdminRateLimit(
+  key: string,
+  limit = 60,
+  windowSeconds = 60,
+): Promise<RateLimitResult> {
+  // Local browser verification must not share production's Upstash bucket.
+  // A stale/shared development identity would otherwise make destructive local
+  // admin checks appear broken with a 429 before the route is reached.
+  const useRemoteLimiter = process.env.NODE_ENV === "production";
+  const url = useRemoteLimiter ? process.env.UPSTASH_REDIS_REST_URL?.trim() : undefined;
+  const token = useRemoteLimiter ? process.env.UPSTASH_REDIS_REST_TOKEN?.trim() : undefined;
+  if (!url || !token) return localRateLimit(key, limit, windowSeconds * 1000);
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), 2_000);
+    const response = await fetch(`${url.replace(/\/$/, "")}/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify([
+        ["INCR", `admin:rate:${key}`],
+        ["EXPIRE", `admin:rate:${key}`, windowSeconds],
+      ]),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) return localRateLimit(key, limit, windowSeconds * 1000);
+    const result = (await response.json()) as Array<{ result?: number }>;
+    const count = Number(result?.[0]?.result ?? limit + 1);
+    const resetAt = Date.now() + windowSeconds * 1000;
+    return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt };
+  } catch {
+    return localRateLimit(key, limit, windowSeconds * 1000);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}

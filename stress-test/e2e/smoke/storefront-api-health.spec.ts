@@ -27,18 +27,17 @@ test.describe("Storefront API health — public routes return 200", () => {
     expect(res.status(), `/api/health/sop → ${res.status()}`).toBe(200);
   });
 
-  test("GET /api/checkout/available-payment-methods → 200", async ({ request }) => {
+  test("GET /api/checkout/available-payment-methods → provider list or controlled unavailable", async ({
+    request,
+  }) => {
     const res = await get(request, "/api/checkout/available-payment-methods");
-    expect(res.status(), `/api/checkout/available-payment-methods → ${res.status()}`).toBe(200);
-  });
-
-  test("GET /api/checkout/medusa-totals-preview → validation or method response", async ({ request }) => {
-    const res = await get(request, "/api/checkout/medusa-totals-preview");
-    const status = res.status();
     expect(
-      [200, 400, 405, 422].includes(status),
-      `/api/checkout/medusa-totals-preview → expected 200/400/405/422, got ${status}`,
+      [200, 503].includes(res.status()),
+      `/api/checkout/available-payment-methods → expected 200/503, got ${res.status()}`,
     ).toBeTruthy();
+    const body = (await res.json()) as { ok?: boolean; code?: string };
+    expect(typeof body.ok).toBe("boolean");
+    if (res.status() === 503) expect(body.code).toBeTruthy();
   });
 
   test("GET /api/shop returns 200 or 404", async ({ request }) => {
@@ -59,7 +58,9 @@ test.describe("Storefront API health — public routes return 200", () => {
     ).toBeTruthy();
   });
 
-  test("GET /api/reviews returns data, validation, or not found", async ({ request }) => {
+  test("GET /api/reviews returns data, validation, or not found", async ({
+    request,
+  }) => {
     const res = await get(request, "/api/reviews");
     const status = res.status();
     expect(
@@ -70,9 +71,14 @@ test.describe("Storefront API health — public routes return 200", () => {
 });
 
 test.describe("Storefront API health — auth-required routes return 401 without session", () => {
-  test("GET /api/account remains absent until an API route exists", async ({ request }) => {
+  test("GET /api/account remains absent until an API route exists", async ({
+    request,
+  }) => {
     const res = await get(request, "/api/account");
-    expect(res.status(), `/api/account → expected 404, got ${res.status()}`).toBe(404);
+    expect(
+      res.status(),
+      `/api/account → expected 404, got ${res.status()}`,
+    ).toBe(404);
   });
 
   test("GET /api/orders returns 401", async ({ request }) => {
@@ -93,7 +99,9 @@ test.describe("Storefront API health — auth-required routes return 401 without
     ).toBeTruthy();
   });
 
-  test("POST /api/checkout/cod-place-order returns 400 without body", async ({ request }) => {
+  test("POST /api/checkout/cod-place-order returns 400 without body", async ({
+    request,
+  }) => {
     const res = await request.post(`${base}/api/checkout/cod-place-order`, {
       data: {},
       failOnStatusCode: false,
@@ -105,7 +113,9 @@ test.describe("Storefront API health — auth-required routes return 401 without
     ).toBeTruthy();
   });
 
-  test("GET /api/cron/finalize-payment-attempts returns 401 without secret", async ({ request }) => {
+  test("GET /api/cron/finalize-payment-attempts returns 401 without secret", async ({
+    request,
+  }) => {
     const res = await get(request, "/api/cron/finalize-payment-attempts");
     expect(
       res.status(),

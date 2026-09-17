@@ -12,7 +12,7 @@ const result = spawnSync(
     "--no-telemetry",
     "--no-parallel",
     "--project",
-    "@universal-music-store/admin,@universal-music-store/storefront",
+    "@universal-music-store/web",
     "--blocking",
     "error",
   ],

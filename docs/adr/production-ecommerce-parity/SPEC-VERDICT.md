@@ -14,7 +14,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Functions / Classes Changed:** (n/a)
 
-**Behavior Implemented:** `apps/storefront/src/app/(public)/checkout/checkout-client.tsx` returns a sign-in gate when `authStatus !== "authenticated"` or `!session?.user`, with no guest path.
+**Behavior Implemented:** `apps/web/src/app/(public)/checkout/checkout-client.tsx` returns a sign-in gate when `authStatus !== "authenticated"` or `!session?.user`, with no guest path.
 
 **Missing For Completion:** Medusa cart update with `email` for guests; relax profile-complete gate for non-COD or gate COD only; session-less or minimal-session checkout flow; fraud and abuse controls as required.
 
@@ -38,7 +38,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Functions / Classes Changed:** (n/a)
 
-**Behavior Implemented:** `apps/storefront/src/app/sitemap.ts` emits static paths plus CMS pages and posts via `loadCmsSitemapEntries()`. No product slug iteration.
+**Behavior Implemented:** `apps/web/src/app/sitemap.ts` emits static paths plus CMS pages and posts via `loadCmsSitemapEntries()`. No product slug iteration.
 
 **Missing For Completion:** `fetchAllProductSlugs()` (or paginated Medusa list) and `/shop/${slug}` entries with `lastModified` from product `updated_at`.
 
@@ -60,7 +60,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `buildJsonLdProduct` in `apps/storefront/src/lib/seo.ts`
+**Functions / Classes Changed:** `buildJsonLdProduct` in `apps/web/src/lib/seo.ts`
 
 **Behavior Implemented:** `offers.availability` is always `https://schema.org/InStock`.
 
@@ -84,7 +84,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `buildJsonLdProduct` in `apps/storefront/src/lib/seo.ts`
+**Functions / Classes Changed:** `buildJsonLdProduct` in `apps/web/src/lib/seo.ts`
 
 **Behavior Implemented:** Product JSON-LD includes name, url, description, image, category, offers with price and currency only.
 
@@ -108,11 +108,11 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `buildJsonLdBreadcrumb` exists in `apps/storefront/src/lib/seo.ts`; PDP layout does not emit it.
+**Functions / Classes Changed:** `buildJsonLdBreadcrumb` exists in `apps/web/src/lib/seo.ts`; PDP layout does not emit it.
 
 **Behavior Implemented:** Helper `buildJsonLdBreadcrumb` in `seo.ts`.
 
-**Missing For Completion:** Serialize breadcrumb JSON-LD on `apps/storefront/src/app/(public)/shop/[slug]/page.tsx` (or shared PDP component) with Home, category, product.
+**Missing For Completion:** Serialize breadcrumb JSON-LD on `apps/web/src/app/(public)/shop/[slug]/page.tsx` (or shared PDP component) with Home, category, product.
 
 **Validation:** manual Rich Results test. e2e: optional snapshot of script tag.
 
@@ -134,7 +134,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Functions / Classes Changed:** (n/a)
 
-**Behavior Implemented:** `apps/storefront/src/app/(public)/shop/page.tsx` uses offset pagination in query; static `metadata` export cannot vary by `searchParams` without `generateMetadata`.
+**Behavior Implemented:** `apps/web/src/app/(public)/shop/page.tsx` uses offset pagination in query; static `metadata` export cannot vary by `searchParams` without `generateMetadata`.
 
 **Missing For Completion:** `generateMetadata` (or route segment pattern) that sets `alternates` or `other: { prev, next }` from current offset and page size.
 
@@ -206,7 +206,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Functions / Classes Changed:** (n/a)
 
-**Behavior Implemented:** `apps/storefront/src/app/(public)/checkout/use-checkout-client.ts` redirects COD success to `trackingPageUrl`. Other flows use track page and embedded completion.
+**Behavior Implemented:** `apps/web/src/app/(public)/checkout/use-checkout-client.ts` redirects COD success to `trackingPageUrl`. Other flows use track page and embedded completion.
 
 **Missing For Completion:** Route such as `/checkout/confirmation/[orderId]` with order lines, totals, shipping address, payment method, and next steps; secure access (token or session).
 
@@ -228,7 +228,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `readRaw`, wishlist helpers in `apps/storefront/src/lib/wishlist.ts`
+**Functions / Classes Changed:** `readRaw`, wishlist helpers in `apps/web/src/lib/wishlist.ts`
 
 **Behavior Implemented:** Wishlist stored in `localStorage` under `universal_music_store_wishlist_v1`.
 
@@ -252,7 +252,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `WishlistPageClient` in `apps/storefront/src/components/WishlistPageClient.tsx`
+**Functions / Classes Changed:** `WishlistPageClient` in `apps/web/src/components/WishlistPageClient.tsx`
 
 **Behavior Implemented:** View and Remove actions per item.
 
@@ -300,7 +300,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `securityHeaders` in `apps/storefront/next.config.js` and `apps/admin/next.config.mjs`
+**Functions / Classes Changed:** `securityHeaders` in `apps/web/next.config.js` and `apps/web/next.config.mjs`
 
 **Behavior Implemented:** X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy, X-DNS-Prefetch-Control.
 
@@ -442,7 +442,7 @@ Evidence: storefront, admin, Medusa sources in this workspace. Checklist is the 
 
 **Files Changed:** (none in this pass)
 
-**Functions / Classes Changed:** `apps/storefront/src/app/(public)/shop/page.tsx`
+**Functions / Classes Changed:** `apps/web/src/app/(public)/shop/page.tsx`
 
 **Behavior Implemented:** `export const dynamic = "force-dynamic"`. PDP uses `revalidate = 120` in `[slug]/page.tsx`.
 

@@ -67,7 +67,7 @@ not prove every business invariant or external integration behavior.
 The following checks passed in the final loop:
 
 - `pnpm install --frozen-lockfile` was previously passed; the final rerun was
-  blocked by a root-owned `apps/admin/node_modules/@sentry/nextjs` symlink
+  blocked by a root-owned `apps/web/node_modules/@sentry/nextjs` symlink
   during pnpm linking, not by lockfile drift.
 - `pnpm run security:check`
 - `pnpm run quality:contracts`
@@ -82,7 +82,7 @@ The following checks passed in the final loop:
 
 The release gate passed lint, builds, security checks, contract checks, and
 test suites. It intentionally skips hosted/browser business-proof suites
-unless `pnpm run release-gate:full` is used.
+unless `pnpm run release-gate --include-e2e` is used.
 
 # Breaking change review
 

@@ -15,6 +15,7 @@ type CheckoutRow = {
   currency_code: string;
   quantity: number;
   unit_price: string | number;
+  discount_total?: string | number | null;
 };
 
 type PreviewRow = {
@@ -43,14 +44,17 @@ export async function readCheckoutTotals(
   database: WorkerDatabaseClient,
 ): Promise<{ currency: string; amountMinor: number } | null> {
   const result = await database.query<CheckoutRow>(
-    `SELECT c.id AS cart_id, c.currency_code, i.quantity, i.unit_price
+    `SELECT c.id AS cart_id, c.currency_code, i.quantity, i.unit_price,
+            COALESCE((SELECT sum(a.amount)
+                      FROM public.cart_line_item_adjustment a
+                      WHERE a.item_id = i.id AND a.deleted_at IS NULL), 0) AS discount_total
      FROM public.cart c JOIN public.cart_line_item i ON i.cart_id = c.id AND i.deleted_at IS NULL
      WHERE c.id = $1 AND c.deleted_at IS NULL AND c.completed_at IS NULL`,
     [cartId],
   );
   if (result.rows.length === 0) return null;
   const amountMinor = result.rows.reduce(
-    (total, row) => total + Math.round(Number(row.unit_price) * row.quantity),
+    (total, row) => total + Math.max(0, Math.round(Number(row.unit_price) * row.quantity) - Math.round(Number(row.discount_total ?? 0))),
     0,
   );
   if (!Number.isSafeInteger(amountMinor) || amountMinor < 1) return null;

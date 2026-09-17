@@ -8,39 +8,10 @@ const collectionName = "Universal Music Store API";
 
 const routeRoots = [
   {
-    app: "storefront",
-    sourceRoot: path.join(repoRoot, "apps", "storefront", "src", "app", "api"),
+    app: "web",
+    sourceRoot: path.join(repoRoot, "apps", "web", "src", "app", "api"),
     urlPrefix: "/api",
-    baseUrlVar: "{{storefrontBaseUrl}}",
-  },
-  {
-    app: "admin",
-    sourceRoot: path.join(repoRoot, "apps", "admin", "src", "app", "api"),
-    urlPrefix: "/api",
-    baseUrlVar: "{{adminBaseUrl}}",
-  },
-  {
-    app: "medusa",
-    sourceRoot: path.join(repoRoot, "apps", "medusa", "src", "api"),
-    urlPrefix: "",
-    baseUrlVar: "{{medusaBaseUrl}}",
-  },
-];
-
-const expressRoutes = [
-  { app: "platform-api", method: "GET", path: "/", source: "apps/api/src/index.ts" },
-  { app: "platform-api", method: "GET", path: "/healthz", source: "apps/api/src/index.ts" },
-  { app: "platform-api", method: "GET", path: "/readyz", source: "apps/api/src/index.ts" },
-  { app: "platform-api", method: "GET", path: "/health", source: "apps/api/src/routes/health.ts" },
-  { app: "platform-api", method: "GET", path: "/health/commerce", source: "apps/api/src/routes/health.ts" },
-  { app: "platform-api", method: "GET", path: "/health/ready", source: "apps/api/src/routes/health.ts" },
-  { app: "platform-api", method: "GET", path: "/compliance/export", source: "apps/api/src/routes/compliance.ts" },
-  { app: "platform-api", method: "POST", path: "/compliance/erasure", source: "apps/api/src/routes/compliance.ts" },
-  {
-    app: "platform-api",
-    method: "POST",
-    path: "/compliance/retention/anonymize-addresses",
-    source: "apps/api/src/routes/compliance.ts",
+    baseUrlVar: "{{webBaseUrl}}",
   },
 ];
 
@@ -52,7 +23,6 @@ main();
 function main() {
   const routes = [
     ...collectFileBasedRoutes(),
-    ...collectExpressRoutes(),
   ].sort((a, b) => {
     const left = `${a.app}/${a.path}/${a.method}`;
     const right = `${b.app}/${b.path}/${b.method}`;
@@ -79,24 +49,18 @@ function main() {
   );
 
   writeFile(path.join(outputDir, "environments", "Development.bru"), renderEnvironment("Development", {
-    storefrontBaseUrl: "http://localhost:3000",
-    adminBaseUrl: "http://localhost:3001",
-    medusaBaseUrl: "http://localhost:9000",
-    apiBaseUrl: "http://localhost:4000",
+    webBaseUrl: "http://localhost:3000",
+    workerBaseUrl: "http://localhost:8787",
   }));
 
   writeFile(path.join(outputDir, "environments", "Staging.bru"), renderEnvironment("Staging", {
-    storefrontBaseUrl: "https://staging-storefront.example.com",
-    adminBaseUrl: "https://staging-admin.example.com",
-    medusaBaseUrl: "https://staging-medusa.example.com",
-    apiBaseUrl: "https://staging-api.example.com",
+    webBaseUrl: "https://staging-web.example.com",
+    workerBaseUrl: "https://staging-worker.example.com",
   }));
 
   writeFile(path.join(outputDir, "environments", "Production.bru"), renderEnvironment("Production", {
-    storefrontBaseUrl: "https://storefront.example.com",
-    adminBaseUrl: "https://admin.example.com",
-    medusaBaseUrl: "https://medusa.example.com",
-    apiBaseUrl: "https://api.example.com",
+    webBaseUrl: "https://web.example.com",
+    workerBaseUrl: "https://worker.example.com",
   }));
 
   let seq = 1;
@@ -165,13 +129,6 @@ function collectFileBasedRoutes() {
   return routes;
 }
 
-function collectExpressRoutes() {
-  return expressRoutes.map((route) => ({
-    ...route,
-    baseUrlVar: "{{apiBaseUrl}}",
-  }));
-}
-
 function walkFiles(dir) {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -200,10 +157,6 @@ function deriveRoutePath(root, file) {
   const relativeDir = path.relative(root.sourceRoot, path.dirname(file));
   const segments = relativeDir === "" ? [] : relativeDir.split(path.sep).filter(Boolean);
   const normalized = segments.map(normalizePathSegment).filter(Boolean);
-
-  if (root.app === "medusa") {
-    return normalized.length ? `/${normalized.join("/")}` : "/";
-  }
 
   const prefixed = normalized.length ? `${root.urlPrefix}/${normalized.join("/")}` : root.urlPrefix;
   return prefixed || "/";
@@ -239,9 +192,6 @@ function cleanParamName(name) {
 function splitPathSegments(route) {
   const segments = route.path.split("/").filter(Boolean);
   if (segments[0] === "api") {
-    segments.shift();
-  }
-  if (route.app === "admin" && segments[0] === "admin") {
     segments.shift();
   }
   return segments;
@@ -300,36 +250,24 @@ function inferHeaders(route) {
     headers.push("x-internal-api-key: {{internalApiKey}}");
   }
 
-  if (route.app === "storefront" && (routePath.startsWith("/api/internal/") || routePath.startsWith("/api/cron/"))) {
+  if (route.app === "web" && (routePath.startsWith("/api/internal/") || routePath.startsWith("/api/cron/"))) {
     headers.push("x-internal-api-key: {{storefrontInternalApiKey}}");
   }
 
-  if (route.app === "storefront" && (routePath.startsWith("/api/account/") || routePath.startsWith("/api/cart/") || routePath.startsWith("/api/checkout/") || routePath.startsWith("/api/payments/") || routePath.startsWith("/api/wishlist") || routePath.startsWith("/api/reviews"))) {
+  if (route.app === "web" && (routePath.startsWith("/api/account/") || routePath.startsWith("/api/cart/") || routePath.startsWith("/api/checkout/") || routePath.startsWith("/api/payments/") || routePath.startsWith("/api/wishlist") || routePath.startsWith("/api/reviews"))) {
     headers.push("Cookie: {{customerSessionCookie}}");
   }
 
-  if (route.app === "admin" && routePath.startsWith("/api/admin/")) {
+  if (route.app === "web" && routePath.startsWith("/api/admin/")) {
     headers.push("Cookie: {{adminSessionCookie}}");
   }
 
-  if (route.app === "admin" && routePath === "/api/integrations/channels/webhook") {
+  if (route.app === "web" && routePath === "/api/integrations/channels/webhook") {
     headers.push("x-channel-secret: {{channelWebhookSecret}}");
   }
 
-  if (route.app === "admin" && (routePath.startsWith("/api/integrations/") || routePath.startsWith("/api/pos/"))) {
+  if (route.app === "web" && (routePath.startsWith("/api/integrations/") || routePath.startsWith("/api/pos/"))) {
     headers.push("x-internal-api-key: {{adminIntegrationKey}}");
-  }
-
-  if (route.app === "medusa" && routePath.startsWith("/admin/")) {
-    headers.push("x-medusa-access-token: {{medusaSecretApiKey}}");
-  }
-
-  if (route.app === "medusa" && routePath.startsWith("/store/")) {
-    headers.push("x-publishable-api-key: {{medusaPublishableKey}}");
-  }
-
-  if (route.app === "medusa" && routePath.startsWith("/hooks/")) {
-    headers.push("x-webhook-secret: {{medusaWebhookSecret}}");
   }
 
   return headers;
@@ -406,17 +344,11 @@ function renderRequest({ seq, name, method, url, headers, source, bodyHint }) {
 function renderEnvironment(name, vars) {
   const lines = [];
   lines.push("vars {");
-  lines.push("  @description('''Base URL for the storefront app.''')");
-  lines.push(`  storefrontBaseUrl: ${vars.storefrontBaseUrl}`);
+  lines.push("  @description('''Base URL for the unified web app.''')");
+  lines.push(`  webBaseUrl: ${vars.webBaseUrl}`);
   lines.push("");
-  lines.push("  @description('''Base URL for the admin app.''')");
-  lines.push(`  adminBaseUrl: ${vars.adminBaseUrl}`);
-  lines.push("");
-  lines.push("  @description('''Base URL for the Medusa app.''')");
-  lines.push(`  medusaBaseUrl: ${vars.medusaBaseUrl}`);
-  lines.push("");
-  lines.push("  @description('''Base URL for the shared API service.''')");
-  lines.push(`  apiBaseUrl: ${vars.apiBaseUrl}`);
+  lines.push("  @description('''Base URL for the Cloudflare Worker.''')");
+  lines.push(`  workerBaseUrl: ${vars.workerBaseUrl}`);
   lines.push("");
   lines.push("  @description('''Internal API key for protected platform endpoints.''')");
   lines.push("  internalApiKey: CHANGE_ME_INTERNAL_API_KEY");
@@ -436,14 +368,6 @@ function renderEnvironment(name, vars) {
   lines.push("  @description('''Integration key for protected admin integrations.''')");
   lines.push("  adminIntegrationKey: CHANGE_ME_ADMIN_INTEGRATION_KEY");
   lines.push("");
-  lines.push("  @description('''Medusa secret API key for admin endpoints.''')");
-  lines.push("  medusaSecretApiKey: CHANGE_ME_MEDUSA_SECRET_API_KEY");
-  lines.push("");
-  lines.push("  @description('''Medusa publishable API key for store endpoints.''')");
-  lines.push("  medusaPublishableKey: CHANGE_ME_MEDUSA_PUBLISHABLE_API_KEY");
-  lines.push("");
-  lines.push("  @description('''Webhook secret for Medusa callback verification.''')");
-  lines.push("  medusaWebhookSecret: CHANGE_ME_MEDUSA_WEBHOOK_SECRET");
   lines.push("}");
   lines.push("");
   return lines.join("\n");

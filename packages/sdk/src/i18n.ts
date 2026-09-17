@@ -1,6 +1,6 @@
 export type SupportedLocale = "en-PH" | "fil-PH" | "en-US";
 
-export const DEFAULT_LOCALE: SupportedLocale = "en-PH";
+const DEFAULT_LOCALE: SupportedLocale = "en-PH";
 
 export type TranslationDict = Record<string, string>;
 

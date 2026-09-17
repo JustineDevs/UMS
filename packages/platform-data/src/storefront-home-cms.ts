@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 import { cmsTreeToBlocks, getCmsPageBySlugLocalePublic } from "./cms-pages.js";
-import type { CmsNode } from "./cms-types.js";
+import type { CmsBlock, CmsNode } from "./cms-types.js";
 
 /** One home-page tile for an instrument-led storefront. */
 export type StorefrontHomeTile = {
@@ -24,6 +24,7 @@ export type StorefrontHomeSectionLayout = {
 };
 
 export type StorefrontHomePayload = {
+  visualBlocks?: CmsBlock[];
   domOverrides?: Record<string, Record<string, string>>;
   sectionLayout?: {
     hero?: StorefrontHomeSectionLayout;
@@ -273,6 +274,15 @@ export function mergeStorefrontHomePayload(raw: unknown): StorefrontHomePayload 
     return cloneDefaultPayload();
   }
   return {
+    visualBlocks: Array.isArray(raw.visualBlocks)
+      ? raw.visualBlocks.filter(
+          (block): block is CmsBlock =>
+            isRecord(block) &&
+            typeof block.id === "string" &&
+            typeof block.type === "string" &&
+            isRecord(block.props),
+        )
+      : undefined,
     domOverrides: isRecord(raw.domOverrides)
       ? Object.fromEntries(Object.entries(raw.domOverrides).filter(([, value]) => isRecord(value)).map(([id, value]) => [id, value as Record<string, string>]))
       : undefined,
@@ -406,5 +416,9 @@ function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
       newsletter: newsletter.layout,
     };
   }
+  const visualBlocks = blocks.filter(
+    (block) => block.type === "visual_primitive" || block.componentId?.startsWith("visual:") === true,
+  );
+  if (visualBlocks.length) raw.visualBlocks = visualBlocks;
   return mergeStorefrontHomePayload(raw);
 }

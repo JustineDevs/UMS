@@ -23,10 +23,6 @@ export type ProductReviewRow = {
   helpful_votes: number | null;
 };
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === "object" && !Array.isArray(v);
-}
-
 function rowToReview(row: Record<string, unknown>): ProductReviewRow {
   const status =
     row.status === "approved" ||
@@ -239,8 +235,4 @@ export async function deleteProductReview(
 ): Promise<boolean> {
   const { error } = await supabase.from("product_reviews").delete().eq("id", id);
   return !error;
-}
-
-export function isProductReviewRecord(value: unknown): value is ProductReviewRow {
-  return isRecord(value) && typeof value.id === "string" && typeof value.body === "string";
 }

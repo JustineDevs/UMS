@@ -6,11 +6,11 @@ import { getPostHogHost, getPostHogProjectToken } from "./env/posthog.js";
 type PostHogPersonProperties = Record<string, unknown>;
 
 type PostHogClient = {
-  init: (token: string, config: Record<string, unknown>) => void;
-  identify: (distinctId: string, properties?: PostHogPersonProperties) => void;
+  init: (_token: string, _config: Record<string, unknown>) => void;
+  identify: (_distinctId: string, _properties?: PostHogPersonProperties) => void;
   reset: () => void;
-  capture: (event: string, properties?: Record<string, unknown>) => void;
-  captureException: (error: Error, properties?: Record<string, unknown>) => void;
+  capture: (_event: string, _properties?: Record<string, unknown>) => void;
+  captureException: (_error: Error, _properties?: Record<string, unknown>) => void;
 };
 
 const posthogClient = posthog as unknown as PostHogClient;

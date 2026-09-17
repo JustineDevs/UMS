@@ -19,6 +19,10 @@ export { Textarea, type TextareaProps } from "./components/ui/textarea";
 export { Label } from "./components/ui/label";
 export { Badge, badgeVariants, type BadgeProps } from "./components/ui/badge";
 export { Separator } from "./components/ui/separator";
+export { ScrollArea } from "./components/ui/scroll-area";
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./components/ui/accordion";
+export { Switch } from "./components/ui/switch";
+export { Avatar, AvatarImage, AvatarFallback } from "./components/ui/avatar";
 export { Skeleton } from "./components/ui/skeleton";
 export { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 
@@ -110,9 +114,6 @@ export {
 
 export {
   CardAction,
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
   AvatarBadge,
   Checkbox,
   Pagination,
@@ -179,3 +180,12 @@ export {
   Calendar,
   Combobox,
 } from "./components/ui/reference-primitives";
+
+export { default as Auth04 } from "./components/ui/auth-04";
+export { default as Announcement4 } from "./components/ui/announcement-4";
+export { Faq4 } from "./components/ui/faq-4";
+export { FileUpload as FileUpload2 } from "./components/ui/file-upload-2";
+export { Footer12 } from "./components/ui/footer-12";
+export { default as Newsletter3 } from "./components/ui/newsletter-3";
+export { default as Notification1 } from "./components/ui/notification-1";
+export { default as Testimonials2 } from "./components/ui/testimonials-2";

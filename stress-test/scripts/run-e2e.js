@@ -10,13 +10,18 @@
  */
 const path = require("path");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const { attach } = require("./lib/runtime-log-tee.cjs");
 attach(__filename);
 
 const projectRoot = path.resolve(__dirname, "..", "..");
 
 process.env.NODE_ENV = process.env.NODE_ENV ?? "development";
+// Browser verification is intentionally isolated from production quotas. Local
+// E2E must never spend or exhaust a shared Upstash request budget.
+if (process.env.NODE_ENV !== "production") {
+  process.env.UVS_DISABLE_REMOTE_RATE_LIMIT = "1";
+}
 
 const stressTestDir = path.join(projectRoot, "stress-test");
 const cacheDir = path.join(stressTestDir, ".playwright-cache");
@@ -57,6 +62,25 @@ function runChild(execPath, argv, useShell) {
     stdio: ["inherit", "pipe", "pipe"],
     shell: useShell,
   });
+  let terminating = false;
+
+  // Playwright owns the web-server children. Forward interrupts so it can
+  // terminate the unified dev stack instead of leaving Next/API descendants
+  // behind when the test runner is stopped or crashes.
+  const forwardSignal = (signal) => {
+    if (terminating) return;
+    terminating = true;
+    child.kill(signal);
+    spawnSync(process.execPath, [path.join(projectRoot, "scripts/cleanup-dev-runtime.cjs")], {
+      cwd: projectRoot,
+      stdio: "ignore",
+      timeout: 15_000,
+    });
+    const forceKill = setTimeout(() => child.kill("SIGKILL"), 10_000);
+    forceKill.unref();
+  };
+  process.on("SIGINT", () => forwardSignal("SIGINT"));
+  process.on("SIGTERM", () => forwardSignal("SIGTERM"));
 
   child.stdout.on("data", (d) => {
     process.stdout.write(d);

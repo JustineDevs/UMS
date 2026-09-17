@@ -12,10 +12,6 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
-    env:
-      # Medusa validates MEDUSA_DB_URL while loading its build config; the build
-      # does not connect to this address. Runtime and E2E jobs must use a real DB.
-      MEDUSA_DB_URL: postgres://ci:ci@127.0.0.1:5432/medusa_ci
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

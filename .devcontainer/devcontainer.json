@@ -15,7 +15,7 @@
       ]
     }
   },
-  "forwardPorts": [3000, 3001, 4000, 9000],
+  "forwardPorts": [3000, 4000, 9000],
   "remoteEnv": {
     "NODE_ENV": "development"
   }

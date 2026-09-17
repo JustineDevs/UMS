@@ -1,0 +1,387 @@
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { sendResendTransactionalEmail } from "@universal-music-store/resend-mail";
+import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { correlatedJson } from "@/lib/staff-api-response";
+import {
+  claimAdminIdempotency,
+  completeAdminIdempotency,
+  getIdempotencyKey,
+  getRequestHash,
+  parseAdminJson,
+} from "@/lib/admin-api-security";
+import { insertStaffAuditLog } from "@/lib/staff-audit";
+import { resolveStaffOrganization } from "@/lib/staff-organization";
+import { fetchCustomerById } from "@/lib/customer-admin-bridge";
+import { recordInvoiceLifecycle } from "@universal-music-store/platform-data";
+
+export const dynamic = "force-dynamic";
+const lineSchema = z
+  .object({
+    id: z.string().trim().min(1).max(80),
+    description: z.string().trim().min(1).max(240),
+    quantity: z.number().finite().int().min(1).max(10000),
+    unitPrice: z.number().finite().min(0).max(100000000),
+  })
+  .strict();
+const detailsSchema = z
+  .object({
+    name: z.string().trim().min(1).max(160),
+    email: z.string().trim().email().max(320),
+    phone: z.string().trim().max(40),
+    website: z.string().trim().max(240),
+    addressLines: z.array(z.string().trim().max(160)).max(6),
+    taxId: z.string().trim().max(80),
+    issuerName: z.string().trim().max(160),
+  })
+  .strict();
+const invoiceSchema = z
+  .object({
+    referenceNumber: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{1,79}$/),
+    issuedDate: z.string().date(),
+    paymentDueDate: z.string().date(),
+    from: detailsSchema,
+    to: z
+      .object({
+        id: z.string().trim().min(1).max(80),
+        name: z.string().trim().min(1).max(160),
+        email: z.string().trim().email().max(320),
+        addressLines: z.array(z.string().trim().max(160)).max(6),
+        taxId: z.string().trim().max(80),
+      })
+      .strict(),
+    taxId: z.enum(["gst", "vat", "service-tax", "none"]),
+    taxRate: z.number().finite().min(0).max(100).default(0),
+    discountType: z.enum(["fixed", "percent"]),
+    discountValue: z.number().finite().min(0).max(100000000),
+    items: z.array(lineSchema).min(1).max(100),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.paymentDueDate < value.issuedDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["paymentDueDate"],
+        message: "Payment due date cannot precede issued date",
+      });
+    }
+    if (value.discountType === "percent" && value.discountValue > 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["discountValue"],
+        message: "Percentage discount cannot exceed 100",
+      });
+    }
+    if (value.taxId !== "none" && value.taxRate === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["taxRate"],
+        message: "A jurisdiction-configured tax rate is required when tax is selected",
+      });
+    }
+  });
+const requestSchema = z
+  .object({
+    invoice: invoiceSchema,
+    documentKind: z.enum(["admin_artifact", "commercial_invoice", "fiscal_invoice"]).default("admin_artifact"),
+    fiscalNumber: z.string().trim().min(1).max(80).optional(),
+    medusaOrderId: z.string().trim().min(1).max(255).optional(),
+    refundId: z.string().trim().min(1).max(255).optional(),
+    mode: z.enum(["draft", "send"]).default("draft"),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.documentKind === "fiscal_invoice" && !value.fiscalNumber) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fiscalNumber"], message: "Fiscal invoice number is required" });
+    }
+  });
+
+type InvoiceInput = Omit<z.infer<typeof invoiceSchema>, "taxRate"> & { taxRate?: number };
+
+function totalOf(invoice: InvoiceInput) {
+  const subtotal = invoice.items.reduce(
+    (sum, item) => sum + item.quantity * item.unitPrice,
+    0,
+  );
+  const discount =
+    invoice.discountType === "percent"
+      ? (subtotal * invoice.discountValue) / 100
+      : invoice.discountValue;
+  const taxable = Math.max(0, subtotal - Math.min(discount, subtotal));
+  return Number((taxable + (taxable * (invoice.taxRate ?? 0)) / 100).toFixed(2));
+}
+
+function escapeHtml(value: string) {
+  return value.replace(
+    /[&<>"']/g,
+    (char) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        char
+      ] ?? char,
+  );
+}
+function invoiceHtml(invoice: InvoiceInput, total: number) {
+  const rows = invoice.items
+    .map(
+      (item) =>
+        `<tr><td>${escapeHtml(item.description)}</td><td>${item.quantity}</td><td>PHP ${item.unitPrice.toFixed(2)}</td><td>PHP ${(item.quantity * item.unitPrice).toFixed(2)}</td></tr>`,
+    )
+    .join("");
+  return `<h1>Invoice ${escapeHtml(invoice.referenceNumber)}</h1><p>From ${escapeHtml(invoice.from.name)} to ${escapeHtml(invoice.to.name)}</p><p>Issued ${invoice.issuedDate}, due ${invoice.paymentDueDate}</p><table><thead><tr><th>Description</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table><p><strong>Total: PHP ${total.toFixed(2)}</strong></p>`;
+}
+
+export async function GET(req: NextRequest) {
+  const correlationId = getCorrelationId(req);
+  const staff = await requireStaffApiSession("receipts:read");
+  if (!staff.ok) return staff.response;
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(
+    sup.client,
+    staff.session.user?.email,
+  );
+  if (!organization)
+    return correlatedJson(
+      correlationId,
+      { error: "Organization membership is not configured" },
+      { status: 403 },
+    );
+  const { data, error } = await sup.client
+    .from("admin_invoices")
+    .select(
+      "id,reference_number,status,currency,total,recipient_email,sent_at,created_by,created_at,updated_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id",
+    )
+    .eq("organization_id", organization.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error)
+    return correlatedJson(
+      correlationId,
+      { error: "Unable to load invoices" },
+      { status: 502 },
+    );
+  return correlatedJson(correlationId, { data: data ?? [] });
+}
+
+export async function POST(req: NextRequest) {
+  const correlationId = getCorrelationId(req);
+  const staff = await requireStaffApiSession("receipts:send");
+  if (!staff.ok) return staff.response;
+  const parsed = await parseAdminJson(req, requestSchema);
+  if (!parsed.ok)
+    return correlatedJson(
+      correlationId,
+      { error: parsed.error },
+      { status: parsed.status },
+    );
+  const { invoice, mode, documentKind, fiscalNumber, medusaOrderId, refundId } = parsed.data;
+  if (documentKind === "fiscal_invoice" && !fiscalNumber) {
+    return correlatedJson(correlationId, { error: "fiscalNumber is required for fiscal invoices" }, { status: 400 });
+  }
+  const total = totalOf(invoice);
+  const sup = adminSupabaseOr503(correlationId);
+  if ("response" in sup) return sup.response;
+  const organization = await resolveStaffOrganization(
+    sup.client,
+    staff.session.user?.email,
+  );
+  if (!organization)
+    return correlatedJson(
+      correlationId,
+      { error: "Organization membership is not configured" },
+      { status: 403 },
+    );
+  const customer = await fetchCustomerById(invoice.to.id);
+  if (!customer?.email) {
+    return correlatedJson(
+      correlationId,
+      { error: "Invoice recipient is unavailable" },
+      { status: 404 },
+    );
+  }
+  if (customer.email.trim().toLowerCase() !== invoice.to.email.trim().toLowerCase()) {
+    return correlatedJson(
+      correlationId,
+      { error: "Invoice recipient changed; reload the customer" },
+      { status: 409 },
+    );
+  }
+  const idempotencyKey = getIdempotencyKey(req);
+  if (!idempotencyKey)
+    return correlatedJson(
+      correlationId,
+      { error: "Idempotency-Key is required for invoice mutations" },
+      { status: 400 },
+    );
+  const claim = await claimAdminIdempotency(sup.client, {
+    actorKey: `${organization.id}:${staff.session.user?.email ?? "local-admin@localhost"}`,
+    actionKey: "admin.invoice.create",
+    idempotencyKey,
+    requestHash: getRequestHash(parsed.data),
+  });
+  if (claim.kind === "replay")
+    return correlatedJson(correlationId, claim.body, { status: claim.status });
+  if (claim.kind !== "claimed")
+    return correlatedJson(
+      correlationId,
+      {
+        error:
+          "Invoice mutation is already in progress or conflicts with a previous request",
+      },
+      { status: 409 },
+    );
+  const idempotencyId = claim.id;
+  const canonicalName =
+    [customer.first_name, customer.last_name].filter(Boolean).join(" ").trim() ||
+    customer.email;
+  const safeInvoice = {
+    ...invoice,
+    taxRate: invoice.taxRate ?? 0,
+    to: {
+      ...invoice.to,
+      id: customer.id,
+      name: canonicalName,
+      email: customer.email,
+    },
+  };
+  const { data, error } = await sup.client
+    .from("admin_invoices")
+    .insert({
+      organization_id: organization.id,
+      reference_number: invoice.referenceNumber,
+      status: "draft",
+      currency: "PHP",
+      total,
+      recipient_email: customer.email,
+      payload: safeInvoice,
+      document_kind: documentKind,
+      fiscal_status: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal",
+      fiscal_number: documentKind === "fiscal_invoice" ? fiscalNumber : null,
+      medusa_order_id: medusaOrderId ?? null,
+      refund_id: refundId ?? null,
+      created_by: staff.session.user?.email ?? "local-admin@localhost",
+    })
+    .select(
+      "id,reference_number,status,currency,total,recipient_email,sent_at,created_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id",
+    )
+    .single();
+  if (error || !data) {
+    const response = correlatedJson(
+      correlationId,
+      {
+        error:
+          error?.code === "23505"
+            ? "Reference number already exists"
+            : "Unable to save invoice",
+      },
+      { status: error?.code === "23505" ? 409 : 502 },
+    );
+    await completeAdminIdempotency(sup.client, idempotencyId, response.status, {
+      error:
+        error?.code === "23505"
+          ? "Reference number already exists"
+          : "Unable to save invoice",
+    });
+    return response;
+  }
+  let result = data;
+  await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, event: "create", status: "draft", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:create`, actorEmail: staff.session.user?.email });
+  if (mode === "send") {
+    await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "sending", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:sending`, actorEmail: staff.session.user?.email });
+    const resendKey = process.env.RESEND_API_KEY?.trim();
+    if (!resendKey) {
+      await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "failed", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:failed`, actorEmail: staff.session.user?.email, metadata: { error: "RESEND_API_KEY is not configured" } }).catch(() => {});
+      const response = correlatedJson(
+        correlationId,
+        {
+          error: "Invoice saved as draft; RESEND_API_KEY is not configured",
+          data,
+        },
+        { status: 503 },
+      );
+      await completeAdminIdempotency(
+        sup.client,
+        idempotencyId,
+        response.status,
+        {
+          error: "Invoice saved as draft; RESEND_API_KEY is not configured",
+          data,
+        },
+      );
+      return response;
+    }
+    const sent = await sendResendTransactionalEmail({
+      apiKey: resendKey,
+      from:
+        process.env.RESEND_FROM_EMAIL?.trim() ||
+        process.env.RESEND_FROM?.trim() ||
+        "noreply@universal-music-store.com",
+      to: invoice.to.email,
+      subject: `Invoice ${invoice.referenceNumber}`,
+      html: invoiceHtml(safeInvoice, total),
+      tags: [{ name: "type", value: "admin_invoice" }],
+    });
+    if (!sent.ok) {
+      await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "failed", fiscalStatus: documentKind === "fiscal_invoice" ? "draft" : "non_fiscal", idempotencyKey: `${idempotencyKey}:failed`, actorEmail: staff.session.user?.email, metadata: { error: "Invoice email delivery failed" } }).catch(() => {});
+      const response = correlatedJson(
+        correlationId,
+        { error: "Invoice saved as draft; email delivery failed", data },
+        { status: 502 },
+      );
+      await completeAdminIdempotency(
+        sup.client,
+        idempotencyId,
+        response.status,
+        { error: "Invoice saved as draft; email delivery failed", data },
+      );
+      return response;
+    }
+    const lifecycle = await recordInvoiceLifecycle(sup.client, { organizationId: organization.id, invoiceId: data.id, toStatus: "sent", fiscalStatus: documentKind === "fiscal_invoice" ? "issued" : "non_fiscal", idempotencyKey: `${idempotencyKey}:sent`, actorEmail: staff.session.user?.email }).catch(() => null);
+    const updated = lifecycle ? await sup.client.from("admin_invoices").update({ sent_at: new Date().toISOString() }).eq("id", data.id).eq("organization_id", organization.id).select("id,reference_number,status,currency,total,recipient_email,sent_at,created_at,document_kind,fiscal_status,fiscal_number,medusa_order_id,refund_id").single() : { error: new Error("lifecycle failed"), data: null };
+    if (updated.error || !updated.data) {
+      const response = correlatedJson(
+        correlationId,
+        {
+          error: "Invoice email sent but invoice status could not be recorded",
+        },
+        { status: 502 },
+      );
+      await completeAdminIdempotency(
+        sup.client,
+        idempotencyId,
+        response.status,
+        {
+          error: "Invoice email sent but invoice status could not be recorded",
+        },
+      );
+      return response;
+    }
+    result = updated.data;
+  }
+  await insertStaffAuditLog(sup.client, {
+    actorEmail: staff.session.user?.email ?? "local-admin@localhost",
+    action: mode === "send" ? "invoice.send" : "invoice.create",
+    resource: "admin_invoice",
+    resourceId: String(data.id),
+    details: {
+      reference_number: invoice.referenceNumber,
+      total,
+      currency: "PHP",
+      status: result.status,
+    },
+  });
+  const response = correlatedJson(
+    correlationId,
+    { data: result },
+    { status: 201 },
+  );
+  await completeAdminIdempotency(sup.client, idempotencyId, response.status, {
+    data: result,
+  });
+  return response;
+}

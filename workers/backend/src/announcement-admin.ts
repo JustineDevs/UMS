@@ -46,8 +46,10 @@ export async function handleCmsAdminAnnouncementRequest(request: Request, databa
   if (!allowed(claims)) return json({ error: "forbidden" }, 403);
   const org = organization(claims); if (!org) return json({ error: "organization_claim_required" }, 403);
   if (request.method === "GET") {
-    const result = await database.query(`SELECT * FROM public.cms_announcement WHERE organization_id = $1 ORDER BY priority DESC, updated_at DESC`, [org]);
-    return json({ data: result.rows });
+    const rawLimit = Number(new URL(request.url).searchParams.get("limit") ?? "100");
+    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
+    const result = await database.query(`SELECT * FROM public.cms_announcement WHERE organization_id = $1 ORDER BY priority DESC, updated_at DESC LIMIT $2`, [org, limit]);
+    return json({ data: result.rows, limit });
   }
   if (request.method === "DELETE") {
     const url = new URL(request.url);

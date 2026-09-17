@@ -1,7 +1,7 @@
 import type { CheckoutEnv } from "./checkout.ts";
 import type { WorkerDatabaseClient } from "./database.ts";
 
-export type PaymentMethodKey = "STRIPE" | "PAYPAL" | "XENDIT" | "COD";
+type PaymentMethodKey = "STRIPE" | "PAYPAL" | "XENDIT" | "COD";
 
 function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {

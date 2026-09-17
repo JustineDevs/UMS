@@ -9,7 +9,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.join(__dirname, "..");
-const rel = process.argv[2] || "apps/storefront";
+const rel = process.argv[2] || "apps/web";
 const nextDir = path.join(root, rel, ".next");
 const tracePath = path.join(nextDir, "trace");
 

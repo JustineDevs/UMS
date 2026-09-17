@@ -2,7 +2,7 @@ import "../runtime-logs-init";
 import { expect, type Page } from "@playwright/test";
 
 export const adminBase =
-  process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+  process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
 function firstAdminAllowedEmail(): string | undefined {
   const raw = process.env.ADMIN_ALLOWED_EMAILS?.trim();
@@ -15,9 +15,12 @@ export type E2eAdminLoginResult = "ok" | "skip_no_ui" | "skip_no_env";
 
 /**
  * Signs in via `/sign-in/e2e` using the first `ADMIN_ALLOWED_EMAILS` entry and `AUTH_SECRET`.
- * Requires `pnpm e2e:ensure-staff` (user + `staff_permission_grants` `*` for full route coverage).
+ * Requires `E2E_ADMIN_AUTH=1` and `pnpm e2e:ensure-staff` (user +
+ * `staff_permission_grants` `*` for full route coverage). Explicit opt-in keeps
+ * ordinary local smoke runs from contacting a remote Supabase project.
  */
 export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
+  if (process.env.E2E_ADMIN_AUTH !== "1") return "skip_no_env";
   if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
     try {
       await page.goto(`${adminBase}/admin`, { waitUntil: "domcontentloaded" });

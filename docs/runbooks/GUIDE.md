@@ -118,4 +118,4 @@ Configure these credentials in Cloudflare Workers or Vercel without committing s
 
 - `/.env.local` is for development only.
 - `/.env.production` mirrors the production host configuration without localhost origins.
-- Use `https://universalmusic.vercel.app` for storefront/admin public links unless a route-specific override is documented elsewhere.
+- Use `https://universalmusic.vercel.app` for public and admin links served by the unified web app unless a route-specific override is documented elsewhere.

@@ -4,11 +4,11 @@ const path = require("node:path");
 const { attach } = require("./lib/runtime-log-tee.cjs");
 attach(__filename);
 
-function checkNode20() {
+function checkSupportedNode() {
   const major = Number.parseInt(process.versions.node.split(".")[0], 10);
-  if (major !== 20) {
+  if (major < 20 || major > 24) {
     throw new Error(
-      `This repo's blocking test and release commands require Node 20. Current: ${process.version}. Switch to Node 20 before running stress or release gates.`,
+      `This repo's blocking test and release commands support Node 20 through 24. Current: ${process.version}. Use a supported Node runtime before running stress or release gates.`,
     );
   }
 }
@@ -59,7 +59,7 @@ function assertSwcRuntime(cwd) {
 }
 
 function checkRuntime(target, cwd = process.cwd()) {
-  checkNode20();
+  checkSupportedNode();
   if (target === "esbuild") {
     assertEsbuildRuntime(cwd);
     return;

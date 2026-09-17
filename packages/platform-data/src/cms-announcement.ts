@@ -3,7 +3,7 @@ import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
 export const CMS_ANNOUNCEMENT_DEFAULT_ID = "default";
 
-export type CmsAnnouncementBodyFormat = "plain" | "html";
+type CmsAnnouncementBodyFormat = "plain" | "html";
 
 export type CmsAnnouncementRow = {
   id: string;

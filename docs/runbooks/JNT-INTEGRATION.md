@@ -55,10 +55,10 @@ Observed responsibilities:
 
 Relevant files:
 
-- [apps/admin/src/lib/courier-registry.ts](../../apps/admin/src/lib/courier-registry.ts)
-- [apps/admin/src/app/api/medusa/shipments/route.ts](../../apps/admin/src/app/api/medusa/shipments/route.ts)
-- [apps/admin/src/app/api/admin/orders/export-pancake-pos-csv/route.ts](../../apps/admin/src/app/api/admin/orders/export-pancake-pos-csv/route.ts)
-- [apps/admin/src/app/api/admin/integration-health/route.ts](../../apps/admin/src/app/api/admin/integration-health/route.ts)
+- [apps/web/src/lib/courier-registry.ts](../../apps/web/src/lib/courier-registry.ts)
+- [apps/web/src/app/api/medusa/shipments/route.ts](../../apps/web/src/app/api/medusa/shipments/route.ts)
+- [apps/web/src/app/api/admin/orders/export-pancake-pos-csv/route.ts](../../apps/web/src/app/api/admin/orders/export-pancake-pos-csv/route.ts)
+- [apps/web/src/app/api/admin/integration-health/route.ts](../../apps/web/src/app/api/admin/integration-health/route.ts)
 
 Observed responsibilities:
 
@@ -71,7 +71,7 @@ Observed responsibilities:
 
 Relevant files:
 
-- [apps/storefront/src/lib/medusa-track-fetch.ts](../../apps/storefront/src/lib/medusa-track-fetch.ts)
+- [apps/web/src/lib/medusa-track-fetch.ts](../../apps/web/src/lib/medusa-track-fetch.ts)
 
 Observed responsibilities:
 

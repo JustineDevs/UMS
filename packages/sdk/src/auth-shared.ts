@@ -26,7 +26,7 @@ export type SharedSessionUser = {
   permissions?: string[];
 };
 
-export type SharedSession = {
+type SharedSession = {
   user?: SharedSessionUser;
   authenticatedAt?: number;
 };
@@ -36,7 +36,7 @@ export function buildSharedJwtCallback() {
 }
 
 export function buildSharedJwtCallbackWithResolver(options?: {
-  resolveCustomerId?: (email: string) => Promise<string | null>;
+  resolveCustomerId?: (_email: string) => Promise<string | null>;
 }) {
   return async function jwtCallback({
     token,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Fails if an apps/admin App Router API route.ts lacks an obvious auth guard pattern.
+ * Fails if a unified web App Router API route.ts lacks an obvious auth guard pattern.
  * Allowlisted routes use Supabase Auth callbacks, HMAC webhooks, or internal keys.
  */
 import fs from "node:fs";
@@ -9,12 +9,14 @@ import { attach } from "./lib/runtime-log-tee.mjs";
 
 attach(import.meta.url);
 const root = process.cwd();
-const apiRoot = path.join(root, "apps", "admin", "src", "app", "api");
+const apiRoots = ["admin", "integrations", "cron", "pos", "webhooks", "medusa"].map(
+  (segment) => path.join(root, "apps", "web", "src", "app", "api", segment),
+);
 
 const ALLOWLIST = new Set([
-  path.join(apiRoot, "auth", "callback", "route.ts"),
-  path.join(apiRoot, "auth", "session", "route.ts"),
-  path.join(apiRoot, "integrations", "channels", "webhook", "route.ts"),
+  path.join(root, "apps", "web", "src", "app", "api", "auth", "callback", "route.ts"),
+  path.join(root, "apps", "web", "src", "app", "api", "auth", "session", "route.ts"),
+  path.join(root, "apps", "web", "src", "app", "api", "integrations", "channels", "webhook", "route.ts"),
 ]);
 
 const GUARD_RES = [
@@ -26,6 +28,7 @@ const GUARD_RES = [
   /\bx-internal-key\b/i,
   /\bgateChannelWebhookSecretConfigured\b/,
   /x-nango-hmac-sha256/i,
+  /CRON_SECRET|CAMPAIGN_CRON_SECRET|x-cron-secret/i,
   /createHmac\(/,
 ];
 
@@ -40,7 +43,7 @@ function walkRoutes(dir, out = []) {
 }
 
 let failed = false;
-for (const file of walkRoutes(apiRoot)) {
+for (const file of apiRoots.flatMap((apiRoot) => walkRoutes(apiRoot))) {
   if (ALLOWLIST.has(file)) continue;
   const text = fs.readFileSync(file, "utf8");
   const ok = GUARD_RES.some((re) => re.test(text));

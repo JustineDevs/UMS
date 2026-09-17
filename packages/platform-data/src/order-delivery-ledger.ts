@@ -4,7 +4,7 @@ export type CanonicalOrderStatus =
   | "pending" | "paid" | "processing" | "packed" | "shipped"
   | "delivered" | "cancelled" | "returned" | "refunded" | "failed";
 
-export const CANONICAL_ORDER_STATUS_BY_SOURCE: Record<string, CanonicalOrderStatus> = {
+const CANONICAL_ORDER_STATUS_BY_SOURCE: Record<string, CanonicalOrderStatus> = {
   pending: "pending", created: "pending", awaiting_payment: "pending", paid: "paid", captured: "paid",
   processing: "processing", packed: "packed", shipped: "shipped", fulfilled: "shipped", delivered: "delivered",
   cancelled: "cancelled", canceled: "cancelled", returned: "returned", refunded: "refunded", failed: "failed",

@@ -6,7 +6,7 @@ import { test } from "@playwright/test";
 const OUT_DIR = path.join(process.cwd(), "stress-test", "dogfood-output", "screenshots");
 
 /**
- * Admin app (Next.js) on 3001. `/admin/*` uses Supabase Auth SSR middleware; without a session,
+ * Unified web app (Next.js) on 3000. `/admin/*` uses Supabase Auth SSR middleware; without a session,
  * requests redirect to sign-in (often with `callbackUrl` in the query). Layout is the
  * same; filenames map to the route you tried to open for traceability.
  */
@@ -18,7 +18,7 @@ const ADMIN_ROUTES: { path: string; file: string }[] = [
   { path: "/admin/pos", file: "admin-pos" },
 ];
 
-test.use({ baseURL: "http://localhost:3001" });
+test.use({ baseURL: "http://127.0.0.1:3000" });
 
 test.beforeAll(() => {
   fs.mkdirSync(OUT_DIR, { recursive: true });

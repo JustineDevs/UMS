@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 
-export type TrackingCapabilityRevocationInput = {
+type TrackingCapabilityRevocationInput = {
   token: string;
   resourceId: string;
   expiresAt?: string | null;
@@ -10,7 +10,7 @@ export type TrackingCapabilityRevocationInput = {
   reason?: string | null;
 };
 
-export function trackingCapabilityHash(token: string): string {
+function trackingCapabilityHash(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
 }
 

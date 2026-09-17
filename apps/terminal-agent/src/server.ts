@@ -242,7 +242,7 @@ function terminalAgentAllowedOrigins(): string[] {
       .map((s) => s.trim())
       .filter(Boolean);
   }
-  return ["http://127.0.0.1:3001", "http://localhost:3001"];
+  return ["http://127.0.0.1:3000", "http://localhost:3000"];
 }
 
 /**

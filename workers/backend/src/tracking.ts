@@ -9,6 +9,7 @@ export type TrackingEnv = {
 
 type Capability = {
   id: string;
+  purpose: "track" | "confirmation";
   scope?: { customerEmailHash?: string; storeId?: string };
 };
 
@@ -20,6 +21,13 @@ type OrderRow = {
   fulfillment_status: string | null;
   email: string | null;
   metadata: Record<string, unknown> | null;
+  total?: string | number | null;
+  subtotal?: string | number | null;
+  tax_total?: string | number | null;
+  shipping_total?: string | number | null;
+  discount_total?: string | number | null;
+  shipping_address?: Record<string, unknown> | null;
+  items?: unknown;
 };
 
 function json(body: Record<string, unknown>, status = 200): Response {
@@ -77,7 +85,7 @@ async function resolveCapability(token: string, env: TrackingEnv): Promise<Capab
       scope?: { customerEmailHash?: string; storeId?: string };
     };
     if (
-      payload.version !== version || payload.purpose !== "track" || payload.audience !== "public-tracking" ||
+      payload.version !== version || !["track", "confirmation"].includes(payload.purpose ?? "") || payload.audience !== "public-tracking" ||
       payload.keyVersion !== keyVersion || payload.issuedAt !== issuedAt || payload.expiresAt !== expiresAt ||
       typeof payload.id !== "string" || !/^order_[A-Za-z0-9_-]+$/.test(payload.id)
     ) return null;
@@ -89,7 +97,11 @@ async function resolveCapability(token: string, env: TrackingEnv): Promise<Capab
             ? { storeId: payload.scope.storeId.trim().slice(0, 128) } : {}),
         }
       : undefined;
-    return { id: payload.id, ...(scope && Object.keys(scope).length > 0 ? { scope } : {}) };
+    return {
+      id: payload.id,
+      purpose: payload.purpose as "track" | "confirmation",
+      ...(scope && Object.keys(scope).length > 0 ? { scope } : {}),
+    };
   } catch {
     return null;
   }
@@ -145,16 +157,33 @@ export async function handleTrackingRequest(
   const capability = await resolveCapability(token, env);
   if (!capability) return json({ error: "not_found" }, 404);
   const result = await database.query<OrderRow>(
-    `SELECT o.id, o.display_id, o.updated_at,
+    `SELECT o.id, o.display_id, o.updated_at, o.total, o.subtotal,
+            o.tax_total, o.shipping_total, o.discount_total,
             pc.status AS payment_status,
             NULL::text AS fulfillment_status,
-            o.email, o.metadata
+            o.email, o.metadata,
+            CASE WHEN oa.id IS NULL THEN NULL ELSE jsonb_build_object(
+              'city', oa.city, 'province', oa.province,
+              'postal_code', oa.postal_code
+            ) END AS shipping_address,
+            CASE WHEN $2::text = 'confirmation' THEN COALESCE((SELECT json_agg(json_build_object(
+              'id', oli.id, 'title', COALESCE(oli.title, ''),
+              'quantity', COALESCE(oi.quantity, 0),
+              'unit_price', COALESCE(oi.unit_price, oli.unit_price, 0),
+              'thumbnail', oli.thumbnail) ORDER BY oli.created_at, oli.id)
+              FROM public.order_line_item oli
+              LEFT JOIN public.order_item oi ON oi.item_id = oli.id
+                AND oi.order_id = o.id AND oi.deleted_at IS NULL
+             WHERE oli.order_id = o.id AND oli.deleted_at IS NULL), '[]'::json)
+              ELSE NULL END AS items
        FROM public."order" o
        LEFT JOIN public.order_payment_collection opc ON opc.order_id = o.id
        LEFT JOIN public.payment_collection pc ON pc.id = opc.payment_collection_id
+       LEFT JOIN public.order_address oa ON oa.id = o.shipping_address_id
       WHERE o.id = $1 AND o.deleted_at IS NULL
+      GROUP BY o.id, pc.status, oa.id
       LIMIT 1`,
-    [capability.id],
+    [capability.id, capability.purpose],
   );
   const row = result.rows[0];
   if (!row) return json({ error: "not_found" }, 404);
@@ -166,7 +195,7 @@ export async function handleTrackingRequest(
     const storeId = typeof metadata.store_id === "string" ? metadata.store_id : typeof metadata.organization_id === "string" ? metadata.organization_id : null;
     if (storeId !== capability.scope.storeId) return json({ error: "not_found" }, 404);
   }
-  return json({
+  const response: Record<string, unknown> = {
     order: {
       order_number: row.display_id == null ? undefined : String(row.display_id),
       status: status(row),
@@ -174,5 +203,23 @@ export async function handleTrackingRequest(
     },
     shipments: shipments(row),
     ...(capability.scope ? { capabilityScope: capability.scope } : {}),
-  });
+  };
+  if (capability.purpose === "confirmation") {
+    response.confirmationOrder = {
+      id: row.id,
+      display_id: row.display_id,
+      order_number: row.display_id == null ? undefined : String(row.display_id),
+      status: status(row),
+      updated_at: row.updated_at,
+      email: row.email ?? undefined,
+      total: Number(row.total ?? 0) / 100,
+      subtotal: Number(row.subtotal ?? 0) / 100,
+      tax_total: Number(row.tax_total ?? 0) / 100,
+      shipping_total: Number(row.shipping_total ?? 0) / 100,
+      discount_total: Number(row.discount_total ?? 0) / 100,
+      shipping_address: row.shipping_address ?? null,
+      items: Array.isArray(row.items) ? row.items : [],
+    };
+  }
+  return json(response);
 }

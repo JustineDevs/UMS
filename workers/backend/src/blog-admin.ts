@@ -26,7 +26,12 @@ async function save(database: WorkerDatabaseClient, tenant: string, input: BlogI
 export async function handleCmsAdminBlogRequest(request: Request, database: WorkerDatabaseClient, env: Env, blogId?: string): Promise<Response> {
   if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL }); if (!claims) return json({ error: "unauthorized" }, 401); const tenant = org(claims); if (!tenant) return json({ error: "organization_claim_required" }, 403);
-  if (request.method === "GET") { const result = await database.query(`SELECT * FROM public.cms_blog_posts WHERE organization_id = $1 ORDER BY updated_at DESC`, [tenant]); return json({ data: result.rows }); }
+  if (request.method === "GET") {
+    const rawLimit = Number(new URL(request.url).searchParams.get("limit") ?? "100");
+    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
+    const result = await database.query(`SELECT * FROM public.cms_blog_posts WHERE organization_id = $1 ORDER BY updated_at DESC LIMIT $2`, [tenant, limit]);
+    return json({ data: result.rows, limit });
+  }
   if (!canWrite(claims)) return json({ error: "forbidden" }, 403);
   if (request.method === "DELETE") {
     if (!blogId) return json({ error: "blog_id_required" }, 400);

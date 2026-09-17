@@ -36,7 +36,7 @@
     },
     {
       "title": "Storefront Application",
-      "purpose": "Overview of apps/storefront — the Next.js 15 customer-facing app. Links to child pages covering routing, checkout, cart, CMS rendering, and observability.",
+      "purpose": "Overview of apps/web — the Next.js 15 customer-facing app. Links to child pages covering routing, checkout, cart, CMS rendering, and observability.",
       "page_notes": [
         {
           "content": ""
@@ -85,7 +85,7 @@
     },
     {
       "title": "Admin Dashboard Application",
-      "purpose": "Overview of apps/admin — the Next.js 15 internal operations dashboard for staff. Links to child pages covering POS, CMS management, finance, and the admin API layer.",
+      "purpose": "Overview of apps/web — the Next.js 15 internal operations dashboard for staff. Links to child pages covering POS, CMS management, finance, and the admin API layer.",
       "page_notes": [
         {
           "content": ""
@@ -124,7 +124,7 @@
     },
     {
       "title": "Admin API Layer & Staff Auth",
-      "purpose": "The BFF (Backend for Frontend) pattern used in apps/admin: staff session validation, permission gates, correlation IDs, staff API response helpers, and the product lookup proxy.",
+      "purpose": "The BFF (Backend for Frontend) pattern used in apps/web: staff session validation, permission gates, correlation IDs, staff API response helpers, and the product lookup proxy.",
       "parent": "Admin Dashboard Application",
       "page_notes": [
         {

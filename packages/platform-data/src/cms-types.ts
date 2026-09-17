@@ -244,18 +244,3 @@ export type CmsBlogPostRow = {
   created_at: string;
   updated_at: string;
 };
-
-export type CmsPaymentLinkRow = {
-  id: string;
-  title: string;
-  provider: string;
-  payment_url: string;
-  description: string;
-  locale: string;
-  cta_label: string;
-  active: boolean;
-  sort_order: number;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
-};

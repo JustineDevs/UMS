@@ -2,7 +2,7 @@ import "../runtime-logs-init";
 import { test, expect } from "@playwright/test";
 
 const adminBase =
-  process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+  process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
 test.describe("Admin access control", () => {
   test("unauthenticated visit to /admin is redirected away from dashboard", async ({

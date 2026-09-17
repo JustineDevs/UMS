@@ -47,7 +47,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
   customers), while `APP_DB_URL` is the application/platform database (CMS,
   staff/RBAC, audit, and platform data). Do not introduce a third database or
   use a generic database-URL alias.
-- Do not deploy the storefront or admin application to the backend origin.
+- Do not deploy the unified web application to the backend origin.
 - Use the Cloudflare Worker deployment URL configured through `API_URL`; a custom DNS hostname is optional and is not a release prerequisite.
 - Do not deploy Medusa, compliance, Render, Fly.io, ECS, or any external backend origin. All backend contracts must execute in the Worker with Hyperdrive, Queues, and fetch/Web Crypto.
 
@@ -65,4 +65,4 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 <!-- CONTINUAL LEARNING -->
 - Sprint and `/sprint` backlog: Treat the user's listed sprint items as mandatory commitments—they stay under Committed unless Blocked by a concrete, named external blocker; do not downgrade to optional/stretch, silently drop items, narrow acceptance criteria, or replace implementation work with docs or placeholders without explicit Product Owner approval.
 - Payments: The codebase standardizes on Stripe plus PayPal; Lemon Squeezy was removed across Medusa, storefront, admin, and BYOK—do not re-add MoR PSP integration unless product direction explicitly changes again.
-- TypeScript workspace resolution: `@universal-music-store/api` needs a direct `@universal-music-store/platform-data` workspace dependency whenever the SDK (or transitive imports) pull that package—pnpm + `tsc` will fail otherwise.
+- TypeScript workspace resolution: keep workspace dependencies explicit so pnpm and `tsc` resolve shared packages consistently.

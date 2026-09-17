@@ -542,7 +542,7 @@ Provider will use the following technology stack:
 - Database: PostgreSQL via Supabase
 - Monorepo: Turborepo + pnpm
 - Auth: Supabase Auth SSR with Google OAuth
-- Deployment: Vercel (storefront/admin) and Cloudflare Workers (backend runtime)
+- Deployment: Vercel (unified public/admin web app) and Cloudflare Workers (backend runtime)
 - CI/CD: GitHub Actions
 
 Any deviation from this stack requires written approval from Client.
@@ -787,7 +787,7 @@ Provider will:
 
 Client will pay for and maintain:
 
-- Vercel hosting (storefront/admin)
+- Vercel hosting (unified public/admin web app)
 - Supabase Postgres database
 - Cloudflare Workers (public API and backend runtime)
 - Third-party API services (payment processors, shipping provider, Google Cloud)

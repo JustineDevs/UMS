@@ -14,23 +14,14 @@
     "test": "node --import tsx/esm --test src/shop-catalog.contract.test.ts src/validation.stress.test.ts src/http-schemas.test.ts src/medusa-inventory-math.test.ts src/sanitize-cms-html.test.ts"
   },
   "dependencies": {
-    "picocolors": "^1.1.1",
-    "dayjs": "^1.11.7",
-    "escape-string-regexp": "^4.0.0",
-    "deepmerge": "^4.3.1",
     "htmlparser2": "^12.0.0",
-    "is-plain-object": "^5.0.0",
-    "launder": "^1.7.1",
-    "nanoid": "^3.3.18",
-    "parse-srcset": "^1.0.2",
-    "postcss": "^8.5.0",
-    "sanitize-html": "^2.17.0",
+    "sanitize-html": "^2.17.7",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@types/sanitize-html": "^2.16.0",
     "@universal-music-store/config-eslint": "workspace:*",
     "@universal-music-store/config-typescript": "workspace:*",
-    "@types/sanitize-html": "^2.16.0",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"

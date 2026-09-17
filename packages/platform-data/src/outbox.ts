@@ -68,7 +68,7 @@ export async function listPendingOutboxEvents(
     .slice(0, limit);
 }
 
-export async function markOutboxEventProcessed(
+async function markOutboxEventProcessed(
   supabase: SupabaseClient,
   eventId: string,
 ): Promise<boolean> {
@@ -84,7 +84,7 @@ export async function markOutboxEventProcessed(
   return true;
 }
 
-export async function incrementOutboxRetry(
+async function incrementOutboxRetry(
   supabase: SupabaseClient,
   eventId: string,
 ): Promise<void> {
@@ -120,11 +120,11 @@ export async function failOutboxEventWithBackoff(
     .eq("id", eventId);
 }
 
-export type OutboxHandler = (_event: OutboxEvent) => Promise<void>;
+type OutboxHandler = (_event: OutboxEvent) => Promise<void>;
 
 const handlers = new Map<string, OutboxHandler[]>();
 
-export function registerOutboxHandler(eventType: string, handler: OutboxHandler): void {
+function registerOutboxHandler(eventType: string, handler: OutboxHandler): void {
   const existing = handlers.get(eventType) ?? [];
   existing.push(handler);
   handlers.set(eventType, existing);

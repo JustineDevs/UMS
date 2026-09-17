@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
+import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
 
 type Env = { CMS_ADMIN_JWT_SECRET?: string; SUPABASE_URL?: string; SUPABASE_STORAGE_URL?: string; SUPABASE_SERVICE_ROLE_KEY?: string };
 function json(body: Record<string, unknown>, status = 200): Response { return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }); }
@@ -9,6 +10,19 @@ function safeLimit(value: string | null): number { const parsed = Number(value);
 function safeSort(value: string | null): "created_at ASC" | "display_name ASC" | "display_name DESC" | "created_at DESC" { return value === "created_asc" ? "created_at ASC" : value === "name_asc" ? "display_name ASC" : value === "name_desc" ? "display_name DESC" : "created_at DESC"; }
 
 function safeSegment(value: string): string { return value.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 120) || "upload"; }
+
+async function uploadDigest(parts: Array<string | Uint8Array>): Promise<string> {
+  const encoded = parts.map((part) => typeof part === "string" ? new TextEncoder().encode(part) : part);
+  const total = encoded.reduce((sum, part) => sum + part.byteLength, 0);
+  const data = new Uint8Array(total);
+  let offset = 0;
+  for (const part of encoded) {
+    data.set(part, offset);
+    offset += part.byteLength;
+  }
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 type MediaRow = {
   id: string;
@@ -68,24 +82,35 @@ export async function handleCmsAdminMediaDeleteRequest(request: Request, appData
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
   if (!/^[a-zA-Z0-9_-]{1,160}$/.test(mediaId)) return json({ error: "invalid_media_id" }, 400);
-  const row = await mediaById(appDatabase, mediaId, organizationId);
-  if (!row) return json({ error: "not_found" }, 404);
-  const isCatalog = row.tags.includes("catalog-product");
-  if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:write" || (isCatalog && value === "catalog:write")))) return json({ error: "forbidden" }, 403);
-  const [cmsReferences, medusaReferences] = await Promise.all([
-    findMediaReferences(appDatabase, row.public_url, organizationId, false),
-    findMediaReferences(medusaDatabase, row.public_url, organizationId, true),
-  ]);
-  const references = [...cmsReferences, ...medusaReferences];
-  if (references.length > 0) return json({ error: "media_in_use", references }, 409);
-  const deleted = await appDatabase.query("UPDATE public.cms_media SET deleted_at = now() WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL", [mediaId, organizationId]);
-  if (!deleted.rowCount) return json({ error: "delete_conflict" }, 409);
-  const storageUrl = env.SUPABASE_STORAGE_URL ?? env.SUPABASE_URL;
-  const external = row.storage_path.startsWith("external/");
-  if (external || !storageUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ ok: true, storageCleanup: external ? "skipped" : "pending" });
-  const bucket = isCatalog ? "catalog" : "cms";
-  const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${row.storage_path}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: env.SUPABASE_SERVICE_ROLE_KEY } });
-  return json({ ok: true, storageCleanup: storage.ok ? "removed" : "pending" });
+  const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
+  if (!idempotencyKey) return json({ error: "idempotency_key_required" }, 400);
+  const requestHash = await uploadDigest([organizationId, mediaId]);
+  const result = await executeIdempotently(
+    new HyperdriveIdempotencyStore(appDatabase),
+    idempotencyKey,
+    requestHash,
+    async () => {
+      const row = await mediaById(appDatabase, mediaId, organizationId);
+      if (!row) return json({ error: "not_found" }, 404);
+      const isCatalog = row.tags.includes("catalog-product");
+      if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:write" || (isCatalog && value === "catalog:write")))) return json({ error: "forbidden" }, 403);
+      const [cmsReferences, medusaReferences] = await Promise.all([
+        findMediaReferences(appDatabase, row.public_url, organizationId, false),
+        findMediaReferences(medusaDatabase, row.public_url, organizationId, true),
+      ]);
+      const references = [...cmsReferences, ...medusaReferences];
+      if (references.length > 0) return json({ error: "media_in_use", references }, 409);
+      const deleted = await appDatabase.query("UPDATE public.cms_media SET deleted_at = now() WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL", [mediaId, organizationId]);
+      if (!deleted.rowCount) return json({ error: "delete_conflict" }, 409);
+      const storageUrl = env.SUPABASE_STORAGE_URL ?? env.SUPABASE_URL;
+      const external = row.storage_path.startsWith("external/");
+      if (external || !storageUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ ok: true, storageCleanup: external ? "skipped" : "pending" });
+      const bucket = isCatalog ? "catalog" : "cms";
+      const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${row.storage_path}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: env.SUPABASE_SERVICE_ROLE_KEY } });
+      return json({ ok: true, storageCleanup: storage.ok ? "removed" : "pending" });
+    },
+  );
+  return result.response;
 }
 
 export async function handleCmsAdminMediaUploadRequest(request: Request, database: WorkerDatabaseClient, env: Env): Promise<Response> {
@@ -96,8 +121,11 @@ export async function handleCmsAdminMediaUploadRequest(request: Request, databas
   if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "catalog:write"))) return json({ error: "forbidden" }, 403);
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+  const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
+  if (!idempotencyKey) return json({ error: "idempotency_key_required" }, 400);
   const storageUrl = env.SUPABASE_STORAGE_URL ?? env.SUPABASE_URL;
-  if (!storageUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ error: "storage_not_configured" }, 503);
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!storageUrl || !serviceKey) return json({ error: "storage_not_configured" }, 503);
   let form: FormData;
   try { form = await request.formData(); } catch { return json({ error: "invalid_form_data" }, 400); }
   const file = form.get("file");
@@ -107,14 +135,32 @@ export async function handleCmsAdminMediaUploadRequest(request: Request, databas
   if (!allowed.has(mime)) return json({ error: "unsupported_media_type" }, 400);
   const safeName = safeSegment(file.name);
   const productId = typeof form.get("productId") === "string" ? safeSegment(form.get("productId") as string) : "";
-  const path = `${productId ? `products/${productId}` : "public"}/${crypto.randomUUID()}-${safeName}`;
-  const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "POST", headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: env.SUPABASE_SERVICE_ROLE_KEY, "Content-Type": mime, "x-upsert": "false" }, body: await file.arrayBuffer() });
-  if (!storage.ok) return json({ error: "media_upload_failed" }, 502);
-  const publicUrl = `${storageUrl.replace(/\/$/, "")}/storage/v1/object/public/catalog/${path}`;
   const altText = mime.startsWith("image/") ? (typeof form.get("alt") === "string" && (form.get("alt") as string).trim() ? (form.get("alt") as string).trim().slice(0, 500) : `Product image: ${safeName.replace(/\.[^.]+$/, "")}`) : null;
-  const result = await database.query(`INSERT INTO public.cms_media (organization_id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags,created_at`, [organizationId, path, publicUrl, altText, mime, safeName, file.size, ["catalog-product"]]);
-  if (!result.rows[0]) { await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: env.SUPABASE_SERVICE_ROLE_KEY } }).catch(() => undefined); return json({ error: "media_metadata_failed" }, 502); }
-  return json({ data: result.rows[0] }, 201);
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const requestHash = await uploadDigest([
+    organizationId,
+    idempotencyKey,
+    productId,
+    safeName,
+    mime,
+    altText ?? "",
+    bytes,
+  ]);
+  const result = await executeIdempotently(
+    new HyperdriveIdempotencyStore(database),
+    idempotencyKey,
+    requestHash,
+    async () => {
+      const path = `${productId ? `products/${productId}` : "public"}/${crypto.randomUUID()}-${safeName}`;
+      const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "POST", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": mime, "x-upsert": "false" }, body: bytes });
+      if (!storage.ok) return json({ error: "media_upload_failed" }, 502);
+      const publicUrl = `${storageUrl.replace(/\/$/, "")}/storage/v1/object/public/catalog/${path}`;
+      const inserted = await database.query(`INSERT INTO public.cms_media (organization_id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags,created_at`, [organizationId, path, publicUrl, altText, mime, safeName, file.size, ["catalog-product"]]);
+      if (!inserted.rows[0]) { await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }).catch(() => undefined); return json({ error: "media_metadata_failed" }, 502); }
+      return json({ data: inserted.rows[0] }, 201);
+    },
+  );
+  return result.response;
 }
 export async function handleCmsAdminMediaListRequest(request: Request, database: WorkerDatabaseClient, env: Env): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);

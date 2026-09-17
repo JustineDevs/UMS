@@ -3,7 +3,12 @@ import path from "node:path";
 import "../runtime-logs-init";
 import { test } from "@playwright/test";
 
-const OUT_DIR = path.join(process.cwd(), "stress-test", "dogfood-output", "screenshots");
+const OUT_DIR = path.join(
+  process.cwd(),
+  "stress-test",
+  "dogfood-output",
+  "screenshots",
+);
 
 const ROUTES: { path: string; file: string }[] = [
   { path: "/", file: "home" },
@@ -51,7 +56,10 @@ test("screenshot first catalog PDP", async ({ page }) => {
   try {
     await first.waitFor({ state: "visible", timeout: 90_000 });
   } catch {
-    test.skip(true, "No products for PDP screenshot (run pnpm e2e:prep:medusa).");
+    test.skip(
+      true,
+      "No published products are available for the PDP screenshot.",
+    );
   }
   const slug = (await first.getAttribute("data-product-slug"))?.trim();
   if (!slug) {

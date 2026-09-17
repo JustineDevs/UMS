@@ -26,7 +26,7 @@ import {
 import { signInAsAdmin } from "../fixtures/admin-auth";
 import { getPayPalSandboxBuyer } from "../fixtures/sandbox-cards";
 
-const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 

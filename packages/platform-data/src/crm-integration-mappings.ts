@@ -720,7 +720,7 @@ function rowToMapping(row: Record<string, unknown>): CrmIntegrationMappingRow {
   };
 }
 
-export type ListCrmIntegrationMappingsOptions = {
+type ListCrmIntegrationMappingsOptions = {
   organizationId?: string;
   customerEmails?: string[];
   medusaCustomerIds?: string[];

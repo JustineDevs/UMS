@@ -24,7 +24,7 @@ function createMockSupabase(opts: {
     in: (_col: string, _vals: unknown[]) => Promise.resolve({ data, error: null }),
     update: (_vals: unknown) => makeUpdateChain(),
     maybeSingle: async () => ({ data: data[0] ?? null, error: null }),
-    then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
+    then: (resolve: (_v: { data: unknown[]; error: null }) => unknown) =>
       Promise.resolve({ data, error: null }).then(resolve),
   });
 

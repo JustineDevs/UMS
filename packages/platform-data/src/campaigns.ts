@@ -115,14 +115,6 @@ export async function updateCampaign(
   return rowToCampaign(data as Record<string, unknown>);
 }
 
-export type CampaignMessage = {
-  id: string;
-  campaign_id: string;
-  recipient_email: string;
-  sent_at: string;
-  status: string;
-};
-
 export async function recordCampaignMessage(
   supabase: SupabaseClient,
   input: {

@@ -34,10 +34,10 @@ A Worker-native music commerce monorepo built with Turborepo, pnpm workspaces, N
 
 ```text
 apps/
-├── storefront/   # Public customer storefront
-├── admin/        # Dashboard, POS, fulfillment
-├── api/          # Express health + compliance APIs
-└── medusa/       # Medusa 2 commerce backend
+├── web/          # Public storefront and admin dashboard
+└── terminal-agent/ # Local POS printing bridge
+workers/
+└── backend/      # Worker-native commerce, admin, webhook, and queue routes
 packages/
 ├── database/     # Legacy Supabase schema, migrations, seeds
 ├── rate-limits/  # Shared rate-limit policies
@@ -56,8 +56,8 @@ stress-test/      # E2E, release-gate, runtime helpers, and dev orchestration sc
 - Node 20.x
 - pnpm 10.x
 - Wrangler and a Cloudflare account with Hyperdrive and Queues configured
-- A Supabase project for the legacy/platform schema
-- A Postgres database for Medusa
+- Supabase Cloud for APP and commerce PostgreSQL
+- Cloudflare Hyperdrive bindings for both databases
 - A root `.env.local` for development and a root `.env.production` for production-mode parity
 
 ### Install
@@ -78,10 +78,8 @@ Copy `.env.example` to `.env.local`, then fill the required local-development va
 - `AUTH_SECRET`
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_MEDUSA_URL`
-- `MEDUSA_BACKEND_URL`
-- `JWT_SECRET`
-- `COOKIE_SECRET`
+- `API_URL`
+- `JWT_SECRET` / `COOKIE_SECRET` only where required by the Worker auth contract
 - `STORE_CORS`
 - `ADMIN_CORS`
 - `AUTH_CORS`
@@ -89,18 +87,18 @@ Copy `.env.example` to `.env.local`, then fill the required local-development va
 
 `NODE_ENV` must stay `development` in the local repo `.env.local`. Use `.env.production` for production host parity, and set `NODE_ENV=production` only in real deployment environment variables on Cloudflare Workers or Vercel.
 
-The Next.js apps load the root env through `scripts/load-monorepo-root-env.cjs`, which intentionally skips `NODE_ENV` so `next dev` and `next build` keep their own mode handling. Supabase Auth callback URLs are configured in the Supabase project and use each app's `/api/auth/callback` route.
+The unified Next.js application loads the root env through `scripts/load-monorepo-root-env.cjs`, which intentionally skips `NODE_ENV` so `next dev` and `next build` keep their own mode handling. Supabase Auth callback URLs are configured in the Supabase project and use the unified app's `/api/auth/callback` route.
 
-`pnpm dev` runs the Worker-native backend and the storefront/admin apps on the host. Configure local Hyperdrive-compatible database URLs in `.env.local`; Docker is not part of the backend runtime.
+`pnpm dev` runs the Worker-native backend and the unified web application on the host. Configure local Hyperdrive-compatible database URLs in `.env.local`; Docker is not part of the backend runtime.
 
 ### Database Setup
 
 ```bash
 pnpm db:migrate
-pnpm --filter medusa exec medusa db:migrate
+pnpm db:migrate:worker
 ```
 
-Run `pnpm db:seed` or `pnpm --filter medusa seed:ph` only when you need sample or baseline data.
+Run the Worker-compatible database seed only when you need sample or baseline data.
 
 ### Startup Sequence
 

@@ -7,15 +7,6 @@ export const CardAction = ({ className, ...props }: React.HTMLAttributes<HTMLDiv
   <div className={cn("col-start-2 row-span-2 row-start-1 self-start justify-self-end", className)} {...props} />
 );
 
-export const Avatar = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div data-slot="avatar" className={cn("relative flex size-8 shrink-0 overflow-hidden rounded-full bg-muted", className)} {...props} />
-);
-export const AvatarImage = ({ className, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => (
-  <img data-slot="avatar-image" className={cn("aspect-square size-full object-cover", className)} {...props} />
-);
-export const AvatarFallback = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div data-slot="avatar-fallback" className={cn("flex size-full items-center justify-center text-sm text-muted-foreground", className)} {...props} />
-);
 export const AvatarBadge = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span data-slot="avatar-badge" className={cn("absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-green-500", className)} {...props} />
 );

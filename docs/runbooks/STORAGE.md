@@ -25,7 +25,18 @@ runtime output. It does not remove `node_modules`, database volumes, or source.
 
 ## Package and Docker Caches
 
-Run these only when the report confirms the machine is under storage pressure:
+The recurring-safe Docker maintenance command removes old disposable
+containers, images, build cache, and networks. It never removes volumes:
+
+```bash
+pnpm docker:maintenance
+```
+
+It keeps seven days by default. Set `DOCKER_PRUNE_DAYS` to change the retention
+period. Run it weekly from the host scheduler if desired.
+
+For one-off package cleanup, run these only when the report confirms the
+machine is under storage pressure:
 
 ```bash
 pnpm store prune

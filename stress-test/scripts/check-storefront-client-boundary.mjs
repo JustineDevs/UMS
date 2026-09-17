@@ -9,7 +9,7 @@ import { attach } from "./lib/runtime-log-tee.mjs";
 
 attach(import.meta.url);
 
-const root = path.join(process.cwd(), "apps", "storefront", "src");
+const root = path.join(process.cwd(), "apps", "web", "src");
 const badPatterns = [
   /medusa-admin-fetch/,
   /from ["']@\/lib\/medusa-admin-fetch["']/,
@@ -44,4 +44,4 @@ for (const file of walk(root)) {
 if (failed) {
   process.exit(1);
 }
-console.log("[client-boundary] storefront client modules OK");
+console.log("[client-boundary] unified web client modules OK");

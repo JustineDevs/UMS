@@ -46,17 +46,6 @@ export async function enqueueJob(
   return data?.id ?? null;
 }
 
-export async function updateJobProgress(
-  supabase: SupabaseClient,
-  jobId: string,
-  progress: number,
-): Promise<void> {
-  await supabase
-    .from("background_jobs")
-    .update({ progress: Math.min(100, Math.max(0, progress)), status: "running" as JobStatus })
-    .eq("id", jobId);
-}
-
 export async function completeJob(
   supabase: SupabaseClient,
   jobId: string,
@@ -86,45 +75,6 @@ export async function failJob(
       completed_at: new Date().toISOString(),
     })
     .eq("id", jobId);
-}
-
-export async function listJobs(
-  supabase: SupabaseClient,
-  options?: { status?: JobStatus; limit?: number; jobType?: string },
-): Promise<BackgroundJob[]> {
-  let query = supabase
-    .from("background_jobs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(options?.limit ?? 50);
-
-  if (options?.status) {
-    query = query.eq("status", options.status);
-  }
-  if (options?.jobType) {
-    query = query.eq("job_type", options.jobType);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    console.error("[jobs] list failed:", error.message);
-    return [];
-  }
-  return (data ?? []) as BackgroundJob[];
-}
-
-export async function getJob(
-  supabase: SupabaseClient,
-  jobId: string,
-): Promise<BackgroundJob | null> {
-  const { data, error } = await supabase
-    .from("background_jobs")
-    .select("*")
-    .eq("id", jobId)
-    .single();
-
-  if (error) return null;
-  return data as BackgroundJob;
 }
 
 /**

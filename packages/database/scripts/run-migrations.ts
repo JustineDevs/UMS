@@ -146,6 +146,8 @@ const MIGRATION_FILES = [
   "112_worker_idempotency_records.sql",
   "113_worker_webhook_events.sql",
   "114_platform_runtime_settings.sql",
+  "115_customer_notification_preference_channels.sql",
+  "116_customer_order_preferences.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;

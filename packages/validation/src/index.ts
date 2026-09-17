@@ -130,6 +130,7 @@ export const storefrontShippingAddressSchema = z
   .object({
     id: z.string().uuid().optional(),
     label: z.string().trim().max(60).optional(),
+    isDefault: z.boolean().optional(),
     fullName: z.string().trim().min(1).max(120),
     phone: z
       .string()
@@ -244,3 +245,4 @@ export {
 } from "./medusa-inventory-math";
 
 export { sanitizeCmsHtml } from "./sanitize-cms-html";
+export { applyCmsDomOverrides } from "./cms-dom-overrides";

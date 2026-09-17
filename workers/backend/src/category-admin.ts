@@ -36,7 +36,12 @@ export async function handleCmsAdminCategoryRequest(request: Request, database: 
   if (!claims) return json({ error: "unauthorized" }, 401);
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
-  if (request.method === "GET") { const result = await database.query(`SELECT * FROM public.cms_category_content WHERE organization_id = $1 ORDER BY collection_handle, locale`, [organizationId]); return json({ data: result.rows }); }
+  if (request.method === "GET") {
+    const rawLimit = Number(new URL(request.url).searchParams.get("limit") ?? "100");
+    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
+    const result = await database.query(`SELECT * FROM public.cms_category_content WHERE organization_id = $1 ORDER BY collection_handle, locale LIMIT $2`, [organizationId, limit]);
+    return json({ data: result.rows, limit });
+  }
   if (!canWrite(claims)) return json({ error: "forbidden" }, 403);
   const key = request.headers.get("Idempotency-Key")?.trim();
   if (!key) return json({ error: "idempotency_key_required" }, 400);

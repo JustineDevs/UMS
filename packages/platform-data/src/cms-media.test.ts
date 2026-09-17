@@ -40,8 +40,8 @@ it("scopes storefront home media references to the requested organization", asyn
           return chain;
         },
         then(
-          resolve: (value: { data: never[] }) => unknown,
-          reject?: (reason: unknown) => unknown,
+          resolve: (_value: { data: never[] }) => unknown,
+          reject?: (_reason: unknown) => unknown,
         ) {
           return Promise.resolve({ data: [] as never[] }).then(resolve, reject);
         },

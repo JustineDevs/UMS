@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 
 test.describe("admin and storefront boundary regressions", () => {
@@ -10,7 +10,7 @@ test.describe("admin and storefront boundary regressions", () => {
 
     const callback = new URL(page.url()).searchParams.get("callbackUrl");
     expect(callback).toBe("/admin");
-    expect(page.url()).toMatch(/^http:\/\/localhost:3001\/sign-in\?/);
+    expect(page.url()).toMatch(/^http:\/\/127\.0\.0\.1:3000\/sign-in\?/);
   });
 
   test("product specifications fill the service-information space", async ({ page }) => {

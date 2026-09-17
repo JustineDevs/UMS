@@ -90,7 +90,7 @@ test.describe("@architecture @smoke Universal Music Store commerce architecture 
   test("10. Admin order surfaces: orders route requires auth (redirect or challenge)", async ({
     request,
   }) => {
-    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://localhost:3001";
+    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://127.0.0.1:3000";
     const res = await request.get(`${adminOrigin}/admin/orders`, {
       maxRedirects: 0,
     });
@@ -102,7 +102,7 @@ test.describe("@architecture @smoke Universal Music Store commerce architecture 
   });
 
   test("12. Receipts: admin receipts entry responds", async ({ request }) => {
-    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://localhost:3001";
+    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://127.0.0.1:3000";
     const res = await request.get(`${adminOrigin}/admin/receipts`, {
       maxRedirects: 0,
     });
@@ -110,7 +110,7 @@ test.describe("@architecture @smoke Universal Music Store commerce architecture 
   });
 
   test("13. Channel intake: admin channels entry responds", async ({ request }) => {
-    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://localhost:3001";
+    const adminOrigin = process.env.PLAYWRIGHT_ADMIN_ORIGIN ?? "http://127.0.0.1:3000";
     const res = await request.get(`${adminOrigin}/admin/channels`, {
       maxRedirects: 0,
     });

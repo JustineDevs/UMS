@@ -15,7 +15,7 @@ export async function getPublishedBlogPost(database: WorkerDatabaseClient, slug:
   return row && visible(row) ? row : null;
 }
 
-export async function listPublishedBlogPosts(database: WorkerDatabaseClient, locale: string, organizationId: string): Promise<BlogRow[]> {
+async function listPublishedBlogPosts(database: WorkerDatabaseClient, locale: string, organizationId: string): Promise<BlogRow[]> {
   const result = await database.query<BlogRow>(`SELECT ${fields} FROM public.cms_blog_posts WHERE organization_id = $1 AND locale = $2 ORDER BY published_at DESC NULLS LAST, updated_at DESC`, [organizationId, locale]);
   return result.rows.filter(visible);
 }

@@ -15,7 +15,8 @@
     "react-dom",
     "prop-types",
     "ts-node",
-    "yalc"
+    "yalc",
+    "turbo"
   ],
   "ignoreBinaries": [
     "next",
@@ -38,7 +39,7 @@
         "**/.next-production/**"
       ]
     },
-    "apps/admin": {
+    "apps/web": {
       "ignoreFiles": [
         "public/guide-demos/demo-mock-data.js",
         "public/guide-demos/demo-runtime.js",
@@ -51,17 +52,15 @@
         ]
       }
     },
-    "apps/storefront": {
-      "next": {
-        "entry": [
-          "src/app/**/*/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}",
-          "src/app/**/{page,layout,route,error,loading,not-found,template,default}.{ts,tsx,js,jsx}"
-        ]
-      }
-    },
     "apps/api": {
       "entry": [
+        "src/index.ts",
         "src/routes/**/*.ts"
+      ]
+    },
+    "apps/terminal-agent": {
+      "entry": [
+        "src/server.ts"
       ]
     },
     "apps/medusa": {
@@ -79,7 +78,7 @@
       ]
     },
     "packages/platform-data": {
-      "entry": ["src/index.ts"]
+      "entry": ["src/index.ts", "src/tracking-capability-revocation.ts"]
     },
     "packages/sdk": {
       "entry": ["src/index.ts", "src/cms-experiment-pick.ts"]

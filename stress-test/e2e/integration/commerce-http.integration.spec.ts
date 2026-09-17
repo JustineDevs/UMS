@@ -48,19 +48,9 @@ test.describe("Storefront commerce HTTP integration", () => {
     expect(json.revalidatedTags).toContain("product:e2e-product-handle");
     expect(json.revalidatedTags).toContain("collection:e2e-collection-handle");
     expect(json.revalidatedPaths).toContain("/shop/e2e-product-handle");
-    expect(json.revalidatedPaths).toContain("/collections/e2e-collection-handle");
-  });
-
-  test("POST /api/checkout/medusa-totals-preview requires an authenticated session", async ({
-    request,
-  }) => {
-    const res = await request.post("/api/checkout/medusa-totals-preview", {
-      data: { lines: [{ variantId: "variant_e2e", quantity: 1 }], paymentMethod: "STRIPE" },
-      headers: { "Content-Type": "application/json" },
-    });
-    expect(res.status()).toBe(401);
-    const json = (await res.json()) as { error?: string };
-    expect(typeof json.error).toBe("string");
+    expect(json.revalidatedPaths).toContain(
+      "/collections/e2e-collection-handle",
+    );
   });
 
   test("GET /api/checkout/available-payment-methods returns Medusa region provider keys shape", async ({

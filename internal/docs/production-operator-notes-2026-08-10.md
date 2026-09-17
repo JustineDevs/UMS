@@ -31,7 +31,7 @@ findings for the admin and storefront packages.
   dependency remediation.
 - Full-workspace audit: 0 critical, 0 high, 4 moderate, 1 low.
 - Final frozen-install rerun was blocked while pnpm attempted to replace a
-  root-owned `apps/admin/node_modules/@sentry/nextjs` symlink. The lockfile
+  root-owned `apps/web/node_modules/@sentry/nextjs` symlink. The lockfile
   was already confirmed current and the release gate passed using the existing
   dependency graph; clean-install proof must be rerun after ownership cleanup.
 

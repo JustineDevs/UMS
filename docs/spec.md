@@ -45,7 +45,7 @@ The platform SHALL maintain **one operational source of truth for live commerce*
 
 The implementation SHALL use the following stack:
 
-- Frontend applications: Next.js App Router (`apps/storefront`, `apps/admin`)
+- Frontend applications: Next.js App Router (`apps/web`, `apps/web`)
 - Commerce engine: **Medusa 2.x** (`apps/medusa`) with Store API and Admin API
 - Commerce database: **PostgreSQL** dedicated to Medusa (`MEDUSA_DB_URL` for Medusa only)
 - Legacy / auxiliary database: **PostgreSQL via Supabase** for OAuth-linked users, compliance tooling, and legacy schema exports (`packages/database`)
@@ -64,8 +64,8 @@ The repository SHALL be organized into application and package boundaries.
 
 #### 3.1 Applications
 
-- `apps/storefront` for the public commerce frontend (Medusa Store API + JS SDK for catalog, checkout, tracking)
-- `apps/admin` for dashboard, POS, and fulfillment UI; Next.js **Route Handlers** under `app/api/**` proxy to Medusa where needed
+- `apps/web` for the public commerce frontend (Medusa Store API + JS SDK for catalog, checkout, tracking)
+- `apps/web` for dashboard, POS, and fulfillment UI; Next.js **Route Handlers** under `app/api/**` proxy to Medusa where needed
 - `apps/medusa` for the **commerce backend**: cart, orders, payments, inventory locations, fulfillments, webhooks
 - `apps/api` for **health** (`/health`) and **compliance** (`/compliance`, internal key); not the primary commerce API surface
 
@@ -236,7 +236,7 @@ Payments SHALL be processed through **Medusa payment sessions** using whichever 
 The system SHALL support:
 
 - Storefront checkout: Medusa cart → `initiatePaymentSession` → provider-specific completion (hosted redirect, embedded flow, or other behavior defined by the active module)
-- POS orders via Medusa **draft orders** and conversion to orders (`apps/admin` BFF → Medusa Admin API)
+- POS orders via Medusa **draft orders** and conversion to orders (`apps/web` BFF → Medusa Admin API)
 - **Webhook-based payment confirmation** on **Medusa** where the provider supplies webhooks: signature verification in the corresponding payment module and idempotency via provider-specific dedup helpers where implemented
 - Payment and order state in **Medusa Postgres**
 
@@ -313,7 +313,7 @@ The implementation SHALL satisfy the following when production is configured wit
 - **`GET /health`** (and nested health routes) including optional Medusa reachability when `MEDUSA_BACKEND_URL` is set
 - **`/compliance`** routes (internal API key) for data-subject export and retention anonymization using **Supabase** via `packages/database`
 
-**Next.js (`apps/admin`, `apps/storefront`)** SHALL own:
+**Next.js (`apps/web`, `apps/web`)** SHALL own:
 
 - UI, Supabase Auth SSR session, **middleware** protecting `/admin/*` for staff roles
 - Server **Route Handlers** that call Medusa with secret keys (POS and order BFF patterns)

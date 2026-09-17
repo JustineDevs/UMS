@@ -1,6 +1,6 @@
 /**
  * Centralized env-driven limits for optional Express or proxy gateways.
- * Medusa duplicates checkout POST env reads in `apps/medusa/src/api/middlewares.ts` (CJS build; keep in sync).
+ * Checkout limits are enforced by the Worker route; keep this package independent of runtime-specific env reads.
  */
 
 export function readPositiveIntEnv(name: string, fallback: number): number {

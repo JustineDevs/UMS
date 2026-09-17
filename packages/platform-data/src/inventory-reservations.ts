@@ -56,7 +56,7 @@ export type FinalizeInventoryReservationInput = {
   idempotencyKey: string;
 };
 
-export type AttachMedusaReservationInput = FinalizeInventoryReservationInput & {
+type AttachMedusaReservationInput = FinalizeInventoryReservationInput & {
   medusaReservationId: string;
 };
 

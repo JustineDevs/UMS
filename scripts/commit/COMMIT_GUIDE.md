@@ -19,12 +19,12 @@ This runs the security-checked parallel Bash commit flow in `scripts/commit/para
 
 ```bash
 pnpm run ci:preflight
-pnpm run ci:preflight:full
+pnpm run ci:preflight
 pnpm run security:check
 ```
 
 - `pnpm run ci:preflight` runs Turbo `lint`, `typecheck`, and `test`
-- `pnpm run ci:preflight:full` adds the repo’s fuller CI-like verification path
+- `pnpm run build` is the explicit production-build verification path when a commit changes build inputs
 - `pnpm run security:check` runs the standalone sensitive-file scan without creating commits
 
 ## Recommended Flow

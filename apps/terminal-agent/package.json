@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --import tsx/esm src/server.ts",
+    "dev": "node ../../scripts/run-bounded-node.cjs 512 node --import tsx/esm src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@node-escpos/network-adapter": "0.0.1",
     "@universal-music-store/printer-core": "workspace:*",
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.114.0"
   },
   "devDependencies": {
     "@universal-music-store/config-typescript": "workspace:*",

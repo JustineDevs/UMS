@@ -10,7 +10,7 @@ import "../runtime-logs-init";
 import { test, expect } from "@playwright/test";
 import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
-const base = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+const base = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
 const PUBLIC_GET_ROUTES: string[] = [];
 
@@ -50,8 +50,10 @@ test.describe("Admin API — unauthenticated requests return 401", () => {
 
 test.describe("Admin API — authenticated requests return 200", () => {
   test.skip(
-    !process.env.ADMIN_ALLOWED_EMAILS || !process.env.AUTH_SECRET,
-    "Skipped: ADMIN_ALLOWED_EMAILS and AUTH_SECRET not set",
+    process.env.E2E_ADMIN_AUTH !== "1" ||
+      !process.env.ADMIN_ALLOWED_EMAILS ||
+      !process.env.AUTH_SECRET,
+    "Skipped: set E2E_ADMIN_AUTH=1 with ADMIN_ALLOWED_EMAILS and AUTH_SECRET after e2e:ensure-staff",
   );
 
   for (const route of AUTH_REQUIRED_GET_ROUTES) {

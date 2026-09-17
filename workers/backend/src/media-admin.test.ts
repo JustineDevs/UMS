@@ -32,15 +32,29 @@ test("CMS media upload writes to Supabase storage and persists tenant metadata",
   const calls: string[] = [];
   const database: WorkerDatabaseClient = { async query<T extends Record<string, unknown>>(text: string) { calls.push(text); return { rows: [{ id: "media-1", public_url: "https://supabase.example/storage/v1/object/public/catalog/public/file.png" }] as T[], rowCount: 1 }; }, async end() {} };
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async (input: RequestInfo | URL) => { calls.push(String(input)); return new Response("{}", { status: 200 }); };
+  globalThis.fetch = async (input: string | URL | Request) => { calls.push(String(input)); return new Response("{}", { status: 200 }); };
   try {
     const form = new FormData();
     form.set("file", new File([new Uint8Array([137, 80, 78, 71])], "cover.png", { type: "image/png" }));
-    const response = await handleCmsAdminMediaUploadRequest(new Request("https://api.example/admin/catalog/media", { method: "POST", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}` }, body: form }), database, { CMS_ADMIN_JWT_SECRET: "admin-secret", SUPABASE_STORAGE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "service-key" });
+    const response = await handleCmsAdminMediaUploadRequest(new Request("https://api.example/admin/catalog/media", { method: "POST", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}`, "Idempotency-Key": "media-upload-1" }, body: form }), database, { CMS_ADMIN_JWT_SECRET: "admin-secret", SUPABASE_STORAGE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "service-key" });
     assert.equal(response.status, 201);
     assert.ok(calls.some((call) => call.includes("/storage/v1/object/catalog/")));
     assert.ok(calls.some((query) => query.includes("INSERT INTO public.cms_media")));
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("CMS media upload rejects replay-unsafe requests without an idempotency key", async () => {
+  const response = await handleCmsAdminMediaUploadRequest(
+    new Request("https://api.example/admin/catalog/media", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}` },
+      body: new FormData(),
+    }),
+    { query: async () => ({ rows: [], rowCount: 0 }), end: async () => {} },
+    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "idempotency_key_required" });
 });
 
 test("CMS media delete refuses tenant-scoped assets still referenced by CMS content", async () => {
@@ -48,13 +62,15 @@ test("CMS media delete refuses tenant-scoped assets still referenced by CMS cont
   const database: WorkerDatabaseClient = {
     async query<T extends Record<string, unknown>>(text: string) {
       queries.push(text);
+      if (text.startsWith("INSERT INTO public.worker_idempotency_records")) return { rows: [{ state: "claimed", request_hash: "" }] as T[], rowCount: 1 };
+      if (text.startsWith("UPDATE public.worker_idempotency_records")) return { rows: [], rowCount: 1 };
       if (text.includes("FROM public.cms_media")) return { rows: [{ id: "media-1", storage_path: "public/file.png", public_url: "https://cdn.example/file.png", tags: ["catalog-product"] }] as T[], rowCount: 1 };
       if (text.includes("FROM public.cms_pages")) return { rows: [{ slug: "home", locale: "en" }] as T[], rowCount: 1 };
       return { rows: [], rowCount: 0 };
     },
     async end() {},
   };
-  const response = await handleCmsAdminMediaDeleteRequest(new Request("https://api.example/admin/cms/media/media-1", { method: "DELETE", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}` } }), database, database, { CMS_ADMIN_JWT_SECRET: "admin-secret" }, "media-1");
+  const response = await handleCmsAdminMediaDeleteRequest(new Request("https://api.example/admin/cms/media/media-1", { method: "DELETE", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}`, "Idempotency-Key": "media-delete-1" } }), database, database, { CMS_ADMIN_JWT_SECRET: "admin-secret" }, "media-1");
   assert.equal(response.status, 409);
   assert.match(await response.text(), /media_in_use/);
   assert.equal(queries.some((query) => query.startsWith("UPDATE public.cms_media")), false);
@@ -65,6 +81,8 @@ test("CMS media delete soft-deletes tenant metadata and removes its storage obje
   const database: WorkerDatabaseClient = {
     async query<T extends Record<string, unknown>>(text: string) {
       queries.push(text);
+      if (text.startsWith("INSERT INTO public.worker_idempotency_records")) return { rows: [{ state: "claimed", request_hash: "" }] as T[], rowCount: 1 };
+      if (text.startsWith("UPDATE public.worker_idempotency_records")) return { rows: [], rowCount: 1 };
       if (text.includes("FROM public.cms_media")) return { rows: [{ id: "media-1", storage_path: "public/file.png", public_url: "https://cdn.example/file.png", tags: ["catalog-product"] }] as T[], rowCount: 1 };
       if (text.startsWith("UPDATE public.cms_media")) return { rows: [], rowCount: 1 };
       return { rows: [], rowCount: 0 };
@@ -73,12 +91,27 @@ test("CMS media delete soft-deletes tenant metadata and removes its storage obje
   };
   const originalFetch = globalThis.fetch;
   const calls: string[] = [];
-  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => { calls.push(`${init?.method ?? "GET"} ${String(input)}`); return new Response(null, { status: 204 }); };
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => { calls.push(`${init?.method ?? "GET"} ${String(input)}`); return new Response(null, { status: 204 }); };
   try {
-    const response = await handleCmsAdminMediaDeleteRequest(new Request("https://api.example/admin/cms/media/media-1", { method: "DELETE", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}` } }), database, database, { CMS_ADMIN_JWT_SECRET: "admin-secret", SUPABASE_STORAGE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "service-key" }, "media-1");
+    const response = await handleCmsAdminMediaDeleteRequest(new Request("https://api.example/admin/cms/media/media-1", { method: "DELETE", headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}`, "Idempotency-Key": "media-delete-2" } }), database, database, { CMS_ADMIN_JWT_SECRET: "admin-secret", SUPABASE_STORAGE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "service-key" }, "media-1");
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { ok: true, storageCleanup: "removed" });
     assert.ok(queries.some((query) => query.startsWith("UPDATE public.cms_media")));
     assert.ok(calls.some((call) => call.includes("DELETE https://supabase.example/storage/v1/object/catalog/public/file.png")));
   } finally { globalThis.fetch = originalFetch; }
+});
+
+test("CMS media delete rejects replay-unsafe requests without an idempotency key", async () => {
+  const response = await handleCmsAdminMediaDeleteRequest(
+    new Request("https://api.example/admin/cms/media/media-1", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${await token({ organization_id: "org_1", permissions: ["catalog:write"] })}` },
+    }),
+    { query: async () => ({ rows: [], rowCount: 0 }), end: async () => {} },
+    { query: async () => ({ rows: [], rowCount: 0 }), end: async () => {} },
+    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+    "media-1",
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "idempotency_key_required" });
 });

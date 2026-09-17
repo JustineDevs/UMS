@@ -1,6 +1,6 @@
 import { Client } from "pg";
 
-export interface HyperdriveBinding {
+interface HyperdriveBinding {
   connectionString: string;
 }
 

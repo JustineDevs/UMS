@@ -3,7 +3,7 @@
  */
 
 const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
-export const adminBase = process.env.PLAYWRIGHT_ADMIN_URL ?? "http://localhost:3001";
+export const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const medusaBase = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
 export function strictCatalog(): boolean {

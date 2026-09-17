@@ -79,24 +79,24 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         feature: "Multi-channel ingestion",
         status: "covered",
         evidence: [
-          "apps/storefront/src/app/api/checkout/complete-medusa-cart/route.ts",
-          "apps/admin/src/app/api/medusa/shipments/route.ts",
-          "apps/admin/src/app/api/admin/tasks/today/route.ts",
+          "apps/web/src/app/api/checkout/complete-medusa-cart/route.ts",
+          "apps/web/src/app/api/medusa/shipments/route.ts",
+          "apps/web/src/app/api/admin/tasks/today/route.ts",
         ],
         notes: "Checkout, fulfillment, and admin task flows already create and surface order rows from multiple entry points.",
       },
       {
         feature: "Geocoding and address verification",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts", "apps/admin/src/lib/logistics-provider-client.ts"],
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts", "apps/web/src/lib/logistics-provider-client.ts"],
         notes: "Strict address input is normalized through the configured geocoding provider; provider credentials remain a deployment prerequisite.",
       },
       {
         feature: "Dynamic SLA assignment",
         status: "covered",
         evidence: [
-          "apps/storefront/src/components/ShippingDeliveryEstimate.tsx",
-          "apps/storefront/src/app/(public)/track/[orderId]/page.tsx",
+          "apps/web/src/components/ShippingDeliveryEstimate.tsx",
+          "apps/web/src/app/(public)/track/[orderId]/page.tsx",
         ],
         notes: "The shared SLA classifier assigns immediate, same-day, or next-day service from distance and cutoff time.",
       },
@@ -130,7 +130,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Geofenced automated dispatch",
         status: "partial",
-        evidence: ["apps/admin/src/app/api/integrations/couriers/route.ts"],
+        evidence: ["apps/web/src/app/api/integrations/couriers/route.ts"],
         notes: "The admin can list couriers, but it does not auto-match the closest available courier within a spatial radius.",
       },
       {
@@ -163,15 +163,15 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "High-frequency telemetry",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/integrations/couriers/telemetry/route.ts", "apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts"],
+        evidence: ["apps/web/src/app/api/integrations/couriers/telemetry/route.ts", "apps/web/src/app/api/admin/delivery-logistics/operations/route.ts"],
         notes: "Signed courier-device telemetry is persisted with tenant and idempotency boundaries.",
       },
       {
         feature: "Predictive ETA engine",
         status: "partial",
         evidence: [
-          "apps/storefront/src/lib/medusa-track-fetch.ts",
-          "apps/storefront/src/app/(public)/track/[orderId]/page.tsx",
+          "apps/web/src/lib/medusa-track-fetch.ts",
+          "apps/web/src/app/(public)/track/[orderId]/page.tsx",
         ],
         notes: "Expected delivery dates are rendered when present, but there is no traffic-adjusted ETA predictor.",
       },
@@ -179,8 +179,8 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         feature: "Webhook tracking webview",
         status: "covered",
         evidence: [
-          "apps/storefront/src/app/api/tracking-link/route.ts",
-          "apps/storefront/src/app/(public)/track/[orderId]/page.tsx",
+          "apps/web/src/app/api/tracking-link/route.ts",
+          "apps/web/src/app/(public)/track/[orderId]/page.tsx",
         ],
         notes: "Customers can open tokenized tracking links and return to the public tracking page without a login.",
       },
@@ -188,8 +188,8 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         feature: "Milestone event logging",
         status: "partial",
         evidence: [
-          "apps/medusa/src/lib/jnt-status-map.ts",
-          "apps/admin/src/lib/medusa-order-bridge.ts",
+          "workers/backend/src/delivery-admin.ts",
+          "apps/web/src/lib/medusa-order-bridge.ts",
         ],
         notes: "Carrier statuses map into internal shipment states, but there is no full event-sourced delivery state machine.",
       },
@@ -197,7 +197,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         feature: "Exception handling and alerts",
         status: "partial",
         evidence: [
-          "apps/admin/src/app/api/admin/tasks/today/route.ts",
+          "apps/web/src/app/api/admin/tasks/today/route.ts",
           "packages/platform-data/src/payment-platform-metrics.ts",
         ],
         notes: "The system surfaces stale sessions and shipment-due tasks, but transit exceptions are not a dedicated alert stream.",
@@ -214,7 +214,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Multi-modal verification",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts"],
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts"],
         notes: "Signature, photo, OTP, and contact-log proofs are schema-validated and persisted.",
       },
       {
@@ -226,7 +226,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Geofence PoD enforcement",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/platform-data/src/delivery-enterprise.ts"],
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/platform-data/src/delivery-enterprise.ts"],
         notes: "Verified delivery status requires a destination geofence when destination coordinates are available.",
       },
       {
@@ -247,7 +247,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Cash-on-delivery custodial tracking",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/database/supabase/migrations/047_pos_logistics_channel_enterprise.sql"],
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/database/supabase/migrations/047_pos_logistics_channel_enterprise.sql"],
         notes: "COD collection and remittance entries are stored in a tenant/courier/idempotency-key ledger.",
       },
       {
@@ -265,7 +265,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Driver earnings and toll splits",
         status: "covered",
-        evidence: ["apps/admin/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/platform-data/src/delivery-enterprise.ts"],
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts", "packages/platform-data/src/delivery-enterprise.ts"],
         notes: "Driver net earnings, tips, tolls, and settlement status are calculated and persisted; statutory payroll remains a separate jurisdictional module.",
       },
     ],

@@ -41,6 +41,9 @@ export * from "./admin-refund.ts";
 export * from "./compliance.ts";
 export * from "./wishlist.ts";
 export * from "./jobs.ts";
+export * from "./reviews.ts";
+export * from "./public-marketing.ts";
+export * from "./order-preferences.ts";
 
 interface WorkerEnv extends BackendEnv {
   COMMERCE_QUEUE?: Queue<CommerceJob>;

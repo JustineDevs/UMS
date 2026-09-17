@@ -16,7 +16,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Functions / Classes Changed:** (n/a)
 
-**Behavior Implemented:** `apps/admin/src/components/catalog/ProductEditorForm.tsx` implements create and edit flows calling `/api/admin/catalog/products` with variant matrix, stock payload, mutation classification toasts, and related catalog UX (per source trace).
+**Behavior Implemented:** `apps/web/src/components/catalog/ProductEditorForm.tsx` implements create and edit flows calling `/api/admin/catalog/products` with variant matrix, stock payload, mutation classification toasts, and related catalog UX (per source trace).
 
 **Missing For Completion:** Automated admin E2E or integration tests proving full catalog CRUD in CI. Prior checklist claim of 24 code `TODO`s is **not supported** by literal `TODO` comments in the current file.
 
@@ -62,7 +62,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none in this pass)
 
-**Behavior Implemented:** `apps/admin/src/app/(dashboard)/admin/pos/page.tsx` wires `handleCommitSale` to Medusa `commit-sale`, offline queue, receipt print helper, shift fetch, void modal, and related POS UX (per source trace).
+**Behavior Implemented:** `apps/web/src/app/(dashboard)/admin/pos/page.tsx` wires `handleCommitSale` to Medusa `commit-sale`, offline queue, receipt print helper, shift fetch, void modal, and related POS UX (per source trace).
 
 **Missing For Completion:** Playwright or scripted POS journey in CI; load test for offline sync. Prior `TODO` count claim is **not supported** by literal `TODO` comments.
 
@@ -108,7 +108,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none in this pass)
 
-**Behavior Implemented:** `apps/storefront/src/app/api/cron/finalize-payment-attempts/route.ts` implements secret check and finalize delegation. Scheduled recovery is executed by the repository GitHub Actions workflow; the Cloudflare Worker remains the backend origin. Root and `apps/storefront/vercel.json` have **no** `crons` block for Vercel-native scheduling.
+**Behavior Implemented:** `apps/web/src/app/api/cron/finalize-payment-attempts/route.ts` implements secret check and finalize delegation. Scheduled recovery is executed by the repository GitHub Actions workflow; the Cloudflare Worker remains the backend origin. Root and `apps/web/vercel.json` have **no** `crons` block for Vercel-native scheduling.
 
 **Scheduling decision:** Vercel Cron is intentionally not used. Scheduled storefront recovery runs from `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`; webhook delivery remains provider-driven and immediate.
 
@@ -130,7 +130,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/components/FulfillmentPanel.tsx` posts shipments to `/api/medusa/shipments` and PATCHes order status via `/api/medusa/orders/:id` (per source trace).
+**Behavior Implemented:** `apps/web/src/components/FulfillmentPanel.tsx` posts shipments to `/api/medusa/shipments` and PATCHes order status via `/api/medusa/orders/:id` (per source trace).
 
 **Missing For Completion:** Automated test proving partial line fulfillment and shipment tracking registration if those code paths are required for your process; confirm against `docs/partial-fulfillment.md` for subset fulfillments.
 
@@ -152,7 +152,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/storefront/src/app/(public)/checkout/checkout-client.tsx` implements profile gates, Medusa totals panel, embedded PSP UI, and pay flow orchestration (no literal `TODO` markers found in prior grep).
+**Behavior Implemented:** `apps/web/src/app/(public)/checkout/checkout-client.tsx` implements profile gates, Medusa totals panel, embedded PSP UI, and pay flow orchestration (no literal `TODO` markers found in prior grep).
 
 **Missing For Completion:** Full PSP matrix in CI (item 25); security review of payment state transitions.
 
@@ -192,7 +192,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/components/cms/CmsPageBlocksEditor.tsx` present.
+**Behavior Implemented:** `apps/web/src/components/cms/CmsPageBlocksEditor.tsx` present.
 
 **Missing For Completion:** Block add/remove/reorder, type switching, API persistence verified by tests.
 
@@ -212,7 +212,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/app/(dashboard)/admin/loyalty/page.tsx` wires enroll, rewards, points adjust, and lookup via `/api/admin/loyalty/*` (per source trace).
+**Behavior Implemented:** `apps/web/src/app/(dashboard)/admin/loyalty/page.tsx` wires enroll, rewards, points adjust, and lookup via `/api/admin/loyalty/*` (per source trace).
 
 **Missing For Completion:** **Checkout coupling:** points do not change cart totals; align with `docs/data-ownership.md` and Medusa Promotions (see [CORRECTED-AUDIT-AND-OSS-GAPS.md](./CORRECTED-AUDIT-AND-OSS-GAPS.md) Gap B). Single-ledger ADR still required (item 22).
 
@@ -232,7 +232,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/app/(dashboard)/admin/devices/page.tsx` implements create, edit with config patch, and list flows against `/api/admin/devices` (per source trace).
+**Behavior Implemented:** `apps/web/src/app/(dashboard)/admin/devices/page.tsx` implements create, edit with config patch, and list flows against `/api/admin/devices` (per source trace).
 
 **Missing For Completion:** E2E with `pos_devices` rows and heartbeat UI verification in CI.
 
@@ -252,7 +252,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/components/cms/CmsExperimentsManager.tsx` persists experiment rows and references `docs/cms-experiment-storefront-keys.md`; SDK exports `cms-experiment-pick`.
+**Behavior Implemented:** `apps/web/src/components/cms/CmsExperimentsManager.tsx` persists experiment rows and references `docs/cms-experiment-storefront-keys.md`; SDK exports `cms-experiment-pick`.
 
 **Missing For Completion:** Confirm storefront uses `cms-experiment-pick` for assignment and metrics, **or** adopt GrowthBook and retire custom storage (see [CORRECTED-AUDIT-AND-OSS-GAPS.md](./CORRECTED-AUDIT-AND-OSS-GAPS.md) Gap D).
 
@@ -272,7 +272,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/app/(dashboard)/admin/campaigns/page.tsx` calls `POST /api/admin/campaigns/:id/execute` and displays `sent` count (per source trace).
+**Behavior Implemented:** `apps/web/src/app/(dashboard)/admin/campaigns/page.tsx` calls `POST /api/admin/campaigns/:id/execute` and displays `sent` count (per source trace).
 
 **Missing For Completion:** **Verify** `execute` route actually invokes Resend (or other mailer) versus only updating timestamps; align with `docs/data-ownership.md` (messaging vs Medusa price rules).
 
@@ -292,7 +292,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/app/(dashboard)/admin/crm/CrmClientEnhancements.tsx` exists.
+**Behavior Implemented:** `apps/web/src/app/(dashboard)/admin/crm/CrmClientEnhancements.tsx` exists.
 
 **Missing For Completion:** Complete enhancement behaviors or narrow product name to match actual capabilities.
 
@@ -310,7 +310,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** Intake route uses hardcoded `email: "chat-intake@instore.local"` in `apps/admin/src/app/api/integrations/chat-orders/intake/route.ts`.
+**Behavior Implemented:** Intake route uses hardcoded `email: "chat-intake@instore.local"` in `apps/web/src/app/api/integrations/chat-orders/intake/route.ts`.
 
 **Missing For Completion:** `CHAT_INTAKE_EMAIL` (or similar) env with validation; complete draft conversion and item entry flows per checklist.
 
@@ -332,7 +332,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/storefront/src/components/AccountProfilePanel.tsx` exists; checkout uses profile gate in `use-checkout-client.ts`.
+**Behavior Implemented:** `apps/web/src/components/AccountProfilePanel.tsx` exists; checkout uses profile gate in `use-checkout-client.ts`.
 
 **Missing For Completion:** Verify all profile fields persist via Medusa customer APIs and match onboarding contract.
 
@@ -410,7 +410,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/admin/src/lib/channel-webhook-policy.ts` and `apps/admin/src/app/api/integrations/channels/webhook/route.ts` read secret; policy distinguishes environments.
+**Behavior Implemented:** `apps/web/src/lib/channel-webhook-policy.ts` and `apps/web/src/app/api/integrations/channels/webhook/route.ts` read secret; policy distinguishes environments.
 
 **Missing For Completion:** Enforce secret on all non-development deployments (including staging) per checklist, not only Vercel production / `NODE_ENV=production` matrix.
 
@@ -490,7 +490,7 @@ Evidence date: repository scan on the active workspace. Verdicts use **current c
 
 **Files Changed:** (none)
 
-**Behavior Implemented:** `apps/storefront/src/app/api/cart/abandonment/route.ts` counts prior sends in 48h window in application logic.
+**Behavior Implemented:** `apps/web/src/app/api/cart/abandonment/route.ts` counts prior sends in 48h window in application logic.
 
 **Missing For Completion:** DB uniqueness or idempotency key constraint for `(email, campaign window)` or equivalent to survive races.
 

@@ -1,0 +1,52 @@
+import { logAdminApiEvent } from "@/lib/admin-api-log";
+import { getCorrelationId } from "@/lib/request-correlation";
+import { requireStaffSessionWithPermission } from "@/lib/requireStaffSession";
+import { tagResponse } from "@/lib/staff-api-response";
+import { createInventoryStream } from "@/lib/admin-inventory-stream";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const ALLOWED_PAGE_SIZES = new Set([25, 50, 100]);
+
+function parseInventoryQuery(req: Request): { page: number; pageSize: number } {
+  const url = new URL(req.url);
+  const pageRaw = Number(url.searchParams.get("page") ?? "1");
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+  const sizeRaw = Number(url.searchParams.get("pageSize") ?? "25");
+  const pageSize = ALLOWED_PAGE_SIZES.has(sizeRaw) ? sizeRaw : 25;
+  return { page, pageSize };
+}
+
+export async function GET(req: Request) {
+  const correlationId = getCorrelationId(req);
+  const staff = await requireStaffSessionWithPermission("inventory:read");
+  if (!staff.ok) {
+    return tagResponse(staff.response, correlationId);
+  }
+
+  const { page, pageSize } = parseInventoryQuery(req);
+  const offset = (page - 1) * pageSize;
+
+  logAdminApiEvent({
+    route: "GET /api/admin/inventory/stream",
+    correlationId,
+    phase: "start",
+    detail: { page, pageSize },
+  });
+
+  const stream = createInventoryStream(req, {
+    page,
+    pageSize,
+    offset,
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "x-request-id": correlationId,
+    },
+  });
+}

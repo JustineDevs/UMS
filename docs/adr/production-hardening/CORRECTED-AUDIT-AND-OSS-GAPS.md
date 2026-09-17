@@ -14,7 +14,7 @@ The following areas show **implemented request handlers and UI wiring** in the c
 |------|-------------------|
 | Terminal agent | `POST /print-receipt`, `/print-label`, `/open-drawer`, `/cloudprnt`, `/status`, `/devices` in `apps/terminal-agent/src/server.ts` |
 | Catalog editor | Create/edit via `/api/admin/catalog/products` in `ProductEditorForm.tsx` |
-| POS page | `handleCommitSale`, offline queue, print hooks in `apps/admin/src/app/(dashboard)/admin/pos/page.tsx` |
+| POS page | `handleCommitSale`, offline queue, print hooks in `apps/web/src/app/(dashboard)/admin/pos/page.tsx` |
 | Loyalty admin | Accounts, rewards, enroll, points, lookup in `loyalty/page.tsx` + admin APIs |
 | Fulfillment | `addShipment`, `patchOrder` via `/api/medusa/shipments` and orders PATCH in `FulfillmentPanel.tsx` |
 | Devices | CRUD and config patch in `devices/page.tsx` |
@@ -54,7 +54,7 @@ The following areas show **implemented request handlers and UI wiring** in the c
 
 ### Gap E — Payment recovery cron not in Vercel config
 
-- Route `GET /api/cron/finalize-payment-attempts` is implemented; **`apps/storefront/vercel.json` has no `crons` array**. GitHub Actions remains the scheduler; the public backend is a Wrangler-managed Worker.
+- Route `GET /api/cron/finalize-payment-attempts` is implemented; **`apps/web/vercel.json` has no `crons` array**. GitHub Actions remains the scheduler; the public backend is a Wrangler-managed Worker.
 
 **Fix direction:** Use the existing GitHub Actions scheduler in `.github/workflows/storefront-cron.yml` with `STOREFRONT_CRON_SECRET`. Vercel Cron is intentionally excluded because this topology does not use it.
 

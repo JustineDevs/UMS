@@ -3,7 +3,7 @@ import path from "node:path";
 import { chromium } from "@playwright/test";
 
 const root = process.cwd();
-const apiRoot = path.join(root, "apps/admin/src/app/api");
+const apiRoot = path.join(root, "apps/web/src/app/api");
 const outputYaml = path.join(root, "internal/reference/admin-open-api.yaml");
 const outputPdf = path.join(root, "internal/reference/admin-open-api.pdf");
 
@@ -175,12 +175,12 @@ const yaml = [
   "  description: >",
   "    English reference documentation for protected administration operations.",
   "",
-  "    All endpoints are implemented under the Next.js admin application and are",
+  "    All endpoints are implemented under the unified Next.js web application and are",
   "    subject to staff authentication, permission checks, audit logging, and",
   "    domain-specific validation.",
   "servers:",
   "  - url: /api",
-  "    description: Admin application API",
+  "    description: Unified web application admin API",
   "security:",
   "  - AdminSession: []",
   "tags:",
@@ -270,8 +270,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><title>Universal 
 @page { size: A4; margin: 18mm 15mm; } body { font-family: Arial, sans-serif; color: #17202a; font-size: 10px; line-height: 1.45; } h1 { font-size: 26px; margin: 0 0 8px; } h2 { font-size: 16px; margin: 24px 0 8px; border-bottom: 1px solid #d7dee5; padding-bottom: 4px; } h3 { font-size: 12px; margin: 16px 0 5px; } p { margin: 5px 0; } .muted { color: #5d6b78; } .cover { min-height: 235mm; display: flex; flex-direction: column; justify-content: center; } .pill { display: inline-block; background: #e7f0f7; color: #16496b; padding: 4px 8px; border-radius: 12px; margin: 3px 4px 3px 0; } table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; } th, td { border: 1px solid #d7dee5; padding: 5px 6px; text-align: left; vertical-align: top; } th { background: #f0f4f7; } code { font-family: monospace; font-size: 9px; } .break { page-break-before: always; } .note { background: #f6f8fa; border-left: 3px solid #477a9e; padding: 8px; } </style></head><body>
 <section class="cover"><div class="pill">OpenAPI 3.1.0</div><h1>Universal Music Store<br>Admin Open API</h1><p class="muted">English administration operations reference</p><p>Version 1.0.0</p><p class="muted">Generated from the implemented admin route tree on ${new Date().toISOString().slice(0, 10)}.</p></section>
 <section class="break"><h2>Authentication and Operations</h2><p>Admin operations require an authenticated staff session or an approved internal bearer credential. Each protected route must enforce the relevant permission before mutating or exposing commerce data.</p><div class="note"><strong>Hardening guidance:</strong> preserve request correlation IDs, audit mutations, redact credentials and payment data, validate payloads server-side, and return least-privilege responses.</div><h3>Authentication schemes</h3><table><thead><tr><th>Scheme</th><th>Transport</th><th>Use</th></tr></thead><tbody><tr><td>AdminSession</td><td>Cookie</td><td>Interactive staff session from admin sign-in.</td></tr><tr><td>StaffApiKey</td><td>Bearer token</td><td>Approved internal integrations and automation.</td></tr></tbody></table><h3>Tags</h3><p>${groups.map((group) => `<span class="pill">${escapeHtml(group)}</span>`).join("")}</p></section>
-<section class="break"><h2>Endpoint Index</h2><p>${endpoints.length} operations discovered from the admin application route handlers.</p><table><thead><tr><th>Method</th><th>Path</th><th>Domain</th><th>Implementation</th></tr></thead><tbody>${endpointRows}</tbody></table></section>
-<section class="break"><h2>Response and Security Contract</h2><h3>Successful responses</h3><p>Each operation has its own request and response schema generated from the route handler source, with strict object boundaries and a runtime source reference. Mutation operations require an Idempotency-Key unless they are signed webhook deliveries.</p><h3>Error responses</h3><table><thead><tr><th>Status</th><th>Meaning</th><th>Required hardening behavior</th></tr></thead><tbody><tr><td>400</td><td>Invalid request</td><td>Validate and reject malformed or unsafe input.</td></tr><tr><td>401</td><td>Unauthenticated or unauthorized</td><td>Do not disclose protected resource details.</td></tr><tr><td>409</td><td>Replay or concurrency conflict</td><td>Do not execute a duplicate side effect.</td></tr><tr><td>413</td><td>Payload too large</td><td>Reject before parsing or persistence.</td></tr><tr><td>500</td><td>Internal failure</td><td>Log with correlation ID and return a safe public message.</td></tr></tbody></table><h3>Source of truth</h3><p class="muted">The companion YAML file is generated from route handlers under <code>apps/admin/src/app/api</code>. Contract metadata is emitted per operation so route, permission, tenant, and replay-control drift is visible in review.</p></section>
+<section class="break"><h2>Endpoint Index</h2><p>${endpoints.length} operations discovered from the unified web application's admin route handlers.</p><table><thead><tr><th>Method</th><th>Path</th><th>Domain</th><th>Implementation</th></tr></thead><tbody>${endpointRows}</tbody></table></section>
+<section class="break"><h2>Response and Security Contract</h2><h3>Successful responses</h3><p>Each operation has its own request and response schema generated from the route handler source, with strict object boundaries and a runtime source reference. Mutation operations require an Idempotency-Key unless they are signed webhook deliveries.</p><h3>Error responses</h3><table><thead><tr><th>Status</th><th>Meaning</th><th>Required hardening behavior</th></tr></thead><tbody><tr><td>400</td><td>Invalid request</td><td>Validate and reject malformed or unsafe input.</td></tr><tr><td>401</td><td>Unauthenticated or unauthorized</td><td>Do not disclose protected resource details.</td></tr><tr><td>409</td><td>Replay or concurrency conflict</td><td>Do not execute a duplicate side effect.</td></tr><tr><td>413</td><td>Payload too large</td><td>Reject before parsing or persistence.</td></tr><tr><td>500</td><td>Internal failure</td><td>Log with correlation ID and return a safe public message.</td></tr></tbody></table><h3>Source of truth</h3><p class="muted">The companion YAML file is generated from route handlers under <code>apps/web/src/app/api</code>. Contract metadata is emitted per operation so route, permission, tenant, and replay-control drift is visible in review.</p></section>
 </body></html>`;
 
 const browser = await chromium.launch({ headless: true });
