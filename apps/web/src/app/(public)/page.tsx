@@ -1,4 +1,3 @@
-import nextDynamic from "next/dynamic";
 import { unstable_cache } from "next/cache";
 import {
   DEFAULT_STOREFRONT_HOME_PAYLOAD,
@@ -7,6 +6,7 @@ import {
 } from "@universal-music-store/platform-data";
 import Link from "next/link";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
+import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
 import { StorefrontHomePreviewBridge } from "@/components/StorefrontHomePreviewBridge";
 import { fetchFeaturedProducts } from "@/lib/catalog-fetch";
 import {
@@ -49,22 +49,6 @@ function loadHomepageAuxiliaryReadWithinDeadline<T>(read: Promise<T>, fallback: 
     ),
   ]);
 }
-
-const HomeScrollExperience = nextDynamic(
-  () =>
-    import("@/components/home/HomeScrollExperience").then((m) => ({
-      default: m.HomeScrollExperience,
-    })),
-  {
-    loading: () => (
-      <div
-        className="min-h-[min(72svh,40rem)] w-full animate-pulse bg-surface-container-low"
-        aria-hidden
-      />
-    ),
-    ssr: true,
-  },
-);
 
 export const dynamic = "force-dynamic";
 
