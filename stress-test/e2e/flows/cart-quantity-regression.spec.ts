@@ -29,7 +29,7 @@ test.describe("cart server-rendered loading state", () => {
   });
 });
 
-test("cart ignores legacy max-stock state and supports exact inline quantity edits", async ({
+test("cart ignores legacy max-stock state and rejects over-limit inline quantity edits", async ({
   page,
 }) => {
   await page.route("**/api/cart/reconcile", async (route) => {
@@ -106,18 +106,19 @@ test("cart ignores legacy max-stock state and supports exact inline quantity edi
 
   await quantity.fill("12");
   await quantity.press("Enter");
-  await expect(quantity).toHaveValue("12");
+  await expect(quantity).toHaveValue("1");
   await expect(
     page.getByText("Only 5 available. Reduce the quantity before checkout."),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Resolve unavailable items" }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Proceed to checkout" })).toBeVisible();
 
   await page.reload();
   await expect(
     page.getByRole("spinbutton", { name: /quantity for canary/i }),
-  ).toHaveValue("12");
+  ).toHaveValue("1");
 
   const reloadedQuantity = page.getByRole("spinbutton", {
     name: /quantity for canary/i,
