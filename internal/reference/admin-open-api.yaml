@@ -13393,7 +13393,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 5ee47969bb9cd8b63f6f42c576d8e9bdcc948aa44a5393d1b75c513644f865a1
+      x-source-sha256: f5fb10cf7934882ea466f502bedb2287345429829889755ab354a454b4043f16
       security: []
       responses:
         "200":
@@ -15808,7 +15808,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /shop/product. Runtime source: apps/web/src/app/api/shop/product/route.ts."
-      x-source-sha256: 5ee47969bb9cd8b63f6f42c576d8e9bdcc948aa44a5393d1b75c513644f865a1
+      x-source-sha256: f5fb10cf7934882ea466f502bedb2287345429829889755ab354a454b4043f16
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:

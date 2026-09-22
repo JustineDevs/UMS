@@ -15,7 +15,7 @@ function errorResponse(error: string, status: number, retryAfter?: number) {
       status,
       headers: {
         "Cache-Control": "no-store",
-        "Referrer-Policy": "no-referrer",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
         ...(retryAfter == null ? {} : { "Retry-After": String(retryAfter) }),
       },
     },
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=60",
-        "Referrer-Policy": "no-referrer",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
         "Vary": "Accept-Encoding",
       },
     },
