@@ -8,6 +8,42 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
+// The web TypeScript graph needs more than 1 GiB on a cold cache. Keep the
+// lower bound above the known OOM point while limiting concurrency separately.
+const ciHeapMb = boundedInteger(
+  "UVS_CI_MAX_OLD_SPACE_MB",
+  process.env.UVS_CI_MAX_OLD_SPACE_MB,
+  1536,
+  8192,
+  1536,
+);
+const ciConcurrency = boundedInteger(
+  "UVS_CI_CONCURRENCY",
+  process.env.UVS_CI_CONCURRENCY,
+  1,
+  4,
+  1,
+);
+
+function boundedInteger(name, value, min, max, fallback) {
+  if (value === undefined || value === "") return fallback;
+  const parsed = Number(value);
+  if (Number.isInteger(parsed) && parsed >= min && parsed <= max) return parsed;
+  throw new Error(`${name} must be an integer between ${min} and ${max}; received ${JSON.stringify(value)}`);
+}
+
+function boundedEnvironment() {
+  const nodeOptions = (process.env.NODE_OPTIONS || "")
+    .replace(/(?:^|\s)--max-old-space-size=\S+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return {
+    ...process.env,
+    NODE_OPTIONS: `${nodeOptions} --max-old-space-size=${ciHeapMb}`.trim(),
+    TURBO_CONCURRENCY: String(ciConcurrency),
+    UV_THREADPOOL_SIZE: process.env.UV_THREADPOOL_SIZE || "2",
+  };
+}
 
 function run(label, command, args, env = process.env) {
   console.log(`\n━━━ ${label} ━━━\n`);
@@ -54,8 +90,9 @@ if (process.env.PREFLIGHT_SKIP_RUNTIME_CHECK !== "1") {
       "typecheck",
       "test",
       "--continue",
-      "--concurrency=2",
+      `--concurrency=${ciConcurrency}`,
     ],
+    boundedEnvironment(),
   );
   if (code !== 0) {
     process.exit(code);

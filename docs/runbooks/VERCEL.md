@@ -2,6 +2,23 @@
 
 This runbook covers the unified Next.js web application on Vercel. It serves both customer-facing storefront routes and protected admin routes. Production also requires the reachable **Cloudflare Worker backend** configured by `API_URL`, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the payment recovery cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. The backend deployment contract is in `wrangler.jsonc`.
 
+Run the read-only backend smoke matrix after a Worker deployment:
+
+```bash
+pnpm backend:worker:smoke
+```
+
+It checks both configured preview and production Worker URLs for Worker-native
+health, both Hyperdrive database roles, a catalog read, and unauthenticated
+admin rejection. Set `UVS_WORKER_SMOKE_URLS` to a comma-separated HTTPS list
+when checking a different deployment. This does not prove provider webhooks,
+queue retries, writes, rollback, restore, or payment reconciliation.
+
+After promoting `dev` through the reviewed pull request into `main`, run the
+manual GitHub Actions `worker-smoke` workflow against the promoted Worker URL.
+It is intentionally manual and does not add Vercel Cron or mutate production
+data.
+
 ## Required Environment Variables
 
 Set these in Vercel → Project → Settings → Environment Variables. Without them, customer-facing catalog routes show "Catalog service unavailable" or "Invalid URL".

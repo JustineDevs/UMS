@@ -1,2 +1,5 @@
 --container-architecture linux/amd64
 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+--bind
+--rm
+--container-options="-m 4g --cpus=2 --pids-limit=512"

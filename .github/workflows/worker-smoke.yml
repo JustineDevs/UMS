@@ -1,0 +1,26 @@
+name: worker-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      worker_url:
+        description: HTTPS Cloudflare Worker URL to verify
+        required: true
+        default: https://ums-backend-production.pcg0255.workers.dev
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify Worker deployment
+        env:
+          UVS_WORKER_SMOKE_URLS: ${{ inputs.worker_url }}
+        run: node scripts/cloudflare-worker-smoke.mjs --json

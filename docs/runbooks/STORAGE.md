@@ -38,3 +38,12 @@ dependencies, databases, credentials, or user uploads as a side effect.
 - Do not run multiple full repository builds in parallel.
 - The app backend runs on Cloudflare Workers; local Docker is only needed when
   the `act` workflow emulator requires it, not to run or deploy the application.
+- Act is an explicit CI emulator, not part of `pnpm dev` or `pnpm ci:preflight`.
+  The checked-in `.actrc` binds the workspace instead of copying it into a
+  container, removes completed containers, and caps each job at 4 GiB RAM, 2
+  CPUs, and 512 processes. Run it only for the workflow you need; do not run
+  Act, a full build, and the dev stack concurrently.
+- `ci:preflight` runs one Turbo task at a time and caps each Node child at
+  1536 MiB by default. `UVS_CI_MAX_OLD_SPACE_MB` may raise the cap on a larger
+  machine, but values below 1536 MiB are rejected because the cold web
+  TypeScript graph can exceed 1 GiB. `UVS_CI_CONCURRENCY` is bounded to 1-4.
