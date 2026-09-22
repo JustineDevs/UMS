@@ -116,7 +116,10 @@ export default async function HomePage({
   const [customerCount, reviewSummary, publicMeta] = await Promise.all([
     loadHomepageAuxiliaryReadWithinDeadline(fetchHomepageCustomerCount(), 0),
     loadHomepageAuxiliaryReadWithinDeadline(fetchHomepageSocialProof(), { average: 0, count: 0 }),
-    getCachedPublicSiteMetadata().catch(() => null),
+    loadHomepageAuxiliaryReadWithinDeadline(
+      getCachedPublicSiteMetadata().catch(() => null),
+      null,
+    ),
   ]);
   const orgJsonLd = buildJsonLdOrganization({
     sameAs: publicMeta ? storefrontSocialLinks(publicMeta).map((link) => link.href) : [],
