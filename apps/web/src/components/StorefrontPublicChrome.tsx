@@ -1,4 +1,5 @@
 import {
+  EMPTY_STOREFRONT_PUBLIC_METADATA,
   loadCmsAbExperimentsActivePublic,
   loadCmsAnnouncementsPublic,
   loadCmsNavigationPublic,
@@ -11,6 +12,23 @@ import { StorefrontFooter } from "./StorefrontFooter";
 import { StorefrontHeader } from "./StorefrontHeader";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
+const PUBLIC_READ_DEADLINE_MS = 1_500;
+
+function withinPublicReadDeadline<T>(read: Promise<T>, fallback: T): Promise<T> {
+  return Promise.race([
+    read,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), PUBLIC_READ_DEADLINE_MS)),
+  ]);
+}
+
+const EMPTY_NAVIGATION = {
+  headerLinks: [],
+  headerLinksMobile: [],
+  footerColumns: [],
+  footerBottomLinks: [],
+  socialLinks: [],
+};
+
 /**
  * Shared storefront chrome (header, footer, motion, CMS experiments) for public routes
  * and root not-found so global 404s still match the main layout.
@@ -21,10 +39,10 @@ export async function StorefrontPublicChrome({
   children: React.ReactNode;
 }) {
   const [nav, announcements, experiments, publicSite] = await Promise.all([
-    loadCmsNavigationPublic(),
-    loadCmsAnnouncementsPublic(),
-    loadCmsAbExperimentsActivePublic(),
-    getCachedPublicSiteMetadata(),
+    withinPublicReadDeadline(loadCmsNavigationPublic(), EMPTY_NAVIGATION),
+    withinPublicReadDeadline(loadCmsAnnouncementsPublic(), []),
+    withinPublicReadDeadline(loadCmsAbExperimentsActivePublic(), []),
+    withinPublicReadDeadline(getCachedPublicSiteMetadata(), EMPTY_STOREFRONT_PUBLIC_METADATA),
   ]);
 
   const announcementBars = announcements.map((ann) => ({
