@@ -132,6 +132,7 @@ test.describe("storefront UX and compliance", () => {
       }),
     );
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("html[data-store-density]")).toHaveCount(1);
     const input = page.locator("#catalog-typeahead");
     await input.fill("ca");
     const option = page.getByRole("option", { name: /Canary/ });
@@ -156,6 +157,7 @@ test.describe("storefront UX and compliance", () => {
       }),
     );
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("html[data-store-density]")).toHaveCount(1);
     const input = page.locator("#catalog-typeahead");
     await input.fill("ca");
     await expect(
@@ -176,6 +178,7 @@ test.describe("storefront UX and compliance", () => {
       }),
     );
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("html[data-store-density]")).toHaveCount(1);
     const input = page.locator("#catalog-typeahead");
     await input.fill("zz");
     await expect(
