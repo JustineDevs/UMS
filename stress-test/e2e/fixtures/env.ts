@@ -2,7 +2,6 @@
  * Shared E2E environment: URLs and strict-mode flags for Playwright specs.
  */
 
-const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 export const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
 export function strictCatalog(): boolean {
@@ -44,8 +43,4 @@ export function stressDescribeMode(): "parallel" | "serial" {
 export function resolveStorefrontStorageStatePath(): string | undefined {
   const raw = process.env.PLAYWRIGHT_STOREFRONT_STORAGE_STATE?.trim();
   return raw || undefined;
-}
-
-function suiteMode(): string {
-  return (process.env.MAHARLIKA_SUITE ?? "all").trim().toLowerCase();
 }
