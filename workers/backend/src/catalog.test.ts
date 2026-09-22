@@ -56,6 +56,35 @@ test("lists published products with bounded pagination and variant data", async 
   assert.match(query, /v\.deleted_at IS NULL/);
 });
 
+test("drops media URLs from the decommissioned catalog project", async () => {
+  const response = await listPublishedProducts(
+    new Request("https://api.test/store/products"),
+    {
+      async query<Row>(): Promise<{ rows: Row[]; rowCount: number }> {
+        return {
+          rowCount: 1,
+          rows: [{
+            id: "prod-stale-media",
+            title: "Legacy media product",
+            handle: "legacy-media-product",
+            subtitle: null,
+            description: null,
+            thumbnail: "https://gvsyfyaqxfrunoghgqiq.supabase.co/storage/v1/object/public/catalog/products/legacy.jpg",
+            status: "published",
+            collection_id: null,
+            variants: [{ id: "var-1", thumbnail: "https://gvsyfyaqxfrunoghgqiq.supabase.co/storage/v1/object/public/catalog/products/legacy-variant.jpg" }],
+            total_count: 1,
+          }] as Row[],
+        };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+
+  assert.equal(response.products[0]?.thumbnail, null);
+  assert.equal(response.products[0]?.variants[0]?.thumbnail, null);
+});
+
 test("returns a cacheable storefront product response", async () => {
   const response = await handleCatalogProductsRequest(
     new Request("https://api.test/store/products"),
