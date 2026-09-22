@@ -256,3 +256,10 @@ contains `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `STRIPE_API_KEY`, and
 the provider startup gap is a deployment-scope mismatch, not an absent provider account. The
 remaining configuration action is to copy the PayPal sandbox credentials and map
 `STRIPE_API_KEY` to the Worker secret name `STRIPE_SECRET_KEY`.
+
+That transfer was tested and immediately rolled back safely: the copied PayPal credentials
+returned HTTP 401 from PayPal Sandbox OAuth, and the copied Stripe key returned HTTP 401 from
+Stripe `/v1/account`. The invalid Worker secrets were removed, and production was redeployed as
+Worker version `3410ad27-04f2-4b1f-a433-4a55f5864579`. The live capability contract now correctly
+returns only `XENDIT` and `COD` until valid provider credentials are supplied; no broken provider
+is advertised to customers.
