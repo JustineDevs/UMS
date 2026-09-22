@@ -13,10 +13,12 @@ export function StorefrontPreferenceSync() {
       document.documentElement.dataset.storeDensity = p.density;
       document.documentElement.dataset.reduceMotion = p.reduceMotion ? "true" : "false";
     };
-    apply();
+    // Let the root hydration commit finish before mutating <html>.
+    const frame = window.requestAnimationFrame(apply);
     window.addEventListener("storefront-prefs-updated", apply);
     window.addEventListener("storage", apply);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.removeEventListener("storefront-prefs-updated", apply);
       window.removeEventListener("storage", apply);
     };
