@@ -211,6 +211,25 @@ export function CartPageClient() {
   }, [isHydrating, reconcile]);
 
   function commitQuantity(variantId: string, quantity: number): void {
+    const line = lines.find((candidate) => candidate.variantId === variantId);
+    const availableQuantity = line?.availableQuantity;
+    if (
+      quantity > 0 &&
+      availableQuantity !== null &&
+      availableQuantity !== undefined &&
+      quantity > availableQuantity
+    ) {
+      setQuantityErrors((errors) => ({
+        ...errors,
+        [variantId]: cartAvailabilityMessage(availableQuantity),
+      }));
+      setQuantityDrafts((drafts) => ({
+        ...drafts,
+        [variantId]: String(line?.quantity ?? availableQuantity),
+      }));
+      setQuantityStatus("Quantity was not changed.");
+      return;
+    }
     const pending = pendingQuantityRef.current[variantId] ?? {
       desired: quantity,
       running: false,
@@ -466,6 +485,11 @@ export function CartPageClient() {
                   onClick={() => {
                     void commitQuantity(l.variantId, l.quantity + 1);
                   }}
+                  disabled={
+                    l.availableQuantity !== null &&
+                    l.availableQuantity !== undefined &&
+                    l.quantity >= l.availableQuantity
+                  }
                   aria-label="Increase quantity"
                 >
                   +
