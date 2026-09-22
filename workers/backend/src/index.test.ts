@@ -122,6 +122,17 @@ test("serves native worker health without an upstream runtime", async () => {
   });
 });
 
+test("serves the documented health compatibility alias", async () => {
+  const response = await handleBackendRequest(new Request("https://worker.test/health"), env);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    status: "ok",
+    runtime: "cloudflare_worker",
+    database: false,
+    requestId: response.headers.get("X-Request-ID"),
+  });
+});
+
 test("readiness requires a Hyperdrive binding", async () => {
   const response = await handleBackendRequest(new Request("https://worker.test/readyz"), env);
   assert.equal(response.status, 503);

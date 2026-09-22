@@ -507,10 +507,14 @@ export async function handleBackendRequest(
     headers.set("X-Request-ID", id);
     return new Response(response.body, { status: response.status, headers });
   }
-  if (request.method === "GET" && (path === "/healthz" || path === "/readyz")) {
+  if (
+    request.method === "GET" &&
+    (path === "/health" || path === "/healthz" || path === "/readyz")
+  ) {
     const databaseRoles =
       path === "/readyz" ? await probeWorkerDatabaseRoles(env) : null;
     const ready =
+      path === "/health" ||
       path === "/healthz" ||
       Boolean(databaseRoles?.app && databaseRoles.medusa);
     const body = JSON.stringify({
