@@ -29,11 +29,11 @@ Configure provider secrets in the Cloudflare Worker environment. Keep provider c
 
 1. Create or open a [Stripe](https://stripe.com) account.
 2. Obtain **Secret key** and **Webhook signing secret** from the Stripe Dashboard.
-3. Register the Cloudflare backend webhook URL: `${API_URL}/webhooks/stripe` (the Worker verifies and persists the event directly).
+3. Register the Cloudflare backend webhook URL: `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe` in the production Stripe sandbox (local development uses `http://localhost:8787/webhooks/stripe`). The Worker verifies and persists the event directly.
 
 ### Worker environment
 
-Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The Worker endpoint is `${API_URL}/webhooks/stripe`; do not use `/hooks/payment/stripe`.
+Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The production Worker endpoint is `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe`; do not use the storefront/Vercel origin or `/hooks/payment/stripe`.
 
 ---
 
