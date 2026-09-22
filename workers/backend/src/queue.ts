@@ -1,4 +1,5 @@
 export type CommerceJobName =
+  | "webhook-persistence"
   | "webhook-finalization"
   | "inventory-reservation-expiry"
   | "notification-delivery";
@@ -30,6 +31,7 @@ export type WorkerQueue = {
 const MAX_PAYLOAD_BYTES = 128 * 1024;
 const MAX_ATTEMPTS = 8;
 const JOB_NAMES = new Set<CommerceJobName>([
+  "webhook-persistence",
   "webhook-finalization",
   "inventory-reservation-expiry",
   "notification-delivery",

@@ -17,6 +17,14 @@ export type WorkerWebhookEnv = {
   COMMERCE_QUEUE?: WorkerQueue;
 };
 
+export type QueuedWebhookProvider = WebhookProvider;
+
+export type QueuedWebhookPayload = {
+  provider: QueuedWebhookProvider;
+  rawBody: string;
+  headers: Record<string, string>;
+};
+
 function fromHex(value: string): Uint8Array | null {
   if (!/^[0-9a-f]+$/i.test(value) || value.length % 2 !== 0) return null;
   const output = new Uint8Array(value.length / 2);
@@ -129,6 +137,28 @@ function json(body: Record<string, unknown>, status: number): Response {
       "Cache-Control": "no-store",
     },
   });
+}
+
+const WEBHOOK_SIGNATURE_HEADERS = [
+  "stripe-signature",
+  "paypal-transmission-id",
+  "paypal-transmission-time",
+  "paypal-transmission-sig",
+  "paypal-auth-algo",
+  "paypal-cert-url",
+  "authorization",
+  "x-callback-token",
+  "x-webhook-token",
+  "x-signature",
+] as const;
+
+function queuedWebhookHeaders(request: Request): Record<string, string> {
+  return Object.fromEntries(
+    WEBHOOK_SIGNATURE_HEADERS.flatMap((name) => {
+      const value = request.headers.get(name);
+      return value ? [[name, value]] : [];
+    }),
+  );
 }
 
 function eventId(provider: WebhookProvider, value: unknown): string | null {
@@ -471,13 +501,6 @@ export async function handleWorkerWebhookRequest(
       }
     }
   }
-  const inserted = await database.query<{ inserted: boolean }>(
-    `INSERT INTO public.worker_webhook_events (provider, event_id, payload, received_at)
-     VALUES ($1, $2, $3::jsonb, now())
-     ON CONFLICT (provider, event_id) DO NOTHING
-     RETURNING true AS inserted`,
-    [provider, id, rawBody],
-  );
   if (refundUpdate) {
     if (!refundAuditDatabase) return json({ error: "refund_audit_unavailable" }, 503);
     await applyProviderRefundUpdate(refundAuditDatabase, provider as "stripe" | "paypal" | "xendit", refundUpdate);
@@ -485,10 +508,42 @@ export async function handleWorkerWebhookRequest(
   return json(
     {
       accepted: true,
-      duplicate: duplicate || inserted.rows.length === 0,
+      duplicate,
       provider,
       event_id: id,
     },
     202,
   );
+}
+
+/** Verify at the edge, then hand persistence to the retryable Commerce Queue. */
+export async function enqueueWorkerWebhookRequest(
+  request: Request,
+  provider: WebhookProvider,
+  env: WorkerWebhookEnv,
+): Promise<Response> {
+  if (request.method !== "POST")
+    return json({ error: "method_not_allowed" }, 405);
+  if (!env.COMMERCE_QUEUE)
+    return json({ error: "webhook_queue_unavailable" }, 503);
+  const rawBody = await request.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return json({ error: "invalid_json" }, 400);
+  }
+  if (!(await verifyProviderWebhook(provider, request, rawBody, body, env)))
+    return json({ error: "invalid_webhook_signature" }, 401);
+  const id = eventId(provider, body);
+  if (!id) return json({ error: "webhook_event_id_required" }, 400);
+  await enqueueCommerceJob(
+    env.COMMERCE_QUEUE,
+    createCommerceJob<QueuedWebhookPayload>("webhook-persistence", {
+      provider,
+      rawBody,
+      headers: queuedWebhookHeaders(request),
+    }),
+  );
+  return json({ accepted: true, queued: true, provider, event_id: id }, 202);
 }
