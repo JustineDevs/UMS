@@ -59,6 +59,24 @@ type CatalogCategoryRow = {
   product_count: string | number;
 };
 
+const DECOMMISSIONED_CATALOG_MEDIA_HOSTS = new Set([
+  "gvsyfyaqxfrunoghgqiq.supabase.co",
+]);
+
+function normalizeCatalogMediaUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!normalized) return null;
+  try {
+    const hostname = new URL(normalized).hostname.toLowerCase();
+    if (DECOMMISSIONED_CATALOG_MEDIA_HOSTS.has(hostname)) return null;
+  } catch {
+    // Preserve relative media paths; malformed absolute URLs are still left
+    // for the storefront's normal media validation boundary.
+  }
+  return normalized;
+}
+
 function boundedInteger(
   value: string | null,
   fallback: number,
@@ -74,7 +92,12 @@ function mapRow(row: CatalogRow): CatalogProduct {
         Boolean(
           variant && typeof variant === "object" && !Array.isArray(variant),
         ),
-      )
+      ).map((variant) => ({
+        ...variant,
+        ...(Object.prototype.hasOwnProperty.call(variant, "thumbnail")
+          ? { thumbnail: normalizeCatalogMediaUrl(variant.thumbnail) }
+          : {}),
+      }))
     : [];
   return {
     id: row.id,
@@ -82,7 +105,7 @@ function mapRow(row: CatalogRow): CatalogProduct {
     handle: row.handle,
     subtitle: row.subtitle,
     description: row.description,
-    thumbnail: row.thumbnail,
+    thumbnail: normalizeCatalogMediaUrl(row.thumbnail),
     status: row.status,
     collection_id: row.collection_id,
     created_at: row.created_at ?? null,
