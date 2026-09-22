@@ -106,8 +106,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // StorefrontPreferenceSync and SmoothScrollProvider intentionally add
+  // client-only attributes/classes to <html> after hydration. The explicit
+  // suppression below keeps those browser preferences and Lenis state from
+  // triggering a root hydration mismatch.
   return (
-    <html lang="en" className={`${plusJakarta.variable} ${inter.variable}`}>
+    <html
+      lang="en"
+      className={`${plusJakarta.variable} ${inter.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-[100dvh] min-w-0 overflow-x-hidden bg-surface text-on-surface font-body antialiased supports-[height:100dvh]:min-h-dvh">
         {children}
       </body>
