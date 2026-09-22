@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 type StartBody = {
   lines?: Array<{ variantId?: string; quantity?: number }>;
   email?: string;
+  guestMode?: boolean;
   providerId?: string;
   loyaltyPointsToRedeem?: number;
   shippingOptionId?: string;
@@ -78,7 +79,10 @@ async function startWorkerCheckout(input: {
       { status: 503 },
     );
   }
-  if (origin.protocol !== "https:") {
+  const localLoopbackOrigin =
+    process.env.NODE_ENV !== "production" &&
+    (origin.hostname === "localhost" || origin.hostname === "127.0.0.1");
+  if (origin.protocol !== "https:" && !localLoopbackOrigin) {
     return NextResponse.json(
       { error: "Worker checkout requires an HTTPS storefront origin." },
       { status: 503 },
@@ -333,7 +337,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const emailResult = resolveCheckoutEmail(sessionEmail, parsed.data.email);
+  // An explicit guest checkout is intentionally allowed to use the receipt
+  // email entered in the checkout form, even when a stale authenticated
+  // session cookie is present in the browser. Signed-in checkout keeps the
+  // account-email ownership guard.
+  const emailResult = resolveCheckoutEmail(
+    parsed.data.guestMode === true ? "" : sessionEmail,
+    parsed.data.email,
+  );
   if (!emailResult.ok && emailResult.error === "account_email_mismatch") {
     return NextResponse.json(
       { error: "Signed-in checkout must use the email on your account." },
