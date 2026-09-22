@@ -114,11 +114,22 @@ export function handleCommerceJobMessage(
   deadLetter?: DeadLetterSink,
 ): Promise<void> {
   if (!isCommerceJob(message.body)) {
+    console.error("commerce_job_invalid", {
+      messageId: message.id,
+      attempts: message.attempts,
+    });
     return deadLetterOrRetry(message, new Error("invalid_commerce_job"), deadLetter);
   }
+  const job = message.body;
   return handler(message.body).then(
     () => message.ack(),
     (error) => {
+      console.error("commerce_job_failed", {
+        messageId: message.id,
+        jobName: job.name,
+        attempts: message.attempts,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
       if (message.attempts >= MAX_ATTEMPTS) {
         return deadLetterOrRetry(message, error, deadLetter);
       }

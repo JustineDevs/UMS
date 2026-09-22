@@ -30,7 +30,22 @@ interface PgClient {
   end(): Promise<void>;
 }
 
-type PgClientFactory = (options: { connectionString: string }) => PgClient;
+type PgClientOptions = {
+  connectionString: string;
+  connectionTimeoutMillis: number;
+  query_timeout: number;
+  statement_timeout: number;
+  idle_in_transaction_session_timeout: number;
+};
+
+type PgClientFactory = (options: PgClientOptions) => PgClient;
+
+const WORKER_DB_CLIENT_OPTIONS = {
+  connectionTimeoutMillis: 10_000,
+  query_timeout: 15_000,
+  statement_timeout: 15_000,
+  idle_in_transaction_session_timeout: 15_000,
+} as const;
 
 function connectionString(
   env: WorkerDatabaseEnv,
@@ -60,6 +75,7 @@ export function createWorkerDatabaseClient(
     typeof roleOrFactory === "function" ? roleOrFactory : maybeFactory;
   const client = createClient({
     connectionString: connectionString(env, role),
+    ...WORKER_DB_CLIENT_OPTIONS,
   });
   let connected = false;
 
