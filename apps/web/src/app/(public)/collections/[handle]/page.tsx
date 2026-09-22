@@ -15,8 +15,15 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ handle: string }>;
-  searchParams: Promise<{ locale?: string; page?: string }>;
+  searchParams: Promise<{ locale?: string; page?: string; sort?: string }>;
 };
+
+const collectionSorts = [
+  { value: "newest", label: "Newest" },
+  { value: "name_asc", label: "Name A–Z" },
+  { value: "price_asc", label: "Price: low to high" },
+  { value: "price_desc", label: "Price: high to low" },
+] as const;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle } = await params;
@@ -36,16 +43,19 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
   const { handle } = await params;
   const h = decodeCollectionHandle(handle);
   if (!h) notFound();
-  const { locale = "en", page: pageRaw } = await searchParams;
+  const { locale = "en", page: pageRaw, sort: sortRaw } = await searchParams;
   const parsedPage = Number.parseInt(pageRaw ?? "1", 10);
   const currentPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const sort = collectionSorts.some((option) => option.value === sortRaw)
+    ? sortRaw as (typeof collectionSorts)[number]["value"]
+    : "newest";
   const pageSize = 24;
 
   const [categories, page] = await Promise.all([
     fetchCategorySummaries(),
     fetchProductsPage(pageSize, {
       category: h,
-      sort: "newest",
+      sort,
       offset: (currentPage - 1) * pageSize,
       revalidate: 60,
     }),
@@ -98,14 +108,26 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
         <p className="mt-4 text-sm text-on-surface-variant" aria-live="polite">
           {page.total === 0 ? "No products currently available" : `Showing ${page.total} ${page.total === 1 ? "product" : "products"}`}
         </p>
-        <p className="mt-1 text-sm text-on-surface-variant">Sorted by newest</p>
+        <nav aria-label="Collection sort" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-on-surface-variant">Sort:</span>
+          {collectionSorts.map((option) => (
+            <Link
+              key={option.value}
+              href={`/collections/${encodeURIComponent(h)}?sort=${option.value}`}
+              aria-current={sort === option.value ? "page" : undefined}
+              className={`min-h-11 rounded border px-3 py-2 font-semibold ${sort === option.value ? "border-primary bg-primary text-on-primary" : "border-outline-variant/40 hover:border-primary"}`}
+            >
+              {option.label}
+            </Link>
+          ))}
+        </nav>
       </header>
       {page.products.length ? <ul aria-label={`${categoryLabel} products`} className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">{page.products.map((product) => <li key={product.id}><CatalogProductCard product={product} /></li>)}</ul> : <p className="text-on-surface-variant">{currentPage > 1 ? "That collection page is no longer available." : "No products are currently available in this collection."}</p>}
       {page.total > pageSize ? (
         <nav aria-label="Collection pages" className="mt-12 flex items-center justify-between gap-4 border-t border-outline-variant/20 pt-6">
-          {currentPage > 1 ? <Link href={`/collections/${encodeURIComponent(h)}?page=${currentPage - 1}`} className="min-h-11 rounded border border-outline-variant/40 px-4 py-2 text-sm font-semibold hover:border-primary">Previous</Link> : <span />}
+          {currentPage > 1 ? <Link href={`/collections/${encodeURIComponent(h)}?sort=${sort}&page=${currentPage - 1}`} className="min-h-11 rounded border border-outline-variant/40 px-4 py-2 text-sm font-semibold hover:border-primary">Previous</Link> : <span />}
           <span className="text-sm text-on-surface-variant">Page {currentPage} of {Math.ceil(page.total / pageSize)}</span>
-          {currentPage < Math.ceil(page.total / pageSize) ? <Link href={`/collections/${encodeURIComponent(h)}?page=${currentPage + 1}`} className="min-h-11 rounded border border-outline-variant/40 px-4 py-2 text-sm font-semibold hover:border-primary">Next</Link> : <span />}
+          {currentPage < Math.ceil(page.total / pageSize) ? <Link href={`/collections/${encodeURIComponent(h)}?sort=${sort}&page=${currentPage + 1}`} className="min-h-11 rounded border border-outline-variant/40 px-4 py-2 text-sm font-semibold hover:border-primary">Next</Link> : <span />}
         </nav>
       ) : null}
     </main>
