@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("node:path");
+const fs = require("node:fs");
 const { existsSync, readdirSync } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 
@@ -61,6 +62,34 @@ function portIsListening(port) {
   return (unixCheck.status ?? 1) === 0;
 }
 
+function portOwnerPids(port) {
+  if (isWin) return [];
+  const result = spawnSync("sh", ["-lc", `owners=$(lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null || true); if [ -n "$owners" ]; then printf '%s\\n' "$owners"; else fuser -n tcp ${port} 2>/dev/null || true; fi`], {
+    cwd: root,
+    encoding: "utf8",
+    env: process.env,
+    shell: false,
+  });
+  const output = String(result.stdout ?? "");
+  const fuserMatch = output.match(/:\s*(.*)$/s);
+  const pidText = fuserMatch ? fuserMatch[1] : output;
+  return pidText
+    .trim()
+    .split(/\s+/)
+    .filter((value) => /^\d+$/.test(value))
+    .map(Number);
+}
+
+function isWorkspaceProcess(pid) {
+  try {
+    const cwd = fs.realpathSync(`/proc/${pid}/cwd`);
+    const command = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").replaceAll("\0", " ");
+    return cwd === root || cwd.startsWith(`${root}${path.sep}`) || command.includes(root);
+  } catch {
+    return false;
+  }
+}
+
 function freePort(port) {
   if (isWin) {
     const result = spawnSync(
@@ -92,6 +121,17 @@ function freePort(port) {
 function ensurePortFree(port) {
   if (!portIsListening(port)) {
     return;
+  }
+
+  if (!isWin) {
+    const owners = portOwnerPids(port);
+    if (owners.length === 0 || owners.some((pid) => !isWorkspaceProcess(pid))) {
+      console.error(
+        `[next-dev] Port ${port} is occupied by a process outside UVS. ` +
+          "Stop that application or choose a different development port; it was not terminated.",
+      );
+      process.exit(1);
+    }
   }
 
   console.error(`[next-dev] Port ${port} is busy. Clearing stale listener before startup.`);

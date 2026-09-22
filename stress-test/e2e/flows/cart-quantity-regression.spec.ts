@@ -804,10 +804,12 @@ test("cart reconciles a quantity update received from another tab", async ({
 test("cart reconciliation rejects an unknown canonical variant", async ({
   request,
 }) => {
+  const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  const origin = new URL(baseUrl).origin;
   const response = await request.post(
-    "http://localhost:3000/api/cart/reconcile",
+    new URL("/api/cart/reconcile", baseUrl).toString(),
     {
-      headers: { origin: "http://localhost:3000" },
+      headers: { origin },
       data: {
         lines: [
           {

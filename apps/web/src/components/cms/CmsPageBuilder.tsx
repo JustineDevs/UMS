@@ -8,9 +8,12 @@ import type {
 } from "@universal-music-store/platform-data";
 import {
   getCmsComponentDefinition,
+  canonicalCmsBlockDefinition,
   componentInstanceFromBlock,
   cmsBlocksToTree,
+  getCmsDefaultProps,
   listCmsComponentDefinitions,
+  listCmsBlockPalette,
   resolveCmsComponentDefinition,
 } from "@universal-music-store/platform-data";
 import {
@@ -88,55 +91,10 @@ import {
 } from "@/lib/cms-preview-frame";
 import { mapCmsPreviewRectToCanvas } from "./cms-preview-geometry";
 
-const BLOCK_TYPES = [
-  {
-    type: "storefront_header",
-    label: "Storefront navbar",
-    group: "Server Components",
-  },
-  {
-    type: "header_navigation",
-    label: "Header navigation",
-    group: "Server Components",
-  },
-  {
-    type: "header_actions",
-    label: "Header actions",
-    group: "Server Components",
-  },
-  { type: "hero", label: "Hero banner", group: "Bootstrap 5" },
-  { type: "two_column", label: "Two column", group: "Bootstrap 5" },
-  { type: "trust_strip", label: "Trust strip", group: "Bootstrap 5" },
-  { type: "contact_strip", label: "Contact strip", group: "Bootstrap 5" },
-  { type: "newsletter", label: "Newsletter", group: "Ecommerce" },
-  { type: "featured_products", label: "Featured products", group: "Ecommerce" },
-  {
-    type: "home_tiles",
-    label: "Homepage category tiles",
-    group: "Bootstrap 5",
-  },
-  {
-    type: "latest_section",
-    label: "Latest products section",
-    group: "Bootstrap 5",
-  },
-  { type: "rich_text", label: "Rich text", group: "Base" },
-  { type: "image", label: "Image", group: "Base" },
-  { type: "cta_row", label: "Call to action", group: "Base" },
-  { type: "faq", label: "FAQ", group: "Content" },
-  { type: "video", label: "Video", group: "Widgets" },
-  { type: "divider", label: "Spacer", group: "Base" },
-  {
-    type: "storefront_footer",
-    label: "Storefront footer",
-    group: "Server Components",
-  },
-  {
-    type: "footer_columns",
-    label: "Footer columns",
-    group: "Server Components",
-  },
-] as const;
+const BLOCK_TYPES = listCmsBlockPalette().map((item) => ({
+  ...item,
+  group: componentPaletteGroup(item.group),
+}));
 
 const FIXED_COMPONENT_TYPES = new Set([
   "storefront_header",
@@ -577,75 +535,6 @@ function persistedCmsMutation(
   return { ...structural, node: findCmsNode(before, structural.nodeId) };
 }
 
-function defaults(type: string): Record<string, unknown> {
-  switch (type) {
-    case "storefront_header":
-      return {};
-    case "header_navigation":
-      return {};
-    case "header_actions":
-      return {};
-    case "storefront_footer":
-      return {};
-    case "footer_columns":
-      return {};
-    case "hero":
-      return {
-        title: "New hero",
-        subtitle: "Add a short introduction",
-        imageUrl: "",
-        mediaType: "image",
-        videoUrl: "",
-        href: "/",
-        ctaLabel: "Learn more",
-      };
-    case "two_column":
-      return {
-        html: "<p>Tell your story here.</p>",
-        imageUrl: "",
-        imageAlt: "",
-        reverse: false,
-      };
-    case "trust_strip":
-      return {
-        col1Title: "Secure checkout",
-        col1Body: "",
-        col2Title: "Fast shipping",
-        col2Body: "",
-        col3Title: "Easy returns",
-        col3Body: "",
-      };
-    case "contact_strip":
-      return { phone: "", email: "", hours: "" };
-    case "newsletter":
-      return { heading: "Stay in the loop", subtitle: "", actionUrl: "" };
-    case "featured_products":
-      return { slugs: "" };
-    case "home_tiles":
-      return { tiles: [] };
-    case "latest_section":
-      return {
-        title: "THE LATEST DROPS",
-        viewAllLabel: "View All Products",
-        viewAllHref: "/shop",
-      };
-    case "rich_text":
-      return { html: "<p>Start writing...</p>" };
-    case "image":
-      return { src: "", alt: "" };
-    case "cta_row":
-      return { label: "Continue", href: "/" };
-    case "faq":
-      return { items: [{ q: "Question?", a: "Answer." }] };
-    case "video":
-      return { url: "", title: "Video" };
-    case "divider":
-      return { heightPx: 24 };
-    default:
-      return {};
-  }
-}
-
 function normalize(raw: unknown): CmsBlock[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((value) => {
@@ -658,7 +547,7 @@ function normalize(raw: unknown): CmsBlock[] {
     const props =
       row.props && typeof row.props === "object"
         ? (row.props as Record<string, unknown>)
-        : defaults(type);
+        : getCmsDefaultProps(type);
     return {
       ...row,
       id: typeof row.id === "string" && row.id ? row.id : makeId(),
@@ -1090,38 +979,6 @@ export function componentCanvasDocument(
     : `<div data-cms-node="${escape(block.id)}">${markup}</div>`;
   return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:24px;font:14px/1.5 system-ui;color:#172033;background:#f8fafc}[data-cms-node]{min-height:32px;outline:1px solid #d9e0ea;outline-offset:3px}[data-cms-slot]{margin-top:16px;padding:18px;border:2px dashed #93c5fd;border-radius:8px;display:grid;gap:4px;color:#475569}${styles}</style></head><body>${rootMarkup}<script>const blockId=${serializedBlockId};const props=${serializedProps};const slots=${serializedSlots};const targetOrigin=()=>{try{return document.referrer?new URL(document.referrer).origin:location.origin}catch{return location.origin}};const emit=(payload)=>parent.postMessage({source:'cms-component-canvas-mutation',id:blockId,...payload},targetOrigin());document.querySelectorAll('[data-cms-prop]').forEach((node)=>{const key=node.dataset.cmsProp;if(props[key]!==undefined&&node.innerHTML!==props[key]&&node.children.length===0)node.textContent=String(props[key]);if(node.matches('[contenteditable=true]'))node.addEventListener('input',()=>emit({property:key,value:node.innerHTML}));});const root=document.querySelector('[data-cms-node]');slots.forEach((slot)=>{if(!root.querySelector('[data-cms-slot="'+CSS.escape(slot.name)+'"]')){const drop=document.createElement('div');drop.dataset.cmsSlot=slot.name;drop.dataset.cmsNode=blockId+'::slot::'+slot.name;drop.tabIndex=0;const label=document.createElement('strong');label.textContent=String(slot.label||slot.name);const hint=document.createElement('span');hint.textContent='Drop a component here';drop.append(label,hint);drop.addEventListener('dragover',(event)=>{event.preventDefault();drop.dataset.dragover='true'});drop.addEventListener('dragleave',()=>delete drop.dataset.dragover);drop.addEventListener('drop',(event)=>{event.preventDefault();delete drop.dataset.dragover;const componentId=event.dataTransfer&&event.dataTransfer.getData('application/x-cms-component-id');if(componentId)emit({event:'slot-drop',slot:slot.name,componentId})});root.append(drop);}});emit({event:'ready'});</script></body></html>`;
 }
-const PROPERTY_KEYS: Record<string, string[]> = {
-  hero: [
-    "title",
-    "subtitle",
-    "imageUrl",
-    "mediaType",
-    "videoUrl",
-    "href",
-    "ctaLabel",
-  ],
-  rich_text: ["html"],
-  image: ["src", "alt"],
-  two_column: ["html", "imageUrl", "imageAlt", "reverse"],
-  cta_row: ["label", "href"],
-  trust_strip: [
-    "col1Title",
-    "col1Body",
-    "col2Title",
-    "col2Body",
-    "col3Title",
-    "col3Body",
-  ],
-  contact_strip: ["phone", "email", "hours"],
-  newsletter: ["heading", "subtitle", "actionUrl"],
-  featured_products: ["slugs"],
-  home_tiles: ["tiles"],
-  latest_section: ["title", "viewAllLabel", "viewAllHref"],
-  faq: ["items"],
-  video: ["url", "title"],
-  divider: ["heightPx"],
-};
-
 const LAYOUT_FIELDS = [
   ["maxWidth", "Max width"],
   ["minHeight", "Min height"],
@@ -1167,7 +1024,8 @@ function componentChildren(block: CmsBlock): ComponentNode[] {
     propertyKey,
     arrayIndex,
   });
-  return (PROPERTY_KEYS[block.type] ?? []).map((key) =>
+  const definition = getCmsComponentDefinition(block.componentId ?? block.type);
+  return (definition?.props.map((item) => item.key) ?? []).map((key) =>
     child(key, propertyLabel(key), key),
   );
 }
@@ -1481,7 +1339,7 @@ function BlockPropertyFields({
     ? [focus.propertyKey]
     : registryProps.length
       ? registryProps.map((item) => item.key)
-      : (PROPERTY_KEYS[block.type] ?? []);
+      : (definition?.props.map((item) => item.key) ?? []);
   if (!keys.length)
     return (
       <p className="text-xs text-slate-500">
@@ -2317,7 +2175,7 @@ export function CmsPageBuilder({
           };
         } | null>(response, null);
         if (!payload?.data?.length) return;
-        setComponentDefinitions(payload.data);
+        setComponentDefinitions(payload.data.map(canonicalCmsBlockDefinition));
         setComponentVersions(
           Object.fromEntries(
             (payload.meta?.records ?? []).map((record) => [
@@ -2477,8 +2335,8 @@ export function CmsPageBuilder({
       ) as CmsComponentDefinition;
       setComponentDefinitions((current) =>
         current.some((item) => item.id === saved.id)
-          ? current.map((item) => (item.id === saved.id ? saved : item))
-          : [...current, saved],
+          ? current.map((item) => (item.id === saved.id ? canonicalCmsBlockDefinition(saved) : item))
+          : [...current, canonicalCmsBlockDefinition(saved)],
       );
       setComponentVersions((current) => ({
         ...current,
@@ -2517,7 +2375,7 @@ export function CmsPageBuilder({
           ) as CmsComponentDefinition)
         : canvasDefinition;
       setComponentDefinitions((current) =>
-        current.map((item) => (item.id === published.id ? published : item)),
+        current.map((item) => (item.id === published.id ? canonicalCmsBlockDefinition(published) : item)),
       );
       setComponentVersions((current) => ({
         ...current,
@@ -2996,7 +2854,7 @@ export function CmsPageBuilder({
         componentId: definition?.id,
         variantId: definition?.defaultVariantId,
         props: {
-          ...defaults(type),
+          ...getCmsDefaultProps(type),
           ...(definition?.props ?? []).reduce<Record<string, unknown>>(
             (acc, item) => {
               if (item.defaultValue !== undefined)
@@ -3059,7 +2917,7 @@ export function CmsPageBuilder({
       componentId: definition.id,
       variantId,
       props: {
-        ...defaults(type),
+        ...getCmsDefaultProps(type),
         ...definition.props.reduce<Record<string, unknown>>((acc, item) => {
           if (item.defaultValue !== undefined)
             acc[item.key] = item.defaultValue;
@@ -3103,7 +2961,7 @@ export function CmsPageBuilder({
         type,
         componentId: definition.id,
         variantId: definition.defaultVariantId,
-        props: {},
+        props: getCmsDefaultProps(definition.id),
         slots: definition.slots.length ? {} : undefined,
       });
       const slotError =
@@ -3501,7 +3359,7 @@ export function CmsPageBuilder({
       componentId: definition?.id,
       variantId: definition?.defaultVariantId,
       props: {
-        ...defaults(type),
+        ...getCmsDefaultProps(type),
         ...(definition?.props ?? []).reduce<Record<string, unknown>>(
           (acc, item) => {
             if (item.defaultValue !== undefined)

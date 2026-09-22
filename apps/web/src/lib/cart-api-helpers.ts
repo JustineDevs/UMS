@@ -176,7 +176,13 @@ export async function retrieveCartLines(
         ...(thumbnail ? { thumbnail } : {}),
       } satisfies CartLine];
     });
-  } catch {
+  } catch (error) {
+    // A deleted or completed Worker cart must not remain bound to the browser.
+    // Keep the cookie during transient upstream failures so a temporary outage
+    // does not discard a recoverable cart capability.
+    if (isMissingWorkerCartError(error)) {
+      await clearCartCookie();
+    }
     return null;
   }
 }
@@ -192,7 +198,7 @@ export async function retrieveCartRaw(
   try {
     return await retrieveWorkerCart(cartId);
   } catch (error) {
-    if (error instanceof Error && error.message === "cart_not_found") return null;
+    if (isMissingWorkerCartError(error)) return null;
     throw error;
   }
 }
@@ -206,6 +212,10 @@ type WorkerCart = {
   metadata?: Record<string, unknown> | null;
   items?: Array<Record<string, unknown>>;
 };
+
+export function isMissingWorkerCartError(error: unknown): boolean {
+  return error instanceof Error && error.message === "cart_not_found";
+}
 
 async function retrieveWorkerCart(cartId: string): Promise<WorkerCart | null> {
   const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");

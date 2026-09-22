@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isCmsPubliclyVisible } from "./cms-public-visibility.js";
 import { isMissingTableOrSchemaError } from "./supabase-errors.js";
 import { resolveCmsMediaUrls, stripResolvedCmsMediaUrls } from "./cms-media.js";
+import { componentInstanceFromBlock, getCmsComponentDefinition, validateCmsBlockInstance } from "./cms-component-registry.js";
 import type {
   CmsBlock,
   CmsComponentInstance,
@@ -16,9 +17,15 @@ export type { CmsNode } from "./cms-types.js";
 
 export type CmsPublishValidation = { ok: true } | { ok: false; errors: string[] };
 
+export const CMS_MAX_TREE_NODES = 200;
+export const CMS_MAX_TREE_DEPTH = 4;
+
 /** Rejects structural corruption before a page can become public. Unknown component IDs are retained for migration compatibility. */
 export function validateCmsPublishTree(nodes: readonly CmsNode[]): CmsPublishValidation {
   const errors: string[] = [];
+  if (nodes.length > CMS_MAX_TREE_NODES) {
+    errors.push(`tree exceeds maximum node count of ${CMS_MAX_TREE_NODES}`);
+  }
   const byId = new Map<string, CmsNode>();
   for (const node of nodes) {
     if (!node.id.trim()) errors.push("node id is required");
@@ -34,8 +41,53 @@ export function validateCmsPublishTree(nodes: readonly CmsNode[]): CmsPublishVal
       const child = byId.get(childId);
       if (!child) errors.push(`missing child: ${node.id}/${childId}`);
       else if (child.parentId !== node.id) errors.push(`parent mismatch: ${childId}`);
+      else if (!child.slot) errors.push(`child slot required: ${childId}`);
     }
+
+    const parentDefinition = node.parentId
+      ? getCmsComponentDefinition(byId.get(node.parentId)?.componentId)
+      : undefined;
+    if (parentDefinition && node.slot) {
+      const slot = parentDefinition.slots.find((candidate) => candidate.name === node.slot);
+      if (!slot) errors.push(`unknown slot: ${node.componentId}/${node.slot}`);
+      else if (slot.allowedComponentIds?.length) {
+        const childDefinition = getCmsComponentDefinition(node.componentId);
+        if (childDefinition && !slot.allowedComponentIds.includes(childDefinition.id)) {
+          errors.push(`component not allowed in slot: ${node.componentId}/${node.slot}`);
+        }
+      }
+    }
+    errors.push(...validateCmsBlockInstance({
+      componentId: node.componentId,
+      type: node.blockType,
+      variantId: node.variantId,
+      props: node.props,
+      styles: node.styles,
+    }).map((error) => `${node.id}: ${error}`));
   }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const walk = (node: CmsNode, depth: number) => {
+    if (depth > CMS_MAX_TREE_DEPTH) {
+      errors.push(`tree exceeds maximum depth of ${CMS_MAX_TREE_DEPTH}: ${node.id}`);
+      return;
+    }
+    if (visiting.has(node.id)) {
+      errors.push(`child cycle detected: ${node.id}`);
+      return;
+    }
+    if (visited.has(node.id)) return;
+    visiting.add(node.id);
+    for (const childId of node.children) {
+      const child = byId.get(childId);
+      if (child) walk(child, depth + 1);
+    }
+    visiting.delete(node.id);
+    visited.add(node.id);
+  };
+  for (const node of nodes.filter((candidate) => candidate.parentId === null)) walk(node, 1);
+  for (const node of nodes) if (!visited.has(node.id)) walk(node, 1);
   return errors.length ? { ok: false, errors } : { ok: true };
 }
 
@@ -171,9 +223,10 @@ export function cmsBlocksToTree(blocks: CmsBlock[]): CmsNode[] {
     }
   };
   for (const block of blocks) {
-    visit(block.id, block.componentId ?? block.type, block.type, block.props, block.styleOverrides ?? {}, block.variantId, null, null, []);
+    const instance = componentInstanceFromBlock(block);
+    visit(instance.id, instance.componentId, block.type, instance.props, instance.styleOverrides ?? {}, instance.variantId, null, null, []);
     const root = nodes[nodes.length - 1];
-    for (const [slot, items] of Object.entries(block.slots ?? {})) {
+    for (const [slot, items] of Object.entries(instance.slots ?? {})) {
       for (const child of items) {
         root.children.push(child.id);
         visitInstance(child, block.id, slot);

@@ -12,10 +12,6 @@
     "dev": {
       "name": "ums-backend-preview",
       "workers_dev": true,
-      "exports": {
-        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
-        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
-      },
       "queues": {
         "producers": [
           { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-dev" },
@@ -36,10 +32,6 @@
     "production": {
       "name": "ums-backend-production",
       "workers_dev": true,
-      "exports": {
-        "MedusaContainer": { "type": "durable-object", "state": "deleted" },
-        "ComplianceContainer": { "type": "durable-object", "state": "deleted" }
-      },
       "queues": {
         "producers": [
           { "binding": "COMMERCE_QUEUE", "queue": "uvs-commerce-production" },
@@ -53,6 +45,13 @@
         { "binding": "MEDUSA_HYPERDRIVE", "id": "e911d409602b4d029dea7bf323801c0f" },
         { "binding": "APP_HYPERDRIVE", "id": "801b922b54e74e0295c0e7d785b80966" }
       ],
+      "observability": {
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+          "persist": true
+        }
+      },
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
       },

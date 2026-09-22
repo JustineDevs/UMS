@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "deps:clean-drift": "node stress-test/scripts/clean-native-package-drift.cjs",
-    "dev": "pnpm cleanup:dev && node scripts/dev-worker-first.mjs",
+    "dev": "pnpm cleanup:dev && node scripts/run-bounded-dev.cjs",
     "diagnose:dev-memory": "node scripts/dev-memory-probe.mjs -- pnpm dev",
     "kill-ports": "node stress-test/scripts/kill-project-ports.js",
     "cleanup:dev": "node scripts/cleanup-dev-runtime.cjs",

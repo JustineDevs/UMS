@@ -10,6 +10,7 @@ import {
   handleCatalogSearchSuggestionsRequest,
   handleSocialProofRequest,
   handleCollectionsRequest,
+  handleCatalogCategoriesRequest,
   handleCollectionRequest,
   handleRegionsRequest,
 } from "./catalog.ts";
@@ -539,6 +540,8 @@ export async function handleBackendRequest(
   const regionsMatch = request.method === "GET" && path === "/store/regions";
   const collectionsMatch =
     request.method === "GET" && path === "/store/collections";
+  const catalogCategoriesMatch =
+    request.method === "GET" && path === "/store/catalog/categories";
   const searchSuggestionsMatch =
     request.method === "GET" && path === "/store/search/suggestions";
   const socialProofMatch =
@@ -1142,6 +1145,7 @@ export async function handleBackendRequest(
     blogPostMatch,
     categoriesMatch,
     categoryMatch,
+    catalogCategoriesMatch,
     searchSuggestionsMatch,
     socialProofMatch,
     sitemapMatch,
@@ -3762,6 +3766,7 @@ export async function handleBackendRequest(
       (path === "/store/products" ||
         regionsMatch ||
         collectionsMatch ||
+        catalogCategoriesMatch ||
         searchSuggestionsMatch ||
         collectionMatch ||
         productMatch ||
@@ -4268,7 +4273,12 @@ export async function handleBackendRequest(
                                                                                                                                       env.CMS_ORGANIZATION_ID ??
                                                                                                                                         env.DEFAULT_ORGANIZATION_ID,
                                                                                                                                     )
-                                                                                                                                  : categoriesMatch
+                                                                                                                                                                                                  : catalogCategoriesMatch
+                                                                                                                                                                                                    ? handleCatalogCategoriesRequest(
+                                                                                                                                                                                                        request,
+                                                                                                                                                                                                        database,
+                                                                                                                                                                                                      )
+                                                                                                                                                                                                  : categoriesMatch
                                                                                                                                     ? handleCategoryRequest(
                                                                                                                                         request,
                                                                                                                                         database,

@@ -376,6 +376,9 @@ export function HomeScrollExperience({
         window.parent.postMessage({ source, id: null }, parentOrigin);
         return;
       }
+      // React can replace preview nodes after the initial decoration pass. Keep
+      // the selection bridge contract true at the point the node is reported.
+      target.dataset.uvsId ??= target.dataset.cmsId;
       const rect = target.getBoundingClientRect();
       const block = target.closest<HTMLElement>("[data-cms-block-id]");
       const component = target.closest<HTMLElement>(
@@ -774,6 +777,7 @@ export function HomeScrollExperience({
       <RecaptchaScript />
       <section
         data-cms-id="home-hero"
+        data-uvs-id="home-hero"
         data-cms-label="Hero"
         style={sectionStyle(home.hero.layout)}
         className="relative flex min-h-[clamp(22rem,72svh,40rem)] w-full items-center overflow-hidden bg-surface-container-low storefront-section-x py-10 sm:py-14 md:py-16 lg:py-20"
@@ -782,7 +786,7 @@ export function HomeScrollExperience({
           <h1
             className={`mb-6 ${heroWidth} ${heroFont} ${heroTitleSize} font-extrabold leading-[1.02] tracking-tighter ${heroTone} sm:mb-8`}
           >
-              <span ref={line1Ref} data-cms-id="home-hero-title" data-cms-label="Headline" className="block">
+              <span ref={line1Ref} data-cms-id="home-hero-title" data-uvs-id="home-hero-title" data-cms-label="Headline" className="block">
               {home.hero.line1}
             </span>
             <span
@@ -795,6 +799,7 @@ export function HomeScrollExperience({
           <p
             ref={leadRef}
             data-cms-id="home-hero-lead"
+            data-uvs-id="home-hero-lead"
             data-cms-label="Supporting text"
             className={`mb-8 ${heroLeadWidth} font-body text-base leading-relaxed ${heroLeadTone} sm:mb-10 sm:text-lg`}
           >
@@ -813,7 +818,7 @@ export function HomeScrollExperience({
               asChild
               className="bg-gradient-to-br from-primary to-primary-container px-8 py-3.5 font-medium sm:px-10 sm:py-4"
             >
-              <Link ref={ctaRef} data-cms-id="home-hero-cta" data-cms-label="Primary action" href={home.hero.ctaHref || "/shop"}>
+              <Link ref={ctaRef} data-cms-id="home-hero-cta" data-uvs-id="home-hero-cta" data-cms-label="Primary action" href={home.hero.ctaHref || "/shop"}>
                 {home.hero.ctaLabel}
               </Link>
             </Button>
@@ -829,7 +834,7 @@ export function HomeScrollExperience({
             className="mt-8 w-full max-w-[min(100%,38rem)]"
           >
             <div className="mb-3 flex flex-col gap-1">
-              <span data-cms-id="home-hero-eyebrow" data-cms-label="Eyebrow" className="font-headline text-[0.7rem] font-bold uppercase tracking-[0.3em] text-on-surface-variant">
+              <span data-cms-id="home-hero-eyebrow" data-uvs-id="home-hero-eyebrow" data-cms-label="Eyebrow" className="font-headline text-[0.7rem] font-bold uppercase tracking-[0.3em] text-on-surface-variant">
                 Partners with
               </span>
               <span className="text-[0.7rem] font-medium text-on-surface-variant">
@@ -837,7 +842,8 @@ export function HomeScrollExperience({
               </span>
             </div>
             <div
-              data-cms-id="home-hero-partners"
+            data-cms-id="home-hero-partners"
+            data-uvs-id="home-hero-partners"
               data-cms-label="Partner marquee"
               className="group relative overflow-hidden py-2 [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]"
               aria-label="Partners logo marquee"
@@ -915,12 +921,14 @@ export function HomeScrollExperience({
       <section
         ref={collectionsRef}
         data-cms-id="home-tiles"
+        data-uvs-id="home-tiles"
         data-cms-label="Homepage category tiles"
         style={sectionStyle(home.sectionLayout?.tiles)}
         className="scroll-mt-[5.5rem] bg-surface py-14 sm:py-16 md:py-24 storefront-section-x"
       >
         <div
           data-cms-id="home-tiles-grid"
+          data-uvs-id="home-tiles-grid"
           data-cms-label="Tile grid"
           className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 md:grid-cols-12"
         >
@@ -931,6 +939,7 @@ export function HomeScrollExperience({
                 key={tile.href}
                 data-home-collection-panel
                 data-cms-id={`home-tile-${index}`}
+                data-uvs-id={`home-tile-${index}`}
                 data-cms-label={`Category tile ${index + 1}`}
                 href={tile.href}
                 className={`group relative min-h-[14rem] overflow-hidden rounded-lg bg-surface-container-high ${wide ? "md:col-span-12" : index === 0 ? "md:col-span-8" : "md:col-span-4"}`}
@@ -962,6 +971,7 @@ export function HomeScrollExperience({
 
       <section
         data-cms-id="home-latest"
+        data-uvs-id="home-latest"
         data-cms-label="Latest products"
         style={sectionStyle(home.sectionLayout?.latest)}
         className="scroll-mt-[5.5rem] bg-surface-container-low py-14 sm:py-16 md:py-24 storefront-section-x"
@@ -969,7 +979,8 @@ export function HomeScrollExperience({
         <div className="mx-auto max-w-[1600px]">
           <div
             ref={latestHeaderRef}
-            data-cms-id="home-latest-header"
+          data-cms-id="home-latest-header"
+          data-uvs-id="home-latest-header"
             data-cms-label="Section heading"
             className="mb-10 flex flex-col items-baseline justify-between gap-4 sm:mb-12 md:mb-16 md:flex-row"
           >
@@ -999,7 +1010,8 @@ export function HomeScrollExperience({
           ) : (
             <div
               ref={productsGridRef}
-              data-cms-id="home-latest-products"
+            data-cms-id="home-latest-products"
+            data-uvs-id="home-latest-products"
               data-cms-label="Product grid"
               className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 lg:grid-cols-4"
             >
@@ -1016,6 +1028,7 @@ export function HomeScrollExperience({
       <section
         ref={clubRef}
         data-cms-id="home-newsletter"
+        data-uvs-id="home-newsletter"
         data-cms-label="Newsletter"
         style={sectionStyle(home.sectionLayout?.newsletter)}
         id="join-club"
@@ -1051,6 +1064,7 @@ export function HomeScrollExperience({
           <section
             key={block.id}
             data-cms-id={block.id}
+            data-uvs-id={block.id}
             data-cms-label={String(block.props.sourceName ?? block.props.sourceType ?? "Vvveb component")}
             data-cms-block-id={block.id}
             data-cms-block-type="visual_primitive"

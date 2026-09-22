@@ -36,6 +36,9 @@ process.env.TEMP = tmpDir;
 process.env.TMPDIR = tmpDir;
 
 const args = process.argv.slice(2);
+if (!args.some((arg) => arg === "--workers" || arg.startsWith("--workers="))) {
+  args.push("--workers=1");
+}
 const cli = path.join(projectRoot, "node_modules", "@playwright", "test", "cli.js");
 
 const runId = new Date().toISOString().replace(/[:.]/g, "-");

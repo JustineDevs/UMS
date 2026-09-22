@@ -15,10 +15,6 @@ function validKey(value: unknown): value is string { return typeof value === "st
 function validDefinition(value: unknown): value is Definition { if (!value || typeof value !== "object" || Array.isArray(value)) return false; const definition = value as Record<string, unknown>; return validKey(definition.id) && typeof definition.name === "string" && definition.name.length > 0 && definition.name.length <= 160 && typeof definition.description === "string" && definition.description.length <= 1000 && typeof definition.category === "string" && definition.category.length > 0 && definition.category.length <= 80 && typeof definition.structure === "string" && definition.structure.length > 0 && definition.structure.length <= 1000 && Array.isArray(definition.props) && definition.props.length <= 100 && Array.isArray(definition.slots) && definition.slots.length <= 50 && Array.isArray(definition.variants) && definition.variants.length > 0 && definition.variants.length <= 50 && !(typeof definition.markup === "string" && /<\s*script\b|javascript\s*:/i.test(definition.markup)) && !(typeof definition.styles === "string" && /<\s*\/style\s*>|@import\b|expression\s*\(/i.test(definition.styles)); }
 const projection = "id, organization_id, component_key, definition, version, status, created_by, updated_by, created_at, updated_at";
 async function digest(value: string): Promise<string> { const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)); return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join(""); }
-// The editor owns the immutable built-in registry and falls back to it when the
-// tenant has no persisted overrides; the Worker only returns persisted rows.
-function defaults(): Definition[] { return []; }
-
 export async function handleAdminCmsComponentsRequest(request: Request, database: WorkerDatabaseClient, env: Env, componentKey?: string): Promise<Response> {
   if (!["GET", "POST", "PATCH", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
@@ -29,10 +25,10 @@ export async function handleAdminCmsComponentsRequest(request: Request, database
   if (request.method === "GET") {
     const result = await database.query<Record<string, unknown>>(`SELECT ${projection} FROM public.cms_component_definitions WHERE organization_id = $1 ${componentKey ? "AND component_key = $2" : "AND status <> 'archived'"} ORDER BY component_key LIMIT $${componentKey ? 3 : 2}`, componentKey ? [organizationId, componentKey, 500] : [organizationId, 500]);
     if (componentKey) return json({ data: result.rows[0] ? normalize(result.rows[0]) : null });
-    const stored = result.rows.map(normalize); const byKey = new Map(stored.map((row) => [row.component_key, row.definition]));
-    const data = defaults().map((definition) => byKey.get(String(definition.id)) ?? definition);
+    const stored = result.rows.map(normalize);
+    const data = stored.map((row) => row.definition);
     const records = stored.map((row) => ({ id: row.component_key, version: row.version, status: row.status }));
-    return json({ data, meta: { version: Math.max(1, ...stored.map((row) => row.version)), contract: "cms-component-editor-v2", source: stored.length ? "organization" : "platform-data-defaults", records } });
+    return json({ data, meta: { version: Math.max(1, ...stored.map((row) => row.version)), contract: "cms-component-editor-v2", source: "organization", records } });
   }
   const key = request.headers.get("Idempotency-Key")?.trim(); if (!key || key.length > 255) return json({ error: "idempotency_key_required" }, 400);
   let body: unknown; try { const raw = await request.text(); if (raw.length > 512 * 1024) return json({ error: "payload_too_large" }, 413); body = JSON.parse(raw); } catch { return json({ error: "invalid_json" }, 400); }

@@ -60,7 +60,7 @@ export const cmsPageSchema = z.object({
   title: z.string().max(240).optional(),
   body: z.string().max(500_000).optional(),
   blocks: z.array(cmsBlockSchema).max(200).optional(),
-  tree: z.array(cmsNodeSchema).max(1000).optional(),
+  tree: z.array(cmsNodeSchema).max(200).optional(),
   mutations: z.array(cmsMutationSchema).max(500).optional(),
   status: z.enum(["draft", "published", "scheduled"]).optional(),
   published_at: nullableText(64),

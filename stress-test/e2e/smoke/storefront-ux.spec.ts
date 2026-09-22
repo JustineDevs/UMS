@@ -61,18 +61,26 @@ test.describe("storefront UX and compliance", () => {
     page,
   }) => {
     await page.goto("/shop", { waitUntil: "domcontentloaded" });
-    const focusStyle = await page
-      .locator(".storefront-page-shell a")
-      .first()
-      .evaluate((element) => {
-        (element as HTMLElement).focus({ focusVisible: true });
-        const style = getComputedStyle(element);
-        return {
-          focusVisible: element.matches(":focus-visible"),
-          outlineStyle: style.outlineStyle,
-          outlineWidth: Number.parseFloat(style.outlineWidth),
-        };
-      });
+    const firstLink = page.locator(".storefront-page-shell a").first();
+    await expect(firstLink).toBeVisible({ timeout: 15_000 });
+    await page.mouse.click(2, 2);
+    let focused = false;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      await page.keyboard.press("Tab");
+      if (await firstLink.evaluate((element) => element === document.activeElement)) {
+        focused = true;
+        break;
+      }
+    }
+    expect(focused).toBeTruthy();
+    const focusStyle = await firstLink.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        focusVisible: element.matches(":focus-visible"),
+        outlineStyle: style.outlineStyle,
+        outlineWidth: Number.parseFloat(style.outlineWidth),
+      };
+    });
     expect(focusStyle.focusVisible).toBeTruthy();
     expect(focusStyle.outlineStyle).not.toBe("none");
     expect(focusStyle.outlineWidth).toBeGreaterThanOrEqual(3);

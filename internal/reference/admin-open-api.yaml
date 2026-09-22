@@ -9674,7 +9674,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 413, 503]
-      x-source-sha256: 679f7bd14a9375ca6b17f445cfd63a27ad8a4556ca8144b1a181754d51f2638a
+      x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       security:
         - StaffSession: []
       responses:
@@ -9717,7 +9717,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 413, 503]
-      x-source-sha256: 679f7bd14a9375ca6b17f445cfd63a27ad8a4556ca8144b1a181754d51f2638a
+      x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       security:
         - StaffSession: []
         - name: Idempotency-Key
@@ -15294,7 +15294,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /admin/storefront-home. Runtime source: apps/web/src/app/api/admin/storefront-home/route.ts."
-      x-source-sha256: 679f7bd14a9375ca6b17f445cfd63a27ad8a4556ca8144b1a181754d51f2638a
+      x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -19013,7 +19013,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for PUT /admin/storefront-home. Runtime source: apps/web/src/app/api/admin/storefront-home/route.ts."
-      x-source-sha256: 679f7bd14a9375ca6b17f445cfd63a27ad8a4556ca8144b1a181754d51f2638a
+      x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:

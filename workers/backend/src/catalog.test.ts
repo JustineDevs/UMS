@@ -4,6 +4,7 @@ import {
   getPublishedProductByHandle,
   handleCatalogProductRequest,
   handleCatalogProductsRequest,
+  handleCatalogCategoriesRequest,
   handleCatalogSearchSuggestionsRequest,
   handleCollectionsRequest,
   handleCollectionRequest,
@@ -208,6 +209,40 @@ test("returns paginated collections without exposing query metadata", async () =
     offset: 2,
   });
   assert.deepEqual(values, [5, 2]);
+});
+
+test("returns active catalog categories with published product counts", async () => {
+  let query = "";
+  const response = await handleCatalogCategoriesRequest(
+    new Request("https://api.test/store/catalog/categories"),
+    {
+      async query<Row>(text: string): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        return {
+          rows: [{
+            id: "cat-1",
+            handle: "guitars",
+            name: "Guitars",
+            parent_category_id: null,
+            product_count: "4",
+          }] as Row[],
+          rowCount: 1,
+        };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+  assert.deepEqual(await response.json(), {
+    categories: [{
+      id: "cat-1",
+      handle: "guitars",
+      category: "Guitars",
+      count: 4,
+      parentId: null,
+    }],
+  });
+  assert.match(query, /product_category_product/);
+  assert.match(query, /p\.status = 'published'/);
 });
 
 test("returns a published collection with its visible products", async () => {

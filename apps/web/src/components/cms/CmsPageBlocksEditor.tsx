@@ -1,6 +1,11 @@
 "use client";
 
-import type { CmsBlock, CmsPageBlockPresetRow } from "@universal-music-store/platform-data";
+import {
+  getCmsDefaultProps,
+  listCmsBlockPalette,
+  type CmsBlock,
+  type CmsPageBlockPresetRow,
+} from "@universal-music-store/platform-data";
 import {
   DndContext,
   closestCenter,
@@ -21,20 +26,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useState } from "react";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
 
-const BLOCK_TYPES = [
-  { type: "hero", label: "Hero banner" },
-  { type: "rich_text", label: "Rich text" },
-  { type: "image", label: "Image" },
-  { type: "cta_row", label: "Button (CTA)" },
-  { type: "divider", label: "Divider (spacing)" },
-  { type: "two_column", label: "Two column (image + HTML)" },
-  { type: "faq", label: "FAQ accordion" },
-  { type: "video", label: "Video (YouTube or file URL)" },
-  { type: "trust_strip", label: "Trust strip (3 columns)" },
-  { type: "contact_strip", label: "Contact strip" },
-  { type: "newsletter", label: "Newsletter signup" },
-  { type: "featured_products", label: "Featured products (slugs)" },
-] as const;
+const BLOCK_TYPES = listCmsBlockPalette().filter(({ group }) => group !== "Global");
 
 function newBlockId(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -51,50 +43,6 @@ function cloneBlocksWithNewIds(blocks: CmsBlock[]): CmsBlock[] {
   }));
 }
 
-function defaultPropsForType(type: string): Record<string, unknown> {
-  switch (type) {
-    case "hero":
-      return {
-        title: "",
-        subtitle: "",
-        imageUrl: "",
-        href: "",
-        ctaLabel: "Learn more",
-      };
-    case "rich_text":
-      return { html: "<p></p>" };
-    case "image":
-      return { src: "", alt: "" };
-    case "cta_row":
-      return { label: "Continue", href: "/" };
-    case "divider":
-      return { heightPx: 24 };
-    case "two_column":
-      return { html: "<p></p>", imageUrl: "", imageAlt: "", reverse: false };
-    case "faq":
-      return { items: [{ q: "Question?", a: "<p>Answer.</p>" }] };
-    case "video":
-      return { url: "", title: "Video" };
-    case "trust_strip":
-      return {
-        col1Title: "Secure checkout",
-        col1Body: "",
-        col2Title: "Shipping",
-        col2Body: "",
-        col3Title: "Returns",
-        col3Body: "",
-      };
-    case "contact_strip":
-      return { phone: "", email: "", hours: "" };
-    case "newsletter":
-      return { heading: "Newsletter", subtitle: "", actionUrl: "" };
-    case "featured_products":
-      return { slugs: "" };
-    default:
-      return {};
-  }
-}
-
 function parseFaqItemsEditor(raw: unknown): { q: string; a: string }[] {
   if (!Array.isArray(raw) || raw.length === 0) return [{ q: "", a: "" }];
   const out: { q: string; a: string }[] = [];
@@ -105,6 +53,22 @@ function parseFaqItemsEditor(raw: unknown): { q: string; a: string }[] {
     }
   }
   return out.length ? out : [{ q: "", a: "" }];
+}
+
+function parseFeatureItemsEditor(raw: unknown): { title: string; body: string }[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [{ title: "", body: "" }];
+  return raw.slice(0, 12).map((value) => {
+    const item = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    return { title: String(item.title ?? ""), body: String(item.body ?? "") };
+  });
+}
+
+function parseTestimonialItemsEditor(raw: unknown): { quote: string; name: string; role: string }[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [{ quote: "", name: "", role: "" }];
+  return raw.slice(0, 12).map((value) => {
+    const item = value && typeof value === "object" ? value as Record<string, unknown> : {};
+    return { quote: String(item.quote ?? ""), name: String(item.name ?? ""), role: String(item.role ?? "") };
+  });
 }
 
 function SortableBlockRow({
@@ -156,6 +120,14 @@ function SortableBlockRow({
   const faqItems = parseFaqItemsEditor(block.props.items);
   const setFaqItems = (items: { q: string; a: string }[]) => {
     onChange({ ...block, props: { ...block.props, items } });
+  };
+  const featureItems = parseFeatureItemsEditor(block.props.items);
+  const setFeatureItems = (items: { title: string; body: string }[]) => {
+    onChange({ ...block, props: { ...block.props, items: items.slice(0, 12) } });
+  };
+  const testimonialItems = parseTestimonialItemsEditor(block.props.items);
+  const setTestimonialItems = (items: { quote: string; name: string; role: string }[]) => {
+    onChange({ ...block, props: { ...block.props, items: items.slice(0, 12) } });
   };
 
   return (
@@ -538,6 +510,52 @@ function SortableBlockRow({
         </label>
       ) : null}
 
+      {block.type === "product_grid" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-slate-600 sm:col-span-2">
+            Heading
+            <input className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={String(block.props.heading ?? "")} onChange={(e) => setProp("heading", e.target.value)} disabled={disabled} />
+          </label>
+          <label className="block text-xs font-medium text-slate-600 sm:col-span-2">
+            Product handles (max 8)
+            <textarea className="mt-1 w-full min-h-[72px] rounded border border-slate-200 bg-white px-2 py-1.5 font-mono text-sm" value={String(block.props.slugs ?? "")} onChange={(e) => setProp("slugs", e.target.value)} disabled={disabled} />
+          </label>
+          <label className="block text-xs font-medium text-slate-600">
+            Columns
+            <select className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={Number(block.props.columns ?? 4)} onChange={(e) => setPropNum("columns", Math.min(4, Math.max(2, Number(e.target.value))))} disabled={disabled}>
+              <option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+
+      {block.type === "promo_banner" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["eyebrow", "title", "body", "href", "ctaLabel"] as const).map((key) => (
+            <label key={key} className={`block text-xs font-medium text-slate-600 ${key === "body" ? "sm:col-span-2" : ""}`}>
+              {key === "href" ? "Action URL" : key === "ctaLabel" ? "Action label" : key[0].toUpperCase() + key.slice(1)}
+              {key === "body" ? <textarea className="mt-1 w-full min-h-[72px] rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={String(block.props[key] ?? "")} onChange={(e) => setProp(key, e.target.value)} disabled={disabled} /> : <input className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={String(block.props[key] ?? "")} onChange={(e) => setProp(key, e.target.value)} disabled={disabled} />}
+            </label>
+          ))}
+        </div>
+      ) : null}
+
+      {block.type === "feature_grid" ? (
+        <div className="space-y-3">
+          <label className="block text-xs font-medium text-slate-600">Heading<input className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={String(block.props.heading ?? "")} onChange={(e) => setProp("heading", e.target.value)} disabled={disabled} /></label>
+          {featureItems.map((item, i) => <div key={`feature-${i}`} className="grid gap-2 rounded border border-slate-200 bg-white p-3 sm:grid-cols-2"><input aria-label={`Feature ${i + 1} title`} className="rounded border border-slate-200 px-2 py-1.5 text-sm" value={item.title} onChange={(e) => { const next = [...featureItems]; next[i] = { ...item, title: e.target.value }; setFeatureItems(next); }} disabled={disabled} placeholder="Title" /><input aria-label={`Feature ${i + 1} body`} className="rounded border border-slate-200 px-2 py-1.5 text-sm" value={item.body} onChange={(e) => { const next = [...featureItems]; next[i] = { ...item, body: e.target.value }; setFeatureItems(next); }} disabled={disabled} placeholder="Description" /></div>)}
+          <button type="button" className="text-xs font-medium text-primary hover:underline" disabled={disabled || featureItems.length >= 12} onClick={() => setFeatureItems([...featureItems, { title: "", body: "" }])}>+ Add feature</button>
+        </div>
+      ) : null}
+
+      {block.type === "testimonial_grid" ? (
+        <div className="space-y-3">
+          <label className="block text-xs font-medium text-slate-600">Heading<input className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1.5 text-sm" value={String(block.props.heading ?? "")} onChange={(e) => setProp("heading", e.target.value)} disabled={disabled} /></label>
+          {testimonialItems.map((item, i) => <div key={`testimonial-${i}`} className="space-y-2 rounded border border-slate-200 bg-white p-3"><textarea aria-label={`Testimonial ${i + 1} quote`} className="w-full rounded border border-slate-200 px-2 py-1.5 text-sm" value={item.quote} onChange={(e) => { const next = [...testimonialItems]; next[i] = { ...item, quote: e.target.value }; setTestimonialItems(next); }} disabled={disabled} placeholder="Quote" /><div className="grid gap-2 sm:grid-cols-2"><input aria-label={`Testimonial ${i + 1} name`} className="rounded border border-slate-200 px-2 py-1.5 text-sm" value={item.name} onChange={(e) => { const next = [...testimonialItems]; next[i] = { ...item, name: e.target.value }; setTestimonialItems(next); }} disabled={disabled} placeholder="Customer name" /><input aria-label={`Testimonial ${i + 1} role`} className="rounded border border-slate-200 px-2 py-1.5 text-sm" value={item.role} onChange={(e) => { const next = [...testimonialItems]; next[i] = { ...item, role: e.target.value }; setTestimonialItems(next); }} disabled={disabled} placeholder="Role or context" /></div></div>)}
+          <button type="button" className="text-xs font-medium text-primary hover:underline" disabled={disabled || testimonialItems.length >= 12} onClick={() => setTestimonialItems([...testimonialItems, { quote: "", name: "", role: "" }])}>+ Add testimonial</button>
+        </div>
+      ) : null}
+
       {!KNOWN_BLOCK_TYPES.has(block.type) ? (
         <p className="text-xs text-amber-800">
           Block type <code className="rounded bg-amber-50 px-1">{block.type}</code> has no visual
@@ -561,7 +579,19 @@ function normalizeBlocks(raw: unknown): CmsBlock[] {
       r.props && typeof r.props === "object" && r.props !== null
         ? (r.props as Record<string, unknown>)
         : {};
-    return { id, type, props };
+    return {
+      id,
+      type,
+      componentId: typeof r.componentId === "string" ? r.componentId : undefined,
+      variantId: typeof r.variantId === "string" ? r.variantId : undefined,
+      props,
+      slots: r.slots && typeof r.slots === "object" && !Array.isArray(r.slots)
+        ? r.slots as CmsBlock["slots"]
+        : undefined,
+      styleOverrides: r.styleOverrides && typeof r.styleOverrides === "object" && !Array.isArray(r.styleOverrides)
+        ? r.styleOverrides as Record<string, string>
+        : undefined,
+    };
   });
 }
 
@@ -617,7 +647,7 @@ export function CmsPageBlocksEditor({
     const t = BLOCK_TYPES.find((x) => x.type === type)?.type ?? "rich_text";
     onChange([
       ...blocks,
-      { id: newBlockId(), type: t, props: defaultPropsForType(t) },
+      { id: newBlockId(), type: t, componentId: BLOCK_TYPES.find((x) => x.type === t)?.componentId, props: getCmsDefaultProps(t) },
     ]);
   };
 
