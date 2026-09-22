@@ -175,6 +175,7 @@ const normalizedNodeEnv =
     : "development";
 
 const localAuthOrigin = `http://localhost:${port}`;
+const configuredPublicOrigin = process.env.UVS_DEV_PUBLIC_ORIGIN?.trim();
 // Webpack is the stable default for the two-process Worker + Next dev stack.
 // Turbopack can race its generated manifest writes when Wrangler reloads the
 // Worker while a dynamic API route is compiling, leaving the storefront with
@@ -189,7 +190,9 @@ const appEnv = {
   ...process.env,
   NODE_ENV: normalizedNodeEnv,
   BABEL_ENV: normalizedNodeEnv,
-  ...(normalizedNodeEnv === "development" ? { NEXT_PUBLIC_SITE_URL: localAuthOrigin } : {}),
+  ...(normalizedNodeEnv === "development"
+    ? { NEXT_PUBLIC_SITE_URL: configuredPublicOrigin || localAuthOrigin }
+    : {}),
 };
 const webHeapMb = Number(process.env.UVS_DEV_WEB_MAX_OLD_SPACE_MB || 1536);
 if (!Number.isInteger(webHeapMb) || webHeapMb < 256) {

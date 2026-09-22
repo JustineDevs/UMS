@@ -23,6 +23,13 @@ test("guest checkout may provide its receipt email", () => {
   });
 });
 
+test("explicit guest checkout ignores a stale authenticated session email", () => {
+  assert.deepEqual(resolveCheckoutEmail("", "guest@example.com"), {
+    ok: true,
+    email: "guest@example.com",
+  });
+});
+
 test("checkout rejects an empty email", () => {
   assert.deepEqual(resolveCheckoutEmail(null, "  "), {
     ok: false,
