@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { minorToMajor } from "./money.ts";
+import { normalizeCatalogMediaUrl } from "./catalog-media.ts";
 
 type ReconcileInputLine = { variantId: string; quantity: number };
 type ReconcileRow = {
@@ -85,6 +86,7 @@ export async function handleCartReconcileRequest(request: Request, database: Wor
     const currencyCode = (row.currency_code ?? "php").toUpperCase();
     const availableQuantity = Math.max(0, Math.floor(Number(row.available_quantity)));
     const overLimit = !row.allow_backorder && line.quantity > availableQuantity;
+    const thumbnail = normalizeCatalogMediaUrl(row.product_thumbnail);
     return {
       variantId: line.variantId,
       quantity: line.quantity,
@@ -95,7 +97,7 @@ export async function handleCartReconcileRequest(request: Request, database: Wor
       finish: metadataString(row.product_metadata, "finish"),
       price: majorFromMinor(Number(row.unit_price), currencyCode),
       currencyCode,
-      ...(row.product_thumbnail ? { thumbnail: row.product_thumbnail } : {}),
+      ...(thumbnail ? { thumbnail } : {}),
       availableQuantity,
       status: overLimit ? ("over_limit" as const) : ("current" as const),
     };

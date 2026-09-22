@@ -1,4 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
+import { normalizeCatalogMediaUrl } from "./catalog-media.ts";
+export { normalizeCatalogMediaUrl } from "./catalog-media.ts";
 
 type CatalogRow = {
   id: string;
@@ -58,24 +60,6 @@ type CatalogCategoryRow = {
   parent_category_id: string | null;
   product_count: string | number;
 };
-
-const DECOMMISSIONED_CATALOG_MEDIA_HOSTS = new Set([
-  "gvsyfyaqxfrunoghgqiq.supabase.co",
-]);
-
-function normalizeCatalogMediaUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const normalized = value.trim();
-  if (!normalized) return null;
-  try {
-    const hostname = new URL(normalized).hostname.toLowerCase();
-    if (DECOMMISSIONED_CATALOG_MEDIA_HOSTS.has(hostname)) return null;
-  } catch {
-    // Preserve relative media paths; malformed absolute URLs are still left
-    // for the storefront's normal media validation boundary.
-  }
-  return normalized;
-}
 
 function boundedInteger(
   value: string | null,

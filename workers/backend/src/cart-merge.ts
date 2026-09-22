@@ -3,6 +3,7 @@ import { verifyWorkerBearerToken } from "./auth.ts";
 import type { WorkerDatabaseClient, WorkerDatabaseEnv } from "./database.ts";
 import { withWorkerDatabase, withWorkerTransaction } from "./database.ts";
 import { minorToMajor } from "./money.ts";
+import { normalizeCatalogMediaUrl } from "./catalog-media.ts";
 
 type CartMergeEnv = WorkerDatabaseEnv & {
   JWT_SECRET?: string;
@@ -66,7 +67,9 @@ async function currentCartLines(database: WorkerDatabaseClient, cartId: string):
     [cartId],
   );
   const currencyCode = String(result.rows[0]?.currency_code ?? "php").toUpperCase();
-  return result.rows.map((line) => ({
+  return result.rows.map((line) => {
+    const thumbnail = normalizeCatalogMediaUrl(line.thumbnail);
+    return {
     variantId: String(line.variant_id),
     quantity: Math.floor(Number(line.quantity)),
     slug: typeof line.slug === "string" ? line.slug : "item",
@@ -76,8 +79,9 @@ async function currentCartLines(database: WorkerDatabaseClient, cartId: string):
     finish: "",
     price: Math.round(minorToMajor(Number(line.unit_price ?? 0), currencyCode) * 1_000_000) / 1_000_000,
     currencyCode,
-    ...(typeof line.thumbnail === "string" && line.thumbnail.trim() ? { thumbnail: line.thumbnail.trim() } : {}),
-  }));
+    ...(thumbnail ? { thumbnail } : {}),
+  };
+  });
 }
 
 async function mergeInCommerceDatabase(
@@ -182,7 +186,7 @@ async function mergeInCommerceDatabase(
               product_description, product_handle, variant_sku, variant_title, unit_price, raw_unit_price)
            VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $3, $8, $9, $10, $11, $12,
                    jsonb_build_object('value', $12::numeric))`,
-          [lineId, cartId, item.product_title, item.thumbnail, quantity, item.variant_id, item.product_id,
+          [lineId, cartId, item.product_title, normalizeCatalogMediaUrl(item.thumbnail), quantity, item.variant_id, item.product_id,
             item.product_description, item.product_handle, item.variant_sku, item.variant_title, Number(item.unit_price)],
         );
       }

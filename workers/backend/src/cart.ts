@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { withWorkerTransaction } from "./database.ts";
+import { normalizeCatalogMediaUrl } from "./catalog-media.ts";
 import {
   executeIdempotently,
   HyperdriveIdempotencyStore,
@@ -67,7 +68,7 @@ export async function getCartById(
       variant_id: row.variant_id,
       product_id: row.product_id,
       unit_price: row.unit_price,
-      thumbnail: row.thumbnail,
+      thumbnail: normalizeCatalogMediaUrl(row.thumbnail),
       variant_title: row.variant_title,
       product_handle: row.product_handle,
       variant_sku: row.variant_sku,
@@ -508,7 +509,7 @@ export async function addCartLine(
         cartId,
         row.product_title,
         null,
-        row.thumbnail,
+        normalizeCatalogMediaUrl(row.thumbnail),
         quantity,
         row.variant_id,
         row.product_id,
