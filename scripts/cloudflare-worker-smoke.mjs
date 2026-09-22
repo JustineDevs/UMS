@@ -52,11 +52,10 @@ function objectPayload(payload, label) {
 
 async function smoke(base) {
   const checks = [
-    ["/health", 200, (payload) => {
-      const value = objectPayload(payload, "/health");
-      if (value.runtime !== "cloudflare_worker") throw new Error("/health is not Worker-native");
+    ["/healthz", 200, (payload) => {
+      const value = objectPayload(payload, "/healthz");
+      if (value.runtime !== "cloudflare_worker") throw new Error("/healthz is not Worker-native");
     }],
-    ["/healthz", 200],
     ["/readyz", 200, (payload) => {
       const value = objectPayload(payload, "/readyz");
       if (value.databaseRoles?.app !== true || value.databaseRoles?.medusa !== true) {
