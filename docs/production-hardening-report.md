@@ -197,3 +197,24 @@ The remaining Webpack cache warnings were traced to the generated visual-builder
 ## Architect review
 
 The architect review returned `REJECT` because the source tree remains untracked/migrating and provider-backed E2E/SQL/long-duration evidence is unavailable. One reported typecheck failure was stale relative to the final checkout: a fresh web typecheck passed after the review. The substantive lifecycle concern—propagating client abort into the inventory upstream fetch—was repaired afterward and covered by the stream tests.
+
+## Addendum: deployed verification pass (2026-09-23)
+
+The following checks were run against the deployed storefront at
+`https://universalmusic.vercel.app` with the production Worker at
+`https://ums-backend-production.pcg0255.workers.dev`, using one Chromium worker:
+
+- PayPal cancellation and declined-return safety: 2/2 passed; neither return exposed an order.
+- Collection catalog browser proof: 2/2 passed; collection status and native collection navigation rendered.
+- Storefront API security plus axe accessibility suite: 18/18 passed.
+- Desktop and mobile performance budgets for `/`, `/shop`, and `/collections`: 6/6 passed; TTFB, LCP, and CLS stayed within configured limits.
+- Tracking capability, hosted cancel/failure recovery, and unavailable intent-service recovery: 3/3 passed.
+- Webhook negative-signature boundary: Stripe, PayPal, and Xendit each returned 401 with `invalid_webhook_signature`.
+- Worker `/healthz` and `/readyz`: both returned 200 with `databaseRoles.app=true` and `databaseRoles.medusa=true`.
+
+The deployed HTTP matrix found one contract defect in `GET /api/shop/product`: the route returned
+`Referrer-Policy: no-referrer` while the checked-in contract requires
+`strict-origin-when-cross-origin`. Error and success responses were aligned, the OpenAPI source
+hash reference was regenerated, and the repair was committed as `737e7249` and pushed to the
+verified-hosted-checkout preview branch. The Vercel preview was still building at the time of this
+addendum; the HTTP matrix must be rerun after that deployment is ready.
