@@ -218,3 +218,11 @@ The deployed HTTP matrix found one contract defect in `GET /api/shop/product`: t
 hash reference was regenerated, and the repair was committed as `737e7249` and pushed to the
 verified-hosted-checkout preview branch. The Vercel preview was still building at the time of this
 addendum; the HTTP matrix must be rerun after that deployment is ready.
+
+The follow-up deployed health pass completed with 14/14 checks passing against the same
+storefront and Worker: Worker and storefront health, admin authentication boundary, payment
+method availability, shop/CMS/review public APIs, unauthenticated account/order/cart behavior,
+COD validation, and cron-secret rejection. The route-header repair is not yet promoted to the
+production alias; Vercel deployment `8DgD98NffjZz1KnZdK4FkdWZCrFo` remains in progress while
+the JavaScript/TypeScript security check has completed successfully. The HTTP matrix remains
+pending until that deployment is ready.
