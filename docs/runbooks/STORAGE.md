@@ -8,7 +8,6 @@ files automatically. Generated outputs and package caches are cleaned explicitly
 ```bash
 pnpm storage:report
 du -xhd1 . | sort -h
-docker system df
 ```
 
 `pnpm storage:report` is a dry run. It reports only generated repository output
@@ -23,34 +22,19 @@ pnpm storage:prune
 This removes local Next.js, Medusa, Turbo, test, coverage, and development
 runtime output. It does not remove `node_modules`, database volumes, or source.
 
-## Package and Docker Caches
+## Package Caches
 
-The recurring-safe Docker maintenance command removes old disposable
-containers, images, build cache, and networks. It never removes volumes:
-
-```bash
-pnpm docker:maintenance
-```
-
-It keeps seven days by default. Set `DOCKER_PRUNE_DAYS` to change the retention
-period. Run it weekly from the host scheduler if desired.
-
-For one-off package cleanup, run these only when the report confirms the
-machine is under storage pressure:
-
-```bash
-pnpm store prune
-npm cache clean --force
-docker builder prune -af
-```
-
-Do not run `docker volume prune` automatically. Local volumes may contain
-PostgreSQL, Redis, or Neo4j data. Remove unused images with `docker image prune
--af` only after confirming they are not needed by an active local workflow.
+Do not prune the global pnpm store or package-manager caches as routine project
+maintenance. They are shared across repositories and may need to be downloaded
+again. If disk pressure requires cache cleanup, first inspect the exact cache
+path and size, then use the package manager's supported prune command only for
+unreferenced package content. Never remove active tool installations, project
+dependencies, databases, credentials, or user uploads as a side effect.
 
 ## Development Rules
 
 - Do not commit build output, test reports, screenshots, or trace archives.
 - Stop stale dev servers with `pnpm cleanup:dev` before starting another stack.
 - Do not run multiple full repository builds in parallel.
-- Keep Docker build contexts bounded by `.dockerignore`.
+- The app backend runs on Cloudflare Workers; local Docker is only needed when
+  the `act` workflow emulator requires it, not to run or deploy the application.

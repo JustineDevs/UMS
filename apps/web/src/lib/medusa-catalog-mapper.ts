@@ -42,7 +42,12 @@ type MedusaProductRaw = {
   status?: string;
   created_at?: string | null;
   metadata?: Record<string, unknown> | null;
-  images?: Array<{ id?: string; url?: string; alt?: string | null; alt_text?: string | null } | null> | null;
+  images?: Array<{
+    id?: string;
+    url?: string;
+    alt?: string | null;
+    alt_text?: string | null;
+  } | null> | null;
   categories?: Array<{
     id?: string;
     name?: string;
@@ -51,13 +56,19 @@ type MedusaProductRaw = {
   variants?: MedusaVariantRaw[] | null;
 };
 
-function strMeta(meta: Record<string, unknown> | null | undefined, key: string): string | null {
+function strMeta(
+  meta: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
   const v = meta?.[key];
   if (typeof v !== "string" || !v.trim()) return null;
   return v.trim();
 }
 
-function numMeta(meta: Record<string, unknown> | null | undefined, key: string): number | null {
+function numMeta(
+  meta: Record<string, unknown> | null | undefined,
+  key: string,
+): number | null {
   const v = meta?.[key];
   if (typeof v === "number" && Number.isFinite(v)) return v;
   if (typeof v === "string" && v.trim()) {
@@ -67,7 +78,9 @@ function numMeta(meta: Record<string, unknown> | null | undefined, key: string):
   return null;
 }
 
-function parseHotspots(meta: Record<string, unknown> | null | undefined): ProductImageHotspot[] {
+function parseHotspots(
+  meta: Record<string, unknown> | null | undefined,
+): ProductImageHotspot[] {
   const raw = meta?.hotspots ?? meta?.image_hotspots;
   let arr: unknown[] = [];
   if (raw == null) return [];
@@ -105,7 +118,9 @@ function parseHotspots(meta: Record<string, unknown> | null | undefined): Produc
   return out;
 }
 
-function parseRelatedHandles(meta: Record<string, unknown> | null | undefined): string[] {
+function parseRelatedHandles(
+  meta: Record<string, unknown> | null | undefined,
+): string[] {
   const raw = meta?.related_handles ?? meta?.relatedHandles;
   if (raw == null) return [];
   if (Array.isArray(raw)) {
@@ -121,20 +136,31 @@ function parseRelatedHandles(meta: Record<string, unknown> | null | undefined): 
         const p = JSON.parse(t) as unknown;
         if (Array.isArray(p)) {
           return p
-            .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+            .filter(
+              (x): x is string => typeof x === "string" && x.trim().length > 0,
+            )
             .map((x) => x.trim());
         }
       } catch {
         return [];
       }
     }
-    return t.split(",").map((s) => s.trim()).filter(Boolean);
+    return t
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return [];
 }
 
-function brandFromMetadata(meta: Record<string, unknown> | null | undefined): string | null {
-  return strMeta(meta, "brand") ?? strMeta(meta, "brand_name") ?? strMeta(meta, "legacy_brand");
+function brandFromMetadata(
+  meta: Record<string, unknown> | null | undefined,
+): string | null {
+  return (
+    strMeta(meta, "brand") ??
+    strMeta(meta, "brand_name") ??
+    strMeta(meta, "legacy_brand")
+  );
 }
 
 function metaValueByKeys(
@@ -148,7 +174,9 @@ function metaValueByKeys(
   return null;
 }
 
-function parseGalleryVideoUrls(meta: Record<string, unknown> | null | undefined): string[] {
+function parseGalleryVideoUrls(
+  meta: Record<string, unknown> | null | undefined,
+): string[] {
   const raw = meta?.gallery_video_urls;
   if (Array.isArray(raw)) {
     return raw
@@ -160,7 +188,9 @@ function parseGalleryVideoUrls(meta: Record<string, unknown> | null | undefined)
       const p = JSON.parse(raw) as unknown;
       if (Array.isArray(p)) {
         return p
-          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          .filter(
+            (x): x is string => typeof x === "string" && x.trim().length > 0,
+          )
           .map((s) => s.trim());
       }
     } catch {
@@ -170,63 +200,94 @@ function parseGalleryVideoUrls(meta: Record<string, unknown> | null | undefined)
   return [];
 }
 
-function parseGuitarSpecs(meta: Record<string, unknown> | null | undefined): GuitarProductSpecs | null {
+function parseGuitarSpecs(
+  meta: Record<string, unknown> | null | undefined,
+): GuitarProductSpecs | null {
   const raw = meta?.guitar_specs_json ?? meta?.guitarSpecsJson;
   if (typeof raw !== "string" || !raw.trim()) return null;
   try {
     const value = JSON.parse(raw) as unknown;
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
     return value as GuitarProductSpecs;
   } catch {
     return null;
   }
 }
 
-function parseAudioDemos(meta: Record<string, unknown> | null | undefined): ProductAudioDemo[] {
+function parseAudioDemos(
+  meta: Record<string, unknown> | null | undefined,
+): ProductAudioDemo[] {
   const raw = meta?.audio_demos_json ?? meta?.audioDemosJson;
   if (typeof raw !== "string" || !raw.trim()) return [];
   try {
     const value = JSON.parse(raw) as unknown;
     if (!Array.isArray(value)) return [];
-    return value.filter((item): item is ProductAudioDemo => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
-      const row = item as Record<string, unknown>;
-      return typeof row.url === "string" && row.url.trim().length > 0 &&
-        typeof row.title === "string" && row.title.trim().length > 0;
-    }).map((item) => ({
-      url: item.url.trim(),
-      title: item.title.trim(),
-      ...(item.description?.trim() ? { description: item.description.trim() } : {}),
-      ...(typeof item.durationSeconds === "number" && Number.isFinite(item.durationSeconds)
-        ? { durationSeconds: item.durationSeconds }
-        : {}),
-    }));
+    return value
+      .filter((item): item is ProductAudioDemo => {
+        if (!item || typeof item !== "object" || Array.isArray(item))
+          return false;
+        const row = item as Record<string, unknown>;
+        return (
+          typeof row.url === "string" &&
+          row.url.trim().length > 0 &&
+          typeof row.title === "string" &&
+          row.title.trim().length > 0
+        );
+      })
+      .map((item) => ({
+        url: item.url.trim(),
+        title: item.title.trim(),
+        ...(item.description?.trim()
+          ? { description: item.description.trim() }
+          : {}),
+        ...(typeof item.durationSeconds === "number" &&
+        Number.isFinite(item.durationSeconds)
+          ? { durationSeconds: item.durationSeconds }
+          : {}),
+      }));
   } catch {
     return [];
   }
 }
 
-function parseTrustContent(meta: Record<string, unknown> | null | undefined): ProductTrustContent | null {
+function parseTrustContent(
+  meta: Record<string, unknown> | null | undefined,
+): ProductTrustContent | null {
   const raw = meta?.trust_content_json ?? meta?.trustContentJson;
   if (typeof raw !== "string" || !raw.trim()) return null;
   try {
     const value = JSON.parse(raw) as unknown;
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
     const row = value as Record<string, unknown>;
     const text = (key: string): string | undefined => {
       const value = row[key];
-      return typeof value === "string" && value.trim() ? value.trim() : undefined;
+      return typeof value === "string" && value.trim()
+        ? value.trim()
+        : undefined;
     };
     const list = Array.isArray(row.includedAccessories)
-      ? row.includedAccessories.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim())
+      ? row.includedAccessories
+          .filter(
+            (item): item is string =>
+              typeof item === "string" && Boolean(item.trim()),
+          )
+          .map((item) => item.trim())
       : undefined;
     const out: ProductTrustContent = {
       ...(text("warranty") ? { warranty: text("warranty") } : {}),
-      ...(text("conditionGrade") ? { conditionGrade: text("conditionGrade") } : {}),
+      ...(text("conditionGrade")
+        ? { conditionGrade: text("conditionGrade") }
+        : {}),
       ...(text("authenticity") ? { authenticity: text("authenticity") } : {}),
-      ...(text("setupAndInspection") ? { setupAndInspection: text("setupAndInspection") } : {}),
+      ...(text("setupAndInspection")
+        ? { setupAndInspection: text("setupAndInspection") }
+        : {}),
       ...(list?.length ? { includedAccessories: list } : {}),
-      ...(text("shippingEligibility") ? { shippingEligibility: text("shippingEligibility") } : {}),
+      ...(text("shippingEligibility")
+        ? { shippingEligibility: text("shippingEligibility") }
+        : {}),
       ...(text("returnNotes") ? { returnNotes: text("returnNotes") } : {}),
     };
     return Object.keys(out).length ? out : null;
@@ -249,11 +310,18 @@ function buildGallerySlides(
     }
   }
   const videos: string[] = [];
-  if (videoUrl?.trim()) videos.push(videoUrl.trim());
+  const seenVideos = new Set<string>();
+  if (videoUrl?.trim()) {
+    videos.push(videoUrl.trim());
+    seenVideos.add(videoUrl.trim());
+  }
   for (const u of galleryVideoUrls) {
     const t = u.trim();
     if (!t) continue;
-    if (!videos.includes(t)) videos.push(t);
+    if (!seenVideos.has(t)) {
+      seenVideos.add(t);
+      videos.push(t);
+    }
   }
   for (const u of videos) {
     slides.push(
@@ -277,7 +345,11 @@ function optionRowsToTypeFinish(rows: MedusaOptionRow[] | null | undefined): {
     if (!val) continue;
     if (title.includes("type") || title.includes("model")) {
       type = val;
-    } else if (title.includes("finish") || title.includes("color") || title.includes("colour")) {
+    } else if (
+      title.includes("finish") ||
+      title.includes("color") ||
+      title.includes("colour")
+    ) {
       finish = val;
     }
   }
@@ -332,7 +404,11 @@ function optionRowsToInstrumentAttributes(
     "";
   out.condition =
     out.condition ||
-    metaValueByKeys(meta, ["condition", "item_condition", "product_condition"]) ||
+    metaValueByKeys(meta, [
+      "condition",
+      "item_condition",
+      "product_condition",
+    ]) ||
     "";
   out.skillLevel =
     out.skillLevel ||
@@ -340,7 +416,11 @@ function optionRowsToInstrumentAttributes(
     "";
   out.shippingSpeed =
     out.shippingSpeed ||
-    metaValueByKeys(meta, ["shipping_speed", "shippingSpeed", "delivery_speed"]) ||
+    metaValueByKeys(meta, [
+      "shipping_speed",
+      "shippingSpeed",
+      "delivery_speed",
+    ]) ||
     "";
   return out;
 }
@@ -358,7 +438,8 @@ function variantCompareAtPriceMajor(v: MedusaVariantRaw): number | null {
   const orig = v.calculated_price?.original_amount;
   const calc = v.calculated_price?.calculated_amount;
   if (typeof orig !== "number" || !Number.isFinite(orig)) return null;
-  if (typeof calc === "number" && Number.isFinite(calc) && orig <= calc) return null;
+  if (typeof calc === "number" && Number.isFinite(calc) && orig <= calc)
+    return null;
   const currency = v.calculated_price?.currency_code ?? "PHP";
   return medusaMinorToMajor(orig, currency);
 }
@@ -391,7 +472,9 @@ function productWithSellableVariantsOnly(p: Product): Product | null {
 }
 
 /** Map Medusa store product JSON and drop variants (and products) with no sellable stock. */
-export function catalogProductFromMedusaRaw(raw: MedusaProductRaw): Product | null {
+export function catalogProductFromMedusaRaw(
+  raw: MedusaProductRaw,
+): Product | null {
   if (typeof raw.id !== "string" || !raw.id.trim()) return null;
   const canonicalRaw: MedusaProductRaw & { id: string } = {
     ...raw,
@@ -401,20 +484,28 @@ export function catalogProductFromMedusaRaw(raw: MedusaProductRaw): Product | nu
   return productWithSellableVariantsOnly(p);
 }
 
-function mapMedusaProductToProduct(raw: MedusaProductRaw & { id: string }): Product {
+function mapMedusaProductToProduct(
+  raw: MedusaProductRaw & { id: string },
+): Product {
   const id = raw.id;
   const images: ProductImage[] = (raw.images ?? [])
-    .filter(Boolean)
-    .map((img, i) => ({
-      id: img?.id ?? `${id}-img-${i}`,
-      productId: id,
-      imageUrl: img?.url ?? raw.thumbnail ?? "",
-      sortOrder: i,
-      altText:
-        typeof (img?.alt_text ?? img?.alt) === "string" && (img?.alt_text ?? img?.alt)?.trim()
-          ? (img?.alt_text ?? img?.alt)!.trim()
-          : undefined,
-    }))
+    .flatMap((img, i) =>
+      img
+        ? [
+            {
+              id: img?.id ?? `${id}-img-${i}`,
+              productId: id,
+              imageUrl: img?.url ?? raw.thumbnail ?? "",
+              sortOrder: i,
+              altText:
+                typeof (img?.alt_text ?? img?.alt) === "string" &&
+                (img?.alt_text ?? img?.alt)?.trim()
+                  ? (img?.alt_text ?? img?.alt)!.trim()
+                  : undefined,
+            },
+          ]
+        : [],
+    )
     .filter((img) => !isKnownUnavailableExternalImage(img.imageUrl));
 
   if (images.length === 0 && raw.thumbnail) {
@@ -432,9 +523,14 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw & { id: string }): Prod
     .filter((v): v is MedusaVariantRaw => Boolean(v?.id))
     .map((v) => {
       const { type, finish } = optionRowsToTypeFinish(v.options ?? []);
-      const attrs = optionRowsToInstrumentAttributes(v.options ?? [], raw.metadata ?? null);
+      const attrs = optionRowsToInstrumentAttributes(
+        v.options ?? [],
+        raw.metadata ?? null,
+      );
       const bc =
-        typeof v.barcode === "string" && v.barcode.trim() ? v.barcode.trim() : null;
+        typeof v.barcode === "string" && v.barcode.trim()
+          ? v.barcode.trim()
+          : null;
       const iq = v.inventory_quantity;
       const inventoryQuantity =
         typeof iq === "number" && Number.isFinite(iq) ? iq : null;
@@ -453,7 +549,9 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw & { id: string }): Prod
         skillLevel: attrs.skillLevel,
         shippingSpeed: attrs.shippingSpeed,
         price: variantPriceMajor(v),
-        currencyCode: (v.calculated_price?.currency_code ?? "PHP").toUpperCase(),
+        currencyCode: (
+          v.calculated_price?.currency_code ?? "PHP"
+        ).toUpperCase(),
         compareAtPrice: variantCompareAtPriceMajor(v),
         cost: null,
         manageInventory,
@@ -484,7 +582,9 @@ function mapMedusaProductToProduct(raw: MedusaProductRaw & { id: string }): Prod
   const trustContent = parseTrustContent(meta);
 
   const createdAt =
-    typeof raw.created_at === "string" && raw.created_at ? raw.created_at : null;
+    typeof raw.created_at === "string" && raw.created_at
+      ? raw.created_at
+      : null;
 
   const gallerySlides = buildGallerySlides(
     images,
@@ -540,9 +640,7 @@ export function productMatchesVariantFilters(
   }
   if (filters.pickupConfig?.trim()) {
     const want = filters.pickupConfig.trim().toLowerCase();
-    if (
-      !p.variants.some((v) => v.pickupConfig.trim().toLowerCase() === want)
-    ) {
+    if (!p.variants.some((v) => v.pickupConfig.trim().toLowerCase() === want)) {
       return false;
     }
   }
@@ -575,7 +673,10 @@ export function productMatchesVariantFilters(
   return true;
 }
 
-export function productMatchesBrand(p: Product, brand: string | undefined): boolean {
+export function productMatchesBrand(
+  p: Product,
+  brand: string | undefined,
+): boolean {
   if (!brand?.trim()) return true;
   const want = brand.trim().toLowerCase();
   const b = (p.brand ?? "").trim().toLowerCase();
@@ -588,8 +689,10 @@ export function productMatchesPriceRange(
   maxPrice: number | undefined,
 ): boolean {
   const price = minVariantPrice(p);
-  if (minPrice != null && Number.isFinite(minPrice) && price < minPrice) return false;
-  if (maxPrice != null && Number.isFinite(maxPrice) && price > maxPrice) return false;
+  if (minPrice != null && Number.isFinite(minPrice) && price < minPrice)
+    return false;
+  if (maxPrice != null && Number.isFinite(maxPrice) && price > maxPrice)
+    return false;
   return true;
 }
 

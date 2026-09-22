@@ -64,10 +64,13 @@ test("compliance export aggregates APP and Medusa records with parameterized ema
     { INTERNAL_API_KEY: "secret", databaseFactory: fakeDatabases(calls) },
   );
   assert.equal(response.status, 200);
-  const body = await response.json() as { email: string; app: Record<string, unknown[]>; medusa: { orders: unknown[] } };
+  const body = await response.json() as { email: string; app: Record<string, unknown[]>; medusa: { orders: unknown[] }; limits: { orders: number } };
   assert.equal(body.email, "buyer@example.com");
   assert.equal(body.app.users.length, 1);
   assert.equal(body.medusa.orders.length, 1);
+  assert.equal(body.limits.orders, 500);
+  assert.ok(calls.some((call) => call.text.includes('ORDER BY o.created_at DESC LIMIT 500')));
+  assert.ok(calls.some((call) => call.text.includes('LIMIT 5000')));
   assert.ok(calls.every((call) => !call.text.includes("buyer@example.com")));
   assert.ok(calls.some((call) => call.role === "app" && call.values.includes("buyer@example.com")));
   assert.ok(calls.some((call) => call.role === "medusa" && call.values.includes("buyer@example.com")));

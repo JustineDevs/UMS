@@ -117,8 +117,9 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
     switch (b.type) {
       case "visual_primitive": {
         const sourceType = String(b.props.sourceType ?? "visual");
-        const domOverrides = b.props.domOverrides && typeof b.props.domOverrides === "object"
-          ? b.props.domOverrides as Record<string, Record<string, unknown>>
+        const rawDomOverrides = b.props.domOverrides;
+        const domOverrides = rawDomOverrides && typeof rawDomOverrides === "object"
+          ? rawDomOverrides as Record<string, Record<string, unknown>>
           : {};
         const rootOverrides = domOverrides[b.id] ?? {};
         const sourceMarkup = sanitizeCmsHtml(String(b.props.markup ?? ""));
@@ -143,8 +144,10 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
       case "hero": {
         const title = String(b.props.title ?? "");
         const subtitle = String(b.props.subtitle ?? "");
-        const imageUrl = typeof b.props.imageUrl === "string" ? b.props.imageUrl : "";
-        const href = typeof b.props.href === "string" ? b.props.href : "";
+        const rawImageUrl = b.props.imageUrl;
+        const rawHref = b.props.href;
+        const imageUrl = typeof rawImageUrl === "string" ? rawImageUrl : "";
+        const href = typeof rawHref === "string" ? rawHref : "";
         const cta = String(b.props.ctaLabel ?? "Learn more");
         const actions = await renderSlot(b.slots?.actions);
         nodes.push(
@@ -341,7 +344,7 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
             className="space-y-3 rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-6"
           >
             {items.map((item, i) => (
-              <details key={i} className="group border-b border-outline-variant/15 pb-3 last:border-0">
+              <details key={`${item.q}-${item.a ?? "answer"}`} className="group border-b border-outline-variant/15 pb-3 last:border-0">
                 <summary data-cms-id={`${b.id}::question-${i}`} data-cms-label={`Question ${i + 1}`} data-cms-prop="items" data-cms-array-index={i} data-cms-array-field="q" className="cursor-pointer list-none font-semibold text-primary">
                   {item.q}
                   <span className="material-symbols-outlined float-right text-on-surface-variant transition-transform group-open:rotate-180">

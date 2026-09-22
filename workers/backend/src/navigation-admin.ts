@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { withWorkerTransaction } from "./database.ts";
+import { lockCmsMediaReferences } from "./cms-media-references.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
 import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
 
@@ -24,6 +25,10 @@ function claimOrganization(claims: WorkerAuthClaims): string | null {
 function canWrite(claims: WorkerAuthClaims, publish: boolean): boolean {
   const permissions = Array.isArray(claims.permissions) ? claims.permissions : [];
   return permissions.some((value) => value === "*" || value === "content:write" || (publish && value === "content:publish")) || claims.role === "owner" || claims.role === "admin";
+}
+function canRead(claims: WorkerAuthClaims): boolean {
+  const permissions = Array.isArray(claims.permissions) ? claims.permissions : [];
+  return permissions.some((value) => value === "*" || value === "content:read" || value === "content:write") || claims.role === "owner" || claims.role === "admin";
 }
 function safeHref(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 2000 || !value.trim()) return null;
@@ -87,8 +92,32 @@ async function digest(raw: string): Promise<string> {
 }
 function emptyPayload(): NavigationPayload { return { headerLinks: [], headerLinksMobile: [], footerColumns: [], footerBottomLinks: [], socialLinks: [] }; }
 
+async function readNavigation(database: WorkerDatabaseClient, organizationId: string): Promise<Response> {
+  const liveResult = await database.query(
+    "SELECT header_links, header_links_mobile, footer_columns, footer_bottom_links, social_links FROM public.cms_navigation WHERE id = 'default' AND organization_id = $1 LIMIT 1",
+    [organizationId],
+  );
+  const liveRow = liveResult.rows[0];
+  const live = liveRow ? parsePayload({
+    headerLinks: liveRow.header_links,
+    headerLinksMobile: liveRow.header_links_mobile,
+    footerColumns: liveRow.footer_columns,
+    footerBottomLinks: liveRow.footer_bottom_links,
+    socialLinks: liveRow.social_links,
+  }) ?? emptyPayload() : emptyPayload();
+  const draftResult = await database.query<{ payload?: unknown }>(
+    "SELECT payload FROM public.cms_navigation_draft WHERE id = 'default' AND organization_id = $1 LIMIT 1",
+    [organizationId],
+  );
+  const rawDraft = draftResult.rows[0]?.payload;
+  const draft = isRecord(rawDraft) && Object.keys(rawDraft).length > 0 ? rawDraft : null;
+  const merged = draft ? parsePayload({ ...live, ...draft }) ?? live : live;
+  return json({ data: merged, meta: { hasDraft: Boolean(draft) } });
+}
+
 async function saveNavigation(database: WorkerDatabaseClient, organizationId: string, payload: NavigationPayload, mode: "draft" | "live"): Promise<Response> {
   return withWorkerTransaction(database, async (tx) => {
+    if (!await lockCmsMediaReferences(tx, organizationId, payload)) return json({ error: "media_reference_deleted" }, 409);
     if (mode === "draft") {
       await tx.query(`INSERT INTO public.cms_navigation_draft (id, organization_id, payload, updated_at) VALUES ('default', $1, $2::jsonb, now()) ON CONFLICT (organization_id, id) DO UPDATE SET payload=EXCLUDED.payload, updated_at=now()`, [organizationId, JSON.stringify(payload)]);
     } else {
@@ -100,6 +129,14 @@ async function saveNavigation(database: WorkerDatabaseClient, organizationId: st
 }
 
 export async function handleCmsAdminNavigationRequest(request: Request, database: WorkerDatabaseClient, env: NavigationAdminEnv, publish = false): Promise<Response> {
+  if (request.method === "GET" && !publish) {
+    const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
+    if (!claims) return json({ error: "unauthorized" }, 401);
+    if (!canRead(claims)) return json({ error: "forbidden" }, 403);
+    const organizationId = claimOrganization(claims);
+    if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+    return readNavigation(database, organizationId);
+  }
   const requiredMethod = publish ? "POST" : "PUT";
   if (request.method !== requiredMethod) return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
@@ -108,14 +145,23 @@ export async function handleCmsAdminNavigationRequest(request: Request, database
   const organizationId = claimOrganization(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
   const parsed = await body(request);
-  if (parsed.raw.length > 128 * 1024 || !parsed.value) return json({ error: "invalid_navigation_payload" }, parsed.raw.length > 128 * 1024 ? 413 : 400);
-  const mode = parsed.value.mode === "draft" ? "draft" : "live";
-  const source = mode === "draft" && isRecord(parsed.value.payload) ? parsed.value.payload : parsed.value;
-  const payload = parsePayload(source);
-  if (!payload) return json({ error: "invalid_navigation_payload" }, 400);
+  if (parsed.raw.length > 128 * 1024 || (!publish && !parsed.value)) return json({ error: "invalid_navigation_payload" }, parsed.raw.length > 128 * 1024 ? 413 : 400);
   const key = request.headers.get("Idempotency-Key")?.trim();
   if (!key) return json({ error: "idempotency_key_required" }, 400);
-  return (await executeIdempotently(new HyperdriveIdempotencyStore(database), key, await digest(parsed.raw), () => saveNavigation(database, organizationId, payload, publish ? "live" : mode))).response;
+  let rawForReplay = parsed.raw;
+  let payload: NavigationPayload | null = null;
+  if (publish && !parsed.value) {
+    const draft = await database.query<{ payload?: unknown }>("SELECT payload FROM public.cms_navigation_draft WHERE id = 'default' AND organization_id = $1 LIMIT 1", [organizationId]);
+    payload = parsePayload(draft.rows[0]?.payload);
+    rawForReplay = `publish:${organizationId}`;
+  } else {
+    const value = parsed.value as Record<string, unknown>;
+    const mode = value.mode === "draft" ? "draft" : "live";
+    const source = mode === "draft" && isRecord(value.payload) ? value.payload : value;
+    payload = parsePayload(source);
+  }
+  if (!payload) return json({ error: "invalid_navigation_payload" }, 400);
+  return (await executeIdempotently(new HyperdriveIdempotencyStore(database), key, await digest(rawForReplay), () => saveNavigation(database, organizationId, payload as NavigationPayload, publish ? "live" : (parsed.value as Record<string, unknown>).mode === "draft" ? "draft" : "live"))).response;
 }
 
 export function navigationPayloadForTest(): NavigationPayload { return emptyPayload(); }

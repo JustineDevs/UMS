@@ -2,20 +2,36 @@ import {
   buildAnalyticsChartsPayload,
   type AnalyticsChartsPayload,
 } from "@/lib/analytics-chart";
-import {
-  fetchMedusaOrdersForAdmin,
-  type MedusaOrderRow,
-} from "@/lib/medusa-order-bridge";
+import { fetchWorkerOrdersForAdmin, type WorkerAdminOrder } from "@/lib/worker-admin-bridge";
 
-export async function fetchAllMedusaOrdersForAnalytics() {
-  const pageSize = 500;
-  const all: MedusaOrderRow[] = [];
+export const MAX_ANALYTICS_ORDERS = 10_000;
+
+export class AnalyticsDataLimitError extends Error {
+  readonly code = "ANALYTICS_DATA_LIMIT";
+
+  constructor() {
+    super(`Analytics order volume exceeds the ${MAX_ANALYTICS_ORDERS.toLocaleString()}-row safety limit`);
+    this.name = "AnalyticsDataLimitError";
+  }
+}
+
+export function assertAnalyticsOrderBudget(total: number, collected: number): void {
+  if (total > MAX_ANALYTICS_ORDERS || collected > MAX_ANALYTICS_ORDERS) {
+    throw new AnalyticsDataLimitError();
+  }
+}
+
+export async function fetchAllWorkerOrdersForAnalytics(): Promise<WorkerAdminOrder[]> {
+  const pageSize = 100;
+  const all: WorkerAdminOrder[] = [];
   let offset = 0;
   let total = 0;
 
   do {
-    const page = await fetchMedusaOrdersForAdmin(pageSize, offset);
+    const page = await fetchWorkerOrdersForAdmin(pageSize, offset);
+    assertAnalyticsOrderBudget(page.total, all.length);
     all.push(...page.orders);
+    assertAnalyticsOrderBudget(page.total, all.length);
     total = page.total;
     if (page.commerceUnavailable || page.orders.length === 0) break;
     offset += page.orders.length;
@@ -26,7 +42,7 @@ export async function fetchAllMedusaOrdersForAnalytics() {
 
 const completedOrderStatuses = new Set(["paid", "shipped", "delivered"]);
 
-function completedOrders(orders: MedusaOrderRow[]): MedusaOrderRow[] {
+function completedOrders(orders: WorkerAdminOrder[]): WorkerAdminOrder[] {
   return orders.filter((order) => completedOrderStatuses.has(order.status));
 }
 
@@ -42,7 +58,7 @@ export type AnalyticsClv = {
 export async function fetchCanonicalCustomerClv(email: string): Promise<AnalyticsClv | null> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
-  const orders = completedOrders(await fetchAllMedusaOrdersForAnalytics()).filter(
+  const orders = completedOrders(await fetchAllWorkerOrdersForAnalytics()).filter(
     (order) => order.email?.trim().toLowerCase() === normalized,
   );
   if (orders.length === 0) return null;
@@ -67,25 +83,22 @@ export type AnalyticsRetention = {
 
 export async function fetchCanonicalRetention(months = 6): Promise<AnalyticsRetention[]> {
   const safeMonths = Math.min(Math.max(Math.floor(months), 1), 24);
-  const orders = completedOrders(await fetchAllMedusaOrdersForAnalytics());
+  const orders = completedOrders(await fetchAllWorkerOrdersForAnalytics());
   const results: AnalyticsRetention[] = [];
   const now = new Date();
   for (let i = safeMonths - 1; i >= 0; i -= 1) {
     const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
     const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i + 1, 1));
-    const current = new Set(
-      orders
-        .filter((order) => {
-          const created = Date.parse(order.created_at);
-          return created >= start.getTime() && created < end.getTime() && order.email;
-        })
-        .map((order) => order.email!.trim().toLowerCase()),
-    );
-    const prior = new Set(
-      orders
-        .filter((order) => Date.parse(order.created_at) < start.getTime() && order.email)
-        .map((order) => order.email!.trim().toLowerCase()),
-    );
+    const current = new Set<string>();
+    const prior = new Set<string>();
+    for (const order of orders) {
+      if (!order.email) continue;
+      const email = order.email.trim().toLowerCase();
+      if (!email) continue;
+      const created = Date.parse(order.created_at);
+      if (created >= start.getTime() && created < end.getTime()) current.add(email);
+      else if (created < start.getTime()) prior.add(email);
+    }
     let returning = 0;
     for (const email of current) if (prior.has(email)) returning += 1;
     results.push({
@@ -107,7 +120,7 @@ export type AnalyticsSalesTrend = {
 
 export async function fetchCanonicalSalesTrends(months = 6): Promise<AnalyticsSalesTrend[]> {
   const safeMonths = Math.min(Math.max(Math.floor(months), 1), 24);
-  const orders = completedOrders(await fetchAllMedusaOrdersForAnalytics());
+  const orders = completedOrders(await fetchAllWorkerOrdersForAnalytics());
   const now = new Date();
   const results: AnalyticsSalesTrend[] = [];
   for (let i = safeMonths - 1; i >= 0; i -= 1) {
@@ -136,24 +149,24 @@ export type AnalyticsSummary = {
   pendingCount: number;
 };
 
-export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
-  const orders = await fetchAllMedusaOrdersForAnalytics();
-  const completed = completedOrders(orders);
+export async function fetchAnalyticsSummary(orders?: WorkerAdminOrder[]): Promise<AnalyticsSummary> {
+  const source = orders ?? await fetchAllWorkerOrdersForAnalytics();
+  const completed = completedOrders(source);
   let revenueTotal = 0;
   let paidCount = 0;
   let pendingCount = 0;
-  const currency = orders[0]?.currency ?? "PHP";
+  const currency = source[0]?.currency ?? "PHP";
 
   for (const o of completed) {
     revenueTotal += o.grand_total;
     paidCount += 1;
   }
-  for (const o of orders) {
+  for (const o of source) {
     if (!completedOrderStatuses.has(o.status) && o.status === "pending") pendingCount += 1;
   }
 
   return {
-    orderCount: orders.length,
+    orderCount: source.length,
     revenueTotal,
     currency,
     paidCount,
@@ -161,11 +174,11 @@ export async function fetchAnalyticsSummary(): Promise<AnalyticsSummary> {
   };
 }
 
-export async function fetchValidatedAnalyticsCharts(horizonDays = 30): Promise<
+export async function fetchValidatedAnalyticsCharts(horizonDays = 30, orders?: WorkerAdminOrder[]): Promise<
   AnalyticsChartsPayload | null
 > {
-  const orders = await fetchAllMedusaOrdersForAnalytics();
-  const built = buildAnalyticsChartsPayload(orders, { horizonDays });
+  const source = orders ?? await fetchAllWorkerOrdersForAnalytics();
+  const built = buildAnalyticsChartsPayload(source, { horizonDays });
   if (!built.ok) {
     console.error("[analytics-bridge] chart payload invalid", built.error.flatten());
     return null;

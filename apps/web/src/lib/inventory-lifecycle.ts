@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { applyVariantStockedQuantity, fetchVariantStockedQuantity } from "@/lib/medusa-catalog-inventory-stock";
+import { createHash } from "node:crypto";
+import { applyVariantStockedQuantity, fetchVariantStockedQuantity } from "@/lib/worker-catalog-inventory-stock";
 import { recordInventoryMovementAudit } from "@/lib/inventory-movement-audit";
 
 export type InventoryStockChange = {
@@ -17,6 +18,7 @@ export async function applyInventoryStockChanges(input: {
   correlationId: string;
   referenceType: string;
   referenceId: string;
+  idempotencyKey: string;
 }): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
   const prepared: InventoryStockChange[] = [];
   for (const change of input.changes) {
@@ -34,20 +36,32 @@ export async function applyInventoryStockChanges(input: {
   }
 
   const applied: InventoryStockChange[] = [];
-  for (const change of prepared) {
+  for (const [index, change] of prepared.entries()) {
+    const keyFor = (phase: "apply" | "compensate", item: InventoryStockChange) =>
+      createHash("sha256")
+        .update(`${input.idempotencyKey}:${phase}:${index}:${item.variantId}:${item.locationId}:${item.quantityAfter}`)
+        .digest("hex");
     const result = await applyVariantStockedQuantity({
       productId: change.productId,
       variantId: change.variantId,
       stockedQuantity: change.quantityAfter,
+      expectedStockedQuantity: change.quantityBefore,
       locationId: change.locationId,
+      idempotencyKey: keyFor("apply", change),
+      reason: input.referenceType.slice(0, 32),
     });
     if (!result.ok) {
-      for (const previous of applied.reverse()) {
+      for (const [rollbackIndex, previous] of applied.reverse().entries()) {
         await applyVariantStockedQuantity({
           productId: previous.productId,
           variantId: previous.variantId,
           stockedQuantity: previous.quantityBefore,
+          expectedStockedQuantity: previous.quantityAfter,
           locationId: previous.locationId,
+          idempotencyKey: createHash("sha256")
+            .update(`${input.idempotencyKey}:compensate:${rollbackIndex}:${previous.variantId}:${previous.locationId}:${previous.quantityBefore}`)
+            .digest("hex"),
+          reason: `${input.referenceType}:rollback`.slice(0, 32),
         });
       }
       return { ok: false, code: "INVENTORY_WRITE_FAILED", message: "Unable to apply inventory changes" };

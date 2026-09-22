@@ -125,7 +125,7 @@ function MegaTrigger({
         </span>
       </Link>
       <div
-        className="pointer-events-none invisible absolute left-1/2 top-full z-40 w-[min(100vw-2rem,28rem)] -translate-x-1/2 pt-2 opacity-0 transition-all group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100"
+        className="pointer-events-none invisible absolute left-1/2 top-full z-40 w-[min(100vw-2rem,28rem)] -translate-x-1/2 pt-2 opacity-0 transition-[transform,opacity,visibility] group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100"
         role="region"
         aria-label={`${link.label} submenu`}
       >

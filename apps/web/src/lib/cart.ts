@@ -64,7 +64,7 @@ export function parseCartQuantityInput(value: string): number | null {
   return Number.isSafeInteger(quantity) ? quantity : null;
 }
 
-/** Browser-only bag until checkout builds a Medusa cart; line prices here are for display. */
+/** Browser-first bag; Worker reconciliation supplies authoritative prices and availability. */
 // v5 intentionally invalidates v3/v4 quantities created by the old stock-max bug.
 export const CART_STORAGE_KEY = "ums-commerce-cart-v5";
 const LEGACY_CART_STORAGE_KEYS = ["ums-commerce-cart-v3", "ums-commerce-cart-v4"];

@@ -62,6 +62,27 @@ test("admin rate-limit clears the timeout after a remote fetch failure", async (
   });
 });
 
+test("production admin rate-limit fails closed when Upstash is not configured", async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const originalToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  delete env.UPSTASH_REDIS_REST_URL;
+  delete env.UPSTASH_REDIS_REST_TOKEN;
+  env.NODE_ENV = "production";
+  try {
+    const result = await checkAdminRateLimit("missing-upstash", 60, 60);
+    assert.equal(result.allowed, false);
+    assert.equal(result.remaining, 0);
+  } finally {
+    if (originalNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = originalNodeEnv;
+    if (originalUrl === undefined) delete env.UPSTASH_REDIS_REST_URL;
+    else env.UPSTASH_REDIS_REST_URL = originalUrl;
+    if (originalToken === undefined) delete env.UPSTASH_REDIS_REST_TOKEN;
+    else env.UPSTASH_REDIS_REST_TOKEN = originalToken;
+  }
+});
+
 test("local admin rate-limit evicts oldest active buckets at its hard cap", async () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalUrl = process.env.UPSTASH_REDIS_REST_URL;

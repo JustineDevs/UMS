@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export type CmsPageRecord = { id: string; slug: string; title: string; body?: string; blocks?: unknown[]; version?: number };
 export type CmsComponentRecord = { id: string; name: string; version: number; markup?: string; props: unknown[]; slots: unknown[]; variants: unknown[] };
@@ -10,8 +11,8 @@ const componentSchema = z.object({ id: z.string(), name: z.string(), version: z.
 const componentSaveSchema = z.object({ definition: z.unknown(), version: z.number().optional() }).passthrough();
 
 async function json<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
-  const payload: unknown = await response.json();
   if (!response.ok) throw new Error(`CMS request failed (${response.status})`);
+  const payload: unknown = await readResponseJson<unknown>(response, null);
   if (payload && typeof payload === "object" && "data" in payload) {
     return schema.parse((payload as { data: unknown }).data);
   }

@@ -105,6 +105,9 @@ export const cmsPreviewMessageSchema = z.union(
   [
     z.object({ source: z.literal("cms-preview-ready") }).strict(),
     z.object({ source: z.literal("cms-builder-select"), id: z.string().max(200).nullable() }).strict(),
+    z.object({ source: z.literal("cms-builder-frame-state"), state: z.string().max(32), theme: z.enum(["light", "dark"]).nullable(), showHidden: z.boolean() }).strict(),
+    z.object({ source: z.literal("cms-builder-css-request") }).strict(),
+    z.object({ source: z.literal("cms-preview-css-variables"), palette: z.object({ font: z.record(z.string(), z.unknown()), color: z.record(z.string(), z.unknown()), dimensions: z.record(z.string(), z.unknown()) }).strict() }).strict(),
     z.object({ source: z.literal("cms-builder-draft"), mode: z.enum(["home", "page"]), pageBody: z.string().max(100_000), blocks: z.array(z.unknown()) }).strict(),
     z.object({ source: z.literal("cms-builder-mutation") }).merge(previewTargetSchema),
     z.object({ source: z.literal("cms-builder-dom-mutation") }).merge(previewTargetSchema),

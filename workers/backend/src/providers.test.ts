@@ -108,6 +108,32 @@ test("confirms and captures a PayPal order only after matching completed capture
   ]);
 });
 
+test("verifies PayPal captures using the currency's actual minor-unit precision", async () => {
+  for (const fixture of [
+    { currency: "JPY", amountMinor: 1299, value: "1299" },
+    { currency: "BHD", amountMinor: 1299, value: "1.299" },
+  ]) {
+    const result = await confirmPayPalOrder({
+      clientId: "client",
+      clientSecret: "secret",
+      sandbox: true,
+      orderId: `ORDER-${fixture.currency}`,
+      expectedAmountMinor: fixture.amountMinor,
+      expectedCurrency: fixture.currency,
+      idempotencyKey: `confirm-${fixture.currency}`,
+      fetcher: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/v1/oauth2/token")) return jsonResponse({ access_token: "token" });
+        if (url.endsWith(`/v2/checkout/orders/ORDER-${fixture.currency}`)) {
+          return jsonResponse({ status: "COMPLETED", purchase_units: [{ payments: { captures: [{ id: `CAPTURE-${fixture.currency}`, status: "COMPLETED", amount: { value: fixture.value, currency_code: fixture.currency } }] } }] });
+        }
+        throw new Error(`unexpected PayPal call: ${url}`);
+      },
+    });
+    assert.equal(result.captureId, `CAPTURE-${fixture.currency}`);
+  }
+});
+
 test("creates Xendit payment link and Pancake order through fetch", async () => {
   const xendit = await createXenditSession({
     secretKey: "xnd_secret",

@@ -36,8 +36,7 @@ export function CartPageClient() {
     isHydrating,
     replaceLines,
     setCartId,
-  } =
-    useCart();
+  } = useCart();
   const [mounted, setMounted] = useState(false);
   const [reconciling, setReconciling] = useState(false);
   const [reconcileError, setReconcileError] = useState<string | null>(null);
@@ -66,7 +65,7 @@ export function CartPageClient() {
     replaceLines(next);
     const localCurrency = next.find((line) => line.currencyCode)?.currencyCode;
     if (localCurrency) setCurrencyCode(localCurrency);
-  }, []);
+  }, [replaceLines]);
 
   const reconcile = useCallback(async () => {
     reconcileAbortRef.current?.abort();
@@ -115,7 +114,10 @@ export function CartPageClient() {
         setReconcileError(
           "Prices and availability could not be refreshed. Refresh before checkout.",
         );
-        return refresh();
+        // Keep the local draft visible so the customer can explicitly retry.
+        // Re-hydrating here can replace a valid local bag with an empty server
+        // snapshot before the recovery action is available.
+        return;
       }
       const payload = (await response.json()) as {
         lines?: Array<{
@@ -166,7 +168,6 @@ export function CartPageClient() {
       setReconcileError(
         "Prices and availability could not be refreshed. Refresh before checkout.",
       );
-      refresh();
     } finally {
       window.clearTimeout(timeout);
       if (sequence === reconcileSequenceRef.current) {
@@ -339,6 +340,11 @@ export function CartPageClient() {
     reconcileError,
     authoritativeTotal,
   });
+  // Keep a stable, disabled recovery CTA visible while the live catalog
+  // reconciliation is still in flight. This prevents the checkout action
+  // from disappearing during the short hydration/reconciliation window.
+  const checkoutUnavailable =
+    checkoutBlocked || reconciling || Boolean(reconcileError);
 
   return (
     <div className="space-y-8" data-cart-source={hydrationSource}>
@@ -597,7 +603,7 @@ export function CartPageClient() {
         >
           Continue shopping
         </Link>
-        {checkoutBlocked ? (
+        {checkoutUnavailable ? (
           <button
             type="button"
             disabled
@@ -619,7 +625,7 @@ export function CartPageClient() {
           </Link>
         )}
       </div>
-      {checkoutBlocked ? (
+      {checkoutUnavailable ? (
         <p
           id="cart-checkout-blocked"
           className="sr-only"

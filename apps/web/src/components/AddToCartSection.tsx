@@ -119,7 +119,7 @@ export function AddToCartSection({
                 if (next && !isVariantAvailable(next.id)) return;
                 if (next) selectVariant(next.id);
               }}
-              className={`py-3 text-sm font-medium transition-all ${
+              className={`py-3 text-sm font-medium transition-colors ${
                 type === t
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-low hover:bg-surface-container-high"
@@ -150,7 +150,7 @@ export function AddToCartSection({
                 if (next) selectVariant(next.id);
               }}
               disabled={!finishesForType.has(f)}
-              className={`py-3 text-sm font-medium transition-all ${
+              className={`py-3 text-sm font-medium transition-colors ${
                 finish === f
                   ? "bg-primary text-on-primary"
                   : "bg-surface-container-low hover:bg-surface-container-high"
@@ -215,7 +215,7 @@ export function AddToCartSection({
           data-client-ready={clientReady ? "true" : "false"}
           disabled={!variant || isOutOfStock}
           onClick={handleAddToBag}
-          className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
+          className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-[transform,opacity] duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
           {isOutOfStock
             ? "Out of stock"

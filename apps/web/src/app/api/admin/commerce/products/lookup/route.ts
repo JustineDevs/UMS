@@ -7,7 +7,8 @@ import {
 } from "@/lib/commerce-product-lookup";
 import { fetchWorkerCatalogProductsForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { adminCommerceProductLookupResponseSchema } from "@/lib/admin-api-contracts";
 
 function pickThumb(p: Record<string, unknown>): string | null {
   const img = p.thumbnail ?? p.thumbnail_url;
@@ -28,9 +29,10 @@ function mapCommerceLookupRow(raw: unknown) {
       ? String((variants[0] as { sku?: string }).sku ?? "")
       : "";
   const cats = Array.isArray(p.categories) ? p.categories : [];
-  const catIds = cats
-    .map((c) => (c && typeof c === "object" ? String((c as { id?: string }).id ?? "") : ""))
-    .filter(Boolean);
+  const catIds = cats.flatMap((c) => {
+    const id = c && typeof c === "object" ? String((c as { id?: string }).id ?? "") : "";
+    return id ? [id] : [];
+  });
   return {
     id: String(p.id ?? ""),
     title: String(p.title ?? ""),
@@ -64,11 +66,13 @@ export async function GET(req: NextRequest) {
       if (result.commerceUnavailable) throw new Error("Catalog unavailable");
       return result.products.map(mapCommerceLookupRow);
     });
-    return correlatedJson(cid, { data: { products: filtered } });
-  } catch (e) {
+    const parsed = adminCommerceProductLookupResponseSchema.safeParse({ data: { products: filtered } });
+    if (!parsed.success) return correlatedError(cid, 502, "Store catalog returned an invalid lookup response", "SERVICE_UNAVAILABLE");
+    return correlatedJson(cid, parsed.data);
+    } catch {
     return correlatedJson(
       cid,
-      { error: e instanceof Error ? e.message : "Store catalog request unavailable" },
+      { error: "Store catalog request unavailable", code: "CATALOG_UNAVAILABLE" },
       { status: 502 },
     );
   }

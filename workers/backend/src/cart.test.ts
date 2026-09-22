@@ -16,26 +16,48 @@ test("creates an empty cart with a server-generated identifier and idempotency",
   const response = await handleCreateCartRequest(
     new Request("https://api.test/store/carts", {
       method: "POST",
-      headers: { "Idempotency-Key": "cart-create-1", "Content-Type": "application/json" },
-      body: JSON.stringify({ currency_code: "PHP", region_id: "reg-ph", sales_channel_id: "sc-web" }),
+      headers: {
+        "Idempotency-Key": "cart-create-1",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        currency_code: "PHP",
+        region_id: "reg-ph",
+        sales_channel_id: "sc-web",
+      }),
     }),
     {
-      async query<Row>(text: string): Promise<{ rows: Row[]; rowCount: number }> {
+      async query<Row>(
+        text: string,
+      ): Promise<{ rows: Row[]; rowCount: number }> {
         queries.push(text);
         if (text.includes("worker_idempotency_records"))
-          return { rows: [{ state: "pending", request_hash: "" }] as Row[], rowCount: 1 };
+          return {
+            rows: [{ state: "pending", request_hash: "" }] as Row[],
+            rowCount: 1,
+          };
         return { rows: [], rowCount: 1 };
       },
       async end(): Promise<void> {},
     },
   );
   assert.equal(response.status, 201);
-  const payload = (await response.json()) as { cart: { id: string; currency_code: string; sales_channel_id: string; items: unknown[] } };
+  const payload = (await response.json()) as {
+    cart: {
+      id: string;
+      currency_code: string;
+      sales_channel_id: string;
+      items: unknown[];
+    };
+  };
   assert.match(payload.cart.id, /^cart_/);
   assert.equal(payload.cart.currency_code, "php");
   assert.equal(payload.cart.sales_channel_id, "sc-web");
   assert.deepEqual(payload.cart.items, []);
-  assert.equal(queries.filter((query) => query.includes("INSERT INTO public.cart")).length, 1);
+  assert.equal(
+    queries.filter((query) => query.includes("INSERT INTO public.cart")).length,
+    1,
+  );
 });
 
 test("reads an active cart and its non-deleted line items from the database", async () => {
@@ -114,22 +136,46 @@ test("updates cart checkout identity and addresses transactionally", async () =>
   const response = await handleCartUpdateRequest(
     new Request("https://api.test/store/carts/cart-1", {
       method: "PATCH",
-      headers: { "Idempotency-Key": "cart-update-1", "Content-Type": "application/json" },
+      headers: {
+        "Idempotency-Key": "cart-update-1",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         email: "buyer@example.com",
-        shipping_address: { first_name: "Buyer", country_code: "PH", city: "Manila" },
+        shipping_address: {
+          first_name: "Buyer",
+          country_code: "PH",
+          city: "Manila",
+        },
         metadata: { payment_provider: "cod" },
       }),
     }),
     {
-      async query<Row>(text: string): Promise<{ rows: Row[]; rowCount: number }> {
+      async query<Row>(
+        text: string,
+      ): Promise<{ rows: Row[]; rowCount: number }> {
         statements.push(text);
         if (text.startsWith("INSERT INTO public.worker_idempotency_records"))
-          return { rows: [{ state: "claimed", request_hash: "" }] as Row[], rowCount: 1 };
+          return {
+            rows: [{ state: "claimed", request_hash: "" }] as Row[],
+            rowCount: 1,
+          };
         if (text.startsWith("SELECT id FROM public.cart"))
           return { rows: [{ id: "cart-1" }] as Row[], rowCount: 1 };
         if (text.startsWith("SELECT c.id AS cart_id"))
-          return { rows: [{ cart_id: "cart-1", region_id: null, sales_channel_id: "sc-web", currency_code: "php", email: "buyer@example.com", item_id: null }] as Row[], rowCount: 1 };
+          return {
+            rows: [
+              {
+                cart_id: "cart-1",
+                region_id: null,
+                sales_channel_id: "sc-web",
+                currency_code: "php",
+                email: "buyer@example.com",
+                item_id: null,
+              },
+            ] as Row[],
+            rowCount: 1,
+          };
         return { rows: [], rowCount: 1 };
       },
       async end(): Promise<void> {},
@@ -137,9 +183,19 @@ test("updates cart checkout identity and addresses transactionally", async () =>
     "cart-1",
   );
   assert.equal(response.status, 200, await response.clone().text());
-  assert.ok(statements[0]?.startsWith("INSERT INTO public.worker_idempotency_records"));
-  assert.ok(statements.some((statement) => statement.includes("INSERT INTO public.cart_address")));
-  assert.ok(statements.some((statement) => statement.includes("UPDATE public.cart SET")));
+  assert.ok(
+    statements[0]?.startsWith("INSERT INTO public.worker_idempotency_records"),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("INSERT INTO public.cart_address"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("UPDATE public.cart SET"),
+    ),
+  );
   assert.ok(statements.includes("COMMIT"));
 });
 
@@ -198,6 +254,40 @@ test("requires idempotency for cart quantity mutations", async () => {
   assert.deepEqual(await response.json(), {
     error: "idempotency_key_required",
   });
+});
+
+test("redacts unexpected database errors from cart quantity mutations", async () => {
+  const secret = "relation public.internal_secret does not exist";
+  const response = await handleCartLineQuantityRequest(
+    new Request("https://api.test/store/carts/cart-1/line-items/line-1", {
+      method: "PUT",
+      headers: { "Idempotency-Key": "cart-error-1" },
+      body: '{"quantity":2}',
+    }),
+    {
+      async query<Row>(
+        text: string,
+      ): Promise<{ rows: Row[]; rowCount: number }> {
+        if (text.startsWith("INSERT INTO public.worker_idempotency_records"))
+          return {
+            rows: [{ state: "pending", request_hash: "" }] as Row[],
+            rowCount: 1,
+          };
+        if (text === "BEGIN") throw new Error(secret);
+        return { rows: [], rowCount: 1 };
+      },
+      async end(): Promise<void> {},
+    },
+    "cart-1",
+    "line-1",
+  );
+  const body = await response.text();
+  assert.equal(response.status, 422);
+  assert.deepEqual(JSON.parse(body), { error: "cart_line_update_failed" });
+  assert.doesNotMatch(
+    body,
+    new RegExp(secret.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")),
+  );
 });
 
 test("adds one line with server-selected price and rejects requested quantity beyond stock", async () => {
@@ -293,5 +383,38 @@ test("defaults add-to-cart quantity to one", async () => {
       query.text.includes("INSERT INTO public.cart_line_item"),
     )?.values[5],
     1,
+  );
+});
+
+test("redacts unexpected database errors from cart line additions", async () => {
+  const secret = "password=do-not-return-this";
+  const response = await handleAddCartLineRequest(
+    new Request("https://api.test/store/carts/cart-1/line-items", {
+      method: "POST",
+      headers: { "Idempotency-Key": "cart-add-error-1" },
+      body: '{"variant_id":"var-1"}',
+    }),
+    {
+      async query<Row>(
+        text: string,
+      ): Promise<{ rows: Row[]; rowCount: number }> {
+        if (text.startsWith("INSERT INTO public.worker_idempotency_records"))
+          return {
+            rows: [{ state: "pending", request_hash: "" }] as Row[],
+            rowCount: 1,
+          };
+        if (text === "BEGIN") throw new Error(secret);
+        return { rows: [], rowCount: 1 };
+      },
+      async end(): Promise<void> {},
+    },
+    "cart-1",
+  );
+  const body = await response.text();
+  assert.equal(response.status, 422);
+  assert.deepEqual(JSON.parse(body), { error: "cart_line_add_failed" });
+  assert.doesNotMatch(
+    body,
+    new RegExp(secret.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")),
   );
 });

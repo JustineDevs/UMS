@@ -15,6 +15,7 @@ export type Employee = {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  organization_id: string | null;
 };
 
 export type CreateEmployeeInput = {
@@ -25,6 +26,7 @@ export type CreateEmployeeInput = {
   hired_at?: string;
   user_id?: string;
   metadata?: Record<string, unknown>;
+  organization_id: string;
 };
 
 export type UpdateEmployeeInput = Partial<CreateEmployeeInput> & {
@@ -45,20 +47,23 @@ function rowToEmployee(row: Record<string, unknown>): Employee {
     metadata: (row.metadata as Record<string, unknown>) ?? {},
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? new Date().toISOString()),
+    organization_id: row.organization_id != null ? String(row.organization_id) : null,
   };
 }
 
 export async function listEmployees(
   supabase: SupabaseClient,
-  opts?: { activeOnly?: boolean },
+  opts?: { activeOnly?: boolean; organizationId?: string },
 ): Promise<Employee[]> {
   let q = supabase
     .from("employees")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(500);
   if (opts?.activeOnly) {
     q = q.eq("is_active", true);
   }
+  if (opts?.organizationId) q = q.eq("organization_id", opts.organizationId);
   const { data, error } = await q;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
@@ -70,12 +75,14 @@ export async function listEmployees(
 export async function getEmployee(
   supabase: SupabaseClient,
   id: string,
+  organizationId: string,
 ): Promise<Employee | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("employees")
     .select("*")
     .eq("id", id)
-    .maybeSingle();
+    .eq("organization_id", organizationId);
+  const { data, error } = await query.maybeSingle();
   if (error) {
     if (isMissingTableOrSchemaError(error)) return null;
     throw error;
@@ -98,6 +105,7 @@ export async function createEmployee(
       hired_at: input.hired_at ?? null,
       user_id: input.user_id ?? null,
       metadata: input.metadata ?? {},
+      organization_id: input.organization_id,
     })
     .select("*")
     .single();
@@ -109,6 +117,7 @@ export async function updateEmployee(
   supabase: SupabaseClient,
   id: string,
   input: UpdateEmployeeInput,
+  organizationId: string,
 ): Promise<Employee> {
   const patch: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
@@ -122,12 +131,12 @@ export async function updateEmployee(
   if (input.user_id !== undefined) patch.user_id = input.user_id;
   if (input.metadata !== undefined) patch.metadata = input.metadata;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("employees")
     .update(patch)
     .eq("id", id)
-    .select("*")
-    .single();
+    .eq("organization_id", organizationId);
+  const { data, error } = await query.select("*").single();
   if (error) throw error;
   return rowToEmployee(data as Record<string, unknown>);
 }
@@ -135,7 +144,12 @@ export async function updateEmployee(
 export async function deleteEmployee(
   supabase: SupabaseClient,
   id: string,
+  organizationId: string,
 ): Promise<void> {
-  const { error } = await supabase.from("employees").delete().eq("id", id);
+  const { error } = await supabase
+    .from("employees")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }

@@ -117,7 +117,7 @@ export default function IntegrationHealthPage() {
                         </span>
                         {entry.lastWebhookAt && (
                           <span className="block text-[10px] text-neutral-400 mt-0.5">
-                            {new Date(entry.lastWebhookAt).toLocaleDateString()}
+                            {new Date(entry.lastWebhookAt).toLocaleDateString("en-PH", { timeZone: "Asia/Manila" })}
                           </span>
                         )}
                       </td>

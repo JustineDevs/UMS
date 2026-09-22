@@ -8,7 +8,7 @@ const inputClass = "w-full rounded border border-slate-200 bg-white px-3 py-2 te
 const labelClass = "block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5";
 
 function NumberField({ id, label, value, onChange, disabled }: { id: string; label: string; value: number; onChange: (_value: number) => void; disabled: boolean }) {
-  return <div><label className={labelClass} htmlFor={id}>{label}</label><input id={id} className={inputClass} type="number" min={0} value={value} onChange={(event) => onChange(Number(event.target.value))} disabled={disabled} /></div>;
+  return <div><label className={labelClass} htmlFor={id}>{label}</label><input id={id} className={inputClass} type="number" min={0} value={value} onChange={(event) => { const raw = event.target.value.trim(); if (!raw) return; const next = Number(raw); if (Number.isFinite(next)) onChange(next); }} disabled={disabled} /></div>;
 }
 
 export function PlatformRuntimeSettingsEditor() {
@@ -45,7 +45,7 @@ export function PlatformRuntimeSettingsEditor() {
     if (!canWrite) return;
     setSaving(true); setSaved(false); setError(null);
     try {
-      const response = await fetch("/api/admin/runtime-settings", { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
+      const response = await fetch("/api/admin/runtime-settings", { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json", "Idempotency-Key": `runtime-settings-${crypto.randomUUID()}` }, body: JSON.stringify(settings) });
       const body = (await response.json()) as { data?: PlatformRuntimeSettings; error?: string };
       if (!response.ok || !body.data) throw new Error(body.error ?? response.statusText);
       setSettings(body.data); setSaved(true);

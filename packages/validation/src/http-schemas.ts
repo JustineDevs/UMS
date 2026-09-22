@@ -13,7 +13,9 @@ export const storefrontProductSlugSchema = z.string().trim().min(1).max(220);
 export const medusaCartIdSchema = z
   .string()
   .trim()
-  .regex(/^cart_[A-Za-z0-9]+$/)
+  // Worker-native carts use UUID-backed IDs (`cart_<uuid>`), so hyphens are
+  // part of the canonical identifier and must survive cookie/API validation.
+  .regex(/^cart_[A-Za-z0-9-]+$/)
   .max(128);
 
 export const complianceEmailParamSchema = z

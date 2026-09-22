@@ -14,6 +14,7 @@ import {
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { commerceInvalidationResponseSchema, internalCommerceInvalidationSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,11 @@ type Body = {
 
 function normalizeStrings(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
-  return [...new Set(values.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean))].sort();
+  return [...new Set(values.flatMap((value): string[] => {
+    if (typeof value !== "string") return [];
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }))].sort();
 }
 
 function rowMissingQuoteMetadata(row: {
@@ -63,7 +68,9 @@ export async function POST(req: Request) {
   const parsedBody = await parseBoundedJson(req, 32 * 1024);
   if (parsedBody.tooLarge) return NextResponse.json({ error: "Request body is too large" }, { status: 413 });
   if (!parsedBody.valid) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  const body = parsedBody.value as Body;
+  const payload = internalCommerceInvalidationSchema.safeParse(parsedBody.value);
+  if (!payload.success) return NextResponse.json({ error: "Invalid invalidation payload" }, { status: 400 });
+  const body = payload.data as Body;
 
   const scope = body.scope === "cms" ? "cms" : "commerce";
   const productHandles = normalizeStrings(body.productHandles);
@@ -146,12 +153,12 @@ export async function POST(req: Request) {
     actorEmail: actorEmail || null,
   });
 
-  return NextResponse.json({
+  return NextResponse.json(commerceInvalidationResponseSchema.parse({
     ok: true,
     scope,
     classification,
     revalidatedTags: [...revalidatedTags],
     revalidatedPaths: [...revalidatedPaths],
     invalidatedAttempts,
-  });
+  }));
 }

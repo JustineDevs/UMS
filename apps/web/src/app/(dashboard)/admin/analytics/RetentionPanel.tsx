@@ -46,7 +46,7 @@ export function RetentionPanel() {
               <span className="text-xs font-mono w-16 text-on-surface-variant">{m.period}</span>
               <div className="flex-1 h-6 bg-surface-container-high rounded overflow-hidden flex">
                 <div
-                  className="bg-primary h-full transition-all"
+                  className="bg-primary h-full transition-[width]"
                   style={{ width: `${Math.min(m.retention_rate * 100, 100)}%` }}
                 />
               </div>

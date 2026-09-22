@@ -6,20 +6,22 @@ import {
   enqueueCommerceJob,
   handleCommerceJobBatch,
   handleCommerceJobMessage,
+  isCommerceJob,
   type WorkerQueueMessage,
 } from "./queue.ts";
 
-test("accepts payment reconciliation jobs with a canonical correlation id", () => {
-  const correlationId = "123e4567-e89b-42d3-a456-426614174000";
-  assert.equal(
-    correlationIdFromJob({
-      id: "job-1",
-      name: "payment-reconciliation",
-      payload: { correlationId },
-      attempt: 0,
-      createdAt: new Date().toISOString(),
-    }),
-    correlationId,
+test("rejects settlement reconciliation messages from the checkout-finalization queue", () => {
+  const message = {
+    id: "job-1",
+    name: "payment-reconciliation",
+    payload: { correlationId: "123e4567-e89b-42d3-a456-426614174000" },
+    attempt: 0,
+    createdAt: new Date().toISOString(),
+  };
+  assert.equal(isCommerceJob(message), false);
+  assert.throws(
+    () => correlationIdFromJob(message as unknown as Parameters<typeof correlationIdFromJob>[0]),
+    /unsupported_commerce_job:payment-reconciliation/,
   );
 });
 
@@ -41,7 +43,7 @@ test("isolates queue batch failures and retries only the failed message", async 
 test("creates and enqueues a bounded commerce job", async () => {
   const sent: unknown[] = [];
   const job = createCommerceJob(
-    "payment-reconciliation",
+    "webhook-finalization",
     { correlationId: "attempt-1" },
     "00000000-0000-4000-8000-000000000001",
   );
@@ -57,8 +59,9 @@ test("creates and enqueues a bounded commerce job", async () => {
   assert.equal(job.attempt, 0);
 });
 
-test("acknowledges malformed messages without invoking the handler", async () => {
+test("retries malformed messages when no dead-letter sink is available", async () => {
   let acknowledged = 0;
+  let retryDelay = 0;
   let handled = 0;
   await handleCommerceJobMessage(
     {
@@ -68,21 +71,23 @@ test("acknowledges malformed messages without invoking the handler", async () =>
       ack: () => {
         acknowledged += 1;
       },
-      retry: () => {
-        throw new Error("must not retry");
+      retry: (options) => {
+        retryDelay = options?.delaySeconds ?? 0;
       },
     },
     async () => {
       handled += 1;
     },
   );
-  assert.equal(acknowledged, 1);
+  assert.equal(acknowledged, 0);
+  assert.equal(retryDelay, 300);
   assert.equal(handled, 0);
 });
 
-test("acknowledges queue jobs with unknown names, invalid attempts, or invalid timestamps", async () => {
+test("dead-letters unknown names, invalid attempts, and invalid timestamps", async () => {
   let acknowledged = 0;
   let handled = 0;
+  const deadLetters: Array<{ id: string; error: string }> = [];
   for (const body of [
     { id: "m-unknown", name: "unknown", payload: {}, attempt: 0, createdAt: new Date().toISOString() },
     { id: "m-attempt", name: "webhook-finalization", payload: {}, attempt: 8, createdAt: new Date().toISOString() },
@@ -97,19 +102,45 @@ test("acknowledges queue jobs with unknown names, invalid attempts, or invalid t
           acknowledged += 1;
         },
         retry: () => {
-          throw new Error("must not retry invalid jobs");
+          throw new Error("must not retry a quarantined job");
         },
       },
       async () => {
         handled += 1;
       },
+      async (message, error) => {
+        deadLetters.push({ id: message.id, error: error instanceof Error ? error.message : "unknown" });
+      },
     );
   }
   assert.equal(acknowledged, 3);
   assert.equal(handled, 0);
+  assert.deepEqual(deadLetters, [
+    { id: "m-unknown", error: "invalid_commerce_job" },
+    { id: "m-attempt", error: "invalid_commerce_job" },
+    { id: "m-date", error: "invalid_commerce_job" },
+  ]);
 });
 
-test("retries transient failures and dead-letters after the attempt limit", async () => {
+test("does not acknowledge an invalid job when its dead-letter write fails", async () => {
+  let acknowledged = 0;
+  let retryDelay = 0;
+  await handleCommerceJobMessage(
+    {
+      body: { invalid: true },
+      id: "m-invalid-dlq-failure",
+      attempts: 8,
+      ack: () => { acknowledged += 1; },
+      retry: (options) => { retryDelay = options?.delaySeconds ?? 0; },
+    },
+    async () => { throw new Error("must not process malformed job"); },
+    async () => { throw new Error("dead-letter unavailable"); },
+  );
+  assert.equal(acknowledged, 0);
+  assert.equal(retryDelay, 300);
+});
+
+test("retries transient failures and leaves terminal failures for the configured platform DLQ", async () => {
   let retries = 0;
   let acknowledged = 0;
   const job = createCommerceJob(
@@ -141,16 +172,16 @@ test("retries transient failures and dead-letters after the attempt limit", asyn
       ack: () => {
         acknowledged += 1;
       },
-      retry: () => {
-        throw new Error("must not retry");
+      retry: (options) => {
+        retries += options?.delaySeconds ?? 0;
       },
     },
     async () => {
       throw new Error("permanent");
     },
   );
-  assert.equal(retries, 4);
-  assert.equal(acknowledged, 1);
+  assert.equal(retries, 304);
+  assert.equal(acknowledged, 0);
 });
 
 test("sends terminal failures to the explicit dead-letter sink before acknowledgement", async () => {
@@ -170,6 +201,27 @@ test("sends terminal failures to the explicit dead-letter sink before acknowledg
   );
   assert.deepEqual(deadLetters, [{ id: "message-dead", error: "permanent" }]);
   assert.equal(acknowledged, 1);
+});
+
+test("does not acknowledge a terminal failure when the explicit dead-letter sink fails", async () => {
+  let acknowledged = 0;
+  let retryDelay = 0;
+  const job = createCommerceJob("webhook-finalization", { eventId: "evt-dlq-failure" }, "00000000-0000-4000-8000-000000000004");
+
+  await handleCommerceJobMessage(
+    {
+      body: job,
+      id: "message-dlq-failure",
+      attempts: 8,
+      ack: () => { acknowledged += 1; },
+      retry: (options) => { retryDelay = options?.delaySeconds ?? 0; },
+    },
+    async () => { throw new Error("permanent"); },
+    async () => { throw new Error("dead-letter unavailable"); },
+  );
+
+  assert.equal(acknowledged, 0);
+  assert.equal(retryDelay, 300);
 });
 
 test("rejects oversized payloads before enqueueing", () => {

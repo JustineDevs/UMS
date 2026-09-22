@@ -42,17 +42,43 @@ function storefrontInvalidationSecretForE2E(): string {
   );
 }
 
-function storefrontDevServerEnv(): NodeJS.ProcessEnv {
+const useProductionWebServer = process.env.PLAYWRIGHT_SERVER_MODE === "production";
+
+function storefrontServerEnv(): Record<string, string | undefined> {
   const inv = storefrontInvalidationSecretForE2E();
   return {
     ...process.env,
-    NODE_ENV: "development",
-    NODE_OPTIONS: boundedNodeOptions(2048),
+    NODE_ENV: useProductionWebServer ? "production" : "development",
+    NODE_OPTIONS: boundedNodeOptions(
+      useProductionWebServer
+        ? Number(process.env.PLAYWRIGHT_PRODUCTION_WEB_HEAP_MB || 1024)
+        : 2048,
+    ),
     NEXT_PUBLIC_SITE_URL:
-      process.env.PLAYWRIGHT_STOREFRONT_URL ?? "http://localhost:3000",
+      baseURL,
+    // Keep the embedded CMS preview on the exact same host as the parent
+    // page. CSP frame-src is intentionally same-origin in local E2E runs.
+    NEXT_PUBLIC_STOREFRONT_URL: baseURL,
+    PUBLIC_STOREFRONT_URL: baseURL,
+    // The browser app must exercise the local Worker that Playwright starts;
+    // inheriting a developer's deployed API_URL makes ownership/security tests
+    // nondeterministic and can return provider failures instead of assertions.
+    API_URL:
+      process.env.PLAYWRIGHT_WORKER_URL ??
+      `http://127.0.0.1:${workerPort}`,
+    // Allows the built local server to use the repository's deterministic QA
+    // identity. This marker is never set by Vercel and is not a production
+    // authentication control.
+    UVS_E2E_LOCAL: process.env.UVS_E2E_LOCAL,
     STOREFRONT_INTERNAL_INVALIDATION_SECRET: inv,
     // Survives if dotenv clears the primary key; route reads this in invalidate-commerce-state
     __PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET: inv,
+    // The CMS editor's cold compile legitimately needs the E2E heap budget.
+    // run-next-dev.cjs uses this explicit override while keeping ordinary
+    // developer sessions at their lower bounded default.
+    UVS_DEV_WEB_MAX_OLD_SPACE_MB: useProductionWebServer
+      ? undefined
+      : process.env.UVS_DEV_WEB_MAX_OLD_SPACE_MB ?? "3072",
   };
 }
 
@@ -72,7 +98,7 @@ const storefrontWebServerUrl =
   new URL("/api/health", baseURL).toString();
 const workerPort = process.env.CLOUDFLARE_DEV_PORT ?? "8787";
 
-const reuseDevServer = !process.env.CI;
+const reuseDevServer = !process.env.CI && !useProductionWebServer;
 const configuredWorkers = Number(
   process.env.PLAYWRIGHT_WORKERS || (process.env.CI ? 2 : 1),
 );
@@ -135,7 +161,7 @@ export default defineConfig({
       : [
         {
           command:
-            `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --port ${workerPort}`,
+            `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --show-interactive-dev-session=false --port ${workerPort}`,
           url: process.env.PLAYWRIGHT_WORKER_URL ?? `http://127.0.0.1:${workerPort}/healthz`,
           reuseExistingServer: reuseDevServer,
           timeout: 180_000,
@@ -151,15 +177,18 @@ export default defineConfig({
           },
         },
         {
-          command: "pnpm --filter @universal-music-store/web dev",
+          command: useProductionWebServer
+            ? "pnpm --filter @universal-music-store/web exec next start --hostname 127.0.0.1 --port 3000"
+            : "pnpm --filter @universal-music-store/web dev",
           url: storefrontWebServerUrl,
-          // Reuse the single web Next.js server from `pnpm dev` when
-          // possible. Set PLAYWRIGHT_SKIP_WEBSERVER=1 for a fully external stack.
+          // Critical release proof serves the already-built artifact. Normal
+          // developer runs can reuse `pnpm dev`; set PLAYWRIGHT_SKIP_WEBSERVER=1
+          // for a fully external stack.
           reuseExistingServer: reuseDevServer,
           timeout: 240_000,
           stdout: "pipe",
           stderr: "pipe",
-          env: storefrontDevServerEnv(),
+          env: storefrontServerEnv(),
         },
       ],
   /** Per-test ceiling must exceed PDP / shop waits (see stress-test/e2e/helpers/storefront.ts). */

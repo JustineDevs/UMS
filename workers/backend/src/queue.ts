@@ -1,5 +1,4 @@
 export type CommerceJobName =
-  | "payment-reconciliation"
   | "webhook-finalization"
   | "inventory-reservation-expiry"
   | "notification-delivery";
@@ -19,19 +18,18 @@ export type WorkerQueueMessage = {
   id: string;
   attempts: number;
   ack(): void;
-  retry(options?: { delaySeconds?: number }): void;
+  retry(_options?: { delaySeconds?: number }): void;
 };
 
-export type DeadLetterSink = (message: WorkerQueueMessage, error: unknown) => Promise<void>;
+export type DeadLetterSink = (_message: WorkerQueueMessage, _error: unknown) => Promise<void>;
 
 export type WorkerQueue = {
-  send(body: CommerceJob, options?: { delaySeconds?: number }): Promise<unknown>;
+  send(_body: CommerceJob, _options?: { delaySeconds?: number }): Promise<unknown>;
 };
 
 const MAX_PAYLOAD_BYTES = 128 * 1024;
 const MAX_ATTEMPTS = 8;
 const JOB_NAMES = new Set<CommerceJobName>([
-  "payment-reconciliation",
   "webhook-finalization",
   "inventory-reservation-expiry",
   "notification-delivery",
@@ -54,7 +52,7 @@ export function createCommerceJob<TPayload extends Record<string, unknown>>(
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function correlationIdFromJob(job: CommerceJob): string {
-  if (job.name !== "webhook-finalization" && job.name !== "payment-reconciliation")
+  if (job.name !== "webhook-finalization")
     throw new Error(`unsupported_commerce_job:${job.name}`);
   const value = job.payload.correlationId;
   if (typeof value !== "string" || !UUID_V4.test(value))
@@ -93,20 +91,34 @@ export function isCommerceJob(value: unknown): value is CommerceJob {
   return Number.isFinite(Date.parse(value.createdAt));
 }
 
+function deadLetterOrRetry(
+  message: WorkerQueueMessage,
+  error: unknown,
+  deadLetter?: DeadLetterSink,
+): Promise<void> {
+  if (!deadLetter) {
+    message.retry({ delaySeconds: 300 });
+    return Promise.resolve();
+  }
+  return deadLetter(message, error).then(
+    () => message.ack(),
+    () => message.retry({ delaySeconds: 300 }),
+  );
+}
+
 export function handleCommerceJobMessage(
   message: WorkerQueueMessage,
-  handler: (job: CommerceJob) => Promise<void>,
+  handler: (_job: CommerceJob) => Promise<void>,
   deadLetter?: DeadLetterSink,
 ): Promise<void> {
   if (!isCommerceJob(message.body)) {
-    message.ack();
-    return Promise.resolve();
+    return deadLetterOrRetry(message, new Error("invalid_commerce_job"), deadLetter);
   }
   return handler(message.body).then(
     () => message.ack(),
     (error) => {
       if (message.attempts >= MAX_ATTEMPTS) {
-        return (deadLetter ? deadLetter(message, error) : Promise.resolve()).then(() => message.ack());
+        return deadLetterOrRetry(message, error, deadLetter);
       }
       else
         message.retry({
@@ -119,7 +131,7 @@ export function handleCommerceJobMessage(
 /** Cloudflare Queue consumer boundary; one bad message must not abort the batch. */
 export async function handleCommerceJobBatch(
   messages: readonly WorkerQueueMessage[],
-  handler: (job: CommerceJob) => Promise<void>,
+  handler: (_job: CommerceJob) => Promise<void>,
   deadLetter?: DeadLetterSink,
 ): Promise<void> {
   await Promise.all(messages.map((message) => handleCommerceJobMessage(message, handler, deadLetter)));

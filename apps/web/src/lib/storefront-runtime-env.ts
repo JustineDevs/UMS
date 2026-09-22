@@ -9,17 +9,6 @@ const STOREFRONT_RUNTIME_ENV_KEYS = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",
-  "MEDUSA_SECRET_API_KEY",
-  "MEDUSA_ADMIN_API_SECRET",
-  "MEDUSA_BACKEND_URL",
-  "NEXT_PUBLIC_MEDUSA_URL",
-  "MEDUSA_REGION_ID",
-  "NEXT_PUBLIC_MEDUSA_REGION_ID",
-  "MEDUSA_PUBLISHABLE_API_KEY",
-  "NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY",
-  "MEDUSA_SALES_CHANNEL_ID",
-  "NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID",
-  "NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID",
 ] as const;
 
 type StorefrontRuntimeEnvKey = (typeof STOREFRONT_RUNTIME_ENV_KEYS)[number];
@@ -159,6 +148,29 @@ export function ensureStorefrontRuntimeEnvLoaded(options?: {
   runtimeEnvLoaded = true;
 }
 
-export function resetStorefrontRuntimeEnvForTests(): void {
-  runtimeEnvLoaded = false;
+export function listMissingWorkerBackendEnv(
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  const raw = env.API_URL?.trim();
+  if (!raw) return ["API_URL"];
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") return ["API_URL must use HTTPS in production"];
+    if (["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+      return ["API_URL must not point to a loopback host in production"];
+    }
+    return [];
+  } catch {
+    return ["API_URL must be a valid HTTPS URL in production"];
+  }
+}
+
+export function assertWorkerBackendEnvProduction(
+  env: Record<string, string | undefined> = process.env,
+): void {
+  if (env.NODE_ENV !== "production") return;
+  const missing = listMissingWorkerBackendEnv(env);
+  if (missing.length) {
+    throw new Error(`Worker backend configuration invalid: ${missing.join("; ")}`);
+  }
 }

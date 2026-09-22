@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
 import { loadCmsPagePublic } from "@universal-music-store/platform-data";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
-import { buildPageMetadata, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
+import { buildPageMetadata, serializeJsonLd, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo";
 
 export const revalidate = 120;
 
@@ -41,7 +41,7 @@ export default async function AboutPage() {
     <main className="storefront-page-shell max-w-[1200px]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}
       />
       <header className="max-w-3xl">
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.24em] text-secondary">{SITE_NAME}</p>

@@ -30,6 +30,7 @@ export async function setEmployeePin(
   supabase: SupabaseClient,
   employeeId: string,
   pin: string,
+  organizationId: string,
 ): Promise<void> {
   if (pin.length < 4 || pin.length > 8) {
     throw new Error("PIN must be 4-8 digits");
@@ -38,7 +39,8 @@ export async function setEmployeePin(
   const { error } = await supabase
     .from("employees")
     .update({ pin_hash: pinHash, updated_at: new Date().toISOString() })
-    .eq("id", employeeId);
+    .eq("id", employeeId)
+    .eq("organization_id", organizationId);
   if (error) throw error;
 }
 
@@ -46,11 +48,13 @@ export async function verifyEmployeePin(
   supabase: SupabaseClient,
   employeeId: string,
   pin: string,
+  organizationId: string,
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from("employees")
     .select("pin_hash")
     .eq("id", employeeId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
   if (error) throw error;
   if (!data?.pin_hash) return false;
@@ -62,11 +66,13 @@ export async function requirePinApproval(
   approverEmployeeId: string,
   pin: string,
   requiredRole: "admin" | "manager" = "manager",
+  organizationId: string,
 ): Promise<{ approved: boolean; reason?: string }> {
   const { data, error } = await supabase
     .from("employees")
     .select("id, role, pin_hash, is_active")
     .eq("id", approverEmployeeId)
+    .eq("organization_id", organizationId)
     .maybeSingle();
   if (error) throw error;
   if (!data) return { approved: false, reason: "employee_not_found" };

@@ -40,7 +40,8 @@ export async function listCmsComponentDefinitionsForOrganization(
     .select("*")
     .eq("organization_id", organizationId)
     .neq("status", "archived")
-    .order("component_key");
+    .order("component_key")
+    .limit(500);
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-components] list", error.message);

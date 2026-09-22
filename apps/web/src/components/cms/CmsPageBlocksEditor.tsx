@@ -362,7 +362,7 @@ function SortableBlockRow({
       {block.type === "faq" ? (
         <div className="space-y-3">
           {faqItems.map((item, i) => (
-            <div key={i} className="rounded border border-slate-200 bg-white p-3">
+            <div key={`${item.q}-${item.a ?? "answer"}`} className="rounded border border-slate-200 bg-white p-3">
               <label className="block text-xs font-medium text-slate-600">
                 Question
                 <input

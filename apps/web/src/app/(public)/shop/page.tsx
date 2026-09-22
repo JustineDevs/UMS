@@ -123,11 +123,12 @@ export default async function ShopPage({
       "q",
     ]);
     const canonical = new URLSearchParams();
+    const invalidKeys = new Set(diagnostics.invalidKeys);
     for (const [key, value] of Object.entries(sp)) {
       if (
         key === "locale" ||
         !allowedQueryKeys.has(key) ||
-        diagnostics.invalidKeys.includes(key)
+        invalidKeys.has(key)
       ) continue;
       if (typeof value === "string" && value.trim()) canonical.set(key, value);
     }
@@ -303,6 +304,7 @@ export default async function ShopPage({
         </div>
         <div className="flex flex-col gap-6 justify-start lg:col-span-4 lg:items-end lg:justify-end">
           <CatalogSearchTypeahead
+            key={searchQ ?? ""}
             initialQ={searchQ}
             category={category}
             type={type}
@@ -421,7 +423,7 @@ export default async function ShopPage({
                         shippingSpeed,
                       })}
                       aria-current={active ? "page" : undefined}
-                      className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-all rounded ${
+                      className={`aspect-square flex items-center justify-center text-[10px] font-bold transition-colors rounded ${
                         active
                           ? "bg-primary text-on-primary"
                           : "bg-surface-container-low hover:bg-primary hover:text-on-primary"
@@ -747,7 +749,7 @@ export default async function ShopPage({
                     href={h({ offset: Math.max(0, offset - limit) })}
                     rel="prev"
                     aria-label="Previous shop page"
-                    className="inline-flex min-h-11 items-center border border-outline-variant/50 px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-all hover:border-primary"
+                    className="inline-flex min-h-11 items-center border border-outline-variant/50 px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-colors hover:border-primary"
                   >
                     Previous page
                   </Link>
@@ -757,7 +759,7 @@ export default async function ShopPage({
                     href={h({ offset: offset + limit })}
                     rel="next"
                     aria-label="Next shop page"
-                    className="inline-flex min-h-11 items-center border border-primary px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-all hover:bg-primary hover:text-on-primary"
+                    className="inline-flex min-h-11 items-center border border-primary px-6 py-3 text-xs font-bold uppercase tracking-[0.2em] text-primary transition-colors hover:bg-primary hover:text-on-primary"
                   >
                     Next page
                   </Link>

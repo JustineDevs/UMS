@@ -24,14 +24,17 @@ export function mergeWishlistSyncResult(
   serverItems: readonly WishlistSyncResultItem[],
   skippedProductIds: readonly string[],
 ): WishlistEntry[] {
-  const skipped = new Set(skippedProductIds.map((id) => id.trim()).filter(Boolean));
+  const skipped = new Set(skippedProductIds.flatMap((id) => {
+    const normalized = id.trim();
+    return normalized ? [normalized] : [];
+  }));
   const merged: WishlistEntry[] = serverItems.map((item) => ({
     slug: item.slug,
     name: item.name,
     ...(item.medusaProductId?.trim() ? { medusaProductId: item.medusaProductId.trim() } : {}),
     addedAt: item.addedAt,
   }));
-  const knownIds = new Set(merged.map((item) => item.medusaProductId).filter(Boolean));
+  const knownIds = new Set(merged.flatMap((item) => item.medusaProductId ? [item.medusaProductId] : []));
   const knownSlugs = new Set(merged.map((item) => item.slug));
 
   for (const item of localItems) {

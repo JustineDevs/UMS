@@ -26,91 +26,38 @@ The webhook-related schemas in the spec describe payloads for orders, products, 
 
 ## Current Repo Pattern
 
-The repo uses a platform-first integration boundary:
-
-- Medusa owns shipment lifecycle hooks and webhook mutation paths.
-- Admin owns fulfillment entry, carrier selection, and export utilities.
-- Storefront owns customer-facing tracking resolution and links.
-- Shared packages own status mapping, env helpers, and validation.
-
-### Medusa
+The Cloudflare Worker is the backend authority. The web application is a UI/API
+gateway and does not call a Medusa service or a J&T API directly.
 
 Relevant files:
 
-- [apps/medusa/src/lib/pancake-pos-client.ts](../../apps/medusa/src/lib/pancake-pos-client.ts)
-- [apps/medusa/src/lib/jnt-status-map.ts](../../apps/medusa/src/lib/jnt-status-map.ts)
-- [apps/medusa/src/api/hooks/jnt/route-logic.ts](../../apps/medusa/src/api/hooks/jnt/route-logic.ts)
-- [apps/medusa/src/api/hooks/jnt/route.ts](../../apps/medusa/src/api/hooks/jnt/route.ts)
-- [apps/medusa/src/subscribers/order-fulfillment-pancake-pos.ts](../../apps/medusa/src/subscribers/order-fulfillment-pancake-pos.ts)
+- `workers/backend/src/delivery-admin.ts` owns tenant-scoped shipment ledger reads/writes.
+- `workers/backend/src/router.ts` exposes `/api/admin/delivery-logistics/shipments`.
+- `apps/web/src/app/api/admin/delivery-logistics/shipments/route.ts` forwards staff requests to the Worker.
+- `apps/web/src/app/api/admin/orders/export-pancake-pos-csv/route.ts` exports from the Worker-owned order data.
+- `apps/web/src/lib/courier-registry.ts` lists supported courier choices.
+- `apps/web/src/app/(public)/track/[orderId]/page.tsx` renders customer tracking state via Worker data.
 
-Observed responsibilities:
-
-- create the carrier order record after fulfillment creation through Pancake POS
-- arrange shipment through Pancake POS after carrier order creation
-- map carrier statuses into internal status vocabulary
-- deduplicate webhook updates
-- update Medusa order metadata and payment capture state
-
-### Admin
-
-Relevant files:
-
-- [apps/web/src/lib/courier-registry.ts](../../apps/web/src/lib/courier-registry.ts)
-- [apps/web/src/app/api/medusa/shipments/route.ts](../../apps/web/src/app/api/medusa/shipments/route.ts)
-- [apps/web/src/app/api/admin/orders/export-pancake-pos-csv/route.ts](../../apps/web/src/app/api/admin/orders/export-pancake-pos-csv/route.ts)
-- [apps/web/src/app/api/admin/integration-health/route.ts](../../apps/web/src/app/api/admin/integration-health/route.ts)
-
-Observed responsibilities:
-
-- expose a courier registry with `pancake-pos-jt-ph`
-- persist shipment metadata on Medusa orders
-- export Pancake POS bulk CSVs from Medusa order data
-- report whether required Pancake POS env variables exist in the admin process
-
-### Storefront
-
-Relevant files:
-
-- [apps/web/src/lib/medusa-track-fetch.ts](../../apps/web/src/lib/medusa-track-fetch.ts)
-
-Observed responsibilities:
-
-- derive customer tracking state from Medusa order metadata
-- build carrier-specific tracking URLs
-- show J&T tracking links when the courier slug matches the Pancake/J&T bridge variants
+Pancake POS is the logistics integration bridge. Do not add J&T API credentials or
+direct J&T network calls unless the product integration changes explicitly.
 
 ## Boundary Model We Should Keep
 
 Use the carrier reference for contract shape, but keep business state in the platform:
 
-1. Carrier client
-   - Talks to Pancake POS.
-   - Adds the api_key query authentication.
-   - Returns raw carrier results.
-
-2. Medusa shipment workflow
-   - Owns fulfillment creation.
-   - Owns webhook processing.
-   - Owns payment capture side effects.
-
-3. Admin operations layer
-   - Selects courier.
-   - Attaches tracking numbers.
-   - Exports carrier-specific CSVs.
-
-4. Storefront display layer
-   - Renders carrier links.
-   - Shows state derived from Medusa metadata.
-   - Never mutates carrier or shipment state directly.
+1. Worker shipment ledger owns shipment and delivery status mutations.
+2. Pancake POS owns the connected logistics bridge and provider-side tracking actions.
+3. Admin calls the Worker to create/update shipment records and export supported files.
+4. Storefront tracking is read-only and renders Worker-owned order/shipment state.
 
 ## Gaps Compared With the Reference
 
 The reference sample is simple and direct. Our platform is safer, but there are still gaps:
 
 - The reference has explicit create, arrange shipment, inquiry, and tracking URL examples. Our code now follows the documented Pancake order family, and we should not rely on a non-existent print endpoint.
-- The reference keeps carrier state in a single imperative flow. Our platform spreads that across Medusa, admin, and storefront. That is correct, but it requires stronger contract docs.
+- The reference keeps carrier state in a single imperative flow. Our platform separates the Worker ledger, admin controls, and storefront display.
 - The reference sample shows direct polling. Our repo is mostly webhook-driven. That is better, but we still need explicit operational docs for fallback polling if webhook delivery fails.
-- The reference uses carrier payloads as the immediate source of truth. Our system relies on Medusa metadata and Supabase event records as the source of truth, which is the right boundary.
+- The reference uses carrier payloads as the immediate source of truth. Our system relies on Worker-owned commerce records and Supabase event records as the source of truth.
 
 ## Current Verification State
 
@@ -125,9 +72,8 @@ Verified directly in the repo:
 
 If we extend J&T support, do it in this order:
 
-1. Keep carrier I/O in `apps/medusa/src/lib/pancake-pos-client.ts`.
-2. Keep webhook mutation logic in `apps/medusa/src/api/hooks/jnt/route-logic.ts`.
-3. Keep admin shipment writes in the admin route that already patches Medusa order metadata.
+1. Keep provider callbacks and mutations in Worker routes.
+2. Keep admin shipment writes in `workers/backend/src/delivery-admin.ts`.
 4. Keep storefront tracking read-only.
 5. Add an explicit cancel flow only if the business actually needs carrier-side cancellations.
 6. Add fallback polling only if webhook delivery reliability is proven to be insufficient.

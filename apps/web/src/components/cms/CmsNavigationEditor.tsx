@@ -706,10 +706,6 @@ export function CmsNavigationEditor() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (!showAdvancedJson) setJsonText(JSON.stringify(toApiPayload(nav), null, 2));
-  }, [nav, showAdvancedJson]);
-
   const onDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1139,12 +1135,16 @@ export function CmsNavigationEditor() {
         <button
           type="button"
           className="text-sm font-medium text-slate-600 underline"
-          onClick={() => setShowAdvancedJson((v) => !v)}
+          onClick={() => {
+            if (!showAdvancedJson) setJsonText(JSON.stringify(toApiPayload(nav), null, 2));
+            setShowAdvancedJson((v) => !v);
+          }}
         >
           {showAdvancedJson ? "Hide" : "Show"} advanced JSON (import / power users)
         </button>
         {showAdvancedJson ? (
           <textarea
+            aria-label="Advanced navigation JSON"
             className="mt-3 w-full min-h-[240px] rounded-lg border border-slate-200 p-4 font-mono text-sm"
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}

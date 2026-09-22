@@ -1,4 +1,5 @@
-import type { CatalogProductDetail } from "@/lib/medusa-catalog-service";
+import type { CatalogProductDetail } from "@/lib/catalog-product-service";
+import { readResponseJson } from "@/lib/read-response-json";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 
 export type StorefrontCatalogMutationClassification =
@@ -37,7 +38,10 @@ function arraysEqual(left: string[], right: string[]): boolean {
 }
 
 function distinctStrings(values: Array<string | null | undefined>): string[] {
-  return [...new Set(values.map((value) => value?.trim() ?? "").filter(Boolean))].sort();
+  return [...new Set(values.flatMap((value) => {
+    const normalized = value?.trim() ?? "";
+    return normalized ? [normalized] : [];
+  }))].sort();
 }
 
 function stockSignature(detail: CatalogProductDetail | null): string {
@@ -125,7 +129,7 @@ export async function notifyStorefrontCommerceInvalidation(
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      const json = await readResponseJson<{ error?: string }>(res, {});
       return {
         ok: false,
         error:

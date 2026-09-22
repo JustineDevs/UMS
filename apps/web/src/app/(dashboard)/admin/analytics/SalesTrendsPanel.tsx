@@ -48,7 +48,7 @@ export function SalesTrendsPanel() {
               <span className="text-xs font-mono w-16 text-on-surface-variant">{m.period}</span>
               <div className="flex-1 h-6 bg-surface-container-high rounded overflow-hidden">
                 <div
-                  className="bg-secondary h-full transition-all"
+                  className="bg-secondary h-full transition-[width]"
                   style={{ width: `${(m.revenue / maxRevenue) * 100}%` }}
                 />
               </div>

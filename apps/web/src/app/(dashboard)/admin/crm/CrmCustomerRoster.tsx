@@ -14,7 +14,7 @@ type Customer = {
   created_at: string;
 };
 
-const dateFormat = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" });
+const dateFormat = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeZone: "Asia/Manila" });
 const pageSize = 20;
 
 function csvCell(value: string) {

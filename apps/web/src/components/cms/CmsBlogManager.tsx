@@ -25,6 +25,7 @@ export function CmsBlogManager() {
   const [error, setError] = useState<string | null>(null);
   const [loadingRows, setLoadingRows] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [mutationBusy, setMutationBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoadingRows(true);
@@ -81,19 +82,25 @@ export function CmsBlogManager() {
         </a>
         <button
           type="button"
-          disabled={!canWrite || selected.size === 0}
+          disabled={!canWrite || selected.size === 0 || mutationBusy}
           className="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-800 disabled:opacity-50"
           onClick={async () => {
+            if (mutationBusy) return;
             if (!confirm(`Delete ${selected.size} post(s)?`)) return;
-            const r = await fetch("/api/admin/cms/blog/bulk", {
-              method: "POST",
-              headers: cmsMutationHeaders(),
-              body: JSON.stringify({ ids: Array.from(selected) }),
-            });
-            if (r.ok) {
-              setSelected(new Set());
-              load();
-            } else setError("Bulk delete failed");
+            setMutationBusy(true);
+            try {
+              const r = await fetch("/api/admin/cms/blog/bulk", {
+                method: "POST",
+                headers: cmsMutationHeaders(),
+                body: JSON.stringify({ ids: Array.from(selected) }),
+              });
+              if (r.ok) {
+                setSelected(new Set());
+                load();
+              } else setError("Bulk delete failed");
+            } finally {
+              setMutationBusy(false);
+            }
           }}
         >
           Delete selected
@@ -148,24 +155,30 @@ export function CmsBlogManager() {
           type="button"
           className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white"
           onClick={async () => {
+            if (mutationBusy) return;
+            setMutationBusy(true);
             const slug = `draft-${Date.now()}`;
-            const r = await fetch("/api/admin/cms/blog", {
-              method: "POST",
-              headers: cmsMutationHeaders(),
-              body: JSON.stringify({
-                slug,
-                title: "New draft",
-                locale: "en",
-                status: "draft",
-              }),
-            });
-            const j = (await r.json()) as {
-              data?: { id: string };
-              error?: string;
-            };
-            if (r.ok && j.data?.id) {
-              window.location.href = `/admin/cms/blog/${j.data.id}`;
-            } else setError(j.error ?? "Could not create");
+            try {
+              const r = await fetch("/api/admin/cms/blog", {
+                method: "POST",
+                headers: cmsMutationHeaders(),
+                body: JSON.stringify({
+                  slug,
+                  title: "New draft",
+                  locale: "en",
+                  status: "draft",
+                }),
+              });
+              const j = (await r.json()) as {
+                data?: { id: string };
+                error?: string;
+              };
+              if (r.ok && j.data?.id) {
+                window.location.href = `/admin/cms/blog/${j.data.id}`;
+              } else setError(j.error ?? "Could not create");
+            } finally {
+              setMutationBusy(false);
+            }
           }}
         >
           New post

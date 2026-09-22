@@ -1,4 +1,5 @@
 import { ExternalLink } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ export function QuickActions() {
       <Card>
         <CardHeader><CardTitle className="font-normal">Payment operations</CardTitle></CardHeader>
         <CardContent>
-          <Button asChild variant="outline"><a href="/admin/payments">Open payment attempts <ExternalLink data-icon="inline-end" /></a></Button>
+          <Button asChild variant="outline"><Link href="/admin/payments">Open payment attempts <ExternalLink data-icon="inline-end" /></Link></Button>
         </CardContent>
       </Card>
       <Card>

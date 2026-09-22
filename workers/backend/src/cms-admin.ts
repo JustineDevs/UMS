@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { withWorkerTransaction } from "./database.ts";
+import { lockCmsMediaReferences } from "./cms-media-references.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
 import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
 
@@ -128,6 +129,62 @@ function canWrite(claims: WorkerAuthClaims): boolean {
   return claims.role === "owner" || claims.role === "admin";
 }
 
+function canRead(claims: WorkerAuthClaims): boolean {
+  const permissions = claims.permissions;
+  if (Array.isArray(permissions) && permissions.some((value) => value === "*" || value === "content:read" || value === "content:write")) return true;
+  return claims.role === "owner" || claims.role === "admin";
+}
+
+async function listPages(database: WorkerDatabaseClient, organizationId: string, request: Request, pageId?: string): Promise<Response> {
+  const url = new URL(request.url);
+  const locale = url.searchParams.get("locale")?.trim();
+  const slug = url.searchParams.get("slug")?.trim();
+  if (locale && !/^[a-z]{2,12}(?:-[A-Z]{2})?$/.test(locale)) return json({ error: "invalid_locale" }, 400);
+  if (slug && !/^[a-z0-9][a-z0-9/_-]{0,159}$/i.test(slug)) return json({ error: "invalid_slug" }, 400);
+  const filters: string[] = ["organization_id = $1"];
+  const values: unknown[] = [organizationId];
+  if (pageId) { values.push(pageId); filters.push(`id = $${values.length}`); }
+  if (locale) { values.push(locale); filters.push(`locale = $${values.length}`); }
+  if (slug) { values.push(slug); filters.push(`slug = $${values.length}`); }
+  const result = await database.query(
+    `SELECT id, organization_id, slug, locale, page_type, title, body, blocks, tree, status, published_at, scheduled_publish_at, preview_token, meta_title, meta_description, canonical_url, og_image_url, json_ld, parent_slug, breadcrumb_label, version, updated_at FROM public.cms_pages WHERE ${filters.join(" AND ")} ORDER BY updated_at DESC LIMIT 500`,
+    values,
+  );
+  if (pageId) return json({ data: result.rows[0] ?? null });
+  return json({ data: result.rows });
+}
+
+async function deletePage(database: WorkerDatabaseClient, organizationId: string, pageId: string): Promise<Response> {
+  return withWorkerTransaction(database, async (tx) => {
+    await tx.query("DELETE FROM public.cms_pages WHERE organization_id = $1 AND id = $2", [organizationId, pageId]);
+    return json({ ok: true });
+  });
+}
+
+export async function handleCmsAdminPageMutationsRequest(
+  request: Request,
+  database: WorkerDatabaseClient,
+  env: CmsAdminEnv,
+  pageId: string,
+): Promise<Response> {
+  const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
+  if (!claims) return json({ error: "unauthorized" }, 401);
+  const organizationId = claimOrganization(claims);
+  if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+  if (!canRead(claims)) return json({ error: "forbidden" }, 403);
+  if (!/^[0-9a-f-]{36}$/i.test(pageId)) return json({ error: "invalid_page_id" }, 400);
+  const page = await database.query(
+    "SELECT id FROM public.cms_pages WHERE id = $1 AND organization_id = $2 LIMIT 1",
+    [pageId, organizationId],
+  );
+  if (!page.rows.length) return json({ error: "not_found" }, 404);
+  const mutations = await database.query(
+    "SELECT id, page_id, organization_id, revision, sequence, mutation, created_at FROM public.cms_page_mutations WHERE page_id = $1 AND organization_id = $2 ORDER BY revision DESC, sequence ASC LIMIT 1000",
+    [pageId, organizationId],
+  );
+  return json({ data: mutations.rows });
+}
+
 async function readBody(request: Request): Promise<{ body: CmsPageInput | null; raw: string }> {
   const raw = await request.text();
   if (raw.length > 512 * 1024) return { body: null, raw };
@@ -160,7 +217,7 @@ async function savePage(
 ): Promise<Response> {
   return withWorkerTransaction(database, async (tx) => {
     const existingResult = await tx.query<CmsPageRow>(
-      `SELECT * FROM public.cms_pages WHERE organization_id = $1 AND ${input.id ? "id = $2" : "slug = $2 AND locale = $3"} FOR UPDATE`,
+      `SELECT id, organization_id, slug, locale, page_type, title, body, blocks, tree, status, published_at, scheduled_publish_at, preview_token, meta_title, meta_description, canonical_url, og_image_url, json_ld, parent_slug, breadcrumb_label, version, updated_at FROM public.cms_pages WHERE organization_id = $1 AND ${input.id ? "id = $2" : "slug = $2 AND locale = $3"} FOR UPDATE`,
       input.id ? [organizationId, input.id] : [organizationId, input.slug, input.locale ?? "en"],
     );
     const existing = existingResult.rows[0];
@@ -201,6 +258,9 @@ async function savePage(
       input.breadcrumb_label !== undefined ? input.breadcrumb_label : existing?.breadcrumb_label ?? null,
       nextVersion,
     ];
+    if (!await lockCmsMediaReferences(tx, organizationId, values)) {
+      return json({ error: "media_reference_deleted" }, 409);
+    }
     const result = existing
       ? await tx.query<CmsPageRow>(
           `UPDATE public.cms_pages SET slug=$2, locale=$3, page_type=$4, title=$5, body=$6, blocks=$7::jsonb, tree=$8::jsonb, status=$9, published_at=$10, scheduled_publish_at=$11, preview_token=$12, meta_title=$13, meta_description=$14, canonical_url=$15, og_image_url=$16, json_ld=$17::jsonb, parent_slug=$18, breadcrumb_label=$19, version=$20, updated_at=now() WHERE organization_id=$1 AND id=$21 AND version=$22 RETURNING *`,
@@ -228,12 +288,33 @@ export async function handleCmsAdminPageRequest(
   env: CmsAdminEnv,
   pageId?: string,
 ): Promise<Response> {
-  if (request.method !== "POST" && request.method !== "PUT") return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
   if (!claims) return json({ error: "unauthorized" }, 401);
-  if (!canWrite(claims)) return json({ error: "forbidden" }, 403);
   const organizationId = claimOrganization(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+  if (request.method === "GET") {
+    if (!canRead(claims)) return json({ error: "forbidden" }, 403);
+    const response = await listPages(database, organizationId, request, pageId);
+    if (pageId && response.status === 200) {
+      const payload = await response.clone().json() as { data?: unknown };
+      if (!payload.data) return json({ error: "not_found" }, 404);
+    }
+    return response;
+  }
+  if (request.method === "DELETE") {
+    if (!pageId || !canWrite(claims)) return json({ error: "forbidden" }, 403);
+    const key = request.headers.get("Idempotency-Key")?.trim();
+    if (!key) return json({ error: "idempotency_key_required" }, 400);
+    const result = await executeIdempotently(
+      new HyperdriveIdempotencyStore(database),
+      key,
+      await hash(`${organizationId}:${pageId}:delete`),
+      () => deletePage(database, organizationId, pageId),
+    );
+    return result.response;
+  }
+  if (request.method !== "POST" && request.method !== "PUT") return json({ error: "method_not_allowed" }, 405);
+  if (!canWrite(claims)) return json({ error: "forbidden" }, 403);
   const parsed = await readBody(request);
   if (parsed.raw.length > 512 * 1024) return json({ error: "payload_too_large" }, 413);
   if (!parsed.body || (pageId && parsed.body.id && parsed.body.id !== pageId)) return json({ error: "invalid_page_payload" }, 400);

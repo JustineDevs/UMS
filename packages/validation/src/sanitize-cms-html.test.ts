@@ -9,6 +9,18 @@ test("sanitizeCmsHtml removes script tags", () => {
   assert.ok(out.includes("Hello"));
 });
 
+test("sanitizeCmsHtml removes executable attributes, unsafe URLs, and CSS payloads", () => {
+  const out = sanitizeCmsHtml([
+    '<img src="x" onerror="alert(1)">',
+    '<a href="javascript:alert(1)">unsafe</a>',
+    '<p style="background:url(javascript:alert(1))">text</p>',
+    '<svg><animate onbegin="alert(1)"></animate></svg>',
+  ].join(""));
+  assert.ok(!/onerror|onbegin|javascript:|<svg|<animate/i.test(out));
+  assert.ok(out.includes("unsafe"));
+  assert.ok(out.includes("text"));
+});
+
 test("sanitizeCmsHtml returns empty for empty input", () => {
   assert.equal(sanitizeCmsHtml(""), "");
 });

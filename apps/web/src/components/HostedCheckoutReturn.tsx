@@ -79,6 +79,7 @@ export function HostedCheckoutReturn({
       }
 
       const correlationId = await resolveCorrelationId(provider, providerOrderId);
+      if (disposed) return;
       if (!correlationId) {
         setMessage(buildHostedReturnMissingCorrelationMessage(provider));
         setFailed(true);
@@ -92,6 +93,7 @@ export function HostedCheckoutReturn({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ correlationId, orderId: providerOrderId }),
         });
+        if (disposed) return;
         if (!confirmRes.ok) {
           setMessage("PayPal did not confirm this payment. Your bag is unchanged; return to checkout and try again.");
           setFailed(true);
@@ -105,6 +107,7 @@ export function HostedCheckoutReturn({
         )}/finalize`,
         { method: "POST", credentials: "include" },
       );
+      if (disposed) return;
       const finalizeJson = finalizeOnce.ok
         ? ((await finalizeOnce.json().catch(() => ({}))) as {
             error?: string;
@@ -112,7 +115,6 @@ export function HostedCheckoutReturn({
             redirectUrl?: string;
           })
         : {};
-      if (disposed) return;
       if (
         finalizeOnce.status === 409 &&
         finalizeJson.code !== "FINALIZE_IN_PROGRESS" &&
@@ -144,10 +146,12 @@ export function HostedCheckoutReturn({
       for (let i = 0; i < POLL_MAX; i += 1) {
         if (disposed) return;
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+        if (disposed) return;
         const st = await fetch(
           `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}`,
           { credentials: "include" },
         );
+        if (disposed) return;
         if (!st.ok) continue;
         const stJson = (await st.json().catch(() => ({}))) as {
           status?: string;
@@ -156,7 +160,6 @@ export function HostedCheckoutReturn({
           staleReason?: string | null;
           lastError?: string | null;
         };
-        if (disposed) return;
         if (
           stJson.status === "completed" &&
           typeof stJson.trackingPageUrl === "string" &&
@@ -218,7 +221,7 @@ export function HostedCheckoutReturn({
       <p
         className="text-sm text-on-surface-variant leading-relaxed"
         role="status"
-        aria-live="assertive"
+        aria-live="polite"
         aria-atomic="true"
       >
         {message}

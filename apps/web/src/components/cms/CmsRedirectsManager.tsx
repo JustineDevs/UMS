@@ -79,7 +79,10 @@ export function CmsRedirectsManager() {
 
   const remove = async (id: string) => {
     if (!canWrite || !confirm("Delete redirect?")) return;
-    await fetch(`/api/admin/cms/redirects/${id}`, { method: "DELETE", headers: cmsMutationHeaders() });
+    await fetch(`/api/admin/cms/redirects/${id}`, {
+      method: "DELETE",
+      headers: cmsMutationHeaders(),
+    });
     load();
   };
 
@@ -97,7 +100,10 @@ export function CmsRedirectsManager() {
   };
 
   const exportCsv = () => {
-    const url = sanitizeSameOriginUrl("/api/admin/cms/redirects/export", window.location.origin);
+    const url = sanitizeSameOriginUrl(
+      "/api/admin/cms/redirects/export",
+      window.location.origin,
+    );
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
@@ -126,9 +132,7 @@ export function CmsRedirectsManager() {
 
   const bulkActive = async (active: boolean) => {
     if (!canWrite) return;
-    const ids = Object.entries(selected)
-      .filter(([, v]) => v)
-      .map(([k]) => k);
+    const ids = Object.entries(selected).flatMap(([k, v]) => (v ? [k] : []));
     if (!ids.length) return;
     const r = await fetch("/api/admin/cms/redirects/bulk", {
       method: "PATCH",
@@ -157,6 +161,7 @@ export function CmsRedirectsManager() {
         </p>
         <div className="flex flex-wrap gap-2 items-end">
           <input
+            aria-label="Path to test redirect resolver"
             className="rounded border border-slate-200 px-2 py-1 text-sm"
             value={testPath}
             onChange={(e) => setTestPath(e.target.value)}

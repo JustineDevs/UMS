@@ -1,65 +1,23 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
-import {
-  recordVoid,
-  listVoids,
-} from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { fetchWorkerVoidsForAdmin, mutateWorkerVoidForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { z } from "zod";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { adminVoidRequestSchema } from "@/lib/admin-api-contracts";
 
-const voidSchema = z.object({
-  shift_id: z.string().uuid().optional(),
-  employee_id: z.string().uuid(),
-  approved_by: z.string().uuid().optional(),
-  order_id: z.string().trim().max(120).optional(),
-  line_item_id: z.string().trim().max(120).optional(),
-  action: z.enum(["void_item", "void_order", "refund", "discount_override"]),
-  amount: z.number().finite().nonnegative().max(1_000_000).optional(),
-  reason: z.string().trim().min(1).max(500).optional(),
-  pin_verified: z.boolean().optional(),
-}).strict();
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffSessionAllows(session, "pos:void")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const organization = await resolveStaffOrganization(sb, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const shiftId = req.nextUrl.searchParams.get("shift_id") ?? undefined;
-  const data = await listVoids(sb, { shiftId, organizationId: organization.id });
-  return correlatedJson(cid, { data });
+export async function GET(request: Request) {
+  const url = new URL(request.url); const params = new URLSearchParams();
+  for (const name of ["shift_id", "limit"]) { const value = url.searchParams.get(name)?.trim(); if (value) params.set(name, value); }
+  return await fetchWorkerVoidsForAdmin(params.toString() ? `?${params}` : "") ?? new Response(JSON.stringify({ error: "Worker backend is unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } });
 }
 
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  if (!staffSessionAllows(session, "pos:void")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const body = await parseBoundedJson(req, 32 * 1024);
-  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
-  const parsed = voidSchema.safeParse(body.valid ? body.value : null);
-  if (!parsed.success) return correlatedJson(cid, { error: "Invalid void payload" }, { status: 400 });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const organization = await resolveStaffOrganization(sb, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const v = await recordVoid(sb, { ...parsed.data, organization_id: organization.id });
-  return correlatedJson(cid, { data: v }, { status: 201 });
+export async function POST(request: Request) {
+  const requestId = getCorrelationId(request); const key = request.headers.get("Idempotency-Key")?.trim();
+  if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const parsed = await parseBoundedJson(request, 32 * 1024);
+  if (parsed.tooLarge) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413, headers: { "Content-Type": "application/json" } });
+  if (!parsed.valid || !parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return new Response(JSON.stringify({ error: "Invalid JSON", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const validated = adminVoidRequestSchema.safeParse(parsed.value);
+  if (!validated.success) return new Response(JSON.stringify({ error: "Invalid payload", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  return await mutateWorkerVoidForAdmin(validated.data, key) ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json" } });
 }
-
-export const POST = withAdminMutationIdempotency("/admin/voids:POST", post);

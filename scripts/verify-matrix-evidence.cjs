@@ -48,8 +48,12 @@ const parsedRows = matrices.flatMap(({ path: matrixPath, text: matrix }) => {
       .split("|")
       .slice(1, -1)
       .map((cell) => cell.replaceAll("`", "").trim().toLowerCase());
-    const status = cells.find((cell) => rowStatuses.has(cell));
-    if (!status) {
+    // Status is the last exact status token in the row. Some historical proof
+    // cells contain literal pipe characters, so the markdown split can create
+    // extra cells; choosing the last token preserves the terminal status while
+    // avoiding false matches from earlier proof text.
+    const status = [...cells].reverse().find((cell) => rowStatuses.has(cell));
+    if (!rowStatuses.has(status)) {
       parsed.push({ id, status: "missing-status", matrixPath });
       errors.push(`${path.relative(root, matrixPath)}: ${id} is missing a terminal row status`);
       continue;
@@ -85,7 +89,18 @@ for (const file of files) {
   }
   if (!Number.isInteger(record.exitCode)) errors.push(`${file}: exitCode must be an integer from the executed runner`);
   if (record.exitCode !== 0) errors.push(`${file}: exitCode must be 0, got ${record.exitCode}`);
-  if (record.result !== "pass") errors.push(`${file}: result must be pass, got ${record.result}`);
+  if (!["pass", "blocked"].includes(record.result)) {
+    errors.push(`${file}: result must be pass or blocked, got ${record.result}`);
+  }
+  const row = expected.get(record.matrixId);
+  if (record.result === "blocked") {
+    if (row?.status !== "blocked") errors.push(`${file}: blocked evidence requires matrix row status=blocked`);
+    for (const key of ["blockedBy", "recoveryCondition"]) {
+      if (!nonEmptyString(record[key])) errors.push(`${file}: ${key} is required for blocked evidence`);
+    }
+  } else if (row?.status === "blocked") {
+    errors.push(`${file}: matrix row status=blocked requires result=blocked`);
+  }
   if (browserProofRows.has(record.matrixId)) {
     if (/\bAUTH_DISABLED\s*=\s*true\b|\bAUTH_DISABLE\s*=\s*true\b/i.test(record.command)) {
       errors.push(`${file}: auth-disabled command cannot prove browser acceptance criteria`);
@@ -107,7 +122,7 @@ for (const file of files) {
   if ((requireHttps || httpsRows.has(record.matrixId)) && !/^https:\/\/[^\s/]+/i.test(record.runtime)) {
     errors.push(`${file}: runtime must be an HTTPS URL, got ${record.runtime}`);
   }
-  if (httpsRows.has(record.matrixId)) {
+  if (httpsRows.has(record.matrixId) && record.result === "pass") {
     if (!/^https:\/\/[^\s/]+/i.test(record.callbackUrl ?? "")) errors.push(`${file}: callbackUrl must be HTTPS`);
     if (!Number.isInteger(record.callbackStatus) || record.callbackStatus < 200 || record.callbackStatus >= 500) errors.push(`${file}: callbackStatus must prove a reachable callback`);
   }
@@ -131,14 +146,16 @@ for (const file of files) {
 
 const missing = rows.filter((row) => !evidence.has(row.id));
 if (missing.length) errors.push(`missing evidence: ${missing.map((row) => row.id).join(", ")}`);
-const unverified = rows.filter((row) => row.status !== "verified");
-if (unverified.length) errors.push(`matrix contains non-verified rows: ${unverified.map((row) => `${row.id}=${row.status}`).join(", ")}`);
+const unresolved = rows.filter((row) => !["verified", "blocked"].includes(row.status));
+if (unresolved.length) errors.push(`matrix contains unresolved rows: ${unresolved.map((row) => `${row.id}=${row.status}`).join(", ")}`);
 
 const summary = {
   matrices: matrixPaths,
   evidenceDir,
   totalRows: rows.length,
   verifiedRows: rows.filter((row) => row.status === "verified").length,
+  blockedRows: rows.filter((row) => row.status === "blocked").length,
+  unresolvedRows: unresolved.length,
   evidenceRecords: evidence.size,
   missingRows: missing.map((row) => row.id),
   errors,

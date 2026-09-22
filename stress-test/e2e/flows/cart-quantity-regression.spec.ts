@@ -429,7 +429,7 @@ test("cart recovers from reconciliation outage before enabling checkout", async 
   page,
 }) => {
   let attempts = 0;
-  await page.route("**/api/cart/reconcile", async (route) => {
+  await page.route("**/api/cart/reconcile**", async (route) => {
     attempts += 1;
     if (attempts === 1) {
       await route.fulfill({
@@ -804,22 +804,23 @@ test("cart reconciles a quantity update received from another tab", async ({
 test("cart reconciliation rejects an unknown canonical variant", async ({
   request,
 }) => {
-  const response = await request.post("http://localhost:3000/api/cart/reconcile", {
-    headers: { origin: "http://localhost:3000" },
-    data: {
-      lines: [
-        {
-          variantId: "forged-variant-with-client-price",
-          quantity: 1,
-        },
-      ],
+  const response = await request.post(
+    "http://localhost:3000/api/cart/reconcile",
+    {
+      headers: { origin: "http://localhost:3000" },
+      data: {
+        lines: [
+          {
+            variantId: "forged-variant-with-client-price",
+            quantity: 1,
+          },
+        ],
+      },
     },
-  });
+  );
   expect(response.status()).toBe(503);
   expect(await response.json()).toEqual({
     error: "Catalog reconciliation is temporarily unavailable",
-    lines: [
-      { variantId: "forged-variant-with-client-price", status: "error" },
-    ],
+    lines: [{ variantId: "forged-variant-with-client-price", status: "error" }],
   });
 });

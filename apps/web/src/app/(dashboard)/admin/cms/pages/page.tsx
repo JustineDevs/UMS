@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { CmsPageFrame } from "@/components/admin-console";
 import { CmsPagesManager } from "@/components/cms/CmsPagesManager";
 import { requirePagePermission } from "@/lib/require-page-permission";
@@ -22,7 +23,7 @@ export default async function CmsPagesAdminPage({
       inspector={null}
       showSurfaceRail={false}
     >
-      <CmsPagesManager />
+      <Suspense fallback={null}><CmsPagesManager /></Suspense>
     </CmsPageFrame>
   );
 }

@@ -56,7 +56,7 @@ function inTimeWindow(startsAt: string | null, endsAt: string | null): boolean {
 
 /** All announcement rows (admin). */
 export async function listCmsAnnouncementsAdmin(supabase: SupabaseClient, organizationId?: string): Promise<CmsAnnouncementRow[]> {
-  let query = supabase.from("cms_announcement").select("*");
+  let query = supabase.from("cms_announcement").select("*").limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

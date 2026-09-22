@@ -14,10 +14,26 @@ import {
 import { AlertTriangle, ChevronRight, FileUp, Search } from "lucide-react";
 import Link from "next/link";
 
-import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminPageHeader, AdminTableToolbar } from "@/components/admin-console";
 
@@ -76,23 +92,36 @@ export function Roles({ roles }: { roles: Role[] }) {
     },
   });
 
-  const search = (table.getColumn("search")?.getFilterValue() as string | undefined) ?? "";
-  const groupFilter = (table.getColumn("group")?.getFilterValue() as string | undefined) ?? "";
+  const search =
+    (table.getColumn("search")?.getFilterValue() as string | undefined) ?? "";
+  const groupFilter =
+    (table.getColumn("group")?.getFilterValue() as string | undefined) ?? "";
   const typeFilter = getRoleTypeFilter(groupFilter);
-  const ownerFilter = (table.getColumn("owner")?.getFilterValue() as string | undefined) ?? "All";
-  const statusFilter = (table.getColumn("status")?.getFilterValue() as string | undefined) ?? "All";
+  const ownerFilter =
+    (table.getColumn("owner")?.getFilterValue() as string | undefined) ?? "All";
+  const statusFilter =
+    (table.getColumn("status")?.getFilterValue() as string | undefined) ??
+    "All";
 
   return (
     <div className="flex min-w-0 h-full flex-col gap-4">
-      <AdminPageHeader title="Roles & Permissions" subtitle="Manage access roles and permissions across your organization." actions={<>
-          <Button asChild size="sm" variant="outline">
-            <Link href="/admin/users">
-            <FileUp data-icon="inline-start" />
-            Import JSON
-            </Link>
-          </Button>
-          <Button asChild size="sm"><Link href="/admin/users">Manage staff access</Link></Button>
-      </>} />
+      <AdminPageHeader
+        title="Roles & Permissions"
+        subtitle="Manage access roles and permissions across your organization."
+        actions={
+          <>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/admin/users">
+                <FileUp data-icon="inline-start" />
+                Import JSON
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link href="/admin/users">Manage staff access</Link>
+            </Button>
+          </>
+        }
+      />
 
       <Tabs className="h-full gap-4" defaultValue="roles">
         <TabsList
@@ -109,96 +138,112 @@ export function Roles({ roles }: { roles: Role[] }) {
             <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-50">
               <AlertTriangle className="size-4" />
               <AlertTitle>Review required</AlertTitle>
-              <AlertDescription>3 roles have unreviewed permission changes.</AlertDescription>
+              <AlertDescription>
+                3 roles have unreviewed permission changes.
+              </AlertDescription>
               <AlertAction>
-                  <Button asChild size="sm" variant="link"><Link href="/admin/users">
-                  Review changes
-                  <ChevronRight data-icon="inline-end" />
-                </Link></Button>
+                <Button asChild size="sm" variant="link">
+                  <Link href="/admin/users">
+                    Review changes
+                    <ChevronRight data-icon="inline-end" />
+                  </Link>
+                </Button>
               </AlertAction>
             </Alert>
 
             <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
               <AdminTableToolbar
                 leading={
-                <InputGroup className="h-7 w-full rounded-md sm:w-82">
-                  <InputGroupAddon>
-                    <Search />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    className="h-7"
-                    placeholder="Search roles..."
-                    value={search}
-                    onChange={(e) => {
-                      table.getColumn("search")?.setFilterValue(e.target.value || undefined);
-                      table.setPageIndex(0);
-                    }}
-                  />
-                </InputGroup>
+                  <InputGroup className="h-7 w-full rounded-md sm:w-82">
+                    <InputGroupAddon>
+                      <Search />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      className="h-7"
+                      placeholder="Search roles..."
+                      value={search}
+                      onChange={(e) => {
+                        table
+                          .getColumn("search")
+                          ?.setFilterValue(e.target.value || undefined);
+                        table.setPageIndex(0);
+                      }}
+                    />
+                  </InputGroup>
                 }
-                trailing={<div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={typeFilter}
-                    onValueChange={(v) => {
-                      table.getColumn("group")?.setFilterValue(getRoleGroupFilterValue(v));
-                      table.setPageIndex(0);
-                    }}
-                  >
-                    <SelectTrigger size="sm">
-                      <span className="text-muted-foreground">Type:</span>
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" align="start">
-                      <SelectGroup>
-                        <SelectItem value="All">All</SelectItem>
-                        <SelectItem value="System">System</SelectItem>
-                        <SelectItem value="Custom">Custom</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                trailing={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={typeFilter}
+                      onValueChange={(v) => {
+                        table
+                          .getColumn("group")
+                          ?.setFilterValue(getRoleGroupFilterValue(v));
+                        table.setPageIndex(0);
+                      }}
+                    >
+                      <SelectTrigger size="sm">
+                        <span className="text-muted-foreground">Type:</span>
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" align="start">
+                        <SelectGroup>
+                          <SelectItem value="All">All</SelectItem>
+                          <SelectItem value="System">System</SelectItem>
+                          <SelectItem value="Custom">Custom</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
 
-                  <Select
-                    value={ownerFilter}
-                    onValueChange={(v) => {
-                      table.getColumn("owner")?.setFilterValue(v === "All" ? undefined : v);
-                      table.setPageIndex(0);
-                    }}
-                  >
-                    <SelectTrigger size="sm">
-                      <span className="text-muted-foreground">Owner:</span>
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" align="start">
-                      <SelectGroup>
-                        <SelectItem value="All">All</SelectItem>
-                        <SelectItem value="System">System</SelectItem>
-                        <SelectItem value="Jane Doe">Jane Doe</SelectItem>
-                        <SelectItem value="Alex Kim">Alex Kim</SelectItem>
-                        <SelectItem value="Chris Lee">Chris Lee</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
+                    <Select
+                      value={ownerFilter}
+                      onValueChange={(v) => {
+                        table
+                          .getColumn("owner")
+                          ?.setFilterValue(v === "All" ? undefined : v);
+                        table.setPageIndex(0);
+                      }}
+                    >
+                      <SelectTrigger size="sm">
+                        <span className="text-muted-foreground">Owner:</span>
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" align="start">
+                        <SelectGroup>
+                          <SelectItem value="All">All</SelectItem>
+                          <SelectItem value="System">System</SelectItem>
+                          <SelectItem value="Jane Doe">Jane Doe</SelectItem>
+                          <SelectItem value="Alex Kim">Alex Kim</SelectItem>
+                          <SelectItem value="Chris Lee">Chris Lee</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
 
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(v) => {
-                      table.getColumn("status")?.setFilterValue(v === "All" ? undefined : v);
-                      table.setPageIndex(0);
-                    }}
-                  >
-                    <SelectTrigger size="sm">
-                      <span className="text-muted-foreground">Status:</span>
-                      <SelectValue placeholder="All" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" align="start">
-                      <SelectGroup>
-                        <SelectItem value="All">All</SelectItem>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Needs review">Needs review</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </div>}
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(v) => {
+                        table
+                          .getColumn("status")
+                          ?.setFilterValue(v === "All" ? undefined : v);
+                        table.setPageIndex(0);
+                      }}
+                    >
+                      <SelectTrigger size="sm">
+                        <span className="text-muted-foreground">Status:</span>
+                        <SelectValue placeholder="All" />
+                      </SelectTrigger>
+                      <SelectContent position="popper" align="start">
+                        <SelectGroup>
+                          <SelectItem value="All">All</SelectItem>
+                          <SelectItem value="Active">Active</SelectItem>
+                          <SelectItem value="Needs review">
+                            Needs review
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                }
               />
 
               <RolesTable table={table} />
@@ -207,22 +252,36 @@ export function Roles({ roles }: { roles: Role[] }) {
         </TabsContent>
         <TabsContent value="permission-sets">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[...new Set(roles.flatMap((role) => role.permissionSets))].map((permissionSet) => (
-              <div key={permissionSet} className="rounded-md border border-border/70 bg-background px-4 py-3 text-sm">
-                {permissionSet}
-              </div>
-            ))}
+            {[...new Set(roles.flatMap((role) => role.permissionSets))].map(
+              (permissionSet) => (
+                <div
+                  key={permissionSet}
+                  className="rounded-md border border-border/70 bg-background px-4 py-3 text-sm"
+                >
+                  {permissionSet}
+                </div>
+              ),
+            )}
           </div>
         </TabsContent>
         <TabsContent value="access-reviews">
           <div className="flex flex-col gap-3">
-            {roles.filter((role) => role.status === "Needs review").map((role) => (
-              <div key={role.role} className="flex items-center justify-between rounded-md border border-border/70 px-4 py-3 text-sm">
-                <span>{role.role}</span>
-                <span className="text-muted-foreground">Review required</span>
+            {roles
+              .flatMap((role) => (role.status === "Needs review" ? [role] : []))
+              .map((role) => (
+                <div
+                  key={role.role}
+                  className="flex items-center justify-between rounded-md border border-border/70 px-4 py-3 text-sm"
+                >
+                  <span>{role.role}</span>
+                  <span className="text-muted-foreground">Review required</span>
+                </div>
+              ))}
+            {roles.every((role) => role.status !== "Needs review") ? (
+              <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
+                No access reviews are pending.
               </div>
-            ))}
-            {roles.every((role) => role.status !== "Needs review") ? <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">No access reviews are pending.</div> : null}
+            ) : null}
           </div>
         </TabsContent>
       </Tabs>

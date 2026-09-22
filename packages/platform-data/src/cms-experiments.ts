@@ -22,7 +22,7 @@ export async function listCmsAbExperiments(
   supabase: SupabaseClient,
   organizationId?: string,
 ): Promise<CmsAbExperimentRow[]> {
-  let query = supabase.from("cms_ab_experiments").select("*").order("experiment_key");
+  let query = supabase.from("cms_ab_experiments").select("*").order("experiment_key").limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

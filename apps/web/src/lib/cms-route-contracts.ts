@@ -96,12 +96,6 @@ export const cmsExperimentSchema = z.object({
   conversions: z.number().int().min(0).optional(),
 }).strict();
 
-export const cmsMediaMetadataSchema = z.object({
-  alt_text: nullableText(500),
-  display_name: nullableText(160),
-  tags: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
-}).strict();
-
 export const cmsRedirectSchema = z.object({
   id: z.string().uuid().optional(),
   from_path: z.string().trim().min(1).max(2048).regex(/^\//),
@@ -155,16 +149,6 @@ export const cmsAnnouncementSchema = z.object({
   priority: z.number().int().min(-1000).max(1000).optional(),
   stackGroup: nullableText(120),
   regionCode: nullableText(16),
-}).strict();
-
-export const cmsCategoryContentSchema = z.object({
-  id: z.string().uuid().optional(),
-  collection_handle: z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-  locale: z.string().trim().min(2).max(16).default("en"),
-  intro_html: z.string().max(100_000).optional(),
-  banner_url: nullableText(2048),
-  banner_alt: nullableText(500),
-  blocks: z.array(cmsBlockSchema).max(100).optional(),
 }).strict();
 
 const navLinkSchema: z.ZodType<unknown> = z.lazy(() => z.object({

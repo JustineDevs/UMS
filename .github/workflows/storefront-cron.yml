@@ -12,22 +12,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     env:
-      STOREFRONT_URL: https://universalmusic.vercel.app
+      BACKEND_WORKER_URL: ${{ vars.BACKEND_WORKER_URL }}
       CRON_SECRET: ${{ secrets.STOREFRONT_CRON_SECRET }}
     steps:
-      - name: Invoke protected storefront jobs
+      - name: Invoke protected Worker jobs
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$BACKEND_WORKER_URL"
           test -n "$CRON_SECRET"
+          if [[ ! "$BACKEND_WORKER_URL" =~ ^https://[A-Za-z0-9.-]+\.workers\.dev/?$ ]]; then
+            echo "BACKEND_WORKER_URL must be an HTTPS Cloudflare workers.dev origin" >&2
+            exit 1
+          fi
+          BACKEND_WORKER_URL="${BACKEND_WORKER_URL%/}"
           for path in \
-            /api/cron/finalize-payment-attempts \
-            /api/cron/campaigns \
-            /api/cron/payment-reconciliation \
-            /api/cron/inventory-reservations \
-            /api/cron/back-in-stock; do
+            /internal/cron/finalize-payment-attempts \
+            /internal/cron/campaigns \
+            /internal/cron/payment-reconciliation \
+            /internal/cron/media-storage-cleanup \
+            /internal/cron/inventory-reservations \
+            /internal/cron/back-in-stock; do
             curl --fail-with-body --silent --show-error --max-time 30 \
               -H "Authorization: Bearer $CRON_SECRET" \
-              "$STOREFRONT_URL$path"
+              "$BACKEND_WORKER_URL$path"
             printf '\n'
           done

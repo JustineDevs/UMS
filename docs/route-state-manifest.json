@@ -1,0 +1,1754 @@
+{
+  "version": 1,
+  "generatedFrom": "apps/web/src/app",
+  "entries": [
+    {
+      "route": "/admin/analytics",
+      "source": "apps/web/src/app/(dashboard)/admin/analytics/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(dashboard)/admin/analytics/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/audit",
+      "source": "apps/web/src/app/(dashboard)/admin/audit/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(dashboard)/admin/audit/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/campaigns",
+      "source": "apps/web/src/app/(dashboard)/admin/campaigns/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": true,
+        "loading": true,
+        "empty": true,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/catalog/{id}",
+      "source": "apps/web/src/app/(dashboard)/admin/catalog/[id]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/catalog/media",
+      "source": "apps/web/src/app/(dashboard)/admin/catalog/media/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/catalog/new",
+      "source": "apps/web/src/app/(dashboard)/admin/catalog/new/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/catalog",
+      "source": "apps/web/src/app/(dashboard)/admin/catalog/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": true,
+        "loading": true,
+        "empty": true,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/channels",
+      "source": "apps/web/src/app/(dashboard)/admin/channels/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/chat-orders",
+      "source": "apps/web/src/app/(dashboard)/admin/chat-orders/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/cms/announcement",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/announcement/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": true,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/blog/{id}",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/blog/[id]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/blog",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/blog/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/builder",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/builder/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/categories",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/categories/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/commerce",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/commerce/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/experiments",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/experiments/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/forms",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/forms/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/media",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/media/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/navigation",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/navigation/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/pages",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/pages/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/cms/redirects",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/redirects/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/cms/site-map",
+      "source": "apps/web/src/app/(dashboard)/admin/cms/site-map/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/commerce-metrics",
+      "source": "apps/web/src/app/(dashboard)/admin/commerce-metrics/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/crm/{customerId}",
+      "source": "apps/web/src/app/(dashboard)/admin/crm/[customerId]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/crm",
+      "source": "apps/web/src/app/(dashboard)/admin/crm/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/delivery-logistics",
+      "source": "apps/web/src/app/(dashboard)/admin/delivery-logistics/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/devices",
+      "source": "apps/web/src/app/(dashboard)/admin/devices/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/docs",
+      "source": "apps/web/src/app/(dashboard)/admin/docs/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/employees",
+      "source": "apps/web/src/app/(dashboard)/admin/employees/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/finance/reconciliation",
+      "source": "apps/web/src/app/(dashboard)/admin/finance/reconciliation/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/inventory",
+      "source": "apps/web/src/app/(dashboard)/admin/inventory/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/invoice",
+      "source": "apps/web/src/app/(dashboard)/admin/invoice/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/loyalty",
+      "source": "apps/web/src/app/(dashboard)/admin/loyalty/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/offline-queue",
+      "source": "apps/web/src/app/(dashboard)/admin/offline-queue/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/orders/{orderId}",
+      "source": "apps/web/src/app/(dashboard)/admin/orders/[orderId]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/orders",
+      "source": "apps/web/src/app/(dashboard)/admin/orders/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin",
+      "source": "apps/web/src/app/(dashboard)/admin/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/payments",
+      "source": "apps/web/src/app/(dashboard)/admin/payments/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/pos",
+      "source": "apps/web/src/app/(dashboard)/admin/pos/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": true,
+        "loading": true,
+        "empty": true,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/receipts",
+      "source": "apps/web/src/app/(dashboard)/admin/receipts/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/reviews",
+      "source": "apps/web/src/app/(dashboard)/admin/reviews/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/roles",
+      "source": "apps/web/src/app/(dashboard)/admin/roles/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/settings/integrations",
+      "source": "apps/web/src/app/(dashboard)/admin/settings/integrations/page.tsx",
+      "client": true,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": true,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/settings/payments",
+      "source": "apps/web/src/app/(dashboard)/admin/settings/payments/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/admin/settings/preferences",
+      "source": "apps/web/src/app/(dashboard)/admin/settings/preferences/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/settings/runtime",
+      "source": "apps/web/src/app/(dashboard)/admin/settings/runtime/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/settings/storefront",
+      "source": "apps/web/src/app/(dashboard)/admin/settings/storefront/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/users",
+      "source": "apps/web/src/app/(dashboard)/admin/users/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/admin/workflow",
+      "source": "apps/web/src/app/(dashboard)/admin/workflow/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(dashboard)/admin/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/about",
+      "source": "apps/web/src/app/(public)/about/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/accessibility",
+      "source": "apps/web/src/app/(public)/accessibility/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/account/loyalty",
+      "source": "apps/web/src/app/(public)/account/loyalty/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/account/orders/{orderId}",
+      "source": "apps/web/src/app/(public)/account/orders/[orderId]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/account/orders/{orderId}/return",
+      "source": "apps/web/src/app/(public)/account/orders/[orderId]/return/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/account",
+      "source": "apps/web/src/app/(public)/account/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": true,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/blog/{slug}",
+      "source": "apps/web/src/app/(public)/blog/[slug]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/blog",
+      "source": "apps/web/src/app/(public)/blog/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/blog/preview",
+      "source": "apps/web/src/app/(public)/blog/preview/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/cart",
+      "source": "apps/web/src/app/(public)/cart/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/checkout/hosted-return",
+      "source": "apps/web/src/app/(public)/checkout/hosted-return/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/checkout/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/checkout",
+      "source": "apps/web/src/app/(public)/checkout/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/checkout/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/checkout/stripe-return",
+      "source": "apps/web/src/app/(public)/checkout/stripe-return/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/checkout/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/collections/{handle}",
+      "source": "apps/web/src/app/(public)/collections/[handle]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/collections",
+      "source": "apps/web/src/app/(public)/collections/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/contact",
+      "source": "apps/web/src/app/(public)/contact/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/cookies",
+      "source": "apps/web/src/app/(public)/cookies/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/errors/{code}",
+      "source": "apps/web/src/app/(public)/errors/[code]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/faq",
+      "source": "apps/web/src/app/(public)/faq/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/help",
+      "source": "apps/web/src/app/(public)/help/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/maintenance",
+      "source": "apps/web/src/app/(public)/maintenance/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/onboarding",
+      "source": "apps/web/src/app/(public)/onboarding/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/order-confirmation/{orderId}",
+      "source": "apps/web/src/app/(public)/order-confirmation/[orderId]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": true,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": false
+      }
+    },
+    {
+      "route": "/p/{slug}",
+      "source": "apps/web/src/app/(public)/p/[slug]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/(public)",
+      "source": "apps/web/src/app/(public)/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/preferences",
+      "source": "apps/web/src/app/(public)/preferences/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/privacy",
+      "source": "apps/web/src/app/(public)/privacy/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/register",
+      "source": "apps/web/src/app/(public)/register/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/returns",
+      "source": "apps/web/src/app/(public)/returns/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/search",
+      "source": "apps/web/src/app/(public)/search/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": true,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/shipping",
+      "source": "apps/web/src/app/(public)/shipping/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/shop/{slug}",
+      "source": "apps/web/src/app/(public)/shop/[slug]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/shop/[slug]/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/shop",
+      "source": "apps/web/src/app/(public)/shop/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/shop/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/sign-in",
+      "source": "apps/web/src/app/(public)/sign-in/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/site-map",
+      "source": "apps/web/src/app/(public)/site-map/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/terms",
+      "source": "apps/web/src/app/(public)/terms/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/track/{orderId}",
+      "source": "apps/web/src/app/(public)/track/[orderId]/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/track/[orderId]/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": true,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": true,
+        "success": true
+      }
+    },
+    {
+      "route": "/track",
+      "source": "apps/web/src/app/(public)/track/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": true,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/variant-guide",
+      "source": "apps/web/src/app/(public)/variant-guide/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/warranty",
+      "source": "apps/web/src/app/(public)/warranty/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/wishlist",
+      "source": "apps/web/src/app/(public)/wishlist/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": true
+      }
+    },
+    {
+      "route": "/sign-in/e2e",
+      "source": "apps/web/src/app/sign-in/e2e/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/sign-in/e2e/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": true,
+        "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    }
+  ]
+}

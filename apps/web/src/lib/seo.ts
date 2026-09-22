@@ -81,6 +81,16 @@ export const SEO_KEYWORDS = {
   ],
 } as const;
 
+/** Serialize JSON-LD without allowing data to terminate the enclosing script element. */
+export function serializeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 function mergeKeywords(...groups: Array<string[] | undefined>): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -173,7 +183,10 @@ export function buildJsonLdOrganization(options?: {
   logoPath?: string;
 }) {
   const base = getBaseUrl();
-  const sameAs = (options?.sameAs ?? []).map((url) => url.trim()).filter(Boolean);
+  const sameAs = (options?.sameAs ?? []).flatMap((url) => {
+    const normalized = url.trim();
+    return normalized ? [normalized] : [];
+  });
   const logoPath = options?.logoPath ?? "/brand/universal-music-store-logo-landscape.png";
   const contactPoint =
     options?.contactEmail || options?.contactPhone
@@ -311,7 +324,7 @@ export function buildJsonLdProduct(product: {
       ? Math.min(...product.variants.map((v) => v.price))
       : 0;
   const hasStock = sellableVariants.length > 0;
-  const imageList = product.images.map((i) => i.imageUrl).filter(Boolean);
+  const imageList = product.images.flatMap((i) => i.imageUrl ? [i.imageUrl] : []);
   const fallbackImage = `${base}/icons/android-chrome-512x512.png`;
   const primarySku = sellableVariants[0]?.sku ?? product.variants[0]?.sku;
   const priceValidUntil = new Date(

@@ -1,5 +1,7 @@
 # Full-task hardening matrix
 
+> **Historical snapshot — superseded.** This matrix was authored for the pre-consolidation `apps/admin`/`apps/storefront` layout and is retained as an audit trail only. Its legacy package commands, old file paths, and “out of scope” conclusions are not current release evidence. Use `docs/full-task-api-hygiene-roast-audit.md`, `docs/production-hardening-report.md`, and the root `pnpm` gates for the current unified `apps/web` + Worker topology.
+
 Date: 2026-08-15
 
 Source of requested findings: `.omx/context/Full-Task-fix.md`.
@@ -16,8 +18,9 @@ historical evidence rows below are retained only to preserve the original
 record; current verification uses the root workspace commands (`pnpm test`,
 `pnpm typecheck`, `pnpm lint`, and `pnpm test:e2e`).
 
-No application, provider, or CMS implementation file was changed in this
-lane. The only test changes are assertions in existing test-only files.
+The original record was documentation/test-only. Subsequent consolidation and
+hardening work changed application and Worker implementation files; those
+changes are tracked in the current production-hardening report.
 
 ## Evidence baseline
 
@@ -109,7 +112,7 @@ complete by the existence of a route:
 | S6 | Account/order cancellation/returns enforce ownership | PARTIAL | `rg -n 'session|customer|ownership|order' apps/web/src/app/'(public)'/account apps/web/src/app/api`; cross-account negative browser/API tests are missing. |
 | S7 | Legal/policy content is current and versioned | FAIL | `rg -n 'shipping|returns|privacy|terms|cookies|Static|CMS' apps/web/src/app/'(public)'`; no policy/version audit artifact exists. |
 | S8 | Accessibility claim has tested conformance scope | FAIL | `rg -n 'WCAG|accessibility' apps/web/src/app/'(public)'/accessibility`; no axe/Lighthouse/browser run was performed. |
-| S9 | Sitemap is complete from route/catalog/CMS sources | PARTIAL | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='sitemap|shop'` is not a configured sitemap test; source is manually inspected with `rg -n 'sitemap|listCmsPages|products|collections' apps/web/src/app/sitemap.ts 'apps/web/src/app/(public)/sitemap/page.tsx'`. |
+| S9 | Sitemap is complete from route/catalog/CMS sources | PARTIAL | Machine sitemap is `/sitemap.xml`; the human-readable route is `/site-map`. Source and Worker coverage remain the evidence surface. |
 | S10 | Newsletter has transactional consent, double opt-in, and unsubscribe lifecycle | PARTIAL | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='newsletter'` has no dedicated configured assertion; source/migration inspection finds confirmation flow, but email/provider E2E is absent. |
 | S11 | Helpful votes are unique and atomic | PARTIAL | `rg -n 'review_helpful_votes|rpc\(|ALREADY_VOTED' apps/web/src/app/api/reviews/helpful/'[id]'/route.ts packages/database/supabase/migrations/085_review_helpful_atomic_increment.sql`; no concurrent vote test ran. |
 | S12 | Public mutations have consistent bot protection and rate limits | PARTIAL | Storefront suite and `rg -n 'withBotIdProtection|rateLimit' apps/web/src/app/api`; no abuse/oversized-payload matrix across all public forms ran. |

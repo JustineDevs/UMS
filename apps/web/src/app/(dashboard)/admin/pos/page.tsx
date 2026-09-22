@@ -255,7 +255,7 @@ export default function POSPage() {
     }
   }
 
-  const medusaPosBase = "/api/pos/medusa";
+  const posCommerceApiBase = "/api/pos/commerce";
 
   async function lookupBarcodeOrSku(
     value: string,
@@ -264,7 +264,7 @@ export default function POSPage() {
     if (!trimmed) return null;
     const isNumeric = /^\d+$/.test(trimmed);
     const body = isNumeric ? { barcode: trimmed } : { sku: trimmed };
-    const res = await fetch(`${medusaPosBase}/lookup`, {
+    const res = await fetch(`${posCommerceApiBase}/lookup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -324,7 +324,7 @@ export default function POSPage() {
       quantity: c.qty,
     }));
     try {
-      const res = await fetch(`${medusaPosBase}/draft-order`, {
+      const res = await fetch(`${posCommerceApiBase}/draft-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items, posFeatures }),
@@ -403,7 +403,7 @@ export default function POSPage() {
     }
 
     const idempotencyKey = crypto.randomUUID();
-    const res = await fetch(`${medusaPosBase}/commit-sale`, {
+      const res = await fetch(`${posCommerceApiBase}/commit-sale`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -551,7 +551,7 @@ export default function POSPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${medusaPosBase}/suggestions`, { signal: controller.signal })
+    fetch(`${posCommerceApiBase}/suggestions`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -580,7 +580,7 @@ export default function POSPage() {
     setSearchBusy(true);
     searchDebounceRef.current = setTimeout(() => {
       void fetch(
-        `${medusaPosBase}/search?${new URLSearchParams({ q })}`,
+        `${posCommerceApiBase}/search?${new URLSearchParams({ q })}`,
         { signal: controller.signal },
       )
         .then((r) => {
@@ -607,7 +607,7 @@ export default function POSPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${medusaPosBase}/quick-products`, { signal: controller.signal })
+    fetch(`${posCommerceApiBase}/quick-products`, { signal: controller.signal })
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -648,7 +648,7 @@ export default function POSPage() {
               </div>
               <p className="text-on-surface-variant font-body mt-2">
                 {activeShift
-                  ? `Shift open since ${new Date(activeShift.opened_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" })}`
+                  ? `Shift open since ${new Date(activeShift.opened_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Manila" })}`
                   : "No active shift. Open a shift to begin."}
               </p>
             </div>
@@ -686,10 +686,12 @@ export default function POSPage() {
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
+            <label htmlFor="pos-barcode-input" className="sr-only">Barcode or SKU</label>
             <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
               barcode_scanner
             </span>
             <input
+              id="pos-barcode-input"
               ref={barcodeInputRef}
               value={barcodeInput}
               onChange={(e) => setBarcodeInput(e.target.value)}
@@ -698,23 +700,24 @@ export default function POSPage() {
                   handleBarcodeSubmit();
                 }
               }}
-              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
+              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-[background-color,box-shadow]"
               placeholder="Scan Barcode or SKU..."
-              autoFocus
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-surface-container-low px-2 py-1 rounded text-[10px] font-bold text-on-surface-variant border border-outline-variant/20 uppercase tracking-tighter">
               F1
             </div>
           </div>
           <div className="relative">
+            <label htmlFor="pos-product-search" className="sr-only">Product search</label>
             <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
               search
             </span>
             <input
+              id="pos-product-search"
               ref={searchInputRef}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-all"
+              className="w-full bg-surface-container-highest border-none rounded py-4 pl-12 pr-4 focus:ring-1 focus:ring-secondary/40 font-body text-sm transition-[background-color,box-shadow]"
               placeholder="Search product name..."
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 bg-surface-container-low px-2 py-1 rounded text-[10px] font-bold text-on-surface-variant border border-outline-variant/20 uppercase tracking-tighter">
@@ -784,7 +787,7 @@ export default function POSPage() {
             {quickProducts.map((p) => (
               <div
                 key={p.variantId}
-                className="relative bg-surface-container-lowest p-4 transition-all hover:bg-surface-container-low"
+                className="relative bg-surface-container-lowest p-4 transition-colors"
               >
                 <button
                   type="button"
@@ -898,6 +901,7 @@ export default function POSPage() {
                 : saleSession.openedAt.toLocaleTimeString("en-PH", {
                   hour: "2-digit",
                   minute: "2-digit",
+                  timeZone: "Asia/Manila",
                 })}
             </p>
           </div>
@@ -1013,7 +1017,7 @@ export default function POSPage() {
             <button
               disabled={cart.length === 0 || commitLoading}
               onClick={handleCommitSale}
-              className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-all shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-[transform,opacity] shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               <span className="material-symbols-outlined text-lg">
                 shopping_cart_checkout
@@ -1066,9 +1070,12 @@ export default function POSPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleOpenShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Open Shift</h2>
-            <input required placeholder="Employee ID" value={shiftForm.employee_id} onChange={(e) => setShiftForm({ ...shiftForm, employee_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <input required placeholder="Device name" value={shiftForm.device_name} onChange={(e) => setShiftForm({ ...shiftForm, device_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <input type="number" step="0.01" placeholder="Opening cash" value={shiftForm.opening_cash} onChange={(e) => setShiftForm({ ...shiftForm, opening_cash: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <label htmlFor="pos-shift-employee" className="sr-only">Employee ID</label>
+            <input id="pos-shift-employee" required placeholder="Employee ID" value={shiftForm.employee_id} onChange={(e) => setShiftForm({ ...shiftForm, employee_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <label htmlFor="pos-shift-device" className="sr-only">Device name</label>
+            <input id="pos-shift-device" required placeholder="Device name" value={shiftForm.device_name} onChange={(e) => setShiftForm({ ...shiftForm, device_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <label htmlFor="pos-shift-opening-cash" className="sr-only">Opening cash</label>
+            <input id="pos-shift-opening-cash" type="number" step="0.01" placeholder="Opening cash" value={shiftForm.opening_cash} onChange={(e) => setShiftForm({ ...shiftForm, opening_cash: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => setShowShiftOpen(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
               <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Open</button>
@@ -1082,7 +1089,8 @@ export default function POSPage() {
           <form onSubmit={handleCloseShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Close Shift</h2>
             <p className="text-sm text-on-surface-variant">Opening cash: PHP {activeShift?.opening_cash?.toLocaleString("en-PH")}</p>
-            <input required type="number" step="0.01" placeholder="Closing cash amount" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
+            <label htmlFor="pos-shift-closing-cash" className="sr-only">Closing cash amount</label>
+            <input id="pos-shift-closing-cash" required type="number" step="0.01" placeholder="Closing cash amount" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => setShowCloseShift(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
               <button type="submit" className="bg-slate-700 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Close Shift</button>
@@ -1095,17 +1103,20 @@ export default function POSPage() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleVoid} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Void / Override</h2>
-            <select disabled value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 disabled:bg-surface-container-low disabled:text-on-surface-variant">
+            <select aria-label="Void action" disabled value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 disabled:bg-surface-container-low disabled:text-on-surface-variant">
               <option value="void_item">Void Item</option>
             </select>
             <p className="text-xs text-on-surface-variant">
               This records a cart-line void. Use the Orders workflow for order-level refunds, voids, or discount overrides.
             </p>
-            <input required placeholder="Reason" value={voidForm.reason} onChange={(e) => setVoidForm({ ...voidForm, reason: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <label htmlFor="pos-void-reason" className="sr-only">Void reason</label>
+            <input id="pos-void-reason" required placeholder="Reason" value={voidForm.reason} onChange={(e) => setVoidForm({ ...voidForm, reason: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="border-t border-outline-variant/20 pt-4">
               <p className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-2">Manager Approval</p>
-              <input placeholder="Manager Employee ID" value={voidForm.approver_id} onChange={(e) => setVoidForm({ ...voidForm, approver_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 mb-2" />
-              <input type="password" placeholder="Manager PIN" value={voidForm.pin} onChange={(e) => setVoidForm({ ...voidForm, pin: e.target.value.replace(/\D/g, "") })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+              <label htmlFor="pos-manager-employee" className="sr-only">Manager employee ID</label>
+              <input id="pos-manager-employee" placeholder="Manager Employee ID" value={voidForm.approver_id} onChange={(e) => setVoidForm({ ...voidForm, approver_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 mb-2" />
+              <label htmlFor="pos-manager-pin" className="sr-only">Manager PIN</label>
+              <input id="pos-manager-pin" type="password" placeholder="Manager PIN" value={voidForm.pin} onChange={(e) => setVoidForm({ ...voidForm, pin: e.target.value.replace(/\D/g, "") })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             </div>
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => { setShowVoidModal(false); setVoidTarget(null); }} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>

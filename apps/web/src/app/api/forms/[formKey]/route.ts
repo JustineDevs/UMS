@@ -6,6 +6,8 @@ import {
 } from "@/lib/recaptcha-enterprise";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { readResponseJson } from "@/lib/read-response-json";
+import { cmsFormSubmissionResponseSchema } from "@/lib/admin-api-contracts";
 
 const MAX_PUBLIC_FORM_BODY_BYTES = 16 * 1024;
 
@@ -32,5 +34,10 @@ export async function POST(
       return Response.json({ error: "Verification failed" }, { status: 400 });
     }
   }
-  return handleCmsFormSubmissionRequest(req, formKey);
+  const response = await handleCmsFormSubmissionRequest(req, formKey);
+  if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) return response;
+  const payload = await readResponseJson(response, null, { maxBytes: 16 * 1024 });
+  const parsed = cmsFormSubmissionResponseSchema.safeParse(payload);
+  if (!parsed.success) return Response.json({ error: "Form submission returned an invalid response" }, { status: 502 });
+  return Response.json(parsed.data, { status: response.status, headers: { "Cache-Control": "no-store" } });
 }

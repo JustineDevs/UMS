@@ -44,6 +44,7 @@ export async function parseAdminJson<T>(
     return { ok: false, status: 400, error: "Invalid request" };
   }
   const parsed = schema.safeParse(value);
+  if (!parsed.success) console.warn("[admin-json] validation issues", parsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message })));
   return parsed.success
     ? { ok: true, data: parsed.data }
     : { ok: false, status: 400, error: "Invalid request" };

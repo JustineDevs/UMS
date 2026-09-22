@@ -49,8 +49,14 @@ export function PosSaleDetailsPanel({
           </label>
           {value.eInvoiceRequested ? (
             <div className="grid gap-3 sm:grid-cols-2">
-              <input type="email" value={value.eInvoiceCustomerEmail ?? ""} onChange={(e) => onChange({ ...value, eInvoiceCustomerEmail: e.target.value })} placeholder="Invoice email" className="rounded-lg border border-outline-variant/25 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10" />
-              <input value={value.eInvoiceCustomerTin ?? ""} onChange={(e) => onChange({ ...value, eInvoiceCustomerTin: e.target.value })} placeholder="Tax ID (optional)" className="rounded-lg border border-outline-variant/25 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10" />
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                Invoice email
+                <input type="email" value={value.eInvoiceCustomerEmail ?? ""} onChange={(e) => onChange({ ...value, eInvoiceCustomerEmail: e.target.value })} placeholder="Invoice email" className="mt-2 w-full rounded-lg border border-outline-variant/25 bg-white px-3 py-2.5 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10" />
+              </label>
+              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                Tax ID (optional)
+                <input value={value.eInvoiceCustomerTin ?? ""} onChange={(e) => onChange({ ...value, eInvoiceCustomerTin: e.target.value })} placeholder="Tax ID (optional)" className="mt-2 w-full rounded-lg border border-outline-variant/25 bg-white px-3 py-2.5 text-sm font-normal normal-case tracking-normal outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10" />
+              </label>
             </div>
           ) : null}
         </div>

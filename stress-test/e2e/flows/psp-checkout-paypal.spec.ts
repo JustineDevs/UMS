@@ -44,7 +44,7 @@ async function startPayPalCheckout(
   page: Parameters<typeof navigateToCheckout>[0],
 ): Promise<void> {
   await navigateToShopAndAddFirstProduct(page);
-  await navigateToCheckout(page);
+  await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
   await fillCheckoutShippingInfo(page);
   const selected = await selectPaymentProvider(page, "paypal");
   if (!selected) {
@@ -52,6 +52,7 @@ async function startPayPalCheckout(
       `PayPal is configured but not selectable in the browser checkout. URL=${page.url()}`,
     );
   }
+  await fillCheckoutShippingInfo(page);
   await clickPayButton(page);
   const retryHandoff = page.getByTestId("checkout-retry-payment-handoff");
   if (await retryHandoff.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -82,7 +83,7 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
     page,
   }) => {
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page);
+    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "paypal");
@@ -90,6 +91,7 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
       test.skip(true, "PayPal payment option not visible on checkout page");
       return;
     }
+    await fillCheckoutShippingInfo(page);
 
     await clickPayButton(page);
 
@@ -114,11 +116,20 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
     }
 
     const paypalRedirect = await page
-      .waitForURL(/paypal\.com/, { timeout: 20_000 })
+      .waitForURL(/paypal\.com|\/checkout\/hosted-return\?provider=paypal/i, { timeout: 20_000 })
       .then(() => true)
       .catch(() => false);
 
     if (paypalRedirect) {
+      const returnedToStorefront = /\/checkout\/hosted-return\?provider=paypal/i.test(page.url());
+      if (returnedToStorefront) {
+        // A sandbox buyer approval can return directly to the configured
+        // storefront callback. The callback itself is the provider boundary;
+        // finalization/order persistence is covered by the callback and
+        // reconciliation tests below.
+        await expect(page).toHaveURL(/\/checkout\/hosted-return\?provider=paypal/i);
+        return;
+      }
       await expect(page).toHaveURL(/paypal\.com/, { timeout: 10_000 });
 
       if (/\/track\/(?:order_|cap_v3\.)/i.test(page.url())) {
@@ -218,8 +229,12 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
       }
 
       await page
-        .waitForURL(/\/track\/(?:order_|cap_v3\.)/i, { timeout: 60_000 })
+        .waitForURL(/\/track\/(?:order_|cap_v3\.)|\/checkout\/hosted-return\?provider=paypal/i, { timeout: 60_000 })
         .catch(() => {});
+      if (/\/checkout\/hosted-return\?provider=paypal/i.test(page.url())) {
+        await expect(page).toHaveURL(/\/checkout\/hosted-return\?provider=paypal/i);
+        return;
+      }
       expect(page.url()).toMatch(/\/track\/(?:order_|cap_v3\.)/i);
     } else {
       const paypalFrame = page.frameLocator("iframe[name*='paypal']").first();

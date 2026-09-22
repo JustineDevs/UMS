@@ -112,7 +112,8 @@ export async function listDevices(
   let query = supabase
     .from("pos_devices")
     .select("*")
-    .order("name");
+    .order("name")
+    .limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

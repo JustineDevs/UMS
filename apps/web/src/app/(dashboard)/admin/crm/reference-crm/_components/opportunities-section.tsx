@@ -89,25 +89,30 @@ export function OpportunitiesSection({ opportunities: rawOpportunities }: { oppo
     if (!editing) return;
     setSaving(true);
     setError(null);
-    const form = new FormData(event.currentTarget);
-    const value = Number(form.get("value") ?? 0);
-    const response = await fetch("/api/admin/crm/operations", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
-      body: JSON.stringify({
-        kind: "deal",
-        id: editing.id,
-        stage: String(form.get("stage") ?? editing.stage).toLowerCase().replaceAll(" ", "_"),
-        value: Math.round(value * 100),
-      }),
-    });
-    if (!response.ok) {
+    try {
+      const form = new FormData(event.currentTarget);
+      const value = Number(form.get("value") ?? 0);
+      const response = await fetch("/api/admin/crm/operations", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({
+          kind: "deal",
+          id: editing.id,
+          stage: String(form.get("stage") ?? editing.stage).toLowerCase().replaceAll(" ", "_"),
+          value: Math.round(value * 100),
+        }),
+      });
+      if (!response.ok) {
+        setError("Unable to update opportunity.");
+      } else {
+        setEditing(null);
+        window.location.reload();
+      }
+    } catch {
       setError("Unable to update opportunity.");
-    } else {
-      setEditing(null);
-      window.location.reload();
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
   const searchQuery = table.getState().globalFilter ?? "";
   const stageFilter = (table.getColumn("stage")?.getFilterValue() as string | undefined) ?? "all";

@@ -34,7 +34,10 @@ type FinalizeResult =
 export type CodPlaceOrderRouteDeps = {
   applyRateLimit: (_req: Request) => Promise<RateLimitResult>;
   readCartIdFromCookie: () => Promise<string | null>;
-  getPaymentAttemptRow: (_correlationId: string) => Promise<PaymentAttemptRow>;
+  getPaymentAttemptRow: (
+    _correlationId: string,
+    _requestedCartId?: string | null,
+  ) => Promise<PaymentAttemptRow>;
   readCurrentQuoteFingerprint: (_cartId: string) => Promise<string | null>;
   incrementFinalizeAttempts: (_correlationId: string) => Promise<void>;
   claimFinalizeAttempt?: (_correlationId: string) => Promise<boolean>;
@@ -59,56 +62,64 @@ export async function handleCodPlaceOrderRequest(
     return rl.response;
   }
 
-  const cartId = await deps.readCartIdFromCookie();
+  const cookieCartId = await deps.readCartIdFromCookie();
 
   let correlationId = "";
   try {
-    const body = (await req.json()) as { correlationId?: string };
+    const body = (await req.json()) as {
+      correlationId?: string;
+      cartId?: string;
+    };
     if (typeof body.correlationId === "string" && body.correlationId.trim()) {
       correlationId = body.correlationId.trim();
     }
+    const requestedCartId =
+      typeof body.cartId === "string" && body.cartId.trim()
+        ? body.cartId.trim()
+        : null;
+    const cartId = cookieCartId ?? requestedCartId;
+
+    const row = correlationId
+      ? await deps.getPaymentAttemptRow(correlationId, cartId)
+      : null;
+    const currentQuoteFingerprint = cartId
+      ? await deps.readCurrentQuoteFingerprint(cartId)
+      : null;
+    const result = await codPlaceOrderRouteLogic({
+      correlationId,
+      cartId,
+      row,
+      currentQuoteFingerprint,
+      incrementFinalizeAttempts: deps.incrementFinalizeAttempts,
+      claimFinalizeAttempt: deps.claimFinalizeAttempt,
+      updatePaymentAttempt: deps.updatePaymentAttempt,
+      finalizeCheckout: (activeCartId, correlationId) =>
+        deps.finalizeCheckout(activeCartId, correlationId),
+      logEvent: deps.logEvent,
+      nowIso: deps.nowIso,
+    });
+
+    if (result.status === 200 && "redirectUrl" in result.body) {
+      const redirectUrl = secureTrackingRedirectUrl(
+        typeof result.body.redirectUrl === "string"
+          ? result.body.redirectUrl
+          : undefined,
+        typeof result.body.orderId === "string" ? result.body.orderId : undefined,
+        getPublicOriginFromRequest(req),
+      );
+      if (!redirectUrl) {
+        return NextResponse.json(
+          { error: "Tracking capability is not configured" },
+          { status: 503 },
+        );
+      }
+      return NextResponse.json(
+        { ...result.body, redirectUrl },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(result.body, { status: result.status });
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-
-  const row = correlationId
-    ? await deps.getPaymentAttemptRow(correlationId)
-    : null;
-  const currentQuoteFingerprint = cartId
-    ? await deps.readCurrentQuoteFingerprint(cartId)
-    : null;
-  const result = await codPlaceOrderRouteLogic({
-    correlationId,
-    cartId,
-    row,
-    currentQuoteFingerprint,
-    incrementFinalizeAttempts: deps.incrementFinalizeAttempts,
-    claimFinalizeAttempt: deps.claimFinalizeAttempt,
-    updatePaymentAttempt: deps.updatePaymentAttempt,
-    finalizeCheckout: (activeCartId, correlationId) =>
-      deps.finalizeCheckout(activeCartId, correlationId),
-    logEvent: deps.logEvent,
-    nowIso: deps.nowIso,
-  });
-
-  if (result.status === 200 && "redirectUrl" in result.body) {
-    const redirectUrl = secureTrackingRedirectUrl(
-      typeof result.body.redirectUrl === "string"
-        ? result.body.redirectUrl
-        : undefined,
-      typeof result.body.orderId === "string" ? result.body.orderId : undefined,
-      getPublicOriginFromRequest(req),
-    );
-    if (!redirectUrl) {
-      return NextResponse.json(
-        { error: "Tracking capability is not configured" },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json(
-      { ...result.body, redirectUrl },
-      { status: result.status },
-    );
-  }
-  return NextResponse.json(result.body, { status: result.status });
 }

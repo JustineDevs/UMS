@@ -6,6 +6,7 @@ import {
   formatAuditActionLabel,
   formatAuditResourceLabel,
 } from "@/lib/audit-display-format";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export type AuditEntry = {
   id: string;
@@ -37,10 +38,10 @@ export function AuditTimeline({
     if (resourcePrefix) params.set("resource_prefix", resourcePrefix);
     fetch(`/api/admin/audit-logs?${params.toString()}`)
       .then(async (r) => {
-        const body = (await r.json().catch(() => ({}))) as {
+        const body = await readResponseJson(r, {} as {
           error?: string;
           entries?: AuditEntry[];
-        };
+        });
         if (cancelled) return;
         if (!r.ok) {
           setError(
@@ -92,7 +93,7 @@ export function AuditTimeline({
                 </p>
               ) : null}
               <p className="text-[10px] text-muted-foreground/80">
-                By {formatAuditActorLabel(e)} · {new Date(e.created_at).toLocaleString()}
+                By {formatAuditActorLabel(e)} · {new Date(e.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
               </p>
             </li>
           ))}

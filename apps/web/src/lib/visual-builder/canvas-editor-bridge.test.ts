@@ -4,8 +4,8 @@ import { CanvasController, CmsApiClient, RichTextEditor, buildNodeTree, createEd
 
 test("canvas lifecycle loads, edits, exports, and clears the iframe document", () => {
   const listeners = new Map<string, () => void>(); const document = { head: { innerHTML: "" }, body: { innerHTML: "old" } };
-  const frame = { contentDocument: document, addEventListener: (type: "load" | "beforeunload" | "unload", listener: () => void) => listeners.set(type, listener) };
-  const canvas = new CanvasController(frame); let ready = false; canvas.bootstrap(() => { ready = true; }); listeners.get("load")?.(); assert.equal(ready, true); canvas.setHtml("<main>new</main>"); assert.match(canvas.getHtml(), /<body>.*new/s); listeners.get("unload")?.(); assert.equal(canvas.loaded, false);
+  const frame = { contentDocument: document, addEventListener: (type: "load" | "beforeunload" | "unload", listener: () => void) => listeners.set(type, listener), removeEventListener: (type: "load" | "beforeunload" | "unload", listener: () => void) => { if (listeners.get(type) === listener) listeners.delete(type); } };
+  const canvas = new CanvasController(frame); let ready = false; canvas.bootstrap(() => { ready = true; }); listeners.get("load")?.(); assert.equal(ready, true); canvas.setHtml("<main>new</main>"); assert.match(canvas.getHtml(), /<body>.*new/s); canvas.dispose(); assert.equal(canvas.loaded, false); assert.equal(listeners.size, 0);
 });
 
 test("tree, rich text, and editor save contracts preserve stable state", () => {

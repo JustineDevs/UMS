@@ -87,10 +87,6 @@ export function InventoryTableWithRefresh({
   }, [initialRows]);
 
   useEffect(() => {
-    setTotalCount(total);
-  }, [total]);
-
-  useEffect(() => {
     let cancelled = false;
     const fallbackMs = 4000;
     const timer = window.setTimeout(() => {
@@ -142,11 +138,14 @@ export function InventoryTableWithRefresh({
   useEffect(() => {
     if (mode !== "poll") return;
     let cancelled = false;
+    const controller = new AbortController();
     async function pull() {
       try {
         const res = await fetch(`/api/admin/inventory?${buildQuery(page, pageSize)}`, {
           credentials: "include",
+          signal: controller.signal,
         });
+        if (cancelled) return;
         if (!res.ok) {
           setError(`Update unsuccessful (${res.status})`);
           return;
@@ -171,13 +170,14 @@ export function InventoryTableWithRefresh({
           setError(null);
         }
       } catch {
-        if (!cancelled) setError("Refresh unavailable");
+        if (!cancelled && !controller.signal.aborted) setError("Refresh unavailable");
       }
     }
     const id = window.setInterval(pull, POLL_MS);
     void pull();
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearInterval(id);
     };
   }, [mode, page, pageSize]);
@@ -251,6 +251,7 @@ export function InventoryTableWithRefresh({
                           className="flex justify-end gap-1"
                           onSubmit={async (event) => {
                             event.preventDefault();
+                            if (savingId) return;
                             if (!row.productId) {
                               setError("This variant has no product reference");
                               return;
@@ -312,7 +313,10 @@ export function InventoryTableWithRefresh({
                             className="w-20 rounded border px-2 py-1 text-right"
                             value={adjustmentMode === "set" ? quantity : delta}
                             onChange={(event) => {
-                              const value = Number(event.target.value);
+                              const raw = event.target.value.trim();
+                              if (!raw) return;
+                              const value = Number(raw);
+                              if (!Number.isFinite(value)) return;
                               if (adjustmentMode === "set") setQuantity(value);
                               else setDelta(value);
                             }}

@@ -1,10 +1,11 @@
 /**
  * Shared utilities for storefront cart API routes.
  * Eliminates duplication of rate-limit wrappers, cart ID validation,
- * cookie management, JSON parsing, and Medusa SDK interactions.
+ * cookie management, JSON parsing, and Worker cart API interactions.
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { readResponseJson } from "./read-response-json";
 
 import { medusaCartIdSchema } from "@universal-music-store/validation";
 
@@ -75,7 +76,7 @@ function hashEmail(s: string): string {
 }
 
 /**
- * Reads the Medusa cart ID from the HttpOnly cookie.
+ * Reads the Worker cart ID from the HttpOnly cookie.
  * Returns null if no valid cart_ ID is present.
  */
 export async function readCartIdFromCookie(): Promise<string | null> {
@@ -91,23 +92,18 @@ export function isValidCartId(id: unknown): id is string {
   return medusaCartIdSchema.safeParse(id).success;
 }
 
-/** The Medusa SDK exposes upstream HTTP status on FetchError instances. */
-export function isMedusaNotFoundError(error: unknown): boolean {
-  return (
-    error !== null &&
-    typeof error === "object" &&
-    (error as { status?: unknown }).status === 404
-  );
-}
-
 /**
- * Writes the Medusa cart cookie with consistent options.
+ * Writes the Worker cart cookie with consistent options.
  */
 export async function writeCartCookie(cartId: string): Promise<void> {
   const jar = await cookies();
   jar.set(MEDUSA_CART_COOKIE, cartId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Local production builds are served over HTTP during browser audits. Keep
+    // the HttpOnly cart cookie usable there while retaining Secure in every
+    // real production deployment.
+    secure:
+      process.env.NODE_ENV === "production" && process.env.UVS_E2E_LOCAL !== "1",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
@@ -186,7 +182,7 @@ export async function retrieveCartLines(
 }
 
 /**
- * Retrieves a Medusa cart with specific fields (for slim queries).
+ * Retrieves a Worker cart. The legacy fields parameter is ignored by the Worker contract.
  */
 export async function retrieveCartRaw(
   cartId: string,
@@ -220,6 +216,6 @@ async function retrieveWorkerCart(cartId: string): Promise<WorkerCart | null> {
   );
   if (response.status === 404) throw new Error("cart_not_found");
   if (!response.ok) throw new Error(`worker_cart_${response.status}`);
-  const payload = (await response.json()) as { cart?: WorkerCart };
+  const payload = await readResponseJson(response, {} as { cart?: WorkerCart });
   return payload.cart ?? null;
 }

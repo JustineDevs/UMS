@@ -9,7 +9,6 @@ export type WorkerDatabaseRole = "app" | "medusa";
 export interface WorkerDatabaseEnv {
   APP_HYPERDRIVE?: HyperdriveBinding;
   MEDUSA_HYPERDRIVE?: HyperdriveBinding;
-  HYPERDRIVE?: HyperdriveBinding;
   APP_DB_URL?: string;
   MEDUSA_DB_URL?: string;
 }
@@ -42,9 +41,7 @@ function connectionString(
       ? env.APP_HYPERDRIVE?.connectionString ??
         env.APP_DB_URL
       : env.MEDUSA_HYPERDRIVE?.connectionString ??
-        env.MEDUSA_DB_URL ??
-        // HYPERDRIVE is retained only as a local/test compatibility alias.
-        env.HYPERDRIVE?.connectionString;
+        env.MEDUSA_DB_URL;
   if (!value) {
     throw new Error(`${role}_database_not_configured`);
   }
@@ -59,13 +56,10 @@ export function createWorkerDatabaseClient(
 ): WorkerDatabaseClient {
   const role: WorkerDatabaseRole =
     typeof roleOrFactory === "function" ? "medusa" : roleOrFactory;
-  const legacyFactoryCall = typeof roleOrFactory === "function";
   const createClient =
     typeof roleOrFactory === "function" ? roleOrFactory : maybeFactory;
   const client = createClient({
-    connectionString: legacyFactoryCall
-      ? env.HYPERDRIVE?.connectionString ?? connectionString(env, role)
-      : connectionString(env, role),
+    connectionString: connectionString(env, role),
   });
   let connected = false;
 

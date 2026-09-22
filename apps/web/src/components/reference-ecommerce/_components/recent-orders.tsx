@@ -15,7 +15,7 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ArrowUpRight, Download, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, ArrowUpRight, MoreHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,6 @@ import { type OrderFilter, type OrderRow, orderFilters } from "./recent-orders-t
 
 export function RecentOrders({ orders }: { orders?: OrderRow[] }) {
   const recentOrders = orders ?? [];
-  const [exportError, setExportError] = React.useState<string | null>(null);
   const [rowSelection, setRowSelection] = React.useState({});
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -77,31 +76,6 @@ export function RecentOrders({ orders }: { orders?: OrderRow[] }) {
   const visibleOrderCount = table.getRowModel().rows.length;
   const currentPage = table.getState().pagination.pageIndex + 1;
   const pageCount = table.getPageCount();
-  async function downloadOrders() {
-    setExportError(null);
-    const selected = table.getSelectedRowModel().rows.map((row) => row.original.backendId).filter(Boolean);
-    const ids = selected.length ? selected : table.getRowModel().rows.map((row) => row.original.backendId).filter(Boolean);
-    if (!ids.length) {
-      setExportError("No exportable Medusa orders on this page.");
-      return;
-    }
-    const response = await fetch("/api/admin/orders/export-jnt-csv", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ orderIds: ids }),
-    });
-    if (!response.ok) {
-      setExportError("Order export failed. Open Orders to retry with the full list.");
-      return;
-    }
-    const blob = await response.blob();
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = "orders-jnt.csv";
-    anchor.click();
-    URL.revokeObjectURL(href);
-  }
   const orderCountDescription =
     selectedOrderCount > 0 ? formatSelectedOrderCount(selectedOrderCount) : formatOrderCount(activeFilter, orderCount);
   const pageNumbers = React.useMemo(() => {
@@ -127,9 +101,6 @@ export function RecentOrders({ orders }: { orders?: OrderRow[] }) {
             <Link href="/admin/orders">
               <ArrowUpRight />
             </Link>
-          </Button>
-          <Button aria-label="Download visible orders" size="icon-sm" variant="outline" onClick={downloadOrders}>
-            <Download />
           </Button>
           <Button aria-label="Open order management" asChild size="icon-sm" variant="outline">
             <Link href="/admin/orders">
@@ -169,8 +140,6 @@ export function RecentOrders({ orders }: { orders?: OrderRow[] }) {
             <ArrowUpDown />
           </Button>
         </div>
-        {exportError ? <p className="px-4 text-destructive text-sm">{exportError}</p> : null}
-
         <div className="overflow-hidden">
           <Table className="**:data-[slot='table-cell']:px-4.5 **:data-[slot='table-head']:px-4.5">
             <TableHeader className="border-t **:data-[slot='table-head']:h-11 **:data-[slot='table-head']:font-normal **:data-[slot='table-head']:text-foreground **:data-[slot='table-head']:text-sm">

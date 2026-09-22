@@ -96,7 +96,17 @@ export async function listPublishedProducts(
   const filters: string[] = [];
   if (query) {
     values.push(`%${query}%`);
-    filters.push(`AND (p.title ILIKE $${values.length} OR p.handle ILIKE $${values.length})`);
+    filters.push(`AND (
+      p.title ILIKE $${values.length}
+      OR p.handle ILIKE $${values.length}
+      OR EXISTS (
+        SELECT 1
+        FROM public.product_variant search_variant
+        WHERE search_variant.product_id = p.id
+          AND search_variant.deleted_at IS NULL
+          AND (search_variant.sku ILIKE $${values.length} OR search_variant.barcode ILIKE $${values.length})
+      )
+    )`);
   }
   if (productId) {
     values.push(productId);
@@ -299,9 +309,10 @@ export async function handleRegionsRequest(
     });
   const result = await database.query<RegionRow>(
     `SELECT id, name, currency_code
-       FROM public.region
+      FROM public.region
       WHERE deleted_at IS NULL
-      ORDER BY name, id`,
+      ORDER BY name, id
+      LIMIT 100`,
   );
   return cacheableJson({ regions: result.rows });
 }
@@ -368,7 +379,8 @@ export async function handleCollectionRequest(
          ON v.product_id = p.id AND v.deleted_at IS NULL
       WHERE pc.handle = $1 AND pc.deleted_at IS NULL
       GROUP BY pc.id, pc.title, pc.handle, p.id
-      ORDER BY p.updated_at DESC NULLS LAST, p.id`,
+      ORDER BY p.updated_at DESC NULLS LAST, p.id
+      LIMIT 500`,
     [normalized],
   );
   const first = result.rows[0];

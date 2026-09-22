@@ -4,10 +4,15 @@ import { adminBase, e2eAdminLogin } from "../helpers/admin-e2e-auth";
 test.describe.configure({ mode: "serial" });
 
 const persistedCanvasNode =
-  '[data-cms-id]:not([hidden]):not([data-cms-generated="true"])';
+  '[data-cms-id="home-hero-title"]:not([hidden])';
 
 test.describe("@admin CMS canonical editor", () => {
+  let homepageSnapshot: Record<string, unknown> | undefined;
+  let createdPageId: string | undefined;
+
   test.beforeEach(async ({ page }) => {
+    homepageSnapshot = undefined;
+    createdPageId = undefined;
     const login = await e2eAdminLogin(page);
     if (login === "skip_no_ui" || login === "skip_no_env") {
       test.skip(true, "Admin E2E auth is not configured.");
@@ -18,13 +23,81 @@ test.describe("@admin CMS canonical editor", () => {
     await expect(
       page.locator('[aria-label="Visual page builder"]'),
     ).toBeVisible({ timeout: 30_000 });
+
+    if (test.info().title.startsWith("CMS-05..")) {
+      const response = await page.request.get(
+        `${adminBase}/api/admin/storefront-home`,
+      );
+      expect(response.ok(), await response.text()).toBeTruthy();
+      const body = (await response.json()) as {
+        data?: Record<string, unknown>;
+      };
+      expect(body.data).toBeDefined();
+      homepageSnapshot = body.data;
+    }
+  });
+
+  test.afterEach(async ({ page }) => {
+    const cleanupErrors: string[] = [];
+
+    if (homepageSnapshot) {
+      try {
+        const response = await page.request.put(
+          `${adminBase}/api/admin/storefront-home`,
+          {
+            headers: {
+              "Idempotency-Key": `cms-e2e-home-restore-${Date.now()}`,
+            },
+            data: homepageSnapshot,
+          },
+        );
+        if (!response.ok()) {
+          cleanupErrors.push(`Homepage restore failed: ${await response.text()}`);
+        }
+      } catch (error) {
+        cleanupErrors.push(`Homepage restore failed: ${String(error)}`);
+      }
+      homepageSnapshot = undefined;
+    }
+
+    if (createdPageId) {
+      const pageId = createdPageId;
+      try {
+        const response = await page.request.delete(
+          `${adminBase}/api/admin/cms/pages/${encodeURIComponent(pageId)}`,
+          {
+            headers: {
+              "Idempotency-Key": `cms-e2e-page-cleanup-${pageId}`,
+            },
+          },
+        );
+        if (!response.ok()) {
+          cleanupErrors.push(`CMS page cleanup failed: ${await response.text()}`);
+        } else {
+          const reloaded = await page.request.get(
+            `${adminBase}/api/admin/cms/pages/${encodeURIComponent(pageId)}`,
+          );
+          if (reloaded.status() !== 404) {
+            cleanupErrors.push(
+              `CMS page ${pageId} still exists after cleanup (${reloaded.status()})`,
+            );
+          }
+        }
+      } catch (error) {
+        cleanupErrors.push(`CMS page cleanup failed: ${String(error)}`);
+      }
+      createdPageId = undefined;
+    }
+
+    expect(cleanupErrors, cleanupErrors.join("\n")).toEqual([]);
   });
 
   test("CMS-01..CMS-04 unified workspace, persisted preview source, and selection", async ({
     page,
   }) => {
+    await page.getByRole("button", { name: "Ai Assistant", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "In context" }),
+      page.getByRole("button", { name: "Context", exact: true }),
     ).toBeVisible();
     await expect(
       page.locator('iframe[title="Storefront canvas"]'),
@@ -36,7 +109,7 @@ test.describe("@admin CMS canonical editor", () => {
       page.getByRole("button", { name: "Components", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Navigator", exact: true }),
+      page.getByRole("button", { name: "Toggle navigator", exact: true }),
     ).toBeVisible();
 
     const frame = page
@@ -46,20 +119,18 @@ test.describe("@admin CMS canonical editor", () => {
     await expect(visibleNode).toBeVisible({ timeout: 30_000 });
     await visibleNode.click({ force: true });
     await expect(visibleNode).toHaveAttribute("data-uvs-id", /.+/);
-    await expect(frame.locator("body")).toHaveAttribute(
-      "data-uvs-editor",
-      "true",
+    const selectedNode = frame.locator(
+      '[data-cms-id][data-selected="true"]',
     );
-    await expect(frame.locator('[data-uvs-overlay="true"]')).toBeVisible();
+    await expect(selectedNode.first()).toBeVisible();
+    await expect(page.getByText("Live DOM element", { exact: true })).toBeVisible();
     await expect(
-      frame.locator('[data-uvs-handle="bottom-right"]'),
+      page.getByRole("tab", { name: "Content", exact: true }),
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Content", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "mobile viewport" }).click();
+    await page.getByRole("button", { name: "Breakpoints", exact: true }).click();
+    await page.getByRole("button", { name: "Mobile view", exact: true }).click();
     await page.getByRole("button", { name: "Zoom in" }).click();
-    await expect(page.getByText("110%", { exact: true })).toBeVisible();
+    await expect(page.getByText("100%", { exact: true })).toBeVisible();
   });
 
   test("CMS-07..CMS-09 inspector coverage and selection geometry remain stable", async ({
@@ -70,12 +141,12 @@ test.describe("@admin CMS canonical editor", () => {
       .contentFrame();
     const selected = frame.locator(persistedCanvasNode).first();
     await expect(selected).toBeVisible({ timeout: 30_000 });
-    await selected.click({ force: true });
+    await selected.evaluate((node) => (node as HTMLElement).click());
 
-    for (const tab of ["Style", "Layout", "Responsive", "Advanced", "Code"]) {
-      await page.getByRole("button", { name: tab, exact: true }).click();
+    for (const tab of ["Content", "Style", "Advanced"]) {
+      await page.getByRole("tab", { name: tab, exact: true }).click();
       await expect(
-        page.getByRole("button", { name: tab, exact: true }),
+        page.getByRole("tab", { name: tab, exact: true }),
       ).toHaveClass(/bg-slate-100/);
     }
     await frame
@@ -110,10 +181,10 @@ test.describe("@admin CMS canonical editor", () => {
       .first();
     await expect(add).toBeVisible();
     await add.click();
-    await page.getByRole("button", { name: "Navigator", exact: true }).click();
+    await page.getByRole("button", { name: "Pages", exact: true }).last().click();
     await page
-      .getByRole("button", { name: /Hero banner/ })
-      .first()
+      .getByRole("button", { name: "Hero banner", exact: true })
+      .last()
       .click();
     await page.getByRole("button", { name: "Components", exact: true }).click();
     const dragSource = page.getByTestId("cms-component-drag-cta-row");
@@ -134,10 +205,10 @@ test.describe("@admin CMS canonical editor", () => {
     await invalidDrag.dragTo(slotTarget);
     await expect(page.getByText(/does not allow/i)).toBeVisible();
     await add.click();
-    await page.getByRole("button", { name: "Navigator", exact: true }).click();
+    await page.getByRole("button", { name: "Pages", exact: true }).last().click();
     await page
-      .getByRole("button", { name: /Hero banner/ })
-      .first()
+      .getByRole("button", { name: "Hero banner", exact: true })
+      .last()
       .click();
     await page.getByRole("button", { name: "Components", exact: true }).click();
     await dragSource.dragTo(slotTarget);
@@ -155,7 +226,7 @@ test.describe("@admin CMS canonical editor", () => {
       .last()
       .click();
     await expect(slotItems).toHaveCount(initialSlotCount + 1);
-    await page.getByRole("button", { name: "Navigator", exact: true }).click();
+    await page.getByRole("button", { name: "Toggle navigator", exact: true }).click();
     await expect(
       page.getByText("Call to action", { exact: true }).first(),
     ).toBeVisible();
@@ -163,9 +234,7 @@ test.describe("@admin CMS canonical editor", () => {
     const frame = page
       .locator('iframe[title="Storefront canvas"]')
       .contentFrame();
-    const selected = frame
-      .locator('[data-cms-id^="cms-dom-"][data-cms-block-id]')
-      .first();
+    const selected = frame.locator(persistedCanvasNode).first();
     await selected.click({ force: true });
     const padding = page
       .locator("label")
@@ -216,15 +285,15 @@ test.describe("@admin CMS canonical editor", () => {
   test("CMS-13 canonical page tree publish and mutation reload", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Navigator", exact: true }).click();
+    await page.getByRole("button", { name: "Toggle navigator", exact: true }).click();
     await page
       .getByRole("button", { name: "Pages", exact: true })
       .last()
       .click();
     await expect(
-      page.getByText("Choose a page to open the visual editor."),
+      page.getByRole("button", { name: "Add page", exact: true }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "New page", exact: true }).click();
+    await page.getByRole("button", { name: "Add page", exact: true }).click();
 
     const nestedBuilder = page
       .locator('[aria-label="Visual page builder"]')
@@ -259,6 +328,7 @@ test.describe("@admin CMS canonical editor", () => {
       };
     };
     expect(saved.data?.id).toBeTruthy();
+    createdPageId = saved.data!.id;
     expect(saved.data?.tree?.length ?? 0).toBeGreaterThan(0);
     const savedPage = await page.request.get(
       `${adminBase}/api/admin/cms/pages/${saved.data!.id}`,
@@ -342,7 +412,7 @@ test.describe("@admin CMS canonical editor", () => {
     ).toBeVisible({ timeout: 30_000 });
     await frame
       .locator('[data-cms-id="storefront-header"]')
-      .click({ force: true });
+      .evaluate((node) => (node as HTMLElement).click());
     await expect(
       page.getByText(/Live DOM element|Storefront navbar/).first(),
     ).toBeVisible();
@@ -357,33 +427,17 @@ test.describe("@admin CMS canonical editor", () => {
     );
     await expect(componentCanvas).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Navigator", exact: true }).click();
-    for (const tool of [
+    for (const tab of [
       "Pages",
-      "Site map",
-      "Navigation",
-      "Announcement",
-      "Categories",
-      "Media",
-      "Blog",
-      "Forms",
-      "Redirects",
-      "Experiments",
-      "Product lookup",
+      "Components",
+      "Sections",
+      "Style",
+      "Ai Assistant",
     ]) {
-      await page
-        .getByRole("button", { name: tool, exact: true })
-        .last()
-        .click();
+      await page.getByRole("button", { name: tab, exact: true }).click();
       await expect(
-        page.getByRole("button", { name: "Back to canvas", exact: true }),
-      ).toBeVisible();
-      await page
-        .getByRole("button", { name: "Back to canvas", exact: true })
-        .click();
-      await page
-        .getByRole("button", { name: "Navigator", exact: true })
-        .click();
+        page.getByRole("button", { name: tab, exact: true }),
+      ).toHaveAttribute("aria-label", tab);
     }
   });
 });

@@ -74,6 +74,8 @@ export type CheckoutPhase =
   | "error";
 const FINALIZE_POLL_MS = 2_000;
 const FINALIZE_POLL_MAX = 20;
+const STRIPE_CANCEL_MESSAGE =
+  "You left the card checkout before paying. Your bag is unchanged. Choose a payment method and continue when you are ready.";
 const localAuthBypass =
   process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
   process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
@@ -93,12 +95,16 @@ export function useCheckoutClient({
 }) {
   const { data: session, status: authStatus } = useSession();
   const payInFlightRef = useRef(false);
+  const payAttemptRef = useRef(0);
   const userSelectedPaymentMethodRef = useRef(false);
   const medusaPreviewSeqRef = useRef(0);
   const medusaPreviewAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    initialReviewMessage?.trim() ||
+    (initialStripeCheckoutCancel ? STRIPE_CANCEL_MESSAGE : null),
+  );
   const [loading, setLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
   const [paymentMethod, setPaymentMethod] =
@@ -336,6 +342,7 @@ export function useCheckoutClient({
 
   useEffect(() => {
     if (!session?.user?.email) return;
+    let cancelled = false;
     fetch("/api/checkout/loyalty-balance")
       .then((r) => {
         if (!r.ok) {
@@ -344,9 +351,10 @@ export function useCheckoutClient({
         return r.json();
       })
       .then((d: { balance?: number }) =>
-        setLoyaltyBalance(Number(d.balance ?? 0)),
+        { if (!cancelled) setLoyaltyBalance(Number(d.balance ?? 0)); },
       )
       .catch((reason: unknown) => {
+        if (cancelled) return;
         setLoyaltyBalance(0);
         setError(
           reason instanceof Error
@@ -354,21 +362,8 @@ export function useCheckoutClient({
             : "Loyalty balance is temporarily unavailable.",
         );
       });
+    return () => { cancelled = true; };
   }, [session?.user?.email]);
-
-  useEffect(() => {
-    if (initialStripeCheckoutCancel) {
-      setError(
-        "You left the card checkout before paying. Your bag is unchanged. Choose a payment method and continue when you are ready.",
-      );
-    }
-  }, [initialStripeCheckoutCancel]);
-
-  useEffect(() => {
-    if (initialReviewMessage?.trim()) {
-      setError(initialReviewMessage.trim());
-    }
-  }, [initialReviewMessage]);
 
   const refresh = useCallback(() => {
     setLines(readCart());
@@ -585,6 +580,7 @@ export function useCheckoutClient({
       return;
     }
     payInFlightRef.current = true;
+    const payAttemptId = ++payAttemptRef.current;
     medusaPreviewAbortRef.current?.abort();
     medusaPreviewAbortRef.current = null;
     setLoading(true);
@@ -593,6 +589,12 @@ export function useCheckoutClient({
 
     const cartTotal = lines.reduce((s, l) => s + l.price * l.quantity, 0);
     const telemetryTotal = medusaPricePreview?.total ?? cartTotal;
+    const finishCurrentPayAttempt = () => {
+      if (payAttemptRef.current !== payAttemptId) return false;
+      setLoading(false);
+      payInFlightRef.current = false;
+      return true;
+    };
     // Telemetry must not block payment initiation if a browser analytics SDK stalls.
     queueMicrotask(() => {
       try {
@@ -637,13 +639,13 @@ export function useCheckoutClient({
             Array.isArray(codJson.missingFields) && codJson.missingFields.length
               ? ` Add: ${codJson.missingFields.join(", ")}.`
               : "";
+          if (payAttemptRef.current !== payAttemptId) return;
           setError(
             (codJson.error ??
               "Cash on delivery needs a complete delivery profile.") + hint,
           );
           setCheckoutPhase("error");
-          setLoading(false);
-          payInFlightRef.current = false;
+          finishCurrentPayAttempt();
           return;
         }
         const codJson = (await codRes.json()) as {
@@ -658,12 +660,12 @@ export function useCheckoutClient({
           !codJson.shipping_address ||
           !codJson.billing_address
         ) {
+          if (payAttemptRef.current !== payAttemptId) return;
           setError(
             "Could not load delivery details for cash on delivery. Update your account profile or pick another payment option.",
           );
           setCheckoutPhase("error");
-          setLoading(false);
-          payInFlightRef.current = false;
+          finishCurrentPayAttempt();
           return;
         }
         codCartPayload = codJson as CodCartPayload;
@@ -791,7 +793,7 @@ export function useCheckoutClient({
         !codOrderPlaced &&
         (typeof trackingPageUrl !== "string" || !checkoutCorrelationId)
       ) {
-        const bindRes = await fetch("/api/cart/medusa-bind", {
+        const bindRes = await fetch("/api/cart/bind", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ cartId }),

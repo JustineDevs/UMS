@@ -9,6 +9,7 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { cmsPreviewResponseSchema } from "@/lib/admin-api-contracts";
 
 export async function GET(req: NextRequest) {
   const ip = getRequestIp(req);
@@ -39,9 +40,15 @@ export async function GET(req: NextRequest) {
   if (kind === "blog") {
     const row = await getCmsBlogPostBySlugPreview(sb, slug, locale, token, organizationId);
     if (!row) return Response.json({ error: "Not found" }, { status: 404 });
-    return Response.json({ kind: "blog", data: row });
+    const payload = { kind: "blog" as const, data: row };
+    const parsed = cmsPreviewResponseSchema.safeParse(payload);
+    if (!parsed.success) return Response.json({ error: "Preview returned an invalid response" }, { status: 502 });
+    return Response.json(parsed.data);
   }
   const row = await getCmsPageBySlugPreview(sb, slug, locale, token, organizationId);
   if (!row) return Response.json({ error: "Not found" }, { status: 404 });
-  return Response.json({ kind: "page", data: row });
+  const payload = { kind: "page" as const, data: row };
+  const parsed = cmsPreviewResponseSchema.safeParse(payload);
+  if (!parsed.success) return Response.json({ error: "Preview returned an invalid response" }, { status: 502 });
+  return Response.json(parsed.data);
 }

@@ -148,6 +148,7 @@ function buildCsp() {
   ].filter(Boolean);
 
   const extraFrameSrc = [
+    ...storefrontFrameSources(),
     "https://js.stripe.com",
     "https://hooks.stripe.com",
     "https://www.paypal.com",
@@ -196,6 +197,27 @@ function buildCsp() {
   ];
 
   return directives.join("; ");
+}
+
+function storefrontFrameSources() {
+  return [
+    process.env.NEXT_PUBLIC_STOREFRONT_URL,
+    process.env.PUBLIC_STOREFRONT_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+  ]
+    .map((value) => value?.trim())
+    .filter((value) => Boolean(value))
+    .flatMap((value) => {
+      try {
+        const url = new URL(value);
+        return url.protocol === "http:" || url.protocol === "https:"
+          ? [url.origin]
+          : [];
+      } catch {
+        return [];
+      }
+    })
+    .filter((origin, index, origins) => origins.indexOf(origin) === index);
 }
 
 function publicWorkerConnectSources() {
@@ -286,9 +308,7 @@ const nextConfig = {
     "@universal-music-store/validation",
     "@universal-music-store/user-preferences",
     "@universal-music-store/platform-data",
-    "@universal-music-store/omnichannel-policy",
     "@universal-music-store/resend-mail",
-    "@medusajs/js-sdk",
     "botid",
   ],
   experimental: {
@@ -310,6 +330,16 @@ const nextConfig = {
       "@radix-ui/react-label",
       "@radix-ui/react-separator",
     ],
+  },
+  turbopack: {
+    // The `@/*` alias is already declared in tsconfig; declaring the section
+    // here keeps Next from warning that webpack-only configuration is active
+    // on the Turbopack dev path. Package-specific webpack aliases remain
+    // production-only because Turbopack treats absolute pnpm store targets as
+    // relative server imports in Next 15.
+    resolveAlias: {
+      "@": path.resolve(__dirname, "src"),
+    },
   },
   images: {
     formats: ["image/avif", "image/webp"],

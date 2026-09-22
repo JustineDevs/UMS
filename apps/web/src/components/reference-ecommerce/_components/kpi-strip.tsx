@@ -26,7 +26,7 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
   const hasSalesOverview = salesOverviewData.some((row) => row.revenue > 0 || row.orders > 0);
   const maxRevenue = Math.max(1, ...salesOverviewData.map((row) => row.revenue));
   const maxOrders = Math.max(1, ...salesOverviewData.map((row) => row.orders));
-  const metricNote = data?.commerceUnavailable ? "Commerce unavailable" : "From live Medusa data";
+  const metricNote = data?.commerceUnavailable ? "Commerce unavailable" : "From live commerce data";
 
   useEffect(() => setMounted(true), []);
 

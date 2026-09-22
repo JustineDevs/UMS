@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createSupabaseClient, getCmsBlogPostBySlugPreview } from "@universal-music-store/platform-data";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
+import { serializeJsonLd } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function BlogPreviewPage({ searchParams }: Props) {
       {jsonLd != null ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
       <header>

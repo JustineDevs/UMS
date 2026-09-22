@@ -115,25 +115,22 @@ export function buildCatalogPreviewModel(
     }
   }
 
-  const imageMedia: CatalogPreviewMedia[] = input.imageUrls
-    .map((url) => normalizeCatalogAssetUrl(url))
-    .filter(Boolean)
-    .map((url, index) => ({
-      kind: "image" as const,
-      url,
-      label: `Photo ${index + 1}`,
-    }));
+  let imageIndex = 0;
+  const imageMedia: CatalogPreviewMedia[] = input.imageUrls.flatMap((rawUrl) => {
+    const url = normalizeCatalogAssetUrl(rawUrl);
+    return url ? [{ kind: "image" as const, url, label: `Photo ${++imageIndex}` }] : [];
+  });
 
-  const galleryMedia: CatalogPreviewMedia[] = input.videoUrls
-    .map((url) => normalizeCatalogAssetUrl(url))
-    .filter(Boolean)
-    .map((url, index) => {
+  let galleryIndex = 0;
+  const galleryMedia: CatalogPreviewMedia[] = input.videoUrls.flatMap((rawUrl) => {
+      const url = normalizeCatalogAssetUrl(rawUrl);
+      if (!url) return [];
       const kind = inferCatalogGalleryMediaKind(url);
-      return {
+      return [{
         kind,
         url,
-        label: `Gallery item ${index + 1}`,
-      };
+        label: `Gallery item ${++galleryIndex}`,
+      }];
     });
 
   const media: CatalogPreviewMedia[] = [...imageMedia, ...galleryMedia];

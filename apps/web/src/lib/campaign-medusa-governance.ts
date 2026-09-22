@@ -1,35 +1,32 @@
-import { medusaAdminFetch } from "@/lib/medusa-admin-http";
+import { fetchWorkerPromotionCodesForAdmin } from "@/lib/worker-admin-bridge";
 
-export type MedusaGovernanceResult = {
+export type PromotionGovernanceResult = {
   ok: boolean;
   promotionCount: number;
   warnings: string[];
 };
 
 /**
- * Confirms Medusa promotion catalog is reachable before campaigns send discount messaging.
- * Medusa remains the single owner of cart discounts; campaigns must not imply unpublished codes.
+ * Confirms the commerce promotion catalog is reachable before campaigns send
+ * discount messaging. The Worker owns this read so admin never falls back to
+ * a separate Medusa HTTP runtime.
  */
-export async function validateCampaignAgainstMedusaPromotions(params: {
+export async function validateCampaignAgainstWorkerPromotions(params: {
   bodyTemplate: string;
   subject: string;
-}): Promise<MedusaGovernanceResult> {
+}): Promise<PromotionGovernanceResult> {
   const warnings: string[] = [];
   try {
-    const res = await medusaAdminFetch("/admin/promotions?limit=500");
-    if (!res.ok) {
-      warnings.push(`medusa_promotions_http_${res.status}`);
+    const codesList = await fetchWorkerPromotionCodesForAdmin();
+    if (!codesList) {
+      warnings.push("worker_promotions_unavailable");
       return { ok: false, promotionCount: 0, warnings };
     }
-    const json = (await res.json()) as {
-      promotions?: Array<{ code?: string | null; status?: string }>;
-      data?: Array<{ code?: string | null; status?: string }>;
-    };
-    const promos = json.promotions ?? json.data ?? [];
     const codes = new Set(
-      promos
-        .map((p) => String(p.code ?? "").trim().toUpperCase())
-        .filter(Boolean),
+      codesList.flatMap((code) => {
+        const normalized = code.trim().toUpperCase();
+        return normalized ? [normalized] : [];
+      }),
     );
     const haystack = `${params.subject}\n${params.bodyTemplate}`.toUpperCase();
     /** Likely promo codes: letters+digits cluster (e.g. SAVE20), not plain words. */
@@ -38,18 +35,18 @@ export async function validateCampaignAgainstMedusaPromotions(params: {
     const mentioned: string[] = [];
     while ((m = tokenRe.exec(haystack)) !== null) {
       const tok = m[1].replace(/-/g, "");
-      if (tok.length > 3 && codes.size > 0 && !codes.has(tok)) {
+      if (tok.length > 3 && !codes.has(tok)) {
         mentioned.push(tok);
       }
     }
     if (mentioned.length > 0) {
       warnings.push(
-        `campaign_mentions_tokens_not_in_medusa_promotions:${mentioned.slice(0, 8).join(",")}`,
+        `campaign_mentions_tokens_not_in_commerce_promotions:${mentioned.slice(0, 8).join(",")}`,
       );
     }
     return {
       ok: mentioned.length === 0,
-      promotionCount: promos.length,
+      promotionCount: codes.size,
       warnings,
     };
   } catch (e) {

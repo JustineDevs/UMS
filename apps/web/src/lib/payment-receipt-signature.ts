@@ -3,7 +3,8 @@ export function matchesReceiptSignature(mimeType: string, bytes: Uint8Array): bo
     return bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === "%PDF-";
   }
   if (mimeType === "image/png") {
-    return bytes.length >= 8 && [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((value, index) => bytes[index] === value);
+    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return bytes.length === signature.length && signature.every((value, index) => bytes[index] === value);
   }
   if (mimeType === "image/webp") {
     return bytes.length >= 12 && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";

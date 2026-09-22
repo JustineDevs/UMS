@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { EMPTY_CATALOG_METADATA_FIELDS } from "./catalog-product-metadata";
-import type { CatalogProductDetail } from "./medusa-catalog-service";
+import type { CatalogProductDetail } from "./catalog-product-service";
 import {
   buildStorefrontCommerceInvalidationPayload,
   classifyCatalogMutation,

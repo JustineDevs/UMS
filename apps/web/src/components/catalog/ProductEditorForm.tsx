@@ -3,7 +3,7 @@
 import type {
   CatalogProductDetail,
   CatalogVariantStockRow,
-} from "@/lib/medusa-catalog-service";
+} from "@/lib/catalog-product-service";
 import { useAdminToast } from "@/components/admin-console";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -187,6 +187,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
   const [categoryIds, setCategoryIds] = useState<string[]>(
     p?.categoryIds ?? [],
   );
+  const selectedCategoryIds = useMemo(() => new Set(categoryIds), [categoryIds]);
   const [stockQuantity, setStockQuantity] = useState(() => {
     if (!isEdit || !p) return "0";
     if (p.variantStockRows.length > 1) return "0";
@@ -545,7 +546,10 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
       const label = p.categoryLabels[index];
       if (id && label) byId.set(id, label);
     }
-    return categoryIds.map((id) => byId.get(id)?.trim() ?? "").filter(Boolean);
+    return categoryIds.flatMap((id) => {
+      const label = byId.get(id)?.trim() ?? "";
+      return label ? [label] : [];
+    });
   }, [categories, categoryIds, isEdit, p]);
 
   function toggleCategory(id: string) {
@@ -1110,10 +1114,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-brand" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Brand
                   </label>
                   <input
+                    id="catalog-product-brand"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={brand}
                     onChange={(e) => setBrand(e.target.value)}
@@ -1122,13 +1127,14 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-trust-content" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Trust and value content (JSON)
                   </label>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                     Publish only verified warranty, condition, setup, authenticity, delivery, and included-item facts.
                   </p>
                   <textarea
+                    id="catalog-product-trust-content"
                     className="mt-2 w-full min-h-[160px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
                     value={trustContentJson}
                     onChange={(e) => setTrustContentJson(e.target.value)}
@@ -1137,10 +1143,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-seo-description" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Search listing description
                   </label>
                   <textarea
+                    id="catalog-product-seo-description"
                     className="mt-2 w-full min-h-[72px] rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={seoDescription}
                     onChange={(e) => setSeoDescription(e.target.value)}
@@ -1149,10 +1156,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-weight" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Weight (kg)
                   </label>
                   <input
+                    id="catalog-product-weight"
                     type="text"
                     inputMode="decimal"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
@@ -1162,10 +1170,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-dimensions" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Dimensions label
                   </label>
                   <input
+                    id="catalog-product-dimensions"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={dimensionsLabel}
                     onChange={(e) => setDimensionsLabel(e.target.value)}
@@ -1174,10 +1183,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-material" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Material
                   </label>
                   <input
+                    id="catalog-product-material"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={material}
                     onChange={(e) => setMaterial(e.target.value)}
@@ -1186,7 +1196,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-lifestyle-image" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Lifestyle image
                   </label>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
@@ -1195,6 +1205,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                     a small embedded image.
                   </p>
                   <input
+                    id="catalog-product-lifestyle-image"
                     type="text"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={lifestyleImageUrl}
@@ -1204,9 +1215,9 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Related products
-                  </label>
+                  </span>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                     Search the catalog and add handles, or edit the list below.
                     Handles must match product web slugs shown on the shop.
@@ -1220,10 +1231,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   </div>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-hotspots" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Image hotspots (advanced)
                   </label>
                   <textarea
+                    id="catalog-product-hotspots"
                     className="mt-2 w-full min-h-[120px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
                     value={hotspotsJson}
                     onChange={(e) => setHotspotsJson(e.target.value)}
@@ -1232,13 +1244,14 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-guitar-specs" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Guitar specifications (JSON)
                   </label>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                     Enter only verified manufacturer or catalog facts. Unknown fields are rejected.
                   </p>
                   <textarea
+                    id="catalog-product-guitar-specs"
                     className="mt-2 w-full min-h-[180px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
                     value={guitarSpecsJson}
                     onChange={(e) => setGuitarSpecsJson(e.target.value)}
@@ -1247,13 +1260,14 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-audio-demos" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Audio demos (JSON)
                   </label>
                   <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                     Array of {"{ url, title, description?, durationSeconds? }"} entries. URLs must be approved media URLs.
                   </p>
                   <textarea
+                    id="catalog-product-audio-demos"
                     className="mt-2 w-full min-h-[160px] rounded-lg border border-outline-variant/30 px-3 py-2 font-mono text-xs"
                     value={audioDemosJson}
                     onChange={(e) => setAudioDemosJson(e.target.value)}
@@ -1296,7 +1310,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                       <label className="flex cursor-pointer items-center gap-2 text-sm">
                         <input
                           type="checkbox"
-                          checked={categoryIds.includes(c.id)}
+                          checked={selectedCategoryIds.has(c.id)}
                           onChange={() => toggleCategory(c.id)}
                         />
                         <span>{c.name}</span>
@@ -1376,10 +1390,11 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                 className={`grid grid-cols-1 gap-6 ${showPerVariantStock ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}
               >
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-status" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Status
                   </label>
                   <select
+                    id="catalog-product-status"
                     className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
                     value={status}
                     onChange={(e) =>
@@ -1393,7 +1408,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                  <label htmlFor="catalog-product-price" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Price (
                     {isEdit && p
                       ? p.currencyCode.toUpperCase()
@@ -1401,6 +1416,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                     )
                   </label>
                   <input
+                    id="catalog-product-price"
                     type="number"
                     step="0.01"
                     min={0}
@@ -1674,9 +1690,9 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+              <span className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                 Product media
-              </label>
+              </span>
               <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
                 Main photos and gallery in one list. The first main photo is the
                 shop preview. Use Send to gallery to move clips or extra stills

@@ -4,7 +4,6 @@ import { type Page, type APIRequestContext, test, expect } from "@playwright/tes
 import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
-const medusaBaseURL = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
 function isTrustedProviderHost(value: string, hosts: readonly string[]): boolean {
   try {
@@ -100,36 +99,43 @@ export function skipUnlessPspConfigured(provider: PaymentProvider): void {
 /**
  * When E2E_EXPECT_ALL_PSPS=1, every PSP Medusa reports as configured must have sandbox E2E_* env set.
  */
-export async function assertExpectAllPspsMatchMedusa(
+export async function assertExpectAllPspsMatchWorker(
   request: APIRequestContext,
 ): Promise<void> {
   if (!isE2eExpectAllPsps()) return;
-  const res = await request.get(`${medusaBaseURL}/admin/payment-health`, {
+  const res = await request.get(`${baseURL}/api/checkout/available-payment-methods`, {
     failOnStatusCode: false,
   });
   if (!res.ok()) {
     if (isE2eStrictPayments()) {
       throw new Error(
-        `E2E_EXPECT_ALL_PSPS: GET /admin/payment-health failed (${res.status()}).`,
+        `E2E_EXPECT_ALL_PSPS: Worker-backed payment-methods route failed (${res.status()}).`,
       );
     }
     return;
   }
-  const body = (await res.json()) as {
-    providers?: Record<string, { configured: boolean }>;
-  };
+  const body = (await res.json()) as { keys?: unknown[] };
+  const enabled = new Set((body.keys ?? []).filter((key): key is string => typeof key === "string").map((key) => key.toLowerCase()));
   for (const entry of getPspTestConfig()) {
     if (entry.provider === "cod") continue;
-    const inMedusa = body.providers?.[entry.provider]?.configured === true;
-    if (inMedusa && !entry.configured) {
+    if (enabled.has(entry.provider) && !entry.configured) {
       throw new Error(
-        `E2E_EXPECT_ALL_PSPS: Medusa has "${entry.provider}" enabled but matching E2E sandbox credentials are missing.`,
+        `E2E_EXPECT_ALL_PSPS: Worker exposes "${entry.provider}" but matching E2E sandbox credentials are missing.`,
       );
     }
   }
 }
 
 export type AddCatalogProductResult = { slug: string; productTitle?: string };
+
+async function dismissCookieConsent(page: Page): Promise<void> {
+  const cookieDialog = page.getByRole("dialog", { name: /cookie consent/i });
+  if (await cookieDialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    await cookieDialog
+      .getByRole("button", { name: /essential only/i })
+      .click();
+  }
+}
 
 /**
  * Walks /shop [data-product-slug] cards, opens PDPs, skips sign-in / disabled / OOS-looking pages,
@@ -166,6 +172,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       waitUntil: "domcontentloaded",
     });
     if (!res || res.status() >= 400) return null;
+    await dismissCookieConsent(page);
     const btn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
     await expect(btn).toBeVisible({ timeout: 20_000 });
     const label = ((await btn.innerText().catch(() => "")) as string).trim();
@@ -232,7 +239,12 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       await addButton.click();
       await page.waitForTimeout(800);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
-        await page.reload({ waitUntil: "domcontentloaded" });
+        // A dev/preview server can leave the document in its loading shell
+        // while the route compiler restarts. Commit the navigation promptly,
+        // then let the next loop iteration prove that the PDP is interactive.
+        await page
+          .reload({ waitUntil: "commit", timeout: 30_000 })
+          .catch(() => undefined);
       }
     }
     await expect(page).toHaveURL(/\/cart(?:\?|$)/, { timeout: 15_000 });
@@ -262,7 +274,7 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
 export async function getStressRunProviders(
   request: APIRequestContext,
 ): Promise<PaymentProvider[]> {
-  await assertExpectAllPspsMatchMedusa(request);
+  await assertExpectAllPspsMatchWorker(request);
   const out: PaymentProvider[] = [];
   for (const entry of getPspTestConfig()) {
     if (entry.provider === "cod") {
@@ -281,26 +293,24 @@ export async function getStressRunProviders(
   return out;
 }
 
-/** Optional: confirm Medusa Admin API sees the order (needs MEDUSA_SECRET_API_KEY or E2E_MEDUSA_ADMIN_SECRET). */
-async function verifyMedusaOrderExists(
+/** Optionally verify the order through the Worker admin contract with a scoped E2E JWT. */
+async function verifyWorkerOrderExists(
   request: APIRequestContext,
   orderId: string,
 ): Promise<boolean> {
-  if (process.env.E2E_VERIFY_MEDUSA_ORDER !== "1") return false;
-  const secret =
-    process.env.E2E_MEDUSA_ADMIN_SECRET?.trim() ??
-    process.env.MEDUSA_SECRET_API_KEY?.trim();
-  if (!secret || !orderId.startsWith("order_")) return false;
-  const auth = `Basic ${Buffer.from(`${secret}:`, "utf8").toString("base64")}`;
+  if (process.env.E2E_VERIFY_WORKER_ORDER !== "1") return false;
+  const token = process.env.E2E_WORKER_ADMIN_TOKEN?.trim();
+  if (!token || !orderId.startsWith("order_")) return false;
+  const workerBase = process.env.PLAYWRIGHT_WORKER_URL ?? process.env.API_URL ?? "http://127.0.0.1:8787";
   const res = await request.get(
-    `${medusaBaseURL}/admin/orders/${encodeURIComponent(orderId)}`,
-    { headers: { Authorization: auth }, failOnStatusCode: false },
+    `${workerBase.replace(/\/$/, "")}/api/admin/orders/${encodeURIComponent(orderId)}`,
+    { headers: { Authorization: `Bearer ${token}` }, failOnStatusCode: false },
   );
   return res.ok();
 }
 
 /**
- * After sandbox payment, assert confirmation UI and optionally Medusa order row.
+ * After sandbox payment, assert confirmation UI and optionally the Worker order row.
  */
 export async function verifyPostPaymentSuccess(
   page: Page,
@@ -311,14 +321,14 @@ export async function verifyPostPaymentSuccess(
 
   if (provider === "stripe" || provider === "cod") {
     await expectOrderConfirmation(page);
-    await expect(page).toHaveURL(/\/(track\/(?:order_|cap_)|checkout\/stripe-return)/i, {
+    await expect(page).toHaveURL(/\/(track\/(?:order_|cap_)|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/i, {
       timeout: strict ? 60_000 : 30_000,
     });
     const m = page.url().match(/(order_[a-z0-9]+)/i);
     if (m?.[1]) {
-      const ok = await verifyMedusaOrderExists(request, m[1]);
-      if (strict && process.env.E2E_VERIFY_MEDUSA_ORDER === "1") {
-        expect(ok, `Medusa admin should return order ${m[1]}`).toBe(true);
+      const ok = await verifyWorkerOrderExists(request, m[1]);
+      if (strict && process.env.E2E_VERIFY_WORKER_ORDER === "1") {
+        expect(ok, `Worker admin should return order ${m[1]}`).toBe(true);
       }
     }
     return;
@@ -356,28 +366,26 @@ export async function verifyPostPaymentSuccess(
 }
 
 /**
- * Verifies Medusa has the payment provider registered via the admin health endpoint.
+ * Verifies the Worker exposes the payment method through the storefront capability contract.
  */
-async function skipUnlessPspRegisteredInMedusa(
+async function skipUnlessPspAvailableInWorker(
   request: APIRequestContext,
   provider: PaymentProvider,
 ): Promise<void> {
   try {
-    const res = await request.get(`${medusaBaseURL}/admin/payment-health`, {
+    const res = await request.get(`${baseURL}/api/checkout/available-payment-methods`, {
       failOnStatusCode: false,
     });
     if (!res.ok()) {
-      test.skip(true, `Medusa payment-health endpoint not available (${res.status()})`);
+      test.skip(true, `Worker payment-method capability route unavailable (${res.status()})`);
       return;
     }
-    const body = (await res.json()) as {
-      providers?: Record<string, { configured: boolean }>;
-    };
-    if (!body.providers?.[provider]?.configured) {
-      test.skip(true, `${provider} not configured in Medusa`);
+    const body = (await res.json()) as { keys?: unknown[] };
+    if (!body.keys?.some((key) => typeof key === "string" && key.toLowerCase() === provider)) {
+      test.skip(true, `${provider} is not exposed by the Worker-backed checkout`);
     }
   } catch {
-    test.skip(true, "Medusa not reachable for payment-health check");
+    test.skip(true, "Worker payment-method capability route is unreachable");
   }
 }
 
@@ -387,6 +395,17 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
   });
   if (preferred) return;
 
+  const catalogCardCount = await page.locator("[data-product-slug]").count();
+  if (catalogCardCount === 0) {
+    if (process.env.CI_STRICT_E2E === "1" || process.env.CI === "true") {
+      throw new Error(
+        "No published catalog products are available for the checkout journey.",
+      );
+    }
+    test.skip(true, "No published catalog products are available for the checkout journey.");
+    return;
+  }
+
   await page.goto(`${baseURL}/shop`);
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
 
@@ -395,6 +414,7 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
   await productLink.click();
 
   await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  await dismissCookieConsent(page);
 
   const addToCartBtn = page.getByRole("button", { name: /add to (cart|bag)/i });
   if (await addToCartBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -404,23 +424,24 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
   }
 }
 
-export async function navigateToCheckout(page: Page): Promise<void> {
+export async function navigateToCheckout(
+  page: Page,
+  options?: { guest?: boolean },
+): Promise<void> {
   // Card providers are intentionally available to guests; enter that explicit
   // mode so provider smoke tests do not mistake the auth gate for a PSP gap.
-  await page.goto(`${baseURL}/checkout?guest=1`, { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL(/guest=1/);
+  const guest = options?.guest ?? true;
+  await page.goto(`${baseURL}/checkout${guest ? "?guest=1" : ""}`, {
+    waitUntil: "domcontentloaded",
+  });
+  if (guest) await expect(page).toHaveURL(/guest=1/);
   await expect(page.getByRole("heading", { name: /checkout/i })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByText("Preparing checkout…")).toHaveCount(0, {
     timeout: 45_000,
   });
-  const cookieDialog = page.getByRole("dialog", { name: /cookie consent/i });
-  if (await cookieDialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await cookieDialog
-      .getByRole("button", { name: /essential only/i })
-      .evaluate((element) => (element as HTMLButtonElement).click());
-  }
+  await dismissCookieConsent(page);
 }
 
 export async function fillCheckoutShippingInfo(
@@ -446,7 +467,12 @@ export async function fillCheckoutShippingInfo(
     ...info,
   };
 
-  const emailInput = page.getByLabel(/email/i).first();
+  // Scope to the checkout field. The page also renders a newsletter email
+  // input in the footer, and a broad `/email/i` locator can silently fill
+  // that unrelated control instead of the value used for payment handoff.
+  const emailInput = page
+    .getByRole("textbox", { name: /email for your receipt/i })
+    .first();
   if (await emailInput.isEditable({ timeout: 3_000 }).catch(() => false)) {
     await emailInput.fill(defaults.email);
   }
@@ -577,6 +603,7 @@ export async function clickContinueToStripeHostedCheckout(page: Page): Promise<v
 
 /** Accepts either direct navigation or the optional intermediate handoff UI. */
 export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
+  if (/\/checkout\/hosted-return\?provider=stripe/i.test(page.url())) return;
   if (isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
   const hostedContinue = page.getByTestId("checkout-retry-payment-handoff");
   const winner = await Promise.race([
@@ -675,7 +702,7 @@ async function submitStripeHostedCheckoutAndWaitForReturn(page: Page): Promise<v
     .first();
   await expect(pay).toBeVisible({ timeout: 30_000 });
   await pay.click();
-  await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
+  await page.waitForURL(/\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/, { timeout: 120_000 });
 }
 
 /**
@@ -709,7 +736,7 @@ export async function payWithStripeSandboxCard(
         .first()
         .fill("123");
       await page.getByRole("button", { name: /complete payment/i }).click();
-      await page.waitForURL(/\/(track\/[^/]+|checkout\/stripe-return)/, { timeout: 120_000 });
+      await page.waitForURL(/\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/, { timeout: 120_000 });
       return;
     } catch {
       throw new Error(
@@ -776,7 +803,7 @@ export async function verifyAdminOrderVisibility(
   orderId: string,
 ): Promise<{ apiVisible: boolean; uiChecked: boolean }> {
   const result = { apiVisible: false, uiChecked: false };
-  if (process.env.E2E_VERIFY_ADMIN_ORDER !== "1") return result;
-  result.apiVisible = await verifyMedusaOrderExists(request, orderId);
+  if (process.env.E2E_VERIFY_WORKER_ORDER !== "1") return result;
+  result.apiVisible = await verifyWorkerOrderExists(request, orderId);
   return result;
 }

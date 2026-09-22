@@ -38,7 +38,8 @@ export async function listReasonRegistry(
     .select("*")
     .order("kind")
     .order("sort_order")
-    .order("label");
+    .order("label")
+    .limit(500);
 
   if (opts?.kind) {
     q = q.eq("kind", opts.kind);

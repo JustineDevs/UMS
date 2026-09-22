@@ -42,7 +42,7 @@ export const DELIVERY_LOGISTICS_SUPPORTED_APPS: readonly DeliveryLogisticsSuppor
     label: "Pancake POS",
     category: "fulfillment",
     primary_objects: ["shipping_order", "tracking_record"],
-    description: "Shipment creation, label capture, and tracking sync for orders forwarded by Medusa.",
+    description: "Shipment creation, label capture, and tracking sync through the Worker-owned logistics ledger.",
   },
   {
     provider_config_key: "lbc",
@@ -79,8 +79,8 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         feature: "Multi-channel ingestion",
         status: "covered",
         evidence: [
-          "apps/web/src/app/api/checkout/complete-medusa-cart/route.ts",
-          "apps/web/src/app/api/medusa/shipments/route.ts",
+          "apps/web/src/app/api/checkout/complete/route.ts",
+          "apps/web/src/app/api/admin/delivery-logistics/shipments/route.ts",
           "apps/web/src/app/api/admin/tasks/today/route.ts",
         ],
         notes: "Checkout, fulfillment, and admin task flows already create and surface order rows from multiple entry points.",
@@ -124,7 +124,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Dynamic route optimization",
         status: "partial",
-        evidence: ["Medusa shipments", "courier registry"],
+        evidence: ["workers/backend/src/delivery-admin.ts", "courier registry"],
         notes: "The configured OSRM adapter supplies road routes; capacity/time-window optimization still requires a routing worker such as OR-Tools.",
       },
       {
@@ -189,7 +189,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
         status: "partial",
         evidence: [
           "workers/backend/src/delivery-admin.ts",
-          "apps/web/src/lib/medusa-order-bridge.ts",
+          "workers/backend/src/delivery-admin.ts",
         ],
         notes: "Carrier statuses map into internal shipment states, but there is no full event-sourced delivery state machine.",
       },
@@ -259,7 +259,7 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Dynamic delivery pricing engine",
         status: "partial",
-        evidence: ["checkout shipping estimates", "Medusa shipping methods"],
+        evidence: ["checkout shipping estimates", "Worker shipping-method contract"],
         notes: "Delivery pricing is not computed from weather, surge, or remote-zone matrices in this repo.",
       },
       {

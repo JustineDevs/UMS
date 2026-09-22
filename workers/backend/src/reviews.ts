@@ -175,11 +175,19 @@ export async function handleReviewCreateRequest(
   const verified = await commerceDatabase.query<{ id: string }>(
     `SELECT o.id
        FROM public."order" o
-       JOIN public.order_line_item oli ON oli.order_id = o.id AND oli.deleted_at IS NULL
+       JOIN public.order_item oi ON oi.order_id = o.id AND oi.deleted_at IS NULL
+       JOIN public.order_line_item oli ON oli.id = oi.item_id AND oli.deleted_at IS NULL
       WHERE o.deleted_at IS NULL
         AND (o.customer_id = $1 OR lower(o.email) = $2)
         AND (lower(o.status) IN ('completed', 'archived')
-          OR lower(o.payment_status) IN ('captured', 'partially_refunded'))
+          OR EXISTS (
+            SELECT 1
+              FROM public.order_payment_collection opc
+              JOIN public.payment_collection pc ON pc.id = opc.payment_collection_id
+             WHERE opc.order_id = o.id
+               AND pc.deleted_at IS NULL
+               AND pc.status IN ('captured', 'partially_refunded', 'completed')
+          ))
         AND oli.product_id = $3
       ORDER BY o.created_at DESC LIMIT 1`,
     [customerId, email, productId],

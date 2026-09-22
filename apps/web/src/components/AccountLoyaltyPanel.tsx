@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type LoyaltyResponse = {
   account: {
@@ -24,7 +25,8 @@ export function AccountLoyaltyPanel() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/account/loyalty", { credentials: "same-origin", cache: "no-store" })
+    const controller = new AbortController();
+    void fetch("/api/account/loyalty", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("loyalty_unavailable");
         return (await response.json()) as LoyaltyResponse;
@@ -35,11 +37,12 @@ export function AccountLoyaltyPanel() {
           setState("ready");
         }
       })
-      .catch(() => {
-        if (active) setState("error");
+      .catch((error) => {
+        if (active && !(error instanceof DOMException && error.name === "AbortError")) setState("error");
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
@@ -59,8 +62,8 @@ export function AccountLoyaltyPanel() {
         <div className="rounded-xl bg-surface-container-low p-4"><dt className="text-xs text-on-surface-variant">Tier</dt><dd className="mt-1 font-headline text-2xl font-bold capitalize text-primary">{data.account.tier}</dd></div>
       </dl>
       <div>
-        <div className="flex items-end justify-between gap-4 border-b border-outline-variant/15 pb-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Wallet activity</p><h3 className="mt-1 text-lg font-bold text-primary">Recent points history</h3></div><a href="/help#loyalty" className="text-xs font-semibold text-primary hover:underline">How points work ↗</a></div>
-        {data.transactions.length === 0 ? <p className="py-5 text-sm text-on-surface-variant">No points activity yet.</p> : <ul className="divide-y divide-outline-variant/15">{data.transactions.map((transaction) => <li key={transaction.id} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-medium text-primary">{transaction.reason}</p><p className="mt-1 text-xs text-on-surface-variant">{new Date(transaction.created_at).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" })}{transaction.order_id ? ` · Order ${transaction.order_id}` : ""}</p></div><span className={`text-sm font-bold tabular-nums ${transaction.points_delta >= 0 ? "text-success" : "text-error"}`}>{transaction.points_delta >= 0 ? "+" : ""}{transaction.points_delta}</span></li>)}</ul>}
+        <div className="flex items-end justify-between gap-4 border-b border-outline-variant/15 pb-3"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Wallet activity</p><h3 className="mt-1 text-lg font-bold text-primary">Recent points history</h3></div><Link href="/help#loyalty" className="text-xs font-semibold text-primary hover:underline">How points work ↗</Link></div>
+        {data.transactions.length === 0 ? <p className="py-5 text-sm text-on-surface-variant">No points activity yet.</p> : <ul className="divide-y divide-outline-variant/15">{data.transactions.map((transaction) => <li key={transaction.id} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-medium text-primary">{transaction.reason}</p><p className="mt-1 text-xs text-on-surface-variant">{new Date(transaction.created_at).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Manila" })}{transaction.order_id ? ` · Order ${transaction.order_id}` : ""}</p></div><span className={`text-sm font-bold tabular-nums ${transaction.points_delta >= 0 ? "text-success" : "text-error"}`}>{transaction.points_delta >= 0 ? "+" : ""}{transaction.points_delta}</span></li>)}</ul>}
       </div>
     </div>
   );

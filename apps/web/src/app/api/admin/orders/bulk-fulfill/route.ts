@@ -1,179 +1,36 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
-import { medusaAdminFetch } from "@/lib/medusa-admin-http";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { parseBoundedJson } from "@/lib/bounded-request-body";
-
-const MAX_CONCURRENCY = 3;
-
-type BulkFulfillBody = {
-  orderIds: string[];
-  trackingNumber?: string;
-  carrierId?: string;
-  notifyCustomer?: boolean;
-};
-
-type FulfillResult = {
-  orderId: string;
-  ok: boolean;
-  error?: string;
-};
-
-async function fulfillOrder(
-  orderId: string,
-  opts: { trackingNumber?: string; carrierId?: string; notifyCustomer?: boolean },
-): Promise<FulfillResult> {
-  try {
-    const orderRes = await medusaAdminFetch(`/admin/orders/${encodeURIComponent(orderId)}`, {
-      method: "GET",
-    });
-    if (!orderRes.ok) {
-      return { orderId, ok: false, error: `Order fetch failed: ${orderRes.status}` };
-    }
-    const orderJson = (await orderRes.json()) as { order?: Record<string, unknown> };
-    const order = orderJson.order ?? {};
-
-    if (order.fulfillment_status === "fulfilled" || order.fulfillment_status === "shipped") {
-      return { orderId, ok: true, error: "Already fulfilled" };
-    }
-
-    const items = Array.isArray(order.items) ? order.items as Array<Record<string, unknown>> : [];
-    const fulfillItems = items
-      .filter((i) => Number(i.quantity ?? 0) > Number(i.fulfilled_quantity ?? 0))
-      .map((i) => ({
-        id: String(i.id),
-        quantity: Number(i.quantity ?? 1) - Number(i.fulfilled_quantity ?? 0),
-      }));
-
-    if (fulfillItems.length === 0) {
-      return { orderId, ok: true, error: "No items to fulfill" };
-    }
-
-    const fulfillBody: Record<string, unknown> = {
-      items: fulfillItems,
-      no_notification: !opts.notifyCustomer,
-    };
-
-    const fulfillRes = await medusaAdminFetch(
-      `/admin/orders/${encodeURIComponent(orderId)}/fulfillments`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fulfillBody),
-      },
-    );
-
-    if (!fulfillRes.ok) {
-      const errText = await fulfillRes.text().catch(() => fulfillRes.status.toString());
-      return { orderId, ok: false, error: `Fulfill failed: ${errText}` };
-    }
-
-    const fulfillJson = (await fulfillRes.json()) as {
-      order?: { fulfillments?: Array<{ id: string }> };
-    };
-
-    if (opts.trackingNumber) {
-      const fulfillmentId = fulfillJson.order?.fulfillments?.[0]?.id;
-      if (fulfillmentId) {
-        await medusaAdminFetch(
-          `/admin/orders/${encodeURIComponent(orderId)}/fulfillments/${encodeURIComponent(fulfillmentId)}/shipments`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tracking_numbers: [opts.trackingNumber],
-            }),
-          },
-        ).catch(() => null);
-      }
-    }
-
-    return { orderId, ok: true };
-  } catch (err) {
-    return {
-      orderId,
-      ok: false,
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { parseAdminJson } from "@/lib/admin-api-security";
+import { adminBulkFulfillmentResponseSchema, adminBulkFulfillmentSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
+  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
+  if (!staffSessionAllows(session, "orders:fulfill")) return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!base) return correlatedError(cid, 503, "Commerce Worker is unavailable", "SERVICE_UNAVAILABLE");
+  const parsed = await parseAdminJson(req, adminBulkFulfillmentSchema, 64 * 1024);
+  if (!parsed.ok) return correlatedError(cid, parsed.status, parsed.error, "VALIDATION_ERROR");
+  const key = req.headers.get("Idempotency-Key")?.trim();
+  if (!key) return correlatedError(cid, 400, "Idempotency-Key is required", "BAD_REQUEST");
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token?.trim();
+  if (!token) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
+  const response = await fetch(`${base}/api/admin/orders/bulk-fulfill`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Idempotency-Key": key, "X-Request-ID": cid }, body: JSON.stringify(parsed.data), cache: "no-store" });
+  const payload = await readResponseJson<unknown>(response, null);
+  if (response.ok) {
+    const validated = adminBulkFulfillmentResponseSchema.safeParse(payload);
+    if (!validated.success) return correlatedError(cid, 502, "Invalid Worker response", "SERVICE_UNAVAILABLE");
+    return correlatedJson(cid, validated.data, { status: response.status });
   }
-  if (!staffSessionAllows(session, "orders:fulfill")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
-
-  const parsedBody = await parseBoundedJson(req, 64 * 1024);
-  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "BAD_REQUEST");
-  if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
-    return correlatedError(cid, 400, "Invalid JSON", "VALIDATION_ERROR");
-  }
-  const body = parsedBody.value as BulkFulfillBody;
-
-  const { orderIds, trackingNumber, carrierId, notifyCustomer = true } = body;
-
-  if (!Array.isArray(orderIds) || orderIds.length === 0) {
-    return correlatedError(cid, 400, "orderIds must be a non-empty array", "VALIDATION_ERROR");
-  }
-  if (orderIds.length > 100) {
-    return correlatedError(cid, 400, "Maximum 100 orders per bulk request", "VALIDATION_ERROR");
-  }
-
-  const results: FulfillResult[] = [];
-
-  for (let i = 0; i < orderIds.length; i += MAX_CONCURRENCY) {
-    const chunk = orderIds.slice(i, i + MAX_CONCURRENCY);
-    const chunkResults = await Promise.all(
-      chunk.map((id) =>
-        fulfillOrder(id, { trackingNumber, carrierId, notifyCustomer }),
-      ),
-    );
-    results.push(...chunkResults);
-  }
-
-  const succeeded = results.filter((r) => r.ok && !r.error?.includes("Already")).map((r) => r.orderId);
-  const failed = results.filter((r) => !r.ok);
-  const skipped = results.filter((r) => r.ok && r.error);
-
-  const sup = adminSupabaseOr503(cid);
-  if (!("response" in sup)) {
-    const staffEmail = session.user.email ?? "unknown";
-    await sup.client
-      .from("audit_log")
-      .insert({
-        actor_email: staffEmail,
-        action: "bulk_fulfill",
-        resource_type: "order",
-        resource_ids: orderIds,
-        metadata: {
-          succeeded: succeeded.length,
-          failed: failed.length,
-          skipped: skipped.length,
-          trackingNumber: trackingNumber ?? null,
-        },
-      })
-      .then(
-        () => null,
-        () => null,
-      );
-  }
-
-  return correlatedJson(cid, {
-    total: orderIds.length,
-    succeeded: succeeded.length,
-    failed: failed.length,
-    skipped: skipped.length,
-    results,
-  });
+  return correlatedJson(cid, payload && typeof payload === "object" ? payload : { error: "Commerce Worker request failed" }, { status: response.status });
 }
 
-export const POST = withAdminMutationIdempotency("/admin/orders/bulk-fulfill:POST", post);
+export const POST = post;

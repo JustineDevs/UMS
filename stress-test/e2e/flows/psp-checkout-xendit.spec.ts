@@ -33,7 +33,7 @@ async function startXenditCheckout(
     maxCandidates: 20,
     shopPath: "/shop?sort=price_asc",
   });
-  await navigateToCheckout(page);
+  await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
   await fillCheckoutShippingInfo(page);
   const selected = await selectPaymentProvider(page, "xendit");
   if (!selected) {
@@ -41,6 +41,7 @@ async function startXenditCheckout(
       `Xendit is configured but not selectable in the browser checkout. URL=${page.url()}`,
     );
   }
+  await fillCheckoutShippingInfo(page);
   await clickPayButton(page);
 }
 
@@ -55,7 +56,7 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
       maxCandidates: 20,
       shopPath: "/shop?sort=price_asc",
     });
-    await navigateToCheckout(page);
+    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "xendit");
@@ -64,6 +65,7 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
         `Xendit is configured and visible in Medusa but not selectable in the browser checkout. URL=${page.url()}`,
       );
     }
+    await fillCheckoutShippingInfo(page);
 
     await clickPayButton(page);
 

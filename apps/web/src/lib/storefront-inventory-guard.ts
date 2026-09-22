@@ -1,4 +1,5 @@
 import type { CheckoutLine } from "@/lib/checkout-worker";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export type StorefrontStockResult =
   | { ok: true }
@@ -8,7 +9,7 @@ export type StorefrontStockResult =
       code: "INSUFFICIENT_STOCK" | "INVENTORY_CHECK_FAILED";
     };
 
-export function inventoryLookupFailure(status: number): StorefrontStockResult {
+function inventoryLookupFailure(status: number): StorefrontStockResult {
   return {
     ok: false,
     message:
@@ -42,9 +43,9 @@ export async function assertStorefrontLinesStock(
         { headers: { Accept: "application/json" }, cache: "no-store" },
       );
       if (!response.ok) return inventoryLookupFailure(response.status);
-      const payload = (await response.json()) as {
+      const payload = await readResponseJson(response, {} as {
         availability?: { manageInventory?: unknown; availableQuantity?: unknown };
-      };
+      });
       const availability = payload.availability;
       if (!availability) return inventoryLookupFailure(502);
       if (availability.manageInventory === false) continue;

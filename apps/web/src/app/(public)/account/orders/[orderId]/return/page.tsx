@@ -35,8 +35,7 @@ export default async function OrderReturnPage({
 }: {
   params: Promise<{ orderId: string }>;
 }) {
-  const { orderId } = await params;
-  const session = await getStorefrontSession();
+  const [{ orderId }, session] = await Promise.all([params, getStorefrontSession()]);
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!userEmail) {
     redirect(
@@ -56,8 +55,8 @@ export default async function OrderReturnPage({
     notFound();
   }
 
-  const lines: ReturnLine[] = (order.items ?? [])
-    .map((it) => ({
+  const lines: ReturnLine[] = (order.items ?? []).flatMap((it) => {
+    const line = {
       id: String(it.id ?? ""),
       title: String(it.title ?? "Item"),
       quantity:
@@ -69,8 +68,9 @@ export default async function OrderReturnPage({
         Number.isFinite(it.returned_quantity)
           ? Math.max(0, Math.floor(it.returned_quantity))
           : 0,
-    }))
-    .filter((l) => l.id.length > 0);
+    };
+    return line.id.length > 0 ? [line] : [];
+  });
 
   return (
     <main className="storefront-page-shell max-w-2xl">

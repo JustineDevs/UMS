@@ -9,6 +9,9 @@ import { minorUnitDivisor } from "@/lib/medusa-money";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { checkoutAttemptCookieHeader } from "@/lib/checkout-attempt-cookie";
 import { resolveCheckoutEmail } from "@/lib/checkout-email";
+import { readResponseJson } from "@/lib/read-response-json";
+import { checkoutStartResponseSchema } from "@/lib/admin-api-contracts";
+import { createWorkerCheckoutCart } from "@/lib/worker-checkout-cart";
 
 export const dynamic = "force-dynamic";
 
@@ -133,13 +136,13 @@ async function startWorkerCheckout(input: {
     }),
     cache: "no-store",
   });
-  const payload = (await response.json().catch(() => ({}))) as {
+  const payload = await readResponseJson(response, {} as {
     checkout?: { id?: unknown; url?: unknown };
     amountMinor?: unknown;
     currency?: unknown;
     correlationId?: unknown;
     error?: unknown;
-  };
+  });
   if (!response.ok) {
     return NextResponse.json(
       {
@@ -181,7 +184,7 @@ async function startWorkerCheckout(input: {
         ? "PayPal balance or card"
         : "GCash and bank transfer";
   return jsonResponse(
-    {
+    checkoutStartResponseSchema.parse({
       checkoutUrl,
       cartId: input.cartId,
       providerLabel,
@@ -195,7 +198,7 @@ async function startWorkerCheckout(input: {
       checkoutActionKind: "redirect",
       correlationId,
       workerCheckout: true,
-    },
+    }),
     201,
     input.cartId,
     correlationId,
@@ -230,19 +233,15 @@ function jsonResponse(
 }
 
 function normalizeLines(lines: StartBody["lines"]): CheckoutLine[] {
-  return (Array.isArray(lines) ? lines : [])
-    .map((line) => ({
-      variantId:
-        typeof line?.variantId === "string" ? line.variantId.trim() : "",
-      quantity:
-        typeof line?.quantity === "number" && Number.isFinite(line.quantity)
-          ? Math.floor(line.quantity)
-          : 0,
-    }))
-    .filter(
-      (line) =>
-        line.variantId.length > 0 && line.quantity > 0 && line.quantity <= 999,
-    )
+  return (Array.isArray(lines) ? lines : []).flatMap((line) => {
+    const variantId = typeof line?.variantId === "string" ? line.variantId.trim() : "";
+    const quantity = typeof line?.quantity === "number" && Number.isFinite(line.quantity)
+      ? Math.floor(line.quantity)
+      : 0;
+    return variantId.length > 0 && quantity > 0 && quantity <= 999
+      ? [{ variantId, quantity }]
+      : [];
+  })
     .slice(0, 50);
 }
 
@@ -279,12 +278,42 @@ export async function POST(req: Request) {
   }
 
   if (providerId === PAYMENT_PROVIDER_IDS.COD) {
-    return NextResponse.json(
+    const baseUrl = workerBaseUrl();
+    if (!baseUrl) {
+      return NextResponse.json(
+        { error: "Worker API is not configured for checkout." },
+        { status: 503 },
+      );
+    }
+
+    // COD still needs a Worker-owned cart before the payment-intent route can
+    // register or finalize it. Hosted providers create that cart in this
+    // route as part of session startup; keep the native COD path on the same
+    // cookie-backed contract instead of relying on client-only cart state.
+    let cartId = await readCartIdFromCookie();
+    if (!cartId) {
+      try {
+        cartId = await createWorkerCheckoutCart(baseUrl, lines);
+      } catch (error) {
+        console.error("[checkout-start] Worker COD cart creation failed", {
+          name: error instanceof Error ? error.name : "unknown",
+        });
+        return NextResponse.json(
+          { error: "The checkout cart could not be prepared." },
+          { status: 502 },
+        );
+      }
+    }
+
+    return jsonResponse(
       {
-        error:
-          "Cash on delivery must be started from the browser checkout flow.",
+        cartId,
+        providerLabel: "Cash on delivery (COD)",
+        checkoutActionKind: "manual",
+        workerCheckout: true,
       },
-      { status: 400 },
+      200,
+      cartId,
     );
   }
 
@@ -320,12 +349,19 @@ export async function POST(req: Request) {
   }
 
   if (nativeProvider && nativeBaseUrl) {
-    const cartId = await readCartIdFromCookie();
+    let cartId = await readCartIdFromCookie();
     if (!cartId) {
-      return NextResponse.json(
-        { error: "No active checkout cart." },
-        { status: 400 },
-      );
+      try {
+        cartId = await createWorkerCheckoutCart(nativeBaseUrl, lines);
+      } catch (error) {
+        console.error("[checkout-start] Worker cart creation failed", {
+          name: error instanceof Error ? error.name : "unknown",
+        });
+        return NextResponse.json(
+          { error: "The checkout cart could not be prepared." },
+          { status: 502 },
+        );
+      }
     }
     try {
       return await startWorkerCheckout({

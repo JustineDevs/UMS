@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveTrackingPath } from "@/lib/tracking-link-resolve";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { trackingLinkResolveSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 const MAX_TRACKING_FORM_BYTES = 8 * 1024;
@@ -21,7 +22,8 @@ export async function POST(request: Request): Promise<Response> {
   }
   const body = await request.formData().catch(() => null);
   const raw = body?.get("trackingUrl");
-  const path = typeof raw === "string" ? resolveTrackingPath(raw.trim(), request.url) : null;
+  const parsed = trackingLinkResolveSchema.safeParse({ trackingUrl: raw });
+  const path = parsed.success ? resolveTrackingPath(parsed.data.trackingUrl, request.url) : null;
   if (!path) {
     return NextResponse.json({ error: "Enter a complete secure tracking link" }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }

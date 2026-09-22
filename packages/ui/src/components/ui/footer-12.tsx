@@ -145,14 +145,14 @@ export function Footer12({
   return (
     <motion.footer
       variants={footerContainer}
-      initial="hidden"
+      initial={false}
       whileInView="visible"
       viewport={{ once: true, amount: 0.28 }}
       className="w-full overflow-hidden bg-white px-6 py-10 font-sans text-neutral-900 antialiased sm:px-10 lg:px-12"
     >
       <div className="mx-auto flex min-h-[390px] w-full max-w-[1440px] flex-col justify-between">
         <div className="grid gap-10 lg:grid-cols-[minmax(250px,390px)_1fr] lg:gap-20">
-          <motion.div variants={riseItem} className="max-w-[390px]">
+          <motion.div initial={false} variants={riseItem} className="max-w-[390px]">
             <h2 className="max-w-[330px] text-[18px] leading-[1.08] font-normal tracking-normal text-neutral-900 sm:text-[19px]">
               {newsletterTitle}
             </h2>
@@ -164,13 +164,13 @@ export function Footer12({
                 aria-label="Email address"
                 required
                 placeholder={inputPlaceholder}
-                className="h-[50px] w-full rounded-md bg-stone-300 px-6 text-sm font-normal text-neutral-900 outline outline-1 outline-black/10 transition-[background-color,outline-color] duration-200 placeholder:text-neutral-500 focus:bg-stone-100 focus:outline-white/40"
+                className="h-[50px] w-full rounded-md bg-stone-300 px-6 text-sm font-normal text-neutral-950 outline outline-1 outline-black/10 transition-[background-color,outline-color] duration-200 placeholder:text-neutral-700 focus:bg-stone-100 focus:outline-white/40"
               />
 
               <motion.button
                 type="submit"
                 whileTap={{ scale: 0.96 }}
-                className="text-md mt-5 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full bg-stone-200 px-5 font-medium text-neutral-800 shadow-[inset_0px_2px_2px_1px_rgba(255,255,255,1),inset_0_-2px_2px_1px_rgba(0,0,0,0.1)] outline-2 outline-stone-200 transition-[background-color,transform] duration-200 hover:bg-stone-200/90 hover:bg-white active:scale-[0.98]"
+                className="text-md mt-5 inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full bg-white px-5 font-medium text-neutral-950 shadow-[inset_0px_2px_2px_1px_rgba(255,255,255,1),inset_0_-2px_2px_1px_rgba(0,0,0,0.1)] outline-2 outline-stone-200 transition-[background-color,transform] duration-200 hover:bg-stone-50 active:scale-[0.98]"
               >
                 <span>{subscribeText}</span>
                 <FaArrowRight className="size-4" />
@@ -179,12 +179,13 @@ export function Footer12({
           </motion.div>
 
           <motion.nav
+            initial={false}
             variants={footerContainer}
             aria-label="Footer navigation"
             className="grid grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4 lg:pt-0"
           >
             {columns.map((column) => (
-              <motion.div key={column.title} variants={riseItem}>
+              <motion.div key={column.title} initial={false} variants={riseItem}>
                 <h3 className="text-lg leading-none font-normal tracking-wide text-neutral-900 uppercase">
                   {column.title}
                 </h3>
@@ -206,6 +207,7 @@ export function Footer12({
         </div>
 
         <motion.div
+          initial={false}
           variants={brandItem}
           className="mx-auto mt-12 flex w-full items-center justify-center  overflow-hidden sm:mt-8 lg:mt-4"
         >
@@ -220,6 +222,7 @@ export function Footer12({
         </motion.div>
 
         <motion.div
+          initial={false}
           variants={riseItem}
           className="mt-9 grid gap-6 text-neutral-900 md:grid-cols-2 md:items-center"
         >

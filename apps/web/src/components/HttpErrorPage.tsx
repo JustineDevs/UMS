@@ -118,7 +118,7 @@ export function HttpErrorPage({
                 <Link href="/shop">Shop</Link>
               </Button>
               <Button asChild variant="ghost" size="lg" className="uppercase tracking-widest">
-                <Link href="/sitemap">Site map</Link>
+                <Link href="/site-map">Site map</Link>
               </Button>
             </CardFooter>
           ) : (

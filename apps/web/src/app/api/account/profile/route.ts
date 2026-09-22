@@ -4,6 +4,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { storefrontCustomerProfilePatchSchema } from "@universal-music-store/validation";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { hasRecentAuthentication } from "@/lib/recent-auth";
+import { isStorefrontAuthDisabled } from "@/lib/auth";
+import { readResponseJson } from "@/lib/read-response-json";
+import { accountProfilePatchResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +56,7 @@ async function patchWorkerProfile(req: Request): Promise<Response> {
     cache: "no-store",
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+    const payload = await readResponseJson(response, { error: "invalid_worker_response" });
     const error = payload && typeof payload === "object" ? payload as { error?: unknown; code?: unknown; reauthUrl?: unknown } : {};
     return Response.json(
       {
@@ -64,11 +67,11 @@ async function patchWorkerProfile(req: Request): Promise<Response> {
       { status: response.status >= 500 ? 503 : response.status },
     );
   }
-  const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
+  const payload = await readResponseJson(response, { error: "invalid_worker_response" });
   const updatedAt = payload && typeof payload === "object" && "profile" in payload
     ? (payload.profile as { updated_at?: unknown } | null)?.updated_at
     : undefined;
-  return Response.json({ ok: true, ...(typeof updatedAt === "string" ? { updatedAt } : {}) });
+  return Response.json(accountProfilePatchResponseSchema.parse({ ok: true, ...(typeof updatedAt === "string" ? { updatedAt } : {}) }));
 }
 
 async function handlePATCH(req: Request) {
@@ -76,6 +79,15 @@ async function handlePATCH(req: Request) {
     return Response.json({ error: "Cross-site mutation rejected" }, { status: 403 });
   }
   try {
+    if (isStorefrontAuthDisabled() && process.env.VERCEL !== "1") {
+      const bounded = await parseBoundedJson(req, 32 * 1024);
+      if (bounded.tooLarge) return Response.json({ error: "Request body is too large" }, { status: 413 });
+      if (!bounded.valid) return Response.json({ error: "Invalid JSON" }, { status: 400 });
+      if (!storefrontCustomerProfilePatchSchema.safeParse(bounded.value).success) {
+        return Response.json({ error: "Check your profile fields and try again." }, { status: 400 });
+      }
+      return Response.json(accountProfilePatchResponseSchema.parse({ ok: true, updatedAt: new Date().toISOString() }));
+    }
     return await patchWorkerProfile(req);
   } catch (error) {
     const correlationId = crypto.randomUUID();

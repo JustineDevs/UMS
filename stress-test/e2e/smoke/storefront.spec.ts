@@ -63,7 +63,7 @@ test.describe("storefront smoke", () => {
         body: JSON.stringify({
           ok: false,
           keys: [],
-          code: "MEDUSA_REGION_FETCH_FAILED",
+          code: "WORKER_PAYMENT_METHODS_UNAVAILABLE",
           message: "Checkout is temporarily unavailable.",
         }),
       });
@@ -89,7 +89,7 @@ test.describe("storefront smoke", () => {
     await page.goto("/account", { waitUntil: "domcontentloaded" });
     for (const locator of [
       page.getByRole("link", { name: "Overview" }),
-      page.getByRole("link", { name: "Orders" }),
+      page.getByRole("link", { name: "Orders", exact: true }),
       page.getByRole("link", { name: "Profile & addresses" }),
       page.getByRole("link", { name: "Preferences", exact: true }),
       page.getByRole("link", { name: /Open full settings/ }),
@@ -116,7 +116,7 @@ test.describe("storefront smoke", () => {
     if (!slug) {
       test.skip(
         true,
-        "No products in Medusa for this region. Run: pnpm --filter medusa seed && pnpm --filter medusa seed:ph (ensure NEXT_PUBLIC_MEDUSA_REGION_ID matches the PH region).",
+        "No published products are available from the Worker catalog. Seed the configured commerce database and verify Worker catalog/region settings.",
       );
     }
     const addBtn = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();

@@ -1,0 +1,18 @@
+import type { WorkerDatabaseClient } from "./database.ts";
+import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
+type Env = { CMS_ADMIN_JWT_SECRET?: string; SUPABASE_URL?: string };
+type Row = { id: string; correlation_id: string; cart_id: string; provider: string; status: string; checkout_state: string; amount_minor: number | string | null; currency: string | null; medusa_order_id: string | null; quote_fingerprint: string | null; stale_reason: string | null; invalidated_at: string | null; invalidated_by: string | null; provider_session_id: string | null; last_error: string | null; finalize_attempts: number | string; webhook_last_status: string | null; updated_at: string; finalized_at: string | null };
+function json(body: Record<string, unknown>, status = 200): Response { return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }); }
+function tenant(claims: WorkerAuthClaims): string | null { const value = claims.organization_id ?? claims.org_id; return typeof value === "string" && value.trim() ? value.trim() : null; }
+function canRead(claims: WorkerAuthClaims): boolean { const permissions = Array.isArray(claims.permissions) ? claims.permissions : []; return claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "dashboard:read"); }
+function boundedError(value: string | null): string | null { return value == null ? null : value.replace(/[\r\n\t]+/g, " ").slice(0, 500); }
+export async function handleAdminPaymentsRequest(request: Request, database: WorkerDatabaseClient, env: Env): Promise<Response> {
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405);
+  const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
+  if (!claims) return json({ error: "unauthorized" }, 401); if (!canRead(claims)) return json({ error: "forbidden" }, 403);
+  const organizationId = tenant(claims); if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+  const rawLimit = new URL(request.url).searchParams.get("limit"); const limit = rawLimit === null || rawLimit.trim() === "" ? 80 : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 200) return json({ error: "invalid_limit" }, 400);
+  const result = await database.query<Row>("SELECT id, correlation_id, cart_id, provider, status, checkout_state, amount_minor, currency, medusa_order_id, quote_fingerprint, stale_reason, invalidated_at, invalidated_by, provider_session_id, last_error, finalize_attempts, webhook_last_status, updated_at, finalized_at FROM public.payment_attempts WHERE organization_id = $1 ORDER BY updated_at DESC LIMIT $2", [organizationId, limit]);
+  return json({ attempts: result.rows.map((row) => ({ id: String(row.id), correlationId: String(row.correlation_id), cartId: String(row.cart_id), provider: String(row.provider), status: String(row.status), checkoutState: String(row.checkout_state), amountMinor: row.amount_minor == null ? null : Number(row.amount_minor), currency: row.currency, medusaOrderId: row.medusa_order_id, quoteFingerprint: row.quote_fingerprint, staleReason: row.stale_reason, invalidatedAt: row.invalidated_at, invalidatedBy: row.invalidated_by, providerSessionId: row.provider_session_id, lastError: boundedError(row.last_error), finalizeAttempts: Number(row.finalize_attempts) || 0, webhookLastStatus: row.webhook_last_status, updatedAt: row.updated_at, finalizedAt: row.finalized_at })) });
+}

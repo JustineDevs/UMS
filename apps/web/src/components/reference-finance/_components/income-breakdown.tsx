@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { formatCurrency } from "@/lib/utils";
 
 export function IncomeBreakdown({ amount, currency }: { amount: number; currency: string }) {
-  const formattedAmount = new Intl.NumberFormat("en-PH", { style: "currency", currency }).format(amount);
+  const formattedAmount = formatCurrency(amount, { currency });
   const hasIncome = amount > 0;
 
   return (

@@ -257,7 +257,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
           <ul className="mt-4 space-y-8">
         {addresses.map((a, i) => (
               <li
-                key={a.id ?? i}
+                key={a.id ?? `${a.line1 ?? "address"}-${a.city ?? "city"}-${a.postalCode ?? "postal"}-${a.country ?? "country"}`}
                 className="rounded-lg border border-outline-variant/15 p-4"
               >
                 <div className="mb-3 flex justify-end">

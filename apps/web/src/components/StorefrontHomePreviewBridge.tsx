@@ -8,7 +8,7 @@ import type {
   StorefrontHomeSectionLayout,
   StorefrontHomePayload,
 } from "@universal-music-store/platform-data";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HomeScrollExperience } from "@/components/home/HomeScrollExperience";
 import { parseHomePreviewMessage } from "@/components/home-preview-message";
 import type { HomepageSocialProof } from "@/lib/homepage-social-proof";
@@ -86,6 +86,10 @@ export function StorefrontHomePreviewBridge({
 }: Props) {
   const [home, setHome] = useState(initialHome);
   const [visualBlocks, setVisualBlocks] = useState<CmsBlock[]>([]);
+  const homeRef = useRef(initialHome);
+  useEffect(() => {
+    homeRef.current = home;
+  }, [home]);
 
   useEffect(() => {
     const parentOrigin = (() => {
@@ -120,7 +124,9 @@ export function StorefrontHomePreviewBridge({
         : [];
       const blocks = message?.blocks ?? rawBlocks;
       const draftBlocks = blocks.length ? blocks : message?.tree ? cmsTreeToBlocks(message.tree) : [];
-      setHome((current) => draftHome(draftBlocks, current));
+      const nextHome = draftHome(draftBlocks, homeRef.current);
+      homeRef.current = nextHome;
+      setHome(nextHome);
       setVisualBlocks(
         draftBlocks.filter(
           (block) =>

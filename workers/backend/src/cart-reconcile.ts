@@ -1,4 +1,5 @@
 import type { WorkerDatabaseClient } from "./database.ts";
+import { minorToMajor } from "./money.ts";
 
 type ReconcileInputLine = { variantId: string; quantity: number };
 type ReconcileRow = {
@@ -14,15 +15,8 @@ type ReconcileRow = {
   allow_backorder: boolean;
 };
 
-function minorUnitDivisor(currencyCode: string): number {
-  const code = currencyCode.trim().toUpperCase();
-  if (["BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA", "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF"].includes(code)) return 1;
-  if (["BHD", "JOD", "KWD", "OMR", "TND"].includes(code)) return 1_000;
-  return 100;
-}
-
 function majorFromMinor(value: number, currencyCode: string): number {
-  return Math.round((value / minorUnitDivisor(currencyCode)) * 1_000_000) / 1_000_000;
+  return Math.round(minorToMajor(value, currencyCode) * 1_000_000) / 1_000_000;
 }
 
 function json(status: number, body: unknown): Response {

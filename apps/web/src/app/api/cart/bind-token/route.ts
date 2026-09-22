@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { createCartBindToken } from "@/lib/cart-session-boundary";
+import { cartBindTokenResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const token = createCartBindToken();
+  const parsed = cartBindTokenResponseSchema.parse({ token });
   const response = NextResponse.json(
-    { token },
+    parsed,
     { headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } },
   );
   response.cookies.set("cart_bind_nonce", token, {

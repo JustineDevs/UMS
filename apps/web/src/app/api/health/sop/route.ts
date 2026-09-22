@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listMissingPostHogEnv } from "@universal-music-store/sdk";
+import { healthSopResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function GET() {
 
   /** Always 200; use `status` for SOP readiness (avoids 503 during Medusa cold start in E2E). */
   return NextResponse.json(
-    {
+    healthSopResponseSchema.parse({
       status: degraded ? "degraded" : "ok",
       commerceSource: "cloudflare_worker",
       worker: {
@@ -37,7 +38,7 @@ export async function GET() {
       },
       missingObservabilityEnv,
       timestamp,
-    },
+    }),
     { status: 200 },
   );
 }

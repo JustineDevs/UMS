@@ -63,32 +63,46 @@ export function CatalogMediaPickerDialog({
   const [editAlt, setEditAlt] = useState("");
   const [savingMeta, setSavingMeta] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(() => {
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     setLoading(true);
     setError(null);
     const sp = new URLSearchParams();
     sp.set("limit", "120");
     sp.set("sort", "created_desc");
     if (q.trim()) sp.set("q", q.trim());
-    fetch(`${mediaApiPath}?${sp.toString()}`)
+    fetch(`${mediaApiPath}?${sp.toString()}`, { signal: controller.signal })
       .then(async (r) => {
         const j = (await r.json()) as { data?: MediaRow[]; error?: string; canWrite?: boolean };
         if (!r.ok) throw new Error(j.error ?? r.statusText);
+        if (controller.signal.aborted) return [];
         setServerCanWrite(Boolean(j.canWrite));
         return j.data ?? [];
       })
-      .then(setRows)
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : "Load failed"),
-      )
-      .finally(() => setLoading(false));
-  }, [q]);
+      .then((nextRows) => {
+        if (!controller.signal.aborted) setRows(nextRows);
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(e instanceof Error ? e.message : "Load failed");
+        }
+      })
+      .finally(() => {
+        if (loadAbortRef.current === controller) setLoading(false);
+      });
+  }, [mediaApiPath, q]);
 
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => load(), 200);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      loadAbortRef.current?.abort();
+    };
   }, [open, load]);
 
   useEffect(() => {
@@ -336,10 +350,11 @@ export function CatalogMediaPickerDialog({
         </div>
 
         <div className="border-b border-outline-variant/20 px-5 py-3">
-          <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+          <label htmlFor="catalog-media-search" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
             Search (URL fragment)
           </label>
           <input
+            id="catalog-media-search"
             type="search"
             className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
             value={q}

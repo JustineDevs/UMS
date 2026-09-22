@@ -11,8 +11,17 @@ export type CmsRedirectRow = {
   created_at: string;
 };
 
-export async function listCmsRedirects(supabase: SupabaseClient, organizationId?: string): Promise<CmsRedirectRow[]> {
-  let query = supabase.from("cms_redirects").select("*").order("from_path");
+export async function listCmsRedirects(
+  supabase: SupabaseClient,
+  organizationId?: string,
+  options: { limit?: number } = {},
+): Promise<CmsRedirectRow[]> {
+  const limit = Math.min(Math.max(Math.trunc(options.limit ?? 1000), 1), 5000);
+  let query = supabase
+    .from("cms_redirects")
+    .select("id,from_path,to_path,status_code,active,preserve_query,created_at")
+    .order("from_path")
+    .limit(limit);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

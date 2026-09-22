@@ -16,8 +16,42 @@ import {
 import { reviewCsrfCookieName, verifyReviewCsrfToken } from "@/lib/review-csrf";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { storefrontReviewCreateResponseSchema, storefrontReviewsResponseSchema } from "@/lib/admin-api-contracts";
 
 const MAX_REVIEW_BODY_BYTES = 16 * 1024;
+const MAX_REVIEW_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+async function readBoundedResponseText(response: Response): Promise<string | null> {
+  const declared = Number(response.headers.get("content-length") ?? "0");
+  if (declared > MAX_REVIEW_RESPONSE_BYTES) return null;
+  if (!response.body) {
+    const text = await response.text();
+    return text.length <= MAX_REVIEW_RESPONSE_BYTES ? text : null;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_REVIEW_RESPONSE_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return text + decoder.decode();
+}
+
+function upstreamReviewFailure(status: number) {
+  return reviewError({ error: status >= 500 ? "Review service is temporarily unavailable" : "Review request was rejected", code: status >= 500 ? "WORKER_REVIEWS_UNAVAILABLE" : "REVIEW_REQUEST_REJECTED" }, status >= 500 ? 503 : status);
+}
 
 function reviewError(
   body: Record<string, unknown>,
@@ -45,14 +79,13 @@ export async function GET(req: Request) {
       `${apiUrl}/store/reviews${new URL(req.url).search}`,
       { cache: "no-store" },
     );
-    return new Response(await upstream.text(), {
-      status: upstream.status,
-      headers: {
-        "Content-Type":
-          upstream.headers.get("Content-Type") || "application/json",
-        "Cache-Control": upstream.headers.get("Cache-Control") || "no-store",
-      },
-    });
+    const text = await readBoundedResponseText(upstream);
+    if (!upstream.ok || text == null) return upstreamReviewFailure(upstream.status);
+    let payload: unknown;
+    try { payload = JSON.parse(text); } catch { return upstreamReviewFailure(503); }
+    const parsed = storefrontReviewsResponseSchema.safeParse(payload);
+    if (!parsed.success) return upstreamReviewFailure(503);
+    return Response.json(parsed.data, { headers: { "Cache-Control": upstream.headers.get("Cache-Control") || "no-store" } });
   } catch {
     return reviewError(
       {
@@ -207,14 +240,13 @@ async function handlePOST(req: Request) {
       }),
       cache: "no-store",
     });
-    return new Response(await upstream.text(), {
-      status: upstream.status,
-      headers: {
-        "Content-Type":
-          upstream.headers.get("Content-Type") || "application/json",
-        "Cache-Control": "no-store",
-      },
-    });
+    const text = await readBoundedResponseText(upstream);
+    if (!upstream.ok || text == null) return upstreamReviewFailure(upstream.status);
+    let payload: unknown;
+    try { payload = JSON.parse(text); } catch { return upstreamReviewFailure(503); }
+    const parsed = storefrontReviewCreateResponseSchema.safeParse(payload);
+    if (!parsed.success) return upstreamReviewFailure(503);
+    return Response.json(parsed.data, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return reviewError(
       {

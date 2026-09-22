@@ -14,6 +14,7 @@ function json(body: Record<string, unknown>, status = 200): Response { return ne
 function record(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function organization(claims: WorkerAuthClaims): string | null { const value = claims.organization_id ?? claims.org_id; return typeof value === "string" && value.trim() ? value.trim() : null; }
 function allowed(claims: WorkerAuthClaims): boolean { const permissions = Array.isArray(claims.permissions) ? claims.permissions : []; return permissions.some((item) => item === "*" || item === "content:write") || claims.role === "owner" || claims.role === "admin"; }
+function canRead(claims: WorkerAuthClaims): boolean { const permissions = Array.isArray(claims.permissions) ? claims.permissions : []; return permissions.some((item) => item === "*" || item === "content:read" || item === "content:write") || claims.role === "owner" || claims.role === "admin"; }
 function url(value: unknown): string | null { if (value === null || value === undefined) return null; if (typeof value !== "string" || value.length > 2000) return null; try { const parsed = new URL(value, "https://storefront.invalid"); return parsed.protocol === "http:" || parsed.protocol === "https:" || value.startsWith("/") ? value : null; } catch { return null; } }
 function parse(value: unknown): Input | null {
   if (!record(value) || typeof value.body !== "string" || value.body.length > 20_000 || !value.body.trim()) return null;
@@ -32,6 +33,29 @@ function parse(value: unknown): Input | null {
 }
 async function hash(raw: string): Promise<string> { const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw)); return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(""); }
 
+function outputRow(row: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: String(row.id ?? "default"), body: String(row.body ?? ""), bodyFormat: row.body_format === "html" ? "html" : "plain",
+    linkUrl: row.link_url == null ? null : String(row.link_url), linkLabel: row.link_label == null ? null : String(row.link_label),
+    dismissible: Boolean(row.dismissible), startsAt: row.starts_at == null ? null : String(row.starts_at), endsAt: row.ends_at == null ? null : String(row.ends_at),
+    locale: String(row.locale ?? "en"), priority: Number(row.priority) || 0, stackGroup: row.stack_group == null ? null : String(row.stack_group), regionCode: row.region_code == null ? null : String(row.region_code),
+  };
+}
+
+async function readResponse(database: WorkerDatabaseClient, org: string): Promise<Response> {
+  const rows = await database.query(
+    "SELECT id, body, body_format, link_url, link_label, dismissible, starts_at, ends_at, locale, priority, stack_group, region_code FROM public.cms_announcement WHERE organization_id = $1 ORDER BY locale ASC, priority DESC, updated_at DESC LIMIT 500",
+    [org],
+  );
+  const analyticsRows = await database.query(
+    "SELECT announcement_id, locale, impressions, clicks, dismisses, updated_at FROM public.cms_announcement_analytics WHERE organization_id = $1 LIMIT 1000",
+    [org],
+  );
+  const analytics: Record<string, { impressions: number; clicks: number; dismisses: number }> = {};
+  for (const row of analyticsRows.rows) analytics[`${String(row.announcement_id ?? "")}:${String(row.locale ?? "en")}`] = { impressions: Number(row.impressions) || 0, clicks: Number(row.clicks) || 0, dismisses: Number(row.dismisses) || 0 };
+  return json({ data: { rows: rows.rows.map(outputRow), analytics } });
+}
+
 async function save(database: WorkerDatabaseClient, org: string, input: Input): Promise<Response> {
   const id = input.id ?? "default";
   return withWorkerTransaction(database, async (tx) => {
@@ -43,13 +67,11 @@ export async function handleCmsAdminAnnouncementRequest(request: Request, databa
   if (!["GET", "PUT", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
   if (!claims) return json({ error: "unauthorized" }, 401);
-  if (!allowed(claims)) return json({ error: "forbidden" }, 403);
+  if (request.method === "GET" && !canRead(claims)) return json({ error: "forbidden" }, 403);
+  if (request.method !== "GET" && !allowed(claims)) return json({ error: "forbidden" }, 403);
   const org = organization(claims); if (!org) return json({ error: "organization_claim_required" }, 403);
   if (request.method === "GET") {
-    const rawLimit = Number(new URL(request.url).searchParams.get("limit") ?? "100");
-    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 100;
-    const result = await database.query(`SELECT * FROM public.cms_announcement WHERE organization_id = $1 ORDER BY priority DESC, updated_at DESC LIMIT $2`, [org, limit]);
-    return json({ data: result.rows, limit });
+    return readResponse(database, org);
   }
   if (request.method === "DELETE") {
     const url = new URL(request.url);
@@ -69,5 +91,8 @@ export async function handleCmsAdminAnnouncementRequest(request: Request, databa
   let value: unknown; try { value = JSON.parse(raw); } catch { return json({ error: "invalid_announcement_payload" }, 400); }
   const input = parse(value); if (!input) return json({ error: "invalid_announcement_payload" }, 400);
   const key = request.headers.get("Idempotency-Key")?.trim(); if (!key) return json({ error: "idempotency_key_required" }, 400);
-  return (await executeIdempotently(new HyperdriveIdempotencyStore(database), key, await hash(raw), () => save(database, org, input))).response;
+  return (await executeIdempotently(new HyperdriveIdempotencyStore(database), key, await hash(raw), async () => {
+    const saved = await save(database, org, input);
+    return saved.status >= 500 ? saved : readResponse(database, org);
+  })).response;
 }

@@ -1,5 +1,6 @@
 import type { CommerceAttribution } from "@universal-music-store/sdk";
 import { minorUnitDivisor } from "@universal-music-store/sdk/multi-region";
+import { readResponseJson } from "./read-response-json";
 
 export type CheckoutLine = { variantId: string; quantity: number };
 
@@ -86,7 +87,7 @@ export function resolveShippingOptionId(
 }
 
 async function readJson<T>(response: Response): Promise<T> {
-  return (await response.json().catch(() => ({}))) as T;
+  return readResponseJson(response, {} as T);
 }
 
 async function readWorkerCart(
@@ -114,19 +115,15 @@ async function readWorkerCartPreview(
   cartId: string,
 ): Promise<CheckoutTotalsPreview> {
   const cart = await readWorkerCart(cartId);
-  const lines = (Array.isArray(cart.items) ? cart.items : [])
-    .filter((item): item is Record<string, unknown> =>
-      Boolean(item && typeof item === "object" && !Array.isArray(item)),
-    )
-    .map((item) => ({
-      variantId:
-        typeof item.variant_id === "string" ? item.variant_id.trim() : "",
-      quantity:
-        typeof item.quantity === "number" && Number.isSafeInteger(item.quantity)
-          ? item.quantity
-          : 0,
-    }))
-    .filter((line) => line.variantId && line.quantity > 0);
+  const lines = (Array.isArray(cart.items) ? cart.items : []).flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>;
+    const variantId = typeof row.variant_id === "string" ? row.variant_id.trim() : "";
+    const quantity = typeof row.quantity === "number" && Number.isSafeInteger(row.quantity)
+      ? row.quantity
+      : 0;
+    return variantId && quantity > 0 ? [{ variantId, quantity }] : [];
+  });
   if (lines.length === 0)
     throw new Error("Add at least one line item before checkout.");
   const base = process.env.API_URL?.trim().replace(/\/$/, "");
@@ -227,12 +224,41 @@ export async function startCheckout(input: {
   );
 
   if (provider === "COD") {
+    // The cart UI may still have a valid local line snapshot while the
+    // HttpOnly Worker cart cookie is absent (for example after a fresh
+    // browser session). Prepare the authoritative Worker cart before the
+    // intent and finalization calls, otherwise COD fails with "No active
+    // cart" even though checkout visibly contains items.
+    const cartPreparation = await fetch("/api/checkout/start", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lines: input.lines,
+        email: input.email,
+        providerId: PAYMENT_PROVIDER_IDS.COD,
+      }),
+    });
+    const cartPreparationBody = await readJson<{
+      cartId?: string;
+      error?: string;
+    }>(
+      cartPreparation,
+    );
+    if (!cartPreparation.ok) {
+      throw new Error(
+        cartPreparationBody.error?.trim() ||
+          "Could not prepare the COD checkout cart.",
+      );
+    }
+
     const intent = await fetch("/api/payments/checkout-intents", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         provider: "cod",
+        lines: input.lines,
         amountMinor,
         currencyCode: preview.currencyCode,
         quoteFingerprint: preview.quoteFingerprint,
@@ -242,6 +268,7 @@ export async function startCheckout(input: {
     });
     const intentBody = await readJson<{
       correlationId?: string;
+      cartId?: string;
       error?: string;
     }>(intent);
     if (!intent.ok || !intentBody.correlationId)
@@ -252,7 +279,10 @@ export async function startCheckout(input: {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ correlationId: intentBody.correlationId }),
+      body: JSON.stringify({
+        correlationId: intentBody.correlationId,
+        cartId: intentBody.cartId ?? cartPreparationBody.cartId,
+      }),
     });
     const placementBody = await readJson<{
       orderId?: string;

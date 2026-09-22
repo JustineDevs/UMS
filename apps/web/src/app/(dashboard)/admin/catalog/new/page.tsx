@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import { AdminTechnicalDetails } from "@/components/AdminTechnicalDetails";
 import { ProductEditorLoader } from "@/components/catalog/ProductEditorLoader";
-import { getCatalogPriceCurrencyCode } from "@/lib/medusa-catalog-service";
+import { getCatalogPriceCurrencyCode } from "@/lib/catalog-product-service";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
 export default async function CatalogNewPage() {

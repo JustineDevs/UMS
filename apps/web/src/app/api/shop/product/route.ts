@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { storefrontProductSlugSchema } from "@universal-music-store/validation";
+import { shopProductResponseSchema } from "@/lib/admin-api-contracts";
 
 import { fetchProductBySlug } from "@/lib/catalog-fetch";
 import {
@@ -49,8 +50,10 @@ export async function GET(req: Request) {
       cost: null,
     })),
   };
+  const parsed = shopProductResponseSchema.safeParse({ product });
+  if (!parsed.success) return errorResponse("Product unavailable", 503);
   return NextResponse.json(
-    { product },
+    parsed.data,
     {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=60",

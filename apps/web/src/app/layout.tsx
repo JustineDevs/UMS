@@ -17,8 +17,18 @@ const inter = Inter({
   display: "swap",
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? DEFAULT_PUBLIC_SITE_ORIGIN;
+function resolveSiteUrl(value: string | undefined): string {
+  const candidate = value?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol === "https:" || parsed.protocol === "http:") return parsed.toString().replace(/\/$/, "");
+  } catch {
+    // Fall through to the known-safe canonical origin.
+  }
+  return DEFAULT_PUBLIC_SITE_ORIGIN;
+}
+
+const siteUrl = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 export const viewport: Viewport = {
   width: "device-width",

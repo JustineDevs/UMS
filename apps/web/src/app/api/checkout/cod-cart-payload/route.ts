@@ -8,6 +8,7 @@ import { profileToCodCartAddresses } from "@/lib/checkout-address";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { checkoutCodCartPayloadResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ async function handlePOST(req: Request) {
     );
   }
 
-  return Response.json(payload);
+  return Response.json(checkoutCodCartPayloadResponseSchema.parse(payload));
 }
 
 export const POST = withBotIdProtection(handlePOST);

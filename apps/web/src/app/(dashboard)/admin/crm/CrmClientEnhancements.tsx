@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Nango from "@nangohq/frontend";
 import {
   Dialog,
@@ -133,6 +133,7 @@ export function CrmClientEnhancements({
   registeredCount: number;
   supportedApps: readonly SupportedApp[];
 }) {
+  const mutatingRef = useRef(false);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [clvEmail, setClvEmail] = useState("");
   const [clvResult, setClvResult] = useState<ClvResult | null>(null);
@@ -222,18 +223,25 @@ export function CrmClientEnhancements({
   async function handleClvLookup() {
     if (!clvEmail.trim()) return;
     setClvLoading(true);
-    const res = await fetch(`/api/admin/analytics/clv?email=${encodeURIComponent(clvEmail)}`);
-    if (res.ok) {
-      const { data } = await res.json();
-      setClvResult(data);
-    } else {
+    try {
+      const res = await fetch(`/api/admin/analytics/clv?email=${encodeURIComponent(clvEmail)}`);
+      if (res.ok) {
+        const { data } = await res.json();
+        setClvResult(data);
+      } else {
+        setClvResult(null);
+      }
+    } catch {
       setClvResult(null);
+    } finally {
+      setClvLoading(false);
     }
-    setClvLoading(false);
   }
 
   async function handleCreateSegment(e: FormEvent) {
     e.preventDefault();
+    if (mutating || mutatingRef.current) return;
+    mutatingRef.current = true;
     setMutationError(null);
     setMutating(true);
     try {
@@ -252,6 +260,7 @@ export function CrmClientEnhancements({
     } catch (err) {
       setMutationError(err instanceof Error ? err.message : "Unable to create segment");
     } finally {
+      mutatingRef.current = false;
       setMutating(false);
     }
   }
@@ -440,6 +449,7 @@ export function CrmClientEnhancements({
           </h3>
           <div className="mb-4 flex gap-2">
             <input
+              aria-label="Customer email for CLV lookup"
               type="email"
               autoComplete="email"
               placeholder="Customer email"
@@ -797,12 +807,14 @@ export function CrmClientEnhancements({
             <h2 className="text-lg font-bold font-headline">Create segment</h2>
             <input
               required
+              aria-label="Segment name"
               placeholder="Segment name"
               value={segForm.name}
               onChange={(e) => setSegForm({ ...segForm, name: e.target.value })}
               className="w-full rounded border border-outline-variant/20 px-3 py-2.5 text-sm"
             />
             <select
+              aria-label="Segment rule type"
               value={segForm.rule_type}
               onChange={(e) => setSegForm({ ...segForm, rule_type: e.target.value })}
               className="w-full rounded border border-outline-variant/20 px-3 py-2.5 text-sm"
@@ -815,6 +827,7 @@ export function CrmClientEnhancements({
               <option value="tier">Loyalty Tier</option>
             </select>
             <textarea
+              aria-label="Segment description"
               placeholder="Description"
               value={segForm.description}
               onChange={(e) => setSegForm({ ...segForm, description: e.target.value })}

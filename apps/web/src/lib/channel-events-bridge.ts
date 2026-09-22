@@ -1,5 +1,5 @@
-import { tryCreateSupabaseClient } from "@universal-music-store/database";
-import { getChannelTenantKey } from "./channel-tenant-scope";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { readResponseJson } from "./read-response-json";
 
 export type ChannelEventRow = {
   id: string;
@@ -9,30 +9,38 @@ export type ChannelEventRow = {
   processed_at: string | null;
 };
 
-export async function fetchRecentChannelEvents(
-  limit = 50,
-): Promise<ChannelEventRow[]> {
-  const supabase = tryCreateSupabaseClient();
-  if (!supabase) return [];
-  const tenantKey = getChannelTenantKey();
-  if (!tenantKey) return [];
-  const { data, error } = await supabase
-    .from("channel_sync_events")
-    .select("id, channel, event_type, received_at, processed_at")
-    .eq("tenant_key", tenantKey)
-    .order("received_at", { ascending: false })
-    .limit(limit);
+function parseChannelEvents(value: unknown): ChannelEventRow[] {
+  if (!value || typeof value !== "object" || !Array.isArray((value as { events?: unknown }).events)) return [];
+  return (value as { events: unknown[] }).events.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry as Record<string, unknown>;
+    if (typeof row.id !== "string" || typeof row.channel !== "string" || typeof row.event_type !== "string" || typeof row.received_at !== "string") return [];
+    return [{
+      id: row.id,
+      channel: row.channel,
+      event_type: row.event_type,
+      received_at: row.received_at,
+      processed_at: typeof row.processed_at === "string" ? row.processed_at : null,
+    }];
+  });
+}
 
-  if (error) {
-    console.error("[channel-events-bridge]", error.message);
+export async function fetchRecentChannelEvents(limit = 50): Promise<ChannelEventRow[]> {
+  const base = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (!base) return [];
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.getSession();
+    const token = data.session?.access_token?.trim();
+    if (error || !token) return [];
+    const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(Math.floor(limit), 1), 100) : 50;
+    const response = await fetch(`${base}/api/admin/channels/events?limit=${boundedLimit}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    return parseChannelEvents(await readResponseJson(response, {}));
+  } catch {
     return [];
   }
-
-  return (data ?? []).map((r) => ({
-    id: String((r as { id: string }).id),
-    channel: String((r as { channel: string }).channel),
-    event_type: String((r as { event_type: string }).event_type),
-    received_at: String((r as { received_at: string }).received_at),
-    processed_at: (r as { processed_at?: string | null }).processed_at ?? null,
-  }));
 }

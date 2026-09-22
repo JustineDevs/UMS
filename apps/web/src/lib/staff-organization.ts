@@ -60,9 +60,3 @@ export function organizationCanManagePayments(
 ): boolean {
   return role === "owner";
 }
-
-export function organizationCanManageCrmConnections(
-  role: StaffOrganization["role"],
-): boolean {
-  return role === "owner";
-}

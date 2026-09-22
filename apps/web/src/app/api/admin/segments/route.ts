@@ -1,51 +1,7 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import {
-  listSegments,
-  createSegment,
-} from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { createWorkerSegmentForAdmin, fetchWorkerSegmentsForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { parseAdminJson } from "@/lib/admin-api-security";
-import { z } from "zod";
 
-const segmentSchema = z.object({
-  name: z.string().trim().min(1).max(160),
-  description: z.string().trim().max(1000).optional(),
-  rule_type: z.enum(["spend_above", "spend_below", "order_count_above", "inactive_days", "product_category", "tier", "manual"]),
-  rule_config: z.record(z.string(), z.unknown()).default({}),
-  auto_refresh: z.boolean().default(true),
-}).strict();
-
-export async function GET(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("crm:segments");
-  if (!auth.ok) return auth.response;
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const organization = await resolveStaffOrganization(sb, auth.session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const data = await listSegments(sb, organization.id);
-  return correlatedJson(cid, { data });
-}
-
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("crm:segments");
-  if (!auth.ok) return auth.response;
-  const parsed = await parseAdminJson(req, segmentSchema);
-  if (!parsed.ok) return correlatedJson(cid, { error: parsed.error }, { status: parsed.status });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const organization = await resolveStaffOrganization(sb, auth.session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const segment = await createSegment(sb, { ...parsed.data, organization_id: organization.id });
-  return correlatedJson(cid, { data: segment }, { status: 201 });
-}
-
-export const POST = withAdminMutationIdempotency("/admin/segments:POST", post);
+export const dynamic = "force-dynamic";
+function fallback(requestId: string) { return new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json" } }); }
+export async function GET(request: Request) { const requestId = getCorrelationId(request); return await fetchWorkerSegmentsForAdmin() ?? fallback(requestId); }
+export async function POST(request: Request) { const requestId = getCorrelationId(request); const key = request.headers.get("Idempotency-Key")?.trim(); if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400, headers: { "Content-Type": "application/json" } }); const length = Number(request.headers.get("content-length") ?? 0); if (length > 128 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413, headers: { "Content-Type": "application/json" } }); let body: Record<string, unknown>; try { const text = await request.text(); if (text.length > 128 * 1024) throw new Error("large"); const value = JSON.parse(text) as unknown; if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid"); body = value as Record<string, unknown>; } catch (error) { const status = error instanceof Error && error.message === "large" ? 413 : 400; return new Response(JSON.stringify({ error: status === 413 ? "Payload too large" : "Invalid JSON body", requestId }), { status, headers: { "Content-Type": "application/json" } }); } return await createWorkerSegmentForAdmin(body, key) ?? fallback(requestId); }

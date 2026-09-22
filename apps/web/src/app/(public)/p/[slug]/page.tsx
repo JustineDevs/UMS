@@ -9,7 +9,7 @@ import {
 } from "@universal-music-store/platform-data";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
-import { canonicalUrl } from "@/lib/seo";
+import { canonicalUrl, serializeJsonLd } from "@/lib/seo";
 import { createStorefrontAnonSupabase } from "@/lib/storefront-supabase";
 
 type Props = {
@@ -85,7 +85,7 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
       {jsonLd != null ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
       {preview ? (
@@ -97,7 +97,7 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
         <nav aria-label="Breadcrumb" className="mb-6 text-sm text-on-surface-variant">
           <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {crumbs.map((c, i) => (
-              <li key={`${c.href}-${i}`} className="flex items-center gap-2">
+              <li key={`${c.href}-${c.label}`} className="flex items-center gap-2">
                 {i > 0 ? (
                   <span aria-hidden className="text-on-surface-variant/40">
                     /

@@ -1,4 +1,4 @@
-import type { WorkerDatabaseClient } from "./database.ts";
+import { withWorkerTransaction, type WorkerDatabaseClient } from "./database.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
 import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
 
@@ -24,11 +24,35 @@ async function uploadDigest(parts: Array<string | Uint8Array>): Promise<string> 
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function scopedMediaIdempotencyKey(
+  organizationId: string,
+  actorId: string,
+  operation: string,
+  requestKey: string,
+): Promise<string> {
+  return `cms-media:v1:${await uploadDigest([JSON.stringify([organizationId, actorId, operation, requestKey])])}`;
+}
+
+function requestIdempotencyKey(request: Request): string | null {
+  const key = request.headers.get("Idempotency-Key")?.trim();
+  return key && key.length <= 255 ? key : null;
+}
+
 type MediaRow = {
   id: string;
   storage_path: string;
   public_url: string;
+  alt_text: string | null;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  deleted_at: string | null;
+  display_name: string | null;
+  byte_size: number | null;
   tags: string[];
+  organization_id: string;
+  storage_cleanup_status?: "ready" | "pending" | "processing" | "retry" | "complete" | "external";
 };
 
 type ReferenceHit = { source: string; detail: string };
@@ -44,29 +68,25 @@ async function findMediaReferences(database: WorkerDatabaseClient, publicUrl: st
         { text: "SELECT collection_handle, locale, to_jsonb(cms_category_content) AS payload FROM public.cms_category_content WHERE organization_id = $2 AND to_jsonb(cms_category_content)::text LIKE $1 LIMIT 500", source: "cms_category_content" },
         { text: "SELECT slug, locale, to_jsonb(cms_blog_posts) AS payload FROM public.cms_blog_posts WHERE organization_id = $2 AND to_jsonb(cms_blog_posts)::text LIKE $1 LIMIT 500", source: "cms_blog_posts" },
         { text: "SELECT id, to_jsonb(cms_navigation) AS payload FROM public.cms_navigation WHERE organization_id = $2 AND to_jsonb(cms_navigation)::text LIKE $1 LIMIT 100", source: "cms_navigation" },
+        { text: "SELECT id, to_jsonb(cms_navigation_draft) AS payload FROM public.cms_navigation_draft WHERE organization_id = $2 AND to_jsonb(cms_navigation_draft)::text LIKE $1 LIMIT 100", source: "cms_navigation_draft" },
         { text: "SELECT component_key, id, to_jsonb(cms_component_definitions) AS payload FROM public.cms_component_definitions WHERE organization_id = $2 AND to_jsonb(cms_component_definitions)::text LIKE $1 LIMIT 500", source: "cms_component_definitions" },
         { text: "SELECT id, to_jsonb(storefront_home_content) AS payload FROM public.storefront_home_content WHERE organization_id = $2 AND to_jsonb(storefront_home_content)::text LIKE $1 LIMIT 100", source: "storefront_home_content" },
       ];
   for (const query of queries) {
-    try {
-      const result = await database.query<Record<string, unknown>>(query.text, medusa ? [`%${needle}%`] : [`%${needle}%`, organizationId]);
-      for (const row of result.rows) {
-        const detail = medusa
-          ? `${String(row.title ?? row.handle ?? row.id ?? "product")} (${String(row.id ?? "")})`
-          : `${String(row.slug ?? row.collection_handle ?? row.component_key ?? row.id ?? "default")} (${String(row.locale ?? "")})`;
-        hits.push({ source: query.source, detail });
-      }
-    } catch {
-      // Optional CMS tables vary by migration level. A missing table is not a reason
-      // to fail a delete, but an existing table is always scanned before deletion.
+    const result = await database.query<Record<string, unknown>>(query.text, medusa ? [`%${needle}%`] : [`%${needle}%`, organizationId]);
+    for (const row of result.rows) {
+      const detail = medusa
+        ? `${String(row.title ?? row.handle ?? row.id ?? "product")} (${String(row.id ?? "")})`
+        : `${String(row.slug ?? row.collection_handle ?? row.component_key ?? row.id ?? "default")} (${String(row.locale ?? "")})`;
+      hits.push({ source: query.source, detail });
     }
   }
   return hits;
 }
 
-async function mediaById(database: WorkerDatabaseClient, id: string, organizationId: string): Promise<MediaRow | null> {
+async function mediaById(database: WorkerDatabaseClient, id: string, organizationId: string, includeDeleted = false, lock = false): Promise<MediaRow | null> {
   const result = await database.query<MediaRow>(
-    "SELECT id, storage_path, public_url, tags FROM public.cms_media WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL LIMIT 1",
+    `SELECT id, storage_path, public_url, alt_text, mime_type, width, height, created_at, deleted_at, display_name, byte_size, tags, organization_id, storage_cleanup_status FROM public.cms_media WHERE id = $1 AND organization_id = $2${includeDeleted ? "" : " AND deleted_at IS NULL"} LIMIT 1${lock ? " FOR UPDATE" : ""}`,
     [id, organizationId],
   );
   const row = result.rows[0];
@@ -82,32 +102,44 @@ export async function handleCmsAdminMediaDeleteRequest(request: Request, appData
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
   if (!/^[a-zA-Z0-9_-]{1,160}$/.test(mediaId)) return json({ error: "invalid_media_id" }, 400);
-  const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
-  if (!idempotencyKey) return json({ error: "idempotency_key_required" }, 400);
-  const requestHash = await uploadDigest([organizationId, mediaId]);
+  const requestKey = requestIdempotencyKey(request);
+  if (!requestKey) return json({ error: "idempotency_key_required" }, 400);
+  const idempotencyKey = await scopedMediaIdempotencyKey(organizationId, claims.sub, `delete:${mediaId}`, requestKey);
+  const requestHash = await uploadDigest([organizationId, claims.sub, "delete", mediaId]);
   const result = await executeIdempotently(
     new HyperdriveIdempotencyStore(appDatabase),
     idempotencyKey,
     requestHash,
     async () => {
-      const row = await mediaById(appDatabase, mediaId, organizationId);
-      if (!row) return json({ error: "not_found" }, 404);
-      const isCatalog = row.tags.includes("catalog-product");
-      if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:write" || (isCatalog && value === "catalog:write")))) return json({ error: "forbidden" }, 403);
-      const [cmsReferences, medusaReferences] = await Promise.all([
-        findMediaReferences(appDatabase, row.public_url, organizationId, false),
-        findMediaReferences(medusaDatabase, row.public_url, organizationId, true),
-      ]);
-      const references = [...cmsReferences, ...medusaReferences];
-      if (references.length > 0) return json({ error: "media_in_use", references }, 409);
-      const deleted = await appDatabase.query("UPDATE public.cms_media SET deleted_at = now() WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL", [mediaId, organizationId]);
-      if (!deleted.rowCount) return json({ error: "delete_conflict" }, 409);
-      const storageUrl = env.SUPABASE_STORAGE_URL ?? env.SUPABASE_URL;
-      const external = row.storage_path.startsWith("external/");
-      if (external || !storageUrl || !env.SUPABASE_SERVICE_ROLE_KEY) return json({ ok: true, storageCleanup: external ? "skipped" : "pending" });
-      const bucket = isCatalog ? "catalog" : "cms";
-      const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${row.storage_path}`, { method: "DELETE", headers: { Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, apikey: env.SUPABASE_SERVICE_ROLE_KEY } });
-      return json({ ok: true, storageCleanup: storage.ok ? "removed" : "pending" });
+      return withWorkerTransaction(appDatabase, async (tx) => {
+        // Serialize against catalog writes that lock the same APP media rows
+        // until their MEDUSA transaction commits.
+        const row = await mediaById(tx, mediaId, organizationId, true, true);
+        if (!row) return json({ error: "not_found" }, 404);
+        if (row.deleted_at) {
+          const queued = row.storage_cleanup_status === "pending" || row.storage_cleanup_status === "retry" || row.storage_cleanup_status === "processing";
+          return json({ ok: true, storageCleanup: queued ? "queued" : "complete" }, queued ? 202 : 200);
+        }
+        const isCatalog = row.tags.includes("catalog-product");
+        if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:write" || (isCatalog && value === "catalog:write")))) return json({ error: "forbidden" }, 403);
+        const [cmsReferences, medusaReferences] = await Promise.all([
+          findMediaReferences(tx, row.public_url, organizationId, false),
+          findMediaReferences(medusaDatabase, row.public_url, organizationId, true),
+        ]);
+        const references = [...cmsReferences, ...medusaReferences];
+        if (references.length > 0) return json({ error: "media_in_use", references }, 409);
+        const external = row.storage_path.startsWith("external/");
+        const result = await tx.query(
+          `UPDATE public.cms_media SET deleted_at = now(), storage_cleanup_status = $3, storage_cleanup_attempts = 0, storage_cleanup_next_attempt_at = CASE WHEN $3 = 'pending' THEN now() ELSE NULL END, storage_cleanup_last_error = NULL WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL RETURNING id`,
+          [mediaId, organizationId, external ? "external" : "pending"],
+        );
+        if (!result.rowCount) return json({ error: "delete_conflict" }, 409);
+        await tx.query(
+          "INSERT INTO public.audit_logs (action, resource, details) VALUES ($1, $2, $3::jsonb)",
+          ["cms.media.delete", `media:${mediaId}`, JSON.stringify({ organization_id: organizationId, actor_subject: claims.sub, storage_cleanup: external ? "external" : "queued" })],
+        );
+        return json({ ok: true, storageCleanup: external ? "external" : "queued" }, external ? 200 : 202);
+      });
     },
   );
   return result.response;
@@ -118,28 +150,49 @@ export async function handleCmsAdminMediaUploadRequest(request: Request, databas
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
   if (!claims) return json({ error: "unauthorized" }, 401);
   const permissions = Array.isArray(claims.permissions) ? claims.permissions : [];
-  if (!(claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "catalog:write"))) return json({ error: "forbidden" }, 403);
+  const isCmsUpload = new URL(request.url).pathname.replace(/\/$/, "").endsWith("/cms/media");
+  const canContentWrite = claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:write");
+  const canCatalogWrite = claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "catalog:write");
+  if (!(isCmsUpload ? canContentWrite || canCatalogWrite : canCatalogWrite)) return json({ error: "forbidden" }, 403);
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
-  const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
-  if (!idempotencyKey) return json({ error: "idempotency_key_required" }, 400);
+  const declaredLength = Number(request.headers.get("content-length") ?? "");
+  const requestLimit = isCmsUpload ? 25 * 1024 * 1024 + 256 * 1024 : 100 * 1024 * 1024 + 256 * 1024;
+  if (Number.isFinite(declaredLength) && declaredLength > requestLimit) return json({ error: "payload_too_large" }, 413);
+  const requestKey = requestIdempotencyKey(request);
+  if (!requestKey) return json({ error: "idempotency_key_required" }, 400);
   const storageUrl = env.SUPABASE_STORAGE_URL ?? env.SUPABASE_URL;
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!storageUrl || !serviceKey) return json({ error: "storage_not_configured" }, 503);
   let form: FormData;
   try { form = await request.formData(); } catch { return json({ error: "invalid_form_data" }, 400); }
   const file = form.get("file");
-  if (!(file instanceof File) || file.size < 1 || file.size > 100 * 1024 * 1024) return json({ error: "invalid_file_size" }, 400);
-  const mime = file.type.trim().toLowerCase();
-  const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime", "video/ogg"]);
+  const bucket = isCmsUpload ? "cms" : "catalog";
+  if (!(file instanceof File) || file.size < 1) return json({ error: "invalid_file_size" }, 400);
+  const declaredMime = file.type.trim().toLowerCase();
+  const extension = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? "";
+  const extensionMime: Record<string, string> = {
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+    gif: "image/gif", avif: "image/avif", svg: "image/svg+xml", bmp: "image/bmp",
+    mp4: "video/mp4", webm: "video/webm", mov: "video/quicktime", ogg: "video/ogg",
+  };
+  const mime = !declaredMime || declaredMime === "application/octet-stream" ? extensionMime[extension] ?? "" : declaredMime;
+  const allowed = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/svg+xml", "image/bmp", "video/mp4", "video/webm", "video/quicktime", "video/ogg"]);
   if (!allowed.has(mime)) return json({ error: "unsupported_media_type" }, 400);
+  const isVideo = mime.startsWith("video/");
+  const maxBytes = isCmsUpload ? 25 * 1024 * 1024 : isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
+  if (file.size > maxBytes) return json({ error: "invalid_file_size" }, 400);
   const safeName = safeSegment(file.name);
-  const productId = typeof form.get("productId") === "string" ? safeSegment(form.get("productId") as string) : "";
-  const altText = mime.startsWith("image/") ? (typeof form.get("alt") === "string" && (form.get("alt") as string).trim() ? (form.get("alt") as string).trim().slice(0, 500) : `Product image: ${safeName.replace(/\.[^.]+$/, "")}`) : null;
+  const productId = !isCmsUpload && typeof form.get("productId") === "string" ? safeSegment(form.get("productId") as string) : "";
+  const rawAlt = form.get("alt");
+  const suppliedAlt = typeof rawAlt === "string" ? rawAlt.trim().slice(0, 500) : "";
+  if (isCmsUpload && mime.startsWith("image/") && !suppliedAlt) return json({ error: "alt_text_required" }, 400);
+  const altText = mime.startsWith("image/") ? suppliedAlt || `Product image: ${safeName.replace(/\.[^.]+$/, "")}` : null;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const requestHash = await uploadDigest([
     organizationId,
-    idempotencyKey,
+    claims.sub,
+    bucket,
     productId,
     safeName,
     mime,
@@ -148,15 +201,31 @@ export async function handleCmsAdminMediaUploadRequest(request: Request, databas
   ]);
   const result = await executeIdempotently(
     new HyperdriveIdempotencyStore(database),
-    idempotencyKey,
+    await scopedMediaIdempotencyKey(organizationId, claims.sub, `upload:${bucket}`, requestKey),
     requestHash,
     async () => {
       const path = `${productId ? `products/${productId}` : "public"}/${crypto.randomUUID()}-${safeName}`;
-      const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "POST", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": mime, "x-upsert": "false" }, body: bytes });
+      const storage = await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${path}`, { method: "POST", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey, "Content-Type": mime, "x-upsert": "false" }, body: bytes });
       if (!storage.ok) return json({ error: "media_upload_failed" }, 502);
-      const publicUrl = `${storageUrl.replace(/\/$/, "")}/storage/v1/object/public/catalog/${path}`;
-      const inserted = await database.query(`INSERT INTO public.cms_media (organization_id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags,created_at`, [organizationId, path, publicUrl, altText, mime, safeName, file.size, ["catalog-product"]]);
-      if (!inserted.rows[0]) { await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/catalog/${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }).catch(() => undefined); return json({ error: "media_metadata_failed" }, 502); }
+      const publicUrl = `${storageUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${path}`;
+      const tags = isCmsUpload ? [] : ["catalog-product"];
+      let inserted: { rows: Array<Record<string, unknown>> };
+      try {
+        inserted = await withWorkerTransaction(database, async (tx) => {
+          const result = await tx.query(`INSERT INTO public.cms_media (organization_id,storage_path,public_url,alt_text,mime_type,display_name,byte_size,tags) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::text[]) RETURNING id,storage_path,public_url,alt_text,mime_type,width,height,created_at,deleted_at,display_name,byte_size,tags,organization_id`, [organizationId, path, publicUrl, altText, mime, safeName, file.size, tags]);
+          const row = result.rows[0];
+          if (!row) throw new Error("media_metadata_failed");
+          await tx.query(
+            "INSERT INTO public.audit_logs (action, resource, details) VALUES ($1, $2, $3::jsonb)",
+            ["cms.media.upload", `media:${String(row.id)}`, JSON.stringify({ organization_id: organizationId, actor_subject: claims.sub, bucket, mime_type: mime, byte_size: file.size })],
+          );
+          return result;
+        });
+      } catch {
+        await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }).catch(() => undefined);
+        return json({ error: "media_metadata_failed" }, 502);
+      }
+      if (!inserted.rows[0]) { await fetch(`${storageUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${path}`, { method: "DELETE", headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }).catch(() => undefined); return json({ error: "media_metadata_failed" }, 502); }
       return json({ data: inserted.rows[0] }, 201);
     },
   );
@@ -170,12 +239,87 @@ export async function handleCmsAdminMediaListRequest(request: Request, database:
   const organizationId = tenant(claims);
   if (!organizationId) return json({ error: "organization_claim_required" }, 403);
   const params = new URL(request.url).searchParams;
+  const catalogEndpoint = new URL(request.url).pathname.replace(/\/$/, "").endsWith("/catalog/media");
+  const permissions = Array.isArray(claims.permissions) ? claims.permissions : [];
+  const contentReader = claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === "content:read");
+  const requestedTag = params.get("tag")?.trim();
+  if (!contentReader && requestedTag && requestedTag !== "catalog-product") return json({ data: [] });
   const values: unknown[] = [organizationId];
   const clauses = ["organization_id = $1", "deleted_at IS NULL"];
   if (params.get("q")?.trim()) { values.push(`%${params.get("q")!.trim()}%`); clauses.push(`(public_url ILIKE $${values.length} OR display_name ILIKE $${values.length} OR alt_text ILIKE $${values.length})`); }
   if (params.get("mime")?.trim()) { values.push(`${params.get("mime")!.trim()}%`); clauses.push(`mime_type ILIKE $${values.length}`); }
-  if (params.get("tag")?.trim()) { values.push(params.get("tag")!.trim()); clauses.push(`$${values.length} = ANY(tags)`); }
+  const effectiveTag = catalogEndpoint ? "catalog-product" : contentReader ? requestedTag : "catalog-product";
+  if (effectiveTag) { values.push(effectiveTag); clauses.push(`$${values.length} = ANY(tags)`); }
   values.push(safeLimit(params.get("limit")));
   const result = await database.query(`SELECT id, storage_path, public_url, alt_text, mime_type, width, height, created_at, deleted_at, display_name, byte_size, tags, organization_id FROM public.cms_media WHERE ${clauses.join(" AND ")} ORDER BY ${safeSort(params.get("sort"))} LIMIT $${values.length}`, values);
   return json({ data: result.rows });
+}
+
+export async function handleCmsAdminMediaDetailRequest(request: Request, appDatabase: WorkerDatabaseClient, medusaDatabase: WorkerDatabaseClient, env: Env, mediaId: string): Promise<Response> {
+  if (!["GET", "PATCH"].includes(request.method)) return json({ error: "method_not_allowed" }, 405);
+  const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
+  if (!claims) return json({ error: "unauthorized" }, 401);
+  const organizationId = tenant(claims);
+  if (!organizationId) return json({ error: "organization_claim_required" }, 403);
+  if (!/^[a-zA-Z0-9_-]{1,160}$/.test(mediaId)) return json({ error: "invalid_media_id" }, 400);
+  const row = await mediaById(appDatabase, mediaId, organizationId);
+  if (!row) return json({ error: "not_found" }, 404);
+  const permissions = Array.isArray(claims.permissions) ? claims.permissions : [];
+  const isPrivileged = claims.role === "owner" || claims.role === "admin" || permissions.includes("*");
+  const isCatalog = row.tags.includes("catalog-product");
+  const contentRead = isPrivileged || permissions.includes("content:read");
+  const catalogRead = isPrivileged || permissions.includes("catalog:read") || permissions.includes("catalog:write");
+  const contentWrite = isPrivileged || permissions.includes("content:write");
+  const catalogWrite = isPrivileged || permissions.includes("catalog:write");
+  if (request.method === "GET") {
+    if (!contentRead && !(isCatalog && catalogRead)) return json({ error: "forbidden" }, 403);
+    if (new URL(request.url).searchParams.get("refs") === "1") {
+      const [cmsReferences, commerceReferences] = await Promise.all([
+        findMediaReferences(appDatabase, row.public_url, organizationId, false),
+        isCatalog ? findMediaReferences(medusaDatabase, row.public_url, organizationId, true) : Promise.resolve([]),
+      ]);
+      return json({ data: { row, refs: [...cmsReferences, ...commerceReferences] } });
+    }
+    return json({ data: row });
+  }
+  if (!contentWrite && !(isCatalog && catalogWrite)) return json({ error: "forbidden" }, 403);
+  const requestKey = requestIdempotencyKey(request);
+  if (!requestKey) return json({ error: "idempotency_key_required" }, 400);
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > 64 * 1024) return json({ error: "payload_too_large" }, 413);
+  let input: unknown;
+  try { input = JSON.parse(body); } catch { return json({ error: "invalid_media_metadata" }, 400); }
+  if (!input || typeof input !== "object" || Array.isArray(input)) return json({ error: "invalid_media_metadata" }, 400);
+  const data = input as Record<string, unknown>;
+  const allowed = new Set(["alt_text", "display_name", "tags"]);
+  if (Object.keys(data).some((key) => !allowed.has(key))) return json({ error: "invalid_media_metadata" }, 400);
+  if (data.alt_text !== undefined && data.alt_text !== null && (typeof data.alt_text !== "string" || data.alt_text.length > 500)) return json({ error: "invalid_media_metadata" }, 400);
+  if (data.display_name !== undefined && data.display_name !== null && (typeof data.display_name !== "string" || data.display_name.length > 160)) return json({ error: "invalid_media_metadata" }, 400);
+  if (data.tags !== undefined && (!Array.isArray(data.tags) || data.tags.length > 50 || data.tags.some((tag) => typeof tag !== "string" || !tag.trim() || tag.trim().length > 80))) return json({ error: "invalid_media_metadata" }, 400);
+  let tags = data.tags === undefined ? undefined : [...new Set((data.tags as string[]).map((tag) => tag.trim()))];
+  if (tags !== undefined && tags.includes("catalog-product") !== isCatalog) return json({ error: "media_bucket_tag_immutable" }, 400);
+  if (isCatalog && tags !== undefined) tags = [...new Set([...tags, "catalog-product"])];
+  const result = await executeIdempotently(
+    new HyperdriveIdempotencyStore(appDatabase),
+    await scopedMediaIdempotencyKey(organizationId, claims.sub, `update:${mediaId}`, requestKey),
+    await uploadDigest([organizationId, claims.sub, "update", mediaId, body]),
+    async () => {
+      const updated = await withWorkerTransaction(appDatabase, async (tx) => {
+        const result = await tx.query<MediaRow>(
+          `UPDATE public.cms_media SET alt_text = CASE WHEN $3::boolean THEN $4 ELSE alt_text END, display_name = CASE WHEN $5::boolean THEN $6 ELSE display_name END, tags = CASE WHEN $7::boolean THEN $8::text[] ELSE tags END WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL RETURNING id, storage_path, public_url, alt_text, mime_type, width, height, created_at, deleted_at, display_name, byte_size, tags, organization_id`,
+          [mediaId, organizationId, data.alt_text !== undefined, data.alt_text ?? null, data.display_name !== undefined, data.display_name ?? null, tags !== undefined, tags ?? []],
+        );
+        const row = result.rows[0];
+        if (!row) return null;
+        await tx.query(
+          "INSERT INTO public.audit_logs (action, resource, details) VALUES ($1, $2, $3::jsonb)",
+          ["cms.media.update", `media:${mediaId}`, JSON.stringify({ organization_id: organizationId, actor_subject: claims.sub, changed_fields: Object.keys(data) })],
+        );
+        return row;
+      });
+      if (!updated) return json({ error: "media_update_failed" }, 500);
+      return json({ data: updated });
+    },
+  );
+  return result.response;
 }

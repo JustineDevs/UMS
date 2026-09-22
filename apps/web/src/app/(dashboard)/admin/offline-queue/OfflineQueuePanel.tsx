@@ -124,7 +124,7 @@ export function OfflineQueuePanel() {
                   {row.device_name}
                 </TableCell>
                 <TableCell className="align-top text-xs text-muted-foreground">
-                  {new Date(row.created_at).toLocaleString()}
+                  {new Date(row.created_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
                 </TableCell>
                 <TableCell className="align-top">
                   <pre className="max-h-40 max-w-xl overflow-auto rounded-lg bg-muted p-2 font-mono text-[11px] text-foreground">

@@ -120,6 +120,19 @@ test("preview contract accepts stable geometry and rejects malformed selection m
   }).success, false);
 });
 
+test("preview bridge contract accepts sandboxed frame-control messages", () => {
+  assert.equal(cmsPreviewMessageSchema.safeParse({
+    source: "cms-builder-frame-state",
+    state: "hover",
+    theme: "dark",
+    showHidden: true,
+  }).success, true);
+  assert.equal(cmsPreviewMessageSchema.safeParse({
+    source: "cms-preview-css-variables",
+    palette: { font: {}, color: {}, dimensions: {} },
+  }).success, true);
+});
+
 test("component canvas contract accepts sanitized source and rejects executable source", () => {
   const base = {
     id: "visual-card",

@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
-import { fetchCanonicalCustomerClv } from "@/lib/analytics-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError } from "@/lib/staff-api-response";
+import { adminAnalyticsClvResponseSchema } from "@/lib/admin-api-contracts";
+import { proxyWorkerAdminRoute } from "@/lib/worker-admin-route-proxy";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -16,7 +17,12 @@ export async function GET(req: NextRequest) {
   if (!email) {
     return correlatedError(cid, 400, "email query param required", "VALIDATION_ERROR");
   }
-  const clv = await fetchCanonicalCustomerClv(email);
-  if (!clv) return correlatedError(cid, 404, "Not found", "NOT_FOUND");
-  return correlatedJson(cid, { data: clv });
+  try {
+    const response = await proxyWorkerAdminRoute(req, "/api/admin/analytics/clv", adminAnalyticsClvResponseSchema);
+    const headers = new Headers(response.headers);
+    headers.set("x-request-id", cid);
+    return new Response(response.body, { status: response.status, headers });
+  } catch {
+    return correlatedError(cid, 503, "Analytics service is unavailable", "SERVICE_UNAVAILABLE");
+  }
 }

@@ -96,7 +96,10 @@ export function WishlistSyncOnLogin({ disabled = false }: { disabled?: boolean }
         })),
         json.skippedProductIds ?? [],
       );
-      const skipped = new Set((json.skippedProductIds ?? []).map((id) => id.trim()).filter(Boolean));
+      const skipped = new Set((json.skippedProductIds ?? []).flatMap((id) => {
+        const trimmed = id.trim();
+        return trimmed ? [trimmed] : [];
+      }));
       window.localStorage.setItem(
         "universal_music_store_wishlist_v1",
         JSON.stringify(merged),

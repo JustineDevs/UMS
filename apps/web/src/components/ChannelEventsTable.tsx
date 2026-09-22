@@ -10,22 +10,48 @@ import type { ChannelEventRow } from "@/lib/channel-events-bridge";
 export function ChannelEventsTable({ initialEvents }: { initialEvents: ChannelEventRow[] }) {
   const [events, setEvents] = useState(initialEvents);
   const [loading, setLoading] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function refresh() {
     setLoading(true);
+    setError(null);
     try {
       const response = await fetch("/api/admin/channels/events?limit=80", { cache: "no-store" });
       const body = await response.json();
       if (response.ok && Array.isArray(body.events)) setEvents(body.events);
+      else setError("Channel events could not be refreshed. Try again.");
+    } catch {
+      setError("Channel events could not be refreshed. Try again.");
     } finally {
       setLoading(false);
     }
   }
 
   async function markProcessed(id: string) {
-    const response = await fetch(`/api/admin/channels/events/${encodeURIComponent(id)}/process`, { method: "POST" });
-    if (!response.ok) return;
-    setEvents((current) => current.map((event) => event.id === id ? { ...event, processed_at: new Date().toISOString() } : event));
+    setProcessingId(id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/channels/events/${encodeURIComponent(id)}/process`, {
+        method: "POST",
+        headers: { "Idempotency-Key": `channel-event-process-${id}` },
+      });
+      if (!response.ok) {
+        setError(response.status === 409 ? "This event was already processed. Refresh the list." : "The event could not be processed. Try again.");
+        return;
+      }
+      const body = await response.json() as { event?: { processed_at?: string } };
+      const processedAt = body.event?.processed_at;
+      if (!processedAt) {
+        setError("The Worker returned an invalid processing result. Refresh the list.");
+        return;
+      }
+      setEvents((current) => current.map((event) => event.id === id ? { ...event, processed_at: processedAt } : event));
+    } catch {
+      setError("The event could not be processed. Check the connection and try again.");
+    } finally {
+      setProcessingId(null);
+    }
   }
 
   return (
@@ -35,6 +61,7 @@ export function ChannelEventsTable({ initialEvents }: { initialEvents: ChannelEv
           <p className="text-sm text-muted-foreground">Signed updates received from connected sales channels.</p>
           <Button type="button" variant="outline" size="sm" onClick={() => void refresh()} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</Button>
         </div>
+        {error ? <p role="alert" className="border-b px-4 py-3 text-sm text-destructive">{error}</p> : null}
         <Table>
           <TableHeader><TableRow><TableHead>Channel</TableHead><TableHead>Event</TableHead><TableHead>Received</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
           <TableBody>
@@ -42,9 +69,9 @@ export function ChannelEventsTable({ initialEvents }: { initialEvents: ChannelEv
               <TableRow key={event.id}>
                 <TableCell className="font-medium">{event.channel}</TableCell>
                 <TableCell className="text-muted-foreground">{event.event_type}</TableCell>
-                <TableCell className="text-muted-foreground">{new Date(event.received_at).toLocaleString()}</TableCell>
+                <TableCell className="text-muted-foreground">{new Date(event.received_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}</TableCell>
                 <TableCell>{event.processed_at ? "Processed" : "Needs review"}</TableCell>
-                <TableCell className="text-right">{event.processed_at ? <span className="text-xs text-muted-foreground">Complete</span> : <Button type="button" variant="outline" size="sm" onClick={() => void markProcessed(event.id)}>Mark processed</Button>}</TableCell>
+                <TableCell className="text-right">{event.processed_at ? <span className="text-xs text-muted-foreground">Complete</span> : <Button type="button" variant="outline" size="sm" disabled={processingId !== null} onClick={() => void markProcessed(event.id)}>{processingId === event.id ? "Processing..." : "Mark processed"}</Button>}</TableCell>
               </TableRow>
             ))}
           </TableBody>

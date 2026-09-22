@@ -1,7 +1,9 @@
 ---
 name: building-admin-dashboard-customizations
-description: Load automatically when planning, researching, or implementing Medusa Admin dashboard UI (widgets, custom pages, forms, tables, data loading, navigation). REQUIRED for all admin UI work in ALL modes (planning, implementation, exploration). Contains design patterns, component usage, and data loading patterns that MCP servers don't provide.
+description: Historical Medusa Admin reference only. Do not load for UVS admin implementation; UVS admin is part of apps/web and uses Worker APIs.
 ---
+
+> Archived reference: this guide targets the separate Medusa Admin application, which UVS no longer deploys. Do not add Medusa Admin SDK, routes, or components to UVS. The active staff UI is `apps/web` and its backend contracts are in `workers/backend`.
 
 # Medusa Admin Dashboard Customizations
 

@@ -8,13 +8,11 @@ Set these in Vercel → Project → Settings → Environment Variables. Without 
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `NEXT_PUBLIC_MEDUSA_URL` | Cloudflare Workers backend gateway (the deployed Worker URL) | `${API_URL}` |
-| `NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY` | Medusa publishable API key | From `medusa seed:ph` output |
-| `NEXT_PUBLIC_MEDUSA_REGION_ID` | Medusa region ID | From Medusa admin or seed |
+| `API_URL` | Deployed Cloudflare Worker API origin | `https://<worker>.<account>.workers.dev` |
 
-Alternative: use `MEDUSA_BACKEND_URL`, `MEDUSA_PUBLISHABLE_API_KEY`, `MEDUSA_REGION_ID` (server-side only).
-
-Do not leave these empty. Empty values cause "Invalid URL" errors.
+Do not set legacy `MEDUSA_*` storefront variables. The web application talks to
+the Cloudflare Worker through `API_URL`; the Worker reaches the commerce database
+through its configured Hyperdrive binding.
 
 ---
 

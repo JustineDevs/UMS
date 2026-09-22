@@ -8,6 +8,7 @@ import {
 import { extractSessionEmail } from "@universal-music-store/sdk";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { cartEmailMatchesOwner } from "@/lib/cart-session-boundary";
+import { cartAttachCustomerResponseSchema } from "@/lib/admin-api-contracts";
 
 /** IP window kept long enough that sequential E2E bursts under load still hit 429 before the window resets. */
 const ATTACH_CUSTOMER_IP_WINDOW_MS = 300_000;
@@ -19,6 +20,17 @@ export async function POST(req: Request) {
       { status: 403 },
     );
   }
+
+  // Authorization must be evaluated before throttling. Otherwise an
+  // unauthenticated caller can receive 429 from a shared IP bucket instead
+  // of the route's stable 401 contract, which also makes security monitoring
+  // indistinguishable from an authenticated abuse event.
+  const session = await getStorefrontSession();
+  const email = extractSessionEmail(session);
+  if (!email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const rl = await applyRateLimit(
     req,
     "cart-attach",
@@ -27,18 +39,12 @@ export async function POST(req: Request) {
   );
   if (!rl.ok) return rl.response;
 
-  const session = await getStorefrontSession();
-  const email = extractSessionEmail(session);
-  if (!email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const userRl = await applyUserRateLimit(email, "cart-attach", 15, 60_000);
   if (!userRl.ok) return userRl.response;
 
   const cartId = await readCartIdFromCookie();
   if (!cartId) {
-    return NextResponse.json({ ok: false, skipped: true });
+    return NextResponse.json(cartAttachCustomerResponseSchema.parse({ ok: false, skipped: true }));
   }
 
   try {
@@ -49,7 +55,7 @@ export async function POST(req: Request) {
       { headers: { Accept: "application/json" }, cache: "no-store" },
     );
     if (read.status === 404) {
-      return NextResponse.json({ ok: false, skipped: true });
+      return NextResponse.json(cartAttachCustomerResponseSchema.parse({ ok: false, skipped: true }));
     }
     if (!read.ok) throw new Error(`worker_cart_${read.status}`);
     const payload = (await read.json()) as { cart?: { email?: unknown } };
@@ -73,7 +79,7 @@ export async function POST(req: Request) {
       },
     );
     if (!update.ok) throw new Error(`worker_cart_update_${update.status}`);
-    return NextResponse.json({ ok: true, cartId });
+    return NextResponse.json(cartAttachCustomerResponseSchema.parse({ ok: true, cartId }));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[cart/attach-customer] unhandled:", msg.slice(0, 300));

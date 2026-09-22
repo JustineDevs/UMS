@@ -5,6 +5,8 @@ import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-li
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { cmsAnnouncementTrackSchema } from "@/lib/admin-api-contracts";
+import { simpleOkResponseSchema } from "@/lib/admin-api-contracts";
 
 const ALLOWED = new Set(["impression", "click", "dismiss"]);
 
@@ -33,13 +35,11 @@ async function handlePOST(req: NextRequest) {
   if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400 });
   }
-  const body = parsedBody.value as { id?: string; locale?: string; metric?: string };
-  const id = typeof body.id === "string" ? body.id.trim() : "";
-  const locale = typeof body.locale === "string" ? body.locale.trim() || "en" : "en";
-  const metricRaw = typeof body.metric === "string" ? body.metric.trim() : "";
-  if (!id || !ALLOWED.has(metricRaw)) {
+  const parsed = cmsAnnouncementTrackSchema.safeParse(parsedBody.value);
+  if (!parsed.success || !ALLOWED.has(parsed.data.metric)) {
     return new Response(JSON.stringify({ error: "Bad request" }), { status: 400 });
   }
+  const { id, locale, metric: metricRaw } = parsed.data;
   const metric =
     metricRaw === "impression"
       ? "impressions"
@@ -47,7 +47,7 @@ async function handlePOST(req: NextRequest) {
         ? "clicks"
         : "dismisses";
   await incrementCmsAnnouncementMetric(sb, id, locale, metric);
-  return Response.json({ ok: true });
+  return Response.json(simpleOkResponseSchema.parse({ ok: true }));
 }
 
 export const POST = withBotIdProtection(handlePOST);

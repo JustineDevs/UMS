@@ -25,7 +25,10 @@ const children = [];
 let shuttingDown = false;
 
 if (existsSync(join(root, ".env.local"))) {
-  loadDotenv({ path: join(root, ".env.local"), override: true });
+  // Keep explicit process overrides authoritative. This is important for
+  // sandbox/provider verification: a live value in .env.local must not
+  // silently replace PAYPAL_ENVIRONMENT=sandbox supplied for a test run.
+  loadDotenv({ path: join(root, ".env.local"), override: false });
 }
 
 function isAlive(pid) {
@@ -175,6 +178,7 @@ const worker = spawnPnpm(
     "--env",
     "dev",
     "--local",
+    "--show-interactive-dev-session=false",
     "--port",
     String(workerPort),
   ],

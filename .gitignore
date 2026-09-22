@@ -4,6 +4,7 @@ node_modules/
 
 # Build outputs
 .next/
+.next-production/
 .wrangler/
 .turbo/
 .medusa/

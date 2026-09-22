@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithPassword } from "@/lib/auth-client";
 import { Button, Input, Label } from "@universal-music-store/ui";
 
 type Props = {
@@ -27,13 +26,19 @@ export function AdminE2eCredentialsForm({ callbackUrl, defaultEmail }: Props) {
     const submittedEmail = String(formData.get("email") ?? email).trim();
     const submittedPassword = String(formData.get("password") ?? password);
     try {
-      const res = await signInWithPassword(submittedEmail, submittedPassword, callbackUrl);
+      const res = await fetch("/api/auth/e2e", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: submittedEmail, password: submittedPassword }),
+      });
       if (!res.ok) {
         setError(
           "Email, password, or staff access did not match. Use the first allowed email, AUTH_SECRET as password, and run pnpm e2e:ensure-staff.",
         );
         return;
       }
+      window.location.assign(callbackUrl.startsWith("/") ? callbackUrl : "/admin");
     } finally {
       setBusy(false);
     }

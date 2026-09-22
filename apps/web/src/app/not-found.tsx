@@ -1,5 +1,5 @@
-/* eslint-disable @next/next/no-html-link-for-pages -- standalone 404 has no router context. */
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Page not found",
@@ -26,18 +26,18 @@ export default function NotFound() {
         The page you requested does not exist or is no longer available.
       </p>
       <nav className="mt-8 flex flex-wrap justify-center gap-3" aria-label="Error recovery">
-        <a
+        <Link
           href="/"
           className="rounded-md bg-primary px-5 py-3 text-sm font-bold text-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Back to home
-        </a>
-        <a
+        </Link>
+        <Link
           href="/shop"
           className="rounded-md border border-outline px-5 py-3 text-sm font-bold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Shop
-        </a>
+        </Link>
       </nav>
     </main>
   );

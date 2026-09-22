@@ -13,6 +13,7 @@ import { trackingLinkRouteLogic } from "@/lib/tracking-link-route-logic";
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { storefrontTrackingLinkSchema, trackingLinkResponseSchema } from "@/lib/admin-api-contracts";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 60;
@@ -41,12 +42,13 @@ async function handlePOST(req: Request) {
   if (!bounded.valid) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const body = bounded.value as { cartId?: string };
+  const parsed = storefrontTrackingLinkSchema.safeParse(bounded.value);
+  if (!parsed.success) return NextResponse.json({ error: "cartId is required" }, { status: 400 });
 
   const base =
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN;
   const result = trackingLinkRouteLogic({
-    cartId: typeof body?.cartId === "string" ? body.cartId : "",
+    cartId: parsed.data.cartId,
     ownedCartId: await readCartIdFromCookie(),
     rateLimited: false,
     retryAfterSec: undefined,
@@ -55,7 +57,8 @@ async function handlePOST(req: Request) {
     }),
   });
 
-  return NextResponse.json(result.body, {
+  const body = result.status === 200 ? trackingLinkResponseSchema.parse(result.body) : result.body;
+  return NextResponse.json(body, {
     status: result.status,
     ...(result.status === 429 && typeof result.body.retryAfter === "number"
       ? { headers: { "Retry-After": String(result.body.retryAfter) } }

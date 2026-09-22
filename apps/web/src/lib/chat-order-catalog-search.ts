@@ -7,15 +7,22 @@ export type ChatOrderVariantLine = {
   sku: string | null;
 };
 
+export type ChatOrderVariantSearchResult =
+  | { lines: ChatOrderVariantLine[] }
+  | { unavailable: true };
+
+type CatalogProductsFetcher = typeof fetchWorkerCatalogProductsForAdmin;
+
 /** Search sellable variants for chat-order intake through the staff Worker catalog contract. */
 export async function searchCatalogVariantLines(
   q: string,
   limitProducts = 12,
-): Promise<ChatOrderVariantLine[]> {
+  fetchProducts: CatalogProductsFetcher = fetchWorkerCatalogProductsForAdmin,
+): Promise<ChatOrderVariantSearchResult> {
   const qt = q.trim();
-  if (qt.length < 2) return [];
-  const result = await fetchWorkerCatalogProductsForAdmin({ limit: limitProducts, offset: 0, q: qt, status: "published" });
-  if (result.commerceUnavailable) return [];
+  if (qt.length < 2) return { lines: [] };
+  const result = await fetchProducts({ limit: limitProducts, offset: 0, q: qt, status: "published" });
+  if (result.commerceUnavailable) return { unavailable: true };
   const out: ChatOrderVariantLine[] = [];
   for (const product of result.products) {
     const productTitle = product.title.trim() || "Untitled";
@@ -31,5 +38,5 @@ export async function searchCatalogVariantLines(
       });
     }
   }
-  return out.slice(0, 40);
+  return { lines: out.slice(0, 40) };
 }

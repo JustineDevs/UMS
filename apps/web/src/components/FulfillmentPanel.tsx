@@ -55,17 +55,26 @@ export function FulfillmentPanel({
     setErr(null);
     setMsg(null);
     setLoading("shipment");
-    const res = await fetch("/api/medusa/shipments", {
+    const res = await fetch("/api/admin/delivery-logistics/shipments", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Idempotency-Key": `shipment-${crypto.randomUUID()}`,
       },
       body: JSON.stringify({
-        orderId,
-        trackingNumber: trackingNumber.trim(),
-        carrierSlug: carrierSlug.trim() || "jtexpress-ph",
-        labelUrl: labelUrl.trim() || undefined,
+        kind: "shipment",
+        order_id: orderId,
+        tracking_status: "assigned",
+        tracking_url: trackingNumber.trim()
+          ? `https://www.jtexpress.ph/index/query/gcsSearch.html?bills=${encodeURIComponent(trackingNumber.trim())}`
+          : null,
+        courier_slug: carrierSlug.trim() || "jtexpress-ph",
+        courier_label: (couriers.find((courier) => courier.slug === carrierSlug)?.label ?? carrierSlug.trim()) || "J&T Express",
+        status: "assigned",
+        metadata: {
+          tracking_number: trackingNumber.trim(),
+          label_url: labelUrl.trim() || null,
+        },
       }),
     });
     if (!res.ok) {
@@ -87,7 +96,7 @@ export function FulfillmentPanel({
     setMsg(null);
     setLoading(`status:${next}`);
     const res = await fetch(
-      `/api/medusa/orders/${encodeURIComponent(orderId)}`,
+      `/api/admin/orders/${encodeURIComponent(orderId)}/status`,
       {
         method: "PATCH",
         headers: {
@@ -120,9 +129,8 @@ export function FulfillmentPanel({
     router.refresh();
   }
 
-  const canShip =
-    status === "paid" || status === "ready_to_ship" || status === "shipped";
-  const showMarkShipped = status === "ready_to_ship" || status === "paid";
+  const canShip = status === "packed" || status === "shipped";
+  const showMarkShipped = status === "packed";
   const showMarkDelivered = status === "shipped";
 
   return (
@@ -154,10 +162,11 @@ export function FulfillmentPanel({
             className="space-y-4 mb-6"
           >
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              <label htmlFor="fulfillment-tracking-number" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Tracking number
               </label>
               <input
+                id="fulfillment-tracking-number"
                 value={trackingNumber}
                 onChange={(e) => setTrackingNumber(e.target.value)}
                 required
@@ -166,10 +175,11 @@ export function FulfillmentPanel({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              <label htmlFor="fulfillment-carrier" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Carrier
               </label>
               <select
+                id="fulfillment-carrier"
                 value={couriers.some((c) => c.slug === carrierSlug) ? carrierSlug : "__custom"}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -186,6 +196,7 @@ export function FulfillmentPanel({
                 ))}
               </select>
               <input
+                aria-label="Custom carrier code"
                 value={carrierSlug}
                 onChange={(e) => setCarrierSlug(e.target.value)}
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs font-mono"
@@ -193,10 +204,11 @@ export function FulfillmentPanel({
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+              <label htmlFor="fulfillment-label-url" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Label URL (optional)
               </label>
               <input
+                id="fulfillment-label-url"
                 value={labelUrl}
                 onChange={(e) => setLabelUrl(e.target.value)}
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm"
@@ -214,6 +226,26 @@ export function FulfillmentPanel({
         )}
 
         <div className="flex flex-wrap gap-2">
+          {status === "paid" && (
+            <button
+              type="button"
+              disabled={loading !== null}
+              onClick={() => void patchOrder("processing")}
+              className="rounded border border-primary px-4 py-2 text-sm font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
+            >
+              Start processing
+            </button>
+          )}
+          {status === "processing" && (
+            <button
+              type="button"
+              disabled={loading !== null}
+              onClick={() => void patchOrder("packed")}
+              className="rounded border border-primary px-4 py-2 text-sm font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
+            >
+              Mark packed
+            </button>
+          )}
           {showMarkShipped && (
             <button
               type="button"
@@ -232,16 +264,6 @@ export function FulfillmentPanel({
               className="rounded border border-primary px-4 py-2 text-sm font-bold uppercase tracking-widest text-primary hover:bg-primary hover:text-on-primary disabled:opacity-50"
             >
               Mark delivered
-            </button>
-          )}
-          {status === "paid" && (
-            <button
-              type="button"
-              disabled={loading !== null}
-              onClick={() => void patchOrder("ready_to_ship")}
-              className="rounded border border-outline-variant px-4 py-2 text-sm font-medium text-on-surface-variant hover:border-primary disabled:opacity-50"
-            >
-              Mark ready to ship (without tracking yet)
             </button>
           )}
         </div>

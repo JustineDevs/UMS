@@ -5,6 +5,7 @@ import { sanitizeSafeUrl } from "@universal-music-store/sdk";
 import { z } from "zod";
 import { useEffect } from "react";
 import { normalizeCmsDomStyle } from "@/lib/cms-dom-edit";
+import { getAllCSSVariableNames } from "@/lib/visual-builder/color-palette";
 
 type DraftBlock = {
   id: string;
@@ -174,6 +175,8 @@ const builderMessageSchema = z.object({
   blocks: z.unknown().optional(),
   tree: z.unknown().optional(),
   mode: z.string().max(32).optional(),
+  theme: z.enum(["light", "dark"]).nullable().optional(),
+  showHidden: z.boolean().optional(),
 });
 
 function applyDomEdit(node: HTMLElement, property: string, value: string) {
@@ -408,6 +411,29 @@ export function CmsPagePreviewBridge() {
         markSelected(node);
         if (node) node.scrollIntoView({ block: "nearest" });
         send("cms-builder", node);
+        return;
+      }
+      if (message.data.source === "cms-builder-frame-state") {
+        if (message.data.theme) document.documentElement.setAttribute("data-bs-theme", message.data.theme);
+        else document.documentElement.removeAttribute("data-bs-theme");
+        const styleId = "vvveb-show-hidden-elements";
+        document.getElementById(styleId)?.remove();
+        if (message.data.showHidden) {
+          const style = document.createElement("style");
+          style.id = styleId;
+          style.textContent = '[hidden],[style*="display: none"],[style*="display:none"]{display:block!important;visibility:visible!important;opacity:.55!important;outline:1px dashed #f59e0b!important}';
+          document.head.append(style);
+        }
+        return;
+      }
+      if (message.data.source === "cms-builder-css-request") {
+        let palette = { font: {}, color: {}, dimensions: {} };
+        try {
+          palette = getAllCSSVariableNames(Array.from(document.styleSheets) as Parameters<typeof getAllCSSVariableNames>[0]);
+        } catch {
+          // Cross-origin stylesheets are intentionally omitted from the palette.
+        }
+        window.parent.postMessage({ source: "cms-preview-css-variables", palette }, origin);
         return;
       }
       if (message.data.source === "cms-builder-dom-edit") {

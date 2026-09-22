@@ -7,6 +7,8 @@ import {
   readCartIdFromCookie,
 } from "@/lib/cart-api-helpers";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { readResponseJson } from "@/lib/read-response-json";
+import { cartLineMutationResponseSchema } from "@/lib/admin-api-contracts";
 
 const bodySchema = z
   .object({
@@ -29,9 +31,9 @@ async function workerCartLineIds(cartId: string, variantId: string): Promise<str
   );
   if (response.status === 404) throw new Error("cart_not_found");
   if (!response.ok) throw new Error(`worker_cart_${response.status}`);
-  const payload = (await response.json()) as {
+  const payload = await readResponseJson<{
     cart?: { items?: Array<{ id?: unknown; variant_id?: unknown }> };
-  };
+  }>(response, {});
   return (payload.cart?.items ?? [])
     .filter(
       (item): item is { id: string; variant_id: string } =>
@@ -90,7 +92,7 @@ export async function PUT(request: Request) {
 
   const cartId = await readCartIdFromCookie();
   if (!cartId)
-    return NextResponse.json({ ok: true, updated: 0, skipped: true });
+    return NextResponse.json(cartLineMutationResponseSchema.parse({ ok: true, updated: 0, skipped: true }));
 
   try {
     const lineIds = await workerCartLineIds(
@@ -98,36 +100,36 @@ export async function PUT(request: Request) {
       body.data.variantId,
     );
     if (body.data.quantity === 0) {
-      for (const lineId of lineIds) {
+      await Promise.all(lineIds.map(async (lineId) => {
         const response = await updateWorkerLine(cartId, lineId, 0);
         if (!response.ok && response.status !== 404) {
           throw new Error(`worker_cart_line_${response.status}`);
         }
-      }
-      return NextResponse.json({
+      }));
+      return NextResponse.json(cartLineMutationResponseSchema.parse({
         ok: true,
         updated: 0,
         removed: lineIds.length,
-      });
+      }));
     }
     const [lineId, ...duplicateIds] = lineIds;
-    if (!lineId) return NextResponse.json({ ok: true, updated: 0 });
+    if (!lineId) return NextResponse.json(cartLineMutationResponseSchema.parse({ ok: true, updated: 0 }));
     const updateResponse = await updateWorkerLine(cartId, lineId, body.data.quantity);
     if (!updateResponse.ok) {
-      const payload = (await updateResponse.json().catch(() => null)) as { error?: unknown } | null;
+      const payload = await readResponseJson<{ error?: unknown } | null>(updateResponse, null);
       throw new Error(typeof payload?.error === "string" ? payload.error : `worker_cart_line_${updateResponse.status}`);
     }
-    for (const duplicateId of duplicateIds) {
+    await Promise.all(duplicateIds.map(async (duplicateId) => {
       const response = await updateWorkerLine(cartId, duplicateId, 0);
       if (!response.ok && response.status !== 404) {
         throw new Error(`worker_cart_line_${response.status}`);
       }
-    }
-    return NextResponse.json({
+    }));
+    return NextResponse.json(cartLineMutationResponseSchema.parse({
       ok: true,
       updated: 1,
       removed: duplicateIds.length,
-    });
+    }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/cart_not_found|already completed|completed/i.test(message)) {
@@ -169,20 +171,20 @@ export async function DELETE(request: Request) {
 
   const cartId = await readCartIdFromCookie();
   if (!cartId)
-    return NextResponse.json({ ok: true, removed: 0, skipped: true });
+    return NextResponse.json(cartLineMutationResponseSchema.parse({ ok: true, removed: 0, skipped: true }));
 
   try {
     const lineIds = await workerCartLineIds(
       cartId,
       body.data.variantId,
     );
-    for (const lineId of lineIds) {
+    await Promise.all(lineIds.map(async (lineId) => {
       const response = await updateWorkerLine(cartId, lineId, 0);
       if (!response.ok && response.status !== 404) {
         throw new Error(`worker_cart_line_${response.status}`);
       }
-    }
-    return NextResponse.json({ ok: true, removed: lineIds.length });
+    }));
+    return NextResponse.json(cartLineMutationResponseSchema.parse({ ok: true, removed: lineIds.length }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/cart_not_found|already completed|completed/i.test(message)) {

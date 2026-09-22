@@ -1,85 +1,27 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
-import {
-  listPendingQueue,
-  enqueueOfflineSale,
-  markSynced,
-  markFailed,
-} from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
-import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { fetchWorkerOfflineQueueForAdmin, saveWorkerOfflineQueueForAdmin } from "@/lib/worker-admin-bridge";
 
-export async function GET(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const deviceName = req.nextUrl.searchParams.get("device") ?? undefined;
-  const data = await listPendingQueue(sb, { deviceName });
-  return correlatedJson(cid, { data });
+export const dynamic = "force-dynamic";
+
+/** Worker auth: pos:use. Queue reads and mutations are organization-scoped in the Worker. */
+export async function GET(request: Request) {
+  const correlationId = getCorrelationId(request);
+  const query = new URL(request.url).searchParams.toString();
+  const response = await fetchWorkerOfflineQueueForAdmin(query);
+  return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
 }
 
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
-  const parsedBody = await parseBoundedJson(req, 256 * 1024);
-  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
-  const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
-    ? parsedBody.value as { device_name?: unknown; employee_id?: unknown; payload?: unknown }
-    : null;
-  if (!body?.device_name || !body.payload) {
-    return correlatedError(cid, 400, "device_name and payload are required", "VALIDATION_ERROR");
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const item = await enqueueOfflineSale(sb, {
-    device_name: String(body.device_name),
-    ...(typeof body.employee_id === "string" ? { employee_id: body.employee_id } : {}),
-    payload: body.payload as Record<string, unknown>,
-  });
-  return correlatedJson(cid, { data: item }, { status: 201 });
+async function mutate(request: Request, method: "POST" | "PATCH") {
+  const correlationId = getCorrelationId(request);
+  const idempotencyKey = request.headers.get("Idempotency-Key")?.trim();
+  if (!idempotencyKey) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId: correlationId }), { status: 400, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > 256 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId: correlationId }), { status: 413, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
+  let body: Record<string, unknown>;
+  try { const text = await request.text(); if (text.length > 256 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId: correlationId }), { status: 413, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); body = JSON.parse(text) as Record<string, unknown>; } catch { return new Response(JSON.stringify({ error: "Invalid JSON body", requestId: correlationId }), { status: 400, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); }
+  const response = await saveWorkerOfflineQueueForAdmin(method, body, idempotencyKey);
+  return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
 }
 
-async function patch(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const session = await getStaffSession();
-  if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  if (!staffSessionAllows(session, "pos:use")) {
-    return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  }
-  const parsedBody = await parseBoundedJson(req, 32 * 1024);
-  if (parsedBody.tooLarge) return correlatedError(cid, 413, "Payload too large", "VALIDATION_ERROR");
-  const body = parsedBody.valid && parsedBody.value && typeof parsedBody.value === "object" && !Array.isArray(parsedBody.value)
-    ? parsedBody.value as { id?: unknown; action?: unknown; error_message?: unknown }
-    : {};
-  const { id, action, error_message } = body;
-  if (!id || !action) {
-    return correlatedError(cid, 400, "id and action required", "VALIDATION_ERROR");
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  if (action === "synced") {
-    await markSynced(sb, String(id));
-  } else if (action === "failed") {
-    await markFailed(sb, String(id), typeof error_message === "string" ? error_message : "Unknown error");
-  }
-  return correlatedJson(cid, { success: true });
-}
-
-export const POST = withAdminMutationIdempotency("/admin/offline-queue:POST", post);
-export const PATCH = withAdminMutationIdempotency("/admin/offline-queue:PATCH", patch);
+export async function POST(request: Request) { return mutate(request, "POST"); }
+export async function PATCH(request: Request) { return mutate(request, "PATCH"); }

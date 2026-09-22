@@ -135,6 +135,16 @@ const normalizedNodeEnv =
     : "development";
 
 const localAuthOrigin = `http://localhost:${port}`;
+// Webpack is the stable default for the two-process Worker + Next dev stack.
+// Turbopack can race its generated manifest writes when Wrangler reloads the
+// Worker while a dynamic API route is compiling, leaving the storefront with
+// an HTTP 500 until the generated directory is rebuilt. Keep Turbopack opt-in
+// for contributors who explicitly want it.
+const requestedBundler = String(process.env.UVS_DEV_NEXT_BUNDLER || "webpack").trim().toLowerCase();
+if (requestedBundler !== "turbo" && requestedBundler !== "webpack") {
+  console.error("UVS_DEV_NEXT_BUNDLER must be either turbo or webpack");
+  process.exit(1);
+}
 const appEnv = {
   ...process.env,
   NODE_ENV: normalizedNodeEnv,
@@ -152,9 +162,13 @@ const existingNodeOptions = (appEnv.NODE_OPTIONS || "")
   .trim();
 appEnv.NODE_OPTIONS = `${existingNodeOptions} --max-old-space-size=${webHeapMb}`.trim();
 
+const nextArgs = [nextBin, "dev", "--port", String(port)];
+if (requestedBundler === "turbo") {
+  nextArgs.splice(2, 0, "--turbo");
+}
 const result = spawnSync(
   process.execPath,
-  [nextBin, "dev", "--port", String(port)],
+  nextArgs,
   {
     cwd: appDir,
     stdio: "inherit",

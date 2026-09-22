@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { getPaymentAttemptByCorrelationId } from "@universal-music-store/platform-data";
-import { buildTrackingUrl, DEFAULT_PUBLIC_SITE_ORIGIN } from "@universal-music-store/sdk";
-
-import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
-import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
-import { publicPaymentAttemptError } from "@/lib/payment-attempt-public";
-import { readCheckoutAttemptCookie } from "@/lib/checkout-attempt-cookie";
+import { readResponseJson } from "@/lib/read-response-json";
+import { checkoutIntentResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,57 +14,28 @@ export async function GET(
   }
 
   const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
-  if (workerBaseUrl) {
-    const response = await fetch(
+  if (!workerBaseUrl) {
+    return NextResponse.json({ error: "Payment service is not configured" }, { status: 503 });
+  }
+  let response: Response;
+  try {
+    response = await fetch(
       `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId.trim())}`,
       {
         cache: "no-store",
+        redirect: "error",
         headers: {
           Accept: "application/json",
           ...(req.headers.get("cookie") ? { Cookie: req.headers.get("cookie")! } : {}),
         },
       },
     );
-    const payload = await response.json().catch(() => ({ error: "Not found" }));
-    return NextResponse.json(payload, { status: response.ok ? 200 : response.status });
+  } catch {
+    return NextResponse.json({ error: "Payment service is unavailable" }, { status: 503 });
   }
-
-  const cartId = await readCartIdFromCookie();
-  const attemptCookie = await readCheckoutAttemptCookie();
-
-  const sb = createStorefrontServiceSupabase();
-  if (!sb) {
-    return NextResponse.json(
-      { error: "Payment ledger is not configured" },
-      { status: 503 },
-    );
-  }
-
-  const row = await getPaymentAttemptByCorrelationId(sb, correlationId.trim());
-  if (!row || (cartId ? row.cart_id !== cartId : attemptCookie !== correlationId.trim())) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    correlationId: row.correlation_id,
-    cartId: row.cart_id,
-    provider: row.provider,
-    providerSessionId: row.provider_session_id,
-    providerPaymentId: row.provider_payment_id,
-    status: row.status,
-    checkoutState: row.checkout_state,
-    quoteFingerprint: row.quote_fingerprint,
-    staleReason: row.stale_reason,
-    medusaOrderId: row.medusa_order_id,
-    trackingPageUrl: row.medusa_order_id
-      ? buildTrackingUrl(
-          process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN,
-          row.medusa_order_id,
-          { storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim() },
-        )
-      : null,
-    lastError: publicPaymentAttemptError(row.last_error),
-    finalizeAttempts: row.finalize_attempts,
-    updatedAt: row.updated_at,
-  });
+  const payload = await readResponseJson(response, { error: "Not found" });
+  if (!response.ok) return NextResponse.json(payload, { status: response.status });
+  const parsed = checkoutIntentResponseSchema.safeParse(payload);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid payment intent response" }, { status: 502 });
+  return NextResponse.json(parsed.data, { status: 200 });
 }

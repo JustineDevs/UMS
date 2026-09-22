@@ -10,13 +10,15 @@ import { readAdminPreferences } from "@universal-music-store/user-preferences";
 export function InventoryDefaultQuerySync() {
   const router = useRouter();
   const searchParams = useSearchParams() ?? new URLSearchParams();
+  const page = searchParams.get("page");
+  const pageSize = searchParams.get("pageSize");
 
   useEffect(() => {
-    if (searchParams.get("page") || searchParams.get("pageSize")) return;
+    if (page || pageSize) return;
     const { inventoryPageSize } = readAdminPreferences();
     if (inventoryPageSize === 25) return;
     router.replace(`/admin/inventory?page=1&pageSize=${inventoryPageSize}`);
-  }, [router, searchParams]);
+  }, [page, pageSize, router]);
 
   return null;
 }

@@ -49,9 +49,9 @@ export interface InvoiceFormValues {
   items: InvoiceLineItem[];
 }
 
-const today = new Date();
-
-export const defaultInvoiceValues: InvoiceFormValues = {
+export function getDefaultInvoiceValues(): InvoiceFormValues {
+  const today = new Date();
+  return {
   referenceNumber: "FL-0425",
   issuedDate: format(today, "yyyy-MM-dd"),
   paymentDueDate: format(addDays(today, 14), "yyyy-MM-dd"),
@@ -94,7 +94,8 @@ export const defaultInvoiceValues: InvoiceFormValues = {
       unitPrice: 400,
     },
   ],
-};
+  };
+}
 
 export const invoiceTaxOptions: InvoiceTaxOption[] = [
   {

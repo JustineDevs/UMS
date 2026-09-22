@@ -193,18 +193,24 @@ export function CmsExperimentsManager() {
         <p className="text-sm font-medium text-slate-800">
           {editingId ? "Edit experiment" : "Create experiment"}
         </p>
-        <input
-          className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          placeholder="experiment_key"
-        />
-        <input
-          className="w-full rounded border border-slate-200 px-3 py-2 text-sm"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Name"
-        />
+        <label className="text-xs text-slate-600">
+          Experiment key
+          <input
+            className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="experiment_key"
+          />
+        </label>
+        <label className="text-xs text-slate-600">
+          Name
+          <input
+            className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+          />
+        </label>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
@@ -264,27 +270,31 @@ export function CmsExperimentsManager() {
           </p>
           <ul className="mt-2 space-y-2">
             {variants.map((v, i) => (
-              <li key={i} className="flex flex-wrap items-center gap-2">
-                <input
-                  className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
-                  value={v.id}
-                  onChange={(e) => {
-                    const n = [...variants];
-                    n[i] = { ...n[i], id: e.target.value };
-                    setVariants(n);
-                  }}
-                  placeholder="id"
-                />
-                <input
-                  className="w-24 rounded border border-slate-200 px-2 py-1 text-sm font-mono"
-                  value={v.weight}
-                  onChange={(e) => {
-                    const n = [...variants];
-                    n[i] = { ...n[i], weight: e.target.value };
-                    setVariants(n);
-                  }}
-                  placeholder="0.5"
-                />
+              <li key={`${v.id || "variant"}-${v.weight}`} className="flex flex-wrap items-center gap-2">
+                <label className="sr-only">Variant ID
+                  <input
+                    className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+                    value={v.id}
+                    onChange={(e) => {
+                      const n = [...variants];
+                      n[i] = { ...n[i], id: e.target.value };
+                      setVariants(n);
+                    }}
+                    placeholder="id"
+                  />
+                </label>
+                <label className="sr-only">Variant weight
+                  <input
+                    className="w-24 rounded border border-slate-200 px-2 py-1 text-sm font-mono"
+                    value={v.weight}
+                    onChange={(e) => {
+                      const n = [...variants];
+                      n[i] = { ...n[i], weight: e.target.value };
+                      setVariants(n);
+                    }}
+                    placeholder="0.5"
+                  />
+                </label>
                 <button
                   type="button"
                   className="text-xs text-red-700 underline"

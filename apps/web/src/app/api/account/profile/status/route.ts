@@ -5,6 +5,8 @@ import {
   listMissingProfileParts,
 } from "@/lib/storefront-profile-complete";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { accountProfileStatusResponseSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +14,37 @@ const privateNoStore = {
   "Cache-Control": "private, no-store, max-age=0",
 };
 
+function profileStatusJson(payload: unknown, init?: Parameters<typeof Response.json>[1]) {
+  return Response.json(accountProfileStatusResponseSchema.parse(payload), init);
+}
+
 export async function GET() {
   const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  // Local E2E uses the deterministic storefront session/profile fixture even
+  // when the app is started in production mode. Keep the status gate aligned
+  // with the COD payload route instead of asking Supabase for a real session.
+  if (process.env.UVS_E2E_LOCAL === "1" && process.env.VERCEL !== "1") {
+    const session = await getStorefrontSession();
+    const email = session?.user?.email?.trim().toLowerCase();
+    if (!email) {
+      return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
+    }
+    const { profile, unavailable } = await loadCustomerProfileResult(email);
+    if (unavailable) {
+      return profileStatusJson(
+        { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
+        { status: 503, headers: privateNoStore },
+      );
+    }
+    const complete = isStorefrontProfileComplete(profile);
+    return profileStatusJson({
+      authenticated: true,
+      available: true,
+      complete,
+      missingFields: complete ? [] : listMissingProfileParts(profile),
+      profile,
+    }, { headers: privateNoStore });
+  }
   if (workerBaseUrl) {
     try {
       const supabase = await createSupabaseServerClient();
@@ -24,19 +55,19 @@ export async function GET() {
       const token = sessionData.session?.access_token?.trim();
       const email = userData.user?.email?.trim().toLowerCase();
       if (!email || !token) {
-        return Response.json({ authenticated: false, complete: false }, { headers: privateNoStore });
+        return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
       }
       const response = await fetch(`${workerBaseUrl}/store/customers/me`, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         cache: "no-store",
       });
       if (!response.ok) {
-        return Response.json(
+        return profileStatusJson(
           { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
           { status: response.status >= 500 ? 503 : response.status, headers: privateNoStore },
         );
       }
-      const payload = (await response.json()) as { profile?: Record<string, unknown> | null };
+      const payload = await readResponseJson<{ profile?: Record<string, unknown> | null }>(response, {});
       const raw = payload.profile;
       const profile = raw
         ? {
@@ -48,7 +79,7 @@ export async function GET() {
           }
         : null;
       const complete = isStorefrontProfileComplete(profile);
-      return Response.json(
+      return profileStatusJson(
         {
           authenticated: true,
           available: true,
@@ -60,7 +91,7 @@ export async function GET() {
       );
     } catch (error) {
       console.error("Worker profile status failed", error instanceof Error ? error.message : "unknown");
-      return Response.json(
+      return profileStatusJson(
         { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
         { status: 503, headers: privateNoStore },
       );
@@ -69,17 +100,17 @@ export async function GET() {
   const session = await getStorefrontSession();
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) {
-    return Response.json({ authenticated: false, complete: false }, { headers: privateNoStore });
+    return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
   }
   const { profile, unavailable } = await loadCustomerProfileResult(email);
   if (unavailable) {
-    return Response.json(
+    return profileStatusJson(
       { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
       { status: 503, headers: privateNoStore },
     );
   }
   const complete = isStorefrontProfileComplete(profile);
-  return Response.json({
+  return profileStatusJson({
     authenticated: true,
     available: true,
     complete,

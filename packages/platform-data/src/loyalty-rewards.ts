@@ -31,7 +31,7 @@ export async function listRewards(
   supabase: SupabaseClient,
   opts?: { activeOnly?: boolean },
 ): Promise<LoyaltyReward[]> {
-  let q = supabase.from("loyalty_rewards").select("*").order("points_cost");
+  let q = supabase.from("loyalty_rewards").select("*").order("points_cost").limit(500);
   if (opts?.activeOnly) {
     q = q.eq("is_active", true);
   }

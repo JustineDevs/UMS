@@ -53,6 +53,15 @@ export default [
     },
   },
   {
+    files: ["workers/backend/src/**/*.ts"],
+    languageOptions: {
+      globals: {
+        Queue: "readonly",
+        MessageBatch: "readonly",
+      },
+    },
+  },
+  {
     files: ["apps/web/src/lib/visual-builder/**/*.ts"],
     rules: {
       // Adapter methods intentionally keep the source builder's callback

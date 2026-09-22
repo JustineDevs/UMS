@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import {
   isPhilippinesMobilePhone,
@@ -24,15 +24,9 @@ function emptyAddress(): StorefrontShippingAddress {
   };
 }
 
-export function OnboardingClient() {
+export function OnboardingClient({ nextPath }: { nextPath: string }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextSafe = (() => {
-    const n = searchParams?.get("next");
-    if (typeof n === "string" && n.startsWith("/") && !n.startsWith("//")) return n;
-    return "/account";
-  })();
 
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -43,15 +37,17 @@ export function OnboardingClient() {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace(`/sign-in?callbackUrl=${encodeURIComponent("/onboarding?next=" + encodeURIComponent(nextSafe))}`);
+      router.replace(`/sign-in?callbackUrl=${encodeURIComponent("/onboarding?next=" + encodeURIComponent(nextPath))}`);
     }
-  }, [status, router, nextSafe]);
+  }, [status, router, nextPath]);
 
   useEffect(() => {
     if (status !== "authenticated") return;
+    const controller = new AbortController();
     void fetch("/api/account/profile/status", {
       credentials: "same-origin",
       cache: "no-store",
+      signal: controller.signal,
     })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Profile status request failed (${r.status})`);
@@ -63,8 +59,9 @@ export function OnboardingClient() {
             shippingAddresses: StorefrontShippingAddress[];
           };
         };
+        if (controller.signal.aborted) return;
         if (j.complete) {
-          router.replace(nextSafe);
+          router.replace(nextPath);
           return;
         }
         const p = j.profile;
@@ -85,8 +82,11 @@ export function OnboardingClient() {
         }
         setHydrated(true);
       })
-      .catch(() => setHydrated(true));
-  }, [status, router, nextSafe, session?.user?.name]);
+      .catch(() => {
+        if (!controller.signal.aborted) setHydrated(true);
+      });
+    return () => controller.abort();
+  }, [status, router, nextPath, session?.user?.name]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,33 +112,38 @@ export function OnboardingClient() {
       return;
     }
     setSaving(true);
-    const r = await fetch("/api/account/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName: dn,
-        phone: phone.trim(),
-        shippingAddresses: [
-          {
-            ...addr,
-            isDefault: true,
-            fullName: dn,
-            phone: phone.trim(),
-          },
-        ],
-      }),
-    });
-    setSaving(false);
-    if (!r.ok) {
-      const j = (await r.json().catch(() => ({}))) as { error?: string; code?: string; reauthUrl?: string };
-      if (j.code === "RECENT_AUTH_REQUIRED" && j.reauthUrl) {
-        router.replace(`/sign-in?callbackUrl=${encodeURIComponent(`/onboarding?next=${nextSafe}`)}&reauth=1`);
+    try {
+      const r = await fetch("/api/account/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: dn,
+          phone: phone.trim(),
+          shippingAddresses: [
+            {
+              ...addr,
+              isDefault: true,
+              fullName: dn,
+              phone: phone.trim(),
+            },
+          ],
+        }),
+      });
+      if (!r.ok) {
+        const j = (await r.json().catch(() => ({}))) as { error?: string; code?: string; reauthUrl?: string };
+        if (j.code === "RECENT_AUTH_REQUIRED" && j.reauthUrl) {
+          router.replace(`/sign-in?callbackUrl=${encodeURIComponent(`/onboarding?next=${encodeURIComponent(nextPath)}`)}&reauth=1`);
+          return;
+        }
+        setErr(j.error ?? "Could not save. Try again.");
         return;
       }
-      setErr(j.error ?? "Could not save. Try again.");
-      return;
+      router.replace(nextPath);
+    } catch {
+      setErr("Could not save. Try again.");
+    } finally {
+      setSaving(false);
     }
-    router.replace(nextSafe);
   }
 
   if (status === "loading" || !hydrated) {
@@ -206,6 +211,7 @@ export function OnboardingClient() {
         <button
           type="submit"
           disabled={saving}
+          data-testid="checkout-onboarding-continue"
           className="w-full rounded bg-primary py-3 text-sm font-bold text-on-primary hover:opacity-90 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Continue"}

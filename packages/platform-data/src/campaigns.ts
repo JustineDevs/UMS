@@ -47,8 +47,9 @@ export async function listCampaigns(
 ): Promise<Campaign[]> {
   let q = supabase
     .from("campaigns")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("id,name,type,segment_id,subject,body_template,channel,is_active,last_run_at,schedule_cron,created_at,organization_id")
+    .order("created_at", { ascending: false })
+    .limit(500);
   if (opts?.type) {
     q = q.eq("type", opts.type);
   }
@@ -139,45 +140,65 @@ export async function executeCampaign(
   organizationId: string,
   sendEmail: (_to: string, _subject: string, _html: string) => Promise<void>,
 ): Promise<number> {
+  const pageSize = 500;
+  async function readAll<T>(query: (_offset: number, _limitEnd: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+    const rows: T[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await query(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = data ?? [];
+      rows.push(...page);
+      if (page.length < pageSize) return rows;
+    }
+  }
   const { data: campaign, error: campErr } = await supabase
     .from("campaigns")
-    .select("*")
+    .select("id,name,subject,body_template,segment_id")
     .eq("id", campaignId)
     .eq("organization_id", organizationId)
     .single();
   if (campErr) throw campErr;
   if (!campaign.segment_id) throw new Error("Campaign has no segment");
 
-  const { data: members, error: memErr } = await supabase
+  const members = await readAll<{ customer_email: string }>((_offset, _limitEnd) => supabase
     .from("customer_segment_members")
     .select("customer_email")
     .eq("segment_id", campaign.segment_id)
-    .eq("organization_id", organizationId);
-  if (memErr) throw memErr;
+    .eq("organization_id", organizationId)
+    .order("customer_email")
+    .range(_offset, _limitEnd));
 
-  const { data: preferences, error: preferenceErr } = await supabase
+  const preferences = await readAll<{ email: string; consent_status: string }>((_offset, _limitEnd) => supabase
     .from("marketing_preferences")
     .select("email, consent_status")
     .eq("organization_id", organizationId)
-    .eq("channel", "email");
-  if (preferenceErr && !isMissingTableOrSchemaError(preferenceErr)) throw preferenceErr;
+    .eq("channel", "email")
+    .order("email")
+    .range(_offset, _limitEnd)).catch((error: unknown) => {
+      if (isMissingTableOrSchemaError(error as { code?: string; message?: string } | null)) return [];
+      throw error;
+    });
   const subscribed = new Set(
-    (preferences ?? [])
+    preferences
       .filter((row) => row.consent_status === "subscribed")
       .map((row) => String(row.email).trim().toLowerCase()),
   );
-  const { data: sentMessages, error: sentErr } = await supabase
+  const sentMessages = await readAll<{ recipient_email: string }>((_offset, _limitEnd) => supabase
     .from("campaign_messages")
     .select("recipient_email")
     .eq("campaign_id", campaignId)
-    .eq("status", "sent");
-  if (sentErr && !isMissingTableOrSchemaError(sentErr)) throw sentErr;
+    .eq("status", "sent")
+    .order("recipient_email")
+    .range(_offset, _limitEnd)).catch((error: unknown) => {
+      if (isMissingTableOrSchemaError(error as { code?: string; message?: string } | null)) return [];
+      throw error;
+    });
   const alreadySent = new Set(
-    (sentMessages ?? []).map((row) => String(row.recipient_email).trim().toLowerCase()),
+    sentMessages.map((row) => String(row.recipient_email).trim().toLowerCase()),
   );
 
   let sent = 0;
-  for (const member of members ?? []) {
+  for (const member of members) {
     const recipient = String(member.customer_email).trim().toLowerCase();
     if (!recipient || !subscribed.has(recipient) || alreadySent.has(recipient)) continue;
     try {

@@ -182,7 +182,7 @@ function MediaFrame({
         <div className="flex gap-2 overflow-x-auto pb-1">
           {media.map((item, idx) => (
             <button
-              key={`${item.kind}-${item.url}-${idx}`}
+              key={`${item.kind}-${item.url}`}
               type="button"
               onClick={() => onChange(idx)}
               aria-label={`Show item ${idx + 1}`}

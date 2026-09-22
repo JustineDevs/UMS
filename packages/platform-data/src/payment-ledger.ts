@@ -115,14 +115,17 @@ export function computeNextQuoteVersionForFingerprintPatch(
 export async function fetchPaymentAttemptInvalidationDayBuckets(
   supabase: SupabaseClient,
   days: number,
+  organizationId?: string,
 ): Promise<{ day: string; count: number }[]> {
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - Math.max(1, Math.min(90, days)));
-  const { data, error } = await supabase
+  let query = supabase
     .from("payment_attempts")
     .select("invalidated_at")
     .not("invalidated_at", "is", null)
     .gte("invalidated_at", since.toISOString());
+  if (organizationId?.trim()) query = query.eq("organization_id", organizationId.trim());
+  const { data, error } = await query;
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;

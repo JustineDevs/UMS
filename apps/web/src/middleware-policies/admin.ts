@@ -3,9 +3,11 @@ import { NextRequest, type NextFetchEvent } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
 import { checkAdminRateLimit } from "@/lib/admin-rate-limit";
+import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
+  if (process.env.NODE_ENV === "development" && process.env.UVS_E2E_REAL_SESSION === "1" && process.env.VERCEL !== "1" && request.cookies.has(E2E_SESSION_COOKIE)) return response;
   // Keep the documented local-auth development mode consistent with the page/session layer.
   // Never allow this bypass in production, even if a stale environment value is present.
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {
@@ -46,16 +48,6 @@ function ensureRequestId(request: NextRequest): {
   return { id, requestHeaders };
 }
 
-function hasDangerousJsonKey(value: unknown, seen = new Set<object>()): boolean {
-  if (!value || typeof value !== "object") return false;
-  if (seen.has(value)) return false;
-  seen.add(value);
-  if (Array.isArray(value)) return value.some((item) => hasDangerousJsonKey(item, seen));
-  return Object.entries(value).some(([key, nested]) =>
-    key === "__proto__" || key === "constructor" || key === "prototype" || hasDangerousJsonKey(nested, seen),
-  );
-}
-
 export default async function middleware(req: NextRequest, _event: NextFetchEvent) {
   const { id: requestId, requestHeaders } = ensureRequestId(req);
   const requestWithId = new NextRequest(req, { headers: requestHeaders });
@@ -80,20 +72,6 @@ export default async function middleware(req: NextRequest, _event: NextFetchEven
       const invalid = NextResponse.json({ error: "Unsupported content type" }, { status: 415 });
       invalid.headers.set("x-request-id", requestId);
       return invalid;
-    }
-    if (contentType === "application/json" && req.body) {
-      try {
-        const candidate = await req.clone().json();
-        if (hasDangerousJsonKey(candidate)) {
-          const invalid = NextResponse.json({ error: "Invalid request" }, { status: 400 });
-          invalid.headers.set("x-request-id", requestId);
-          return invalid;
-        }
-      } catch {
-        const invalid = NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-        invalid.headers.set("x-request-id", requestId);
-        return invalid;
-      }
     }
   }
   if (p.startsWith("/api/admin") || p.startsWith("/api/integrations")) {
@@ -129,6 +107,14 @@ export default async function middleware(req: NextRequest, _event: NextFetchEven
       res.headers.set("x-request-id", requestId);
       return res;
     }
+  }
+  // API handlers own authentication and authorization. Avoid a second Supabase
+  // session lookup here; it added an upstream round trip to every admin and
+  // integration request while the route immediately revalidated the session.
+  if (p.startsWith("/api/")) {
+    const apiResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    apiResponse.headers.set("x-request-id", requestId);
+    return apiResponse;
   }
   const response = await updateSupabaseSession(requestWithId);
   if (response instanceof NextResponse) {

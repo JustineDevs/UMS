@@ -5,6 +5,7 @@ import { isSameOriginMutation } from "@/lib/request-origin";
 import { isPrivacyErasureConfirmation } from "@/lib/account-privacy";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { hasRecentAuthentication } from "@/lib/recent-auth";
+import { accountPrivacyErasureResponseSchema, storefrontPrivacyErasureConfirmationSchema } from "@/lib/admin-api-contracts";
 
 const MAX_ERASURE_BODY_BYTES = 2 * 1024;
 
@@ -46,7 +47,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "Confirmation is required" }, { status: 400 });
   }
   const body = bounded.value;
-  if (!isPrivacyErasureConfirmation(body)) {
+  if (!storefrontPrivacyErasureConfirmationSchema.safeParse(body).success || !isPrivacyErasureConfirmation(body)) {
     return NextResponse.json({ error: "Type DELETE to confirm account erasure" }, { status: 400 });
   }
 
@@ -69,7 +70,7 @@ export async function POST(req: Request): Promise<Response> {
         { status: response.status === 404 ? 404 : 503, headers: { "Cache-Control": "no-store" } },
       );
     }
-    return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(accountPrivacyErasureResponseSchema.parse({ ok: true }), { headers: { "Cache-Control": "no-store" } });
   } catch {
     return NextResponse.json(
       { error: "Account erasure is temporarily unavailable." },

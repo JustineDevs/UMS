@@ -1,6 +1,7 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
 import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
+import { sendResendEmail } from "./resend.ts";
 
 type InvoiceAdminEnv = { CMS_ADMIN_JWT_SECRET?: string; SUPABASE_URL?: string; RESEND_API_KEY?: string; RESEND_FROM_EMAIL?: string; RESEND_FROM?: string };
 type InvoiceAction = "retry" | "void" | "refund";
@@ -151,7 +152,7 @@ export async function handleInvoiceCreateRequest(
       return json({ error: "invoice_saved_as_draft_email_not_configured", data: invoice }, 503);
     }
     await appDatabase.query("SELECT public.record_invoice_lifecycle($1,$2::uuid,'send','sending',$3,$4,NULL,'{}'::jsonb)", [org, invoice.id, fiscalDraft, `${key}:sending`]);
-    const sent = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${env.RESEND_API_KEY.trim()}`, "Content-Type": "application/json" }, body: JSON.stringify({ from: env.RESEND_FROM_EMAIL?.trim() || env.RESEND_FROM?.trim() || "noreply@universal-music-store.com", to: [canonical.email], subject: `Invoice ${normalized.invoice.referenceNumber}`, html: invoiceHtml(normalized.invoice, normalized.total), tags: [{ name: "type", value: "admin_invoice" }] }) });
+    const sent = await sendResendEmail({ apiKey: env.RESEND_API_KEY, from: env.RESEND_FROM_EMAIL?.trim() || env.RESEND_FROM?.trim() || "noreply@universal-music-store.com", to: [canonical.email], subject: `Invoice ${normalized.invoice.referenceNumber}`, html: invoiceHtml(normalized.invoice, normalized.total), idempotencyKey: `invoice:${org}:${invoice.id}` });
     if (!sent.ok) {
       await appDatabase.query("SELECT public.record_invoice_lifecycle($1,$2::uuid,'fail','failed',$3,$4,$5,'{}'::jsonb)", [org, invoice.id, fiscalDraft, `${key}:failed`, "Invoice email delivery failed"]);
       return json({ error: "invoice_saved_as_draft_email_failed", data: invoice }, 502);

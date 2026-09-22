@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { readResponseJson } from "./read-response-json";
 
 type Assessment = {
   tokenProperties?: { valid?: boolean; action?: string };
@@ -69,9 +70,9 @@ export async function verifyRecaptchaAction(
       cache: "no-store",
     }).catch(() => null);
     if (!response?.ok) return false;
-    const assessment = (await response.json().catch(() => null)) as
-      | { success?: boolean; action?: string; score?: number }
-      | null;
+    const assessment = await readResponseJson<
+      { success?: boolean; action?: string; score?: number } | null
+    >(response, null);
     return Boolean(
       assessment?.success &&
         assessment.action?.toLowerCase() === action.toLowerCase() &&
@@ -106,7 +107,7 @@ export async function verifyRecaptchaAction(
     },
   ).catch(() => null);
   if (!response?.ok) return false;
-  const assessment = (await response.json().catch(() => null)) as Assessment | null;
+  const assessment = await readResponseJson<Assessment | null>(response, null);
   return Boolean(
       assessment?.tokenProperties?.valid &&
       assessment.tokenProperties.action?.toLowerCase() === action.toLowerCase() &&

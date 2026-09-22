@@ -8,6 +8,7 @@ import {
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { accountMutationFailure } from "@/lib/account-mutation-error";
 import { buildOrderCancellationIdempotencyKey } from "@/lib/account-order-mutation";
+import { accountOrderCancelResponseSchema } from "@/lib/admin-api-contracts";
 
 export const runtime = "nodejs";
 
@@ -64,11 +65,15 @@ async function handlePOST(
           cache: "no-store",
         },
       );
-      const status = response.status;
+      if (!response.ok) {
+        return NextResponse.json({ error: "Could not cancel the order right now." }, { status: response.status });
+      }
       const body = await response
         .json()
         .catch(() => ({ error: "invalid_worker_response" }));
-      return NextResponse.json(body, { status });
+      const validated = accountOrderCancelResponseSchema.safeParse(body);
+      if (!validated.success) return NextResponse.json({ error: "Order cancellation returned an invalid response" }, { status: 502 });
+      return NextResponse.json(validated.data, { status: 200 });
     } catch (err) {
       const correlationId = crypto.randomUUID();
       console.error("Worker cancel order failed", {

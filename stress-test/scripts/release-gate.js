@@ -151,6 +151,15 @@ function main() {
   }
 
   if (includeE2e) {
+    // The build gate has produced the exact artifact that production serves.
+    // Stop stale local dev descendants before browser proof so Playwright
+    // cannot attach to a compiler with a partially invalidated module graph.
+    const cleanupCode = run("E2E runtime cleanup", ["pnpm", "cleanup:dev"]);
+    if (cleanupCode !== 0) {
+      emitLine(`❌ E2E runtime cleanup failed (exit ${cleanupCode})`);
+      failed = true;
+    }
+    process.env.PLAYWRIGHT_SERVER_MODE = "production";
     const code = run("Critical E2E (Playwright)", ["pnpm", "test:e2e:critical"]);
     if (code !== 0) {
       emitLine("❌ Critical E2E failed");

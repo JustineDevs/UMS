@@ -3,7 +3,8 @@ import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { fetchWorkerCatalogProductsForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { adminCommerceProductSearchResponseSchema } from "@/lib/admin-api-contracts";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
     if (result.commerceUnavailable) {
       return correlatedJson(cid, { error: "Store catalog request unavailable" }, { status: 502 });
     }
-    return correlatedJson(cid, {
+    const response = {
       data: {
         products: result.products.map((product) => ({
           id: product.id,
@@ -37,11 +38,14 @@ export async function GET(req: NextRequest) {
         })),
         count: result.count,
       },
-    });
-  } catch (e) {
+    };
+    const parsed = adminCommerceProductSearchResponseSchema.safeParse(response);
+    if (!parsed.success) return correlatedError(cid, 502, "Store catalog returned an invalid search response", "SERVICE_UNAVAILABLE");
+    return correlatedJson(cid, parsed.data);
+    } catch {
     return correlatedJson(
       cid,
-      { error: e instanceof Error ? e.message : "Store catalog request unavailable" },
+      { error: "Store catalog request unavailable", code: "CATALOG_UNAVAILABLE" },
       { status: 502 },
     );
   }

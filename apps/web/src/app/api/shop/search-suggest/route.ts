@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readResponseJson } from "@/lib/read-response-json";
 import {
   getRequestIp,
   rateLimitFixedWindow,
@@ -7,6 +8,7 @@ import {
   rankSearchSuggestions,
   expandSearchQueries,
 } from "@/lib/search-suggestion-ranking";
+import { searchSuggestionsResponseSchema } from "@/lib/admin-api-contracts";
 
 const SUGGESTION_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=5, s-maxage=60, stale-while-revalidate=300",
@@ -52,16 +54,18 @@ export async function GET(req: Request) {
         ),
       ),
     );
-    for (const response of responses) {
+    const payloads = await Promise.all(responses.map(async (response) => {
       if (!response.ok) throw new Error(`worker_catalog_${response.status}`);
-      const payload = (await response.json()) as {
+      return readResponseJson<{
         suggestions?: Array<{
           slug?: unknown;
           name?: unknown;
           minPrice?: unknown;
           imageUrl?: unknown;
         }>;
-      };
+      }> (response, {});
+    }));
+    for (const payload of payloads) {
       for (const suggestion of payload.suggestions ?? []) {
         if (
           typeof suggestion.slug === "string" &&
@@ -80,7 +84,7 @@ export async function GET(req: Request) {
       }
     }
     return NextResponse.json(
-      { suggestions: rankSearchSuggestions([...suggestionsBySlug.values()], q).slice(0, 8) },
+      searchSuggestionsResponseSchema.parse({ suggestions: rankSearchSuggestions([...suggestionsBySlug.values()], q).slice(0, 8) }),
       { headers: SUGGESTION_CACHE_HEADERS },
     );
   } catch {

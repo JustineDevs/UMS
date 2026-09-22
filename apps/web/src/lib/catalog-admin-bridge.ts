@@ -22,10 +22,6 @@ export function getAdminProductEditUrl(productId: string): string {
   return `/admin/catalog/${encodeURIComponent(productId)}`;
 }
 
-export function getAdminDraftOrderEditUrl(draftOrderId: string): string {
-  return `/admin/chat-orders?draftOrder=${encodeURIComponent(draftOrderId)}`;
-}
-
 export async function fetchCatalogProductsForAdmin(opts: {
   limit?: number;
   offset?: number;
@@ -47,8 +43,10 @@ export async function fetchCatalogProductsForAdmin(opts: {
   const products = result.products.map((product) => {
     const categorySummary =
       product.categories
-        .map((category) => String(category.name ?? "").trim())
-        .filter(Boolean)
+        .flatMap((category) => {
+          const name = String(category.name ?? "").trim();
+          return name ? [name] : [];
+        })
         .join(", ") || "—";
     const titles = product.options.map((option) =>
       String(option.title ?? "").toLowerCase(),

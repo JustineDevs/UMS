@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PUBLIC_REVIEW_FIELDS =
+const PUBLIC_REVIEW_FIELDS =
   "id,rating,author_name,image_url,body,created_at,product_slug,medusa_product_id,is_verified_buyer,helpful_votes" as const;
 
 export const PUBLIC_REVIEW_FIELD_NAMES = PUBLIC_REVIEW_FIELDS.split(",");

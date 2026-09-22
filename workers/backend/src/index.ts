@@ -20,6 +20,7 @@ export { handleBackendRequest } from "./router.ts";
 export * from "./idempotency.ts";
 export * from "./catalog.ts";
 export * from "./cart.ts";
+export * from "./cart-merge.ts";
 export * from "./inventory.ts";
 export * from "./checkout.ts";
 export * from "./providers.ts";
@@ -44,6 +45,7 @@ export * from "./jobs.ts";
 export * from "./reviews.ts";
 export * from "./public-marketing.ts";
 export * from "./order-preferences.ts";
+export * from "./loyalty.ts";
 
 interface WorkerEnv extends BackendEnv {
   COMMERCE_QUEUE?: Queue<CommerceJob>;
@@ -61,6 +63,9 @@ async function handleNativeCommerceJob(
   if (isNotificationDeliveryJob(job)) {
     await handleNotificationDeliveryJob(env, job);
     return;
+  }
+  if (job.name !== "webhook-finalization") {
+    throw new Error(`unsupported_commerce_job:${job.name}`);
   }
   const correlationId = readCorrelationIdFromJob(job);
   await withWorkerDatabase(env, (appDatabase) =>

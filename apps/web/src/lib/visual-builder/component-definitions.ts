@@ -379,9 +379,12 @@ const spec = (type: string, family: (typeof UVS_CONCRETE_COMPONENTS)[number]): V
   return sourceBacked(type, name ?? type, source, group, `<${tag} class="${type.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}"></${tag}>`, [tag], properties);
 };
 
-const concreteDefinitions: readonly VisualComponentDefinition[] = UVS_CONCRETE_COMPONENTS
-  .filter(({ type }) => !UVS_CORE_DEFINITIONS.some((definition) => definition.type === type) && !UVS_HTML_DEFINITIONS.some((definition) => definition.type === type))
-  .map((family) => spec(family.type, family));
+const concreteDefinitions: readonly VisualComponentDefinition[] = UVS_CONCRETE_COMPONENTS.flatMap((family) =>
+  UVS_CORE_DEFINITIONS.some((definition) => definition.type === family.type) ||
+  UVS_HTML_DEFINITIONS.some((definition) => definition.type === family.type)
+    ? []
+    : [spec(family.type, family)],
+);
 
 const allDefinitions = [...UVS_CORE_DEFINITIONS, ...UVS_HTML_DEFINITIONS, ...concreteDefinitions] as const;
 const sourceAlignedDefinitions = allDefinitions.map((definition) => {

@@ -1,7 +1,9 @@
 ---
 name: building-with-medusa
-description: Load automatically when planning, researching, or implementing ANY Medusa backend features (custom modules, API routes, workflows, data models, module links, business logic). REQUIRED for all Medusa backend work in ALL modes (planning, implementation, exploration). Contains architectural patterns, best practices, and critical rules that MCP servers don't provide.
+description: Historical Medusa reference only. Do not load for UVS implementation; the active backend is Cloudflare Workers.
 ---
+
+> Archived reference: UVS no longer runs Medusa as a backend. Do not follow instructions here that add Medusa runtime, API, SDK, workflow, or deployment dependencies. Use `workers/backend` contracts instead.
 
 # Medusa Backend Development
 

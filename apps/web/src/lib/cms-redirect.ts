@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { readResponseJson } from "./read-response-json";
 
 export async function tryCmsRedirect(request: NextRequest): Promise<NextResponse | null> {
   const url = process.env.SUPABASE_URL?.trim();
@@ -18,11 +19,11 @@ export async function tryCmsRedirect(request: NextRequest): Promise<NextResponse
       next: { revalidate: 120 },
     });
     if (!res.ok) return null;
-    const rows = (await res.json()) as {
+    const rows = await readResponseJson<{
       to_path: string;
       status_code: number;
       preserve_query?: boolean;
-    }[];
+    }[]>(res, []);
     if (!rows?.length) return null;
     const { to_path, status_code, preserve_query: preserveQuery } = rows[0];
     const base = to_path.startsWith("http")

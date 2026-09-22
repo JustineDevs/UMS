@@ -1,5 +1,6 @@
 import { medusaMinorToMajor } from "./medusa-money";
 import { createSupabaseServerClient } from "./supabase/server";
+import { readResponseJson } from "./read-response-json";
 
 export type AccountOrder = {
   id: string;
@@ -112,7 +113,7 @@ async function fetchWorkerCustomerOrders(): Promise<{
     );
     if (!response.ok)
       return { orders: [], error: "Order history is temporarily unavailable." };
-    const body = (await response.json()) as { orders?: unknown[] };
+    const body = await readResponseJson(response, {} as { orders?: unknown[] });
     const orders = (Array.isArray(body.orders) ? body.orders : []).flatMap(
       (raw): AccountOrder[] => {
         if (!raw || typeof raw !== "object") return [];
@@ -173,7 +174,7 @@ export async function fetchWorkerCustomerOrderDetail(
         order: null,
         error: "Order details are temporarily unavailable.",
       };
-    const body = (await response.json()) as { order?: Record<string, unknown> };
+    const body = await readResponseJson(response, {} as { order?: Record<string, unknown> });
     const raw = body.order;
     if (!raw || typeof raw.id !== "string")
       return { order: null, error: "not_found" };

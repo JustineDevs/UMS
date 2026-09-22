@@ -5,7 +5,7 @@ import {
   isDirectVideoFileUrl,
   normalizeCatalogAssetUrl,
 } from "@/lib/catalog-asset-url";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Props = {
   items: string[];
@@ -14,6 +14,11 @@ type Props = {
   onMainCountChange: (_n: number) => void;
   disabled?: boolean;
 };
+
+const SECTION_LABELS = {
+  main: "Main photos",
+  gallery: "Gallery (photos and clips)",
+} as const;
 
 function MediaThumb({ address }: { address: string }) {
   const normalized = normalizeCatalogAssetUrl(address);
@@ -88,7 +93,7 @@ export function CatalogUnifiedMediaList({
     } else {
       setSelected(new Set(items.map((_, i) => i)));
     }
-  }, [items.length, selected.size, items]);
+  }, [selected.size, items]);
 
   const move = useCallback(
     (from: number, to: number) => {
@@ -181,14 +186,6 @@ export function CatalogUnifiedMediaList({
     [mainImageCount],
   );
 
-  const sectionLabel = useMemo(
-    () => ({
-      main: "Main photos",
-      gallery: "Gallery (photos and clips)",
-    }),
-    [],
-  );
-
   return (
     <div className="space-y-3">
       {items.length > 0 ? (
@@ -223,15 +220,15 @@ export function CatalogUnifiedMediaList({
           const showGalleryHeader =
             index === mainImageCount && mainImageCount < items.length;
           return (
-            <li key={`row-${index}`} className="space-y-2">
+            <li key={`${line}-${region}`} className="space-y-2">
               {showMainHeader ? (
                 <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  {sectionLabel.main}
+                  {SECTION_LABELS.main}
                 </p>
               ) : null}
               {showGalleryHeader ? (
                 <p className="pt-1 text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  {sectionLabel.gallery}
+                  {SECTION_LABELS.gallery}
                 </p>
               ) : null}
               <div className="flex flex-wrap items-start gap-3 rounded-lg border border-outline-variant/25 bg-surface-container-high/40 p-3">

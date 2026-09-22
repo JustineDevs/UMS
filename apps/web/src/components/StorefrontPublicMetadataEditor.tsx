@@ -64,7 +64,7 @@ export function StorefrontPublicMetadataEditor() {
     try {
       const r = await fetch("/api/admin/storefront-public-metadata", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": `storefront-metadata-${crypto.randomUUID()}` },
         body: JSON.stringify(payload),
       });
       const j = (await r.json()) as {

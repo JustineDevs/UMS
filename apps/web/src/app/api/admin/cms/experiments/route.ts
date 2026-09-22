@@ -1,41 +1,5 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { listCmsAbExperiments, upsertCmsAbExperiment } from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
+import { fetchWorkerCmsExperimentsForAdmin, saveWorkerCmsExperimentForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { cmsExperimentSchema } from "@/lib/cms-route-contracts";
-import { parseBoundedJson } from "@/lib/bounded-request-body";
-
-export async function GET(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("content:read");
-  if (!auth.ok) return auth.response;
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const data = await listCmsAbExperiments(sup.client, organization.id);
-  return correlatedJson(cid, { data });
-}
-
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("content:write");
-  if (!auth.ok) return auth.response;
-  const body = await parseBoundedJson(req, 128 * 1024);
-  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const parsed = cmsExperimentSchema.safeParse(body.valid ? body.value : null);
-  if (!parsed.success) return correlatedJson(cid, { error: "Invalid experiment payload" }, { status: 400 });
-  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const data = await upsertCmsAbExperiment(sup.client, { ...parsed.data, organization_id: organization.id });
-  if (!data) return correlatedJson(cid, { error: "Unable to save" }, { status: 500 });
-  return correlatedJson(cid, { data });
-}
-
-export const POST = withAdminMutationIdempotency("/admin/cms/experiments:POST", post);
+export const dynamic = "force-dynamic";
+export async function GET(request: Request) { const requestId = getCorrelationId(request); const response = await fetchWorkerCmsExperimentsForAdmin(new URL(request.url).searchParams.toString()); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); }
+export async function POST(request: Request) { const requestId = getCorrelationId(request); const key = request.headers.get("Idempotency-Key")?.trim(); if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400 }); let body: Record<string, unknown>; try { const raw = await request.text(); if (raw.length > 128 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413 }); const parsed = JSON.parse(raw) as unknown; if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid"); body = parsed as Record<string, unknown>; } catch { return new Response(JSON.stringify({ error: "Invalid JSON body", requestId }), { status: 400 }); } const response = await saveWorkerCmsExperimentForAdmin(body, key); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503 }); }

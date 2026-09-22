@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   AdminBreadcrumbs,
   AdminEmptyState,
@@ -61,6 +61,7 @@ export function LoyaltyPageClient() {
   const [pointsAmount, setPointsAmount] = useState("");
   const [pointsReason, setPointsReason] = useState("");
   const [lookupValue, setLookupValue] = useState("");
+  const mutationBusyRef = useRef(false);
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
@@ -91,19 +92,24 @@ export function LoyaltyPageClient() {
 
   async function handleEnroll(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/admin/loyalty", {
+    if (mutationBusyRef.current) return;
+    mutationBusyRef.current = true;
+    try { await fetch("/api/admin/loyalty", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: enrollEmail }),
     });
-    setShowEnroll(false);
-    setEnrollEmail("");
-    void fetchAccounts();
+      setShowEnroll(false);
+      setEnrollEmail("");
+      void fetchAccounts();
+    } finally { mutationBusyRef.current = false; }
   }
 
   async function handleCreateReward(e: React.FormEvent) {
     e.preventDefault();
-    await fetch("/api/admin/loyalty/rewards", {
+    if (mutationBusyRef.current) return;
+    mutationBusyRef.current = true;
+    try { await fetch("/api/admin/loyalty/rewards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -112,15 +118,18 @@ export function LoyaltyPageClient() {
         reward_type: rewardForm.reward_type,
       }),
     });
-    setShowRewardForm(false);
-    setRewardForm({ name: "", points_cost: "", reward_type: "discount" });
-    void fetchRewards();
+      setShowRewardForm(false);
+      setRewardForm({ name: "", points_cost: "", reward_type: "discount" });
+      void fetchRewards();
+    } finally { mutationBusyRef.current = false; }
   }
 
   async function handleAddPoints(e: React.FormEvent) {
     e.preventDefault();
     if (!pointsModal) return;
-    await fetch("/api/admin/loyalty/points", {
+    if (mutationBusyRef.current) return;
+    mutationBusyRef.current = true;
+    try { await fetch("/api/admin/loyalty/points", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -129,10 +138,11 @@ export function LoyaltyPageClient() {
         reason: pointsReason,
       }),
     });
-    setPointsModal(null);
-    setPointsAmount("");
-    setPointsReason("");
-    void fetchAccounts();
+      setPointsModal(null);
+      setPointsAmount("");
+      setPointsReason("");
+      void fetchAccounts();
+    } finally { mutationBusyRef.current = false; }
   }
 
   async function handleLookup() {
@@ -274,7 +284,7 @@ export function LoyaltyPageClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleEnroll} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Enroll Customer</h2>
-            <input required type="email" placeholder="Customer email" value={enrollEmail} onChange={(e) => setEnrollEmail(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
+            <input aria-label="Customer email" required type="email" placeholder="Customer email" value={enrollEmail} onChange={(e) => setEnrollEmail(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
             <div className="flex gap-3 justify-end">
               <Button type="button" variant="outline" onClick={() => setShowEnroll(false)}>Cancel</Button>
               <Button type="submit">Enroll</Button>
@@ -287,9 +297,9 @@ export function LoyaltyPageClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleCreateReward} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Create Reward</h2>
-            <input required placeholder="Reward name" value={rewardForm.name} onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <input required type="number" min="1" placeholder="Points cost" value={rewardForm.points_cost} onChange={(e) => setRewardForm({ ...rewardForm, points_cost: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <select value={rewardForm.reward_type} onChange={(e) => setRewardForm({ ...rewardForm, reward_type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+            <input aria-label="Reward name" required placeholder="Reward name" value={rewardForm.name} onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input aria-label="Points cost" required type="number" min="1" placeholder="Points cost" value={rewardForm.points_cost} onChange={(e) => setRewardForm({ ...rewardForm, points_cost: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <select aria-label="Reward type" value={rewardForm.reward_type} onChange={(e) => setRewardForm({ ...rewardForm, reward_type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
               <option value="discount">Discount</option>
               <option value="free_item">Free Item</option>
               <option value="free_shipping">Free Shipping</option>
@@ -309,8 +319,8 @@ export function LoyaltyPageClient() {
             <h2 className="text-lg font-bold font-headline">Adjust Points</h2>
             <p className="text-sm text-on-surface-variant">{pointsModal.customer_email}</p>
             <p className="text-xs text-on-surface-variant">Current balance: {pointsModal.points_balance.toLocaleString()}</p>
-            <input required type="number" placeholder="Points (negative to deduct)" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <input required placeholder="Reason" value={pointsReason} onChange={(e) => setPointsReason(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input aria-label="Points adjustment" required type="number" placeholder="Points (negative to deduct)" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input aria-label="Points adjustment reason" required placeholder="Reason" value={pointsReason} onChange={(e) => setPointsReason(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
               <Button type="button" variant="outline" onClick={() => setPointsModal(null)}>Cancel</Button>
               <Button type="submit">Submit</Button>

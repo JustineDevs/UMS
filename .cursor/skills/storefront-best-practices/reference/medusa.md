@@ -1,5 +1,7 @@
 # Medusa Backend Integration
 
+> Archived reference: this guide describes a Medusa-backed storefront and is not applicable to the active UVS runtime. UVS storefront commerce requests use the Cloudflare Worker configured by `API_URL`; do not add the Medusa SDK or `localhost:9000` fallback.
+
 ## Contents
 
 - [Overview](#overview)

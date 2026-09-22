@@ -11,11 +11,18 @@ export const metadata: Metadata = buildPageMetadata({
   noindex: true,
 });
 
-export default function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
+  const nextPath = rawNext?.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/account";
   return (
     <main className="storefront-page-shell mx-auto max-w-lg py-10">
       <Suspense fallback={<p className="text-sm text-on-surface-variant">Loading…</p>}>
-        <OnboardingClient />
+        <OnboardingClient nextPath={nextPath} />
       </Suspense>
     </main>
   );

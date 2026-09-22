@@ -4,6 +4,7 @@ export async function listOperatorNotes(
   client: SupabaseClient,
   entityType: string,
   entityId: string,
+  organizationId: string,
   limit = 50,
 ): Promise<
   Array<{
@@ -18,6 +19,7 @@ export async function listOperatorNotes(
     .select("id,body,author_email,created_at")
     .eq("entity_type", entityType)
     .eq("entity_id", entityId)
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -44,6 +46,7 @@ export async function createOperatorNote(
     entityId: string;
     body: string;
     authorEmail: string | null;
+    organizationId: string;
   },
 ): Promise<{ id: string } | null> {
   const { data, error } = await client
@@ -53,6 +56,7 @@ export async function createOperatorNote(
       entity_id: input.entityId,
       body: input.body.trim(),
       author_email: input.authorEmail,
+      organization_id: input.organizationId,
     })
     .select("id")
     .maybeSingle();

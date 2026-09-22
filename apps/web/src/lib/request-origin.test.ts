@@ -29,6 +29,21 @@ test("same-origin mutation policy rejects explicit cross-site metadata", () => {
     true,
   );
   assert.equal(
+    isSameOriginMutation(new Request("http://127.0.0.1:3000/api/cart/reconcile", {
+      headers: {
+        origin: "http://localhost:3000",
+        "sec-fetch-site": "cross-site",
+      },
+    })),
+    true,
+  );
+  assert.equal(
+    isSameOriginMutation(new Request("http://0.0.0.0:3000/api/checkout/preview", {
+      headers: { origin: "http://localhost:3000" },
+    })),
+    true,
+  );
+  assert.equal(
     isSameOriginMutation(new Request("https://127.0.0.1/api/account/profile", {
       headers: { origin: "https://evil.test" },
     })),

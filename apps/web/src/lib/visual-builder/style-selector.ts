@@ -31,10 +31,9 @@ export function getSelectorForElement(
       break;
     }
 
-    const classSelector = [...current.classList]
-      .filter((className) => !ignoredClasses.has(className))
-      .map((className) => `.${className}`)
-      .join("");
+    const classSelector = [...current.classList].reduce((selector, className) =>
+      ignoredClasses.has(className) ? selector : `${selector}.${className}`,
+    "");
     selectors.push(classSelector || tag);
     current = current.parentElement;
   }

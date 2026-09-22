@@ -1,15 +1,4 @@
 export {
-  getMedusaStoreBaseUrl,
-  getMedusaAdminBaseUrl,
-  getMedusaPublishableKey,
-  getMedusaRegionId,
-  getMedusaPaymentProviderId,
-  getMedusaSalesChannelId,
-  getMedusaSecretApiKey,
-  withSalesChannelId,
-} from "./medusa-env.js";
-
-export {
   generateTrackingToken,
   verifyTrackingToken,
   generateTrackingCapability,
@@ -32,11 +21,6 @@ export {
   capturePostHogClientException,
 } from "./posthog-client.js";
 
-export {
-  listMissingMedusaStorefrontEnv,
-  assertMedusaStorefrontEnvProduction,
-} from "./env/medusa-storefront.js";
-export { assertAdminMedusaEnvProduction } from "./env/admin-medusa.js";
 export {
   getPostHogProjectToken,
   getPostHogApiKey,

@@ -1,42 +1,4 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
-import { updateCmsFormSubmission } from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
-import { cmsFormSubmissionSchema } from "@/lib/cms-route-contracts";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { parseBoundedJson } from "@/lib/bounded-request-body";
-
-type RouteCtx = { params: Promise<{ id: string }> };
-
-async function patch(req: NextRequest, ctx: RouteCtx) {
-  const cid = getCorrelationId(req);
-  const { id } = await ctx.params;
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const body = await parseBoundedJson(req, 32 * 1024);
-  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
-  const parsed = cmsFormSubmissionSchema.safeParse(body.valid ? body.value : null);
-  if (!parsed.success) return correlatedJson(cid, { error: "Invalid form submission payload" }, { status: 400 });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
-  const row = await updateCmsFormSubmission(sup.client, id, {
-    read_at: parsed.data.read_at,
-    assigned_to: parsed.data.assigned_to,
-    spam_score: parsed.data.spam_score,
-  }, organization.id);
-  if (!row) return correlatedJson(cid, { error: "Not found" }, { status: 404 });
-  return correlatedJson(cid, { data: row });
-}
-
-export const PATCH = withAdminMutationIdempotency("/admin/cms/forms/submissions/[id]:PATCH", patch);
+import { updateWorkerCmsFormSubmissionForAdmin } from "@/lib/worker-admin-bridge";
+export const dynamic = "force-dynamic";
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) { const requestId = getCorrelationId(request); const { id } = await context.params; const key = request.headers.get("Idempotency-Key")?.trim(); if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); const length = Number(request.headers.get("content-length") ?? 0); if (length > 32 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); let body: Record<string, unknown>; try { const text = await request.text(); if (text.length > 32 * 1024) throw new Error("payload_too_large"); const parsed = JSON.parse(text) as unknown; if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid_payload"); body = parsed as Record<string, unknown>; } catch (error) { const status = error instanceof Error && error.message === "payload_too_large" ? 413 : 400; return new Response(JSON.stringify({ error: status === 413 ? "Payload too large" : "Invalid JSON body", requestId }), { status, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); } const response = await updateWorkerCmsFormSubmissionForAdmin(id, body, key); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); }

@@ -8,6 +8,7 @@ import { finalizeCheckoutFromServer } from "@/lib/finalize-checkout-server";
 import { internalReconcilePaymentAttemptRouteLogic } from "@/lib/payment-attempt-route-logic";
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { internalReconcilePaymentAttemptResponseSchema, internalReconcilePaymentAttemptSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +34,9 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const body = parsedBody.value as { correlationId?: string };
-  const correlationId =
-    typeof body.correlationId === "string" ? body.correlationId.trim() : "";
+  const parsed = internalReconcilePaymentAttemptSchema.safeParse(parsedBody.value);
+  if (!parsed.success) return NextResponse.json({ error: "correlationId is required" }, { status: 400 });
+  const correlationId = parsed.data.correlationId;
 
   const sb = createStorefrontServiceSupabase();
   const row =
@@ -62,5 +63,10 @@ export async function POST(req: Request) {
     nowIso: () => new Date().toISOString(),
   });
 
+  if (result.status === 200 || (result.body && typeof result.body === "object" && "ok" in result.body)) {
+    const validated = internalReconcilePaymentAttemptResponseSchema.safeParse(result.body);
+    if (!validated.success) return NextResponse.json({ error: "Payment reconciliation returned an invalid response" }, { status: 502 });
+    return NextResponse.json(validated.data, { status: result.status });
+  }
   return NextResponse.json(result.body, { status: result.status });
 }

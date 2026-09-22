@@ -2,6 +2,8 @@ import {
   buildTrackingUrl,
   DEFAULT_PUBLIC_SITE_ORIGIN,
 } from "@universal-music-store/sdk";
+import { createHmac } from "node:crypto";
+import { readResponseJson } from "./read-response-json";
 
 export type CheckoutFinalizationResult =
   | {
@@ -26,6 +28,31 @@ export type CheckoutFinalizationOptions = {
   publicOrigin?: string;
   correlationId?: string;
 };
+
+function createFinalizationToken(
+  correlationId: string,
+  cartId: string,
+): string | null {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) return null;
+  const encode = (value: unknown) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "HS256", typ: "JWT" });
+  const payload = encode({
+    sub: "uvs-checkout-finalizer",
+    scope: "payment:finalize",
+    correlation_id: correlationId,
+    cart_id: cartId,
+    iss: "uvs.internal",
+    aud: "uvs-worker",
+    exp: Math.floor(Date.now() / 1000) + 60,
+  });
+  const signingInput = `${header}.${payload}`;
+  const signature = createHmac("sha256", secret)
+    .update(signingInput)
+    .digest("base64url");
+  return `${signingInput}.${signature}`;
+}
 
 export function getPublicOriginFromRequest(req: Request): string {
   const forwardedProto = req.headers
@@ -103,6 +130,15 @@ export async function finalizeCheckoutFromServer(
       attempts: 0,
     };
   }
+  const authorization = createFinalizationToken(correlationId, cartId);
+  if (!authorization) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Checkout service authorization is not configured",
+      attempts: 0,
+    };
+  }
 
   let orderId: string | undefined;
   let errorMessage = "Order not ready";
@@ -111,12 +147,16 @@ export async function finalizeCheckoutFromServer(
     attempts += 1;
     const response = await fetch(
       `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(correlationId)}/finalize`,
-      { method: "POST", cache: "no-store" },
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authorization}` },
+        cache: "no-store",
+      },
     );
-    const payload = (await response.json().catch(() => ({}))) as {
+    const payload = await readResponseJson(response, {} as {
       orderId?: unknown;
       error?: unknown;
-    };
+    });
     orderId = typeof payload.orderId === "string" ? payload.orderId : undefined;
     errorMessage =
       typeof payload.error === "string" ? payload.error : errorMessage;

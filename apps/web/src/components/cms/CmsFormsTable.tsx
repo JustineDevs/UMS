@@ -61,10 +61,10 @@ export function CmsFormsTable() {
   const loadSettings = useCallback(() => {
     void fetch("/api/admin/cms/forms/settings")
       .then(async (r) => {
+        if (!r.ok) return;
         const j = (await r.json()) as {
           data?: { webhook_url: string | null; notify_email: string | null };
         };
-        if (!r.ok) return;
         const d = j.data;
         if (d) {
           setWebhookUrl(d.webhook_url ?? "");

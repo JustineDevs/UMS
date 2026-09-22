@@ -1,3 +1,5 @@
+import { majorToMinor } from "./money.ts";
+
 export type ProviderFetch = typeof fetch;
 
 export type StripeCheckoutInput = {
@@ -237,7 +239,7 @@ export async function confirmPayPalOrder(
   const capture = captures[0] && typeof captures[0] === "object" ? captures[0] as Record<string, unknown> : {};
   const amount = capture.amount && typeof capture.amount === "object" ? capture.amount as Record<string, unknown> : {};
   const captureId = typeof capture.id === "string" ? capture.id.trim() : "";
-  const amountMinor = Math.round(Number(amount.value) * 100);
+  const amountMinor = majorToMinor(Number(amount.value), currency);
   if (String(capture.status ?? payload.status ?? "").toUpperCase() !== "COMPLETED" ||
       !captureId || amountMinor !== input.expectedAmountMinor || String(amount.currency_code ?? "").toUpperCase() !== currency) {
     throw new Error("paypal_payment_not_completed");

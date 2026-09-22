@@ -1,11 +1,3 @@
-import {
-  getPaymentAttemptByCorrelationId,
-  incrementFinalizeAttempts,
-  claimPaymentAttemptForFinalization,
-  updatePaymentAttemptByCorrelationId,
-  linkCommerceAttributionOrder,
-} from "@universal-music-store/platform-data";
-
 import { getStorefrontSession } from "@/lib/auth";
 import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { logCheckoutCompletionEvent } from "@/lib/checkout-telemetry";
@@ -13,10 +5,11 @@ import { handleCodPlaceOrderRequest } from "@/lib/cod-place-order-route-handler"
 import { finalizeCheckoutFromServer } from "@/lib/finalize-checkout-server";
 import { getPublicOriginFromRequest } from "@/lib/finalize-checkout-server";
 import { readCheckoutCartTotalsPreview } from "@/lib/checkout-worker";
-import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
 import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { codPlaceOrderResponseSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 import {
   claimIsolatedCodAttempt,
   getIsolatedCodAttempt,
@@ -52,15 +45,53 @@ export async function POST(req: Request) {
     );
   }
 
-  const sb = createStorefrontServiceSupabase();
   const isolatedCodE2E = isIsolatedCodE2E();
+  const cartId = await readCartIdFromCookie();
+  const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
   const response = await handleCodPlaceOrderRequest(req, {
     applyRateLimit: async (request) =>
       applyRateLimit(request, "cod-place-order", 30, 60_000),
     readCartIdFromCookie,
-    getPaymentAttemptRow: async (id) => {
-      if (sb) return getPaymentAttemptByCorrelationId(sb, id);
-      return isolatedCodE2E ? getIsolatedCodAttempt(id) : null;
+    getPaymentAttemptRow: async (id, requestedCartId) => {
+      if (isolatedCodE2E) return getIsolatedCodAttempt(id);
+      const activeCartId = requestedCartId ?? cartId;
+      if (!workerBaseUrl || !activeCartId) return null;
+      try {
+        const workerResponse = await fetch(
+          `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(id)}`,
+          {
+            headers: { Cookie: `mcart_id=${encodeURIComponent(activeCartId)}` },
+            cache: "no-store",
+          },
+        );
+        if (!workerResponse.ok) return null;
+        const attempt = await readResponseJson<Record<string, unknown>>(
+          workerResponse,
+          {},
+        );
+        if (
+          typeof attempt.cartId !== "string" ||
+          typeof attempt.provider !== "string"
+        )
+          return null;
+        return {
+          cart_id: attempt.cartId,
+          correlation_id: id,
+          provider: attempt.provider,
+          status:
+            typeof attempt.status === "string" ? attempt.status : undefined,
+          quote_fingerprint:
+            typeof attempt.quoteFingerprint === "string"
+              ? attempt.quoteFingerprint
+              : null,
+          stale_reason:
+            typeof attempt.staleReason === "string"
+              ? attempt.staleReason
+              : null,
+        };
+      } catch {
+        return null;
+      }
     },
     readCurrentQuoteFingerprint: async (activeCartId) => {
       try {
@@ -71,32 +102,20 @@ export async function POST(req: Request) {
       }
     },
     incrementFinalizeAttempts: async (id) => {
-      if (isolatedCodE2E && !sb) {
+      if (isolatedCodE2E) {
         incrementIsolatedCodFinalizeAttempts(id);
-        return;
       }
-      if (!sb) {
-        throw new Error("Payment ledger is not configured");
-      }
-      await incrementFinalizeAttempts(sb, id);
     },
     claimFinalizeAttempt: async (id) => {
-      if (isolatedCodE2E && !sb) return claimIsolatedCodAttempt(id);
-      // Native Worker finalization owns the durable claim. Claiming here first
-      // would make the Worker see its own request as already in progress.
-      if (sb && process.env.API_URL?.trim()) return true;
-      if (!sb) throw new Error("Payment ledger is not configured");
-      return claimPaymentAttemptForFinalization(sb, id);
+      if (isolatedCodE2E) return claimIsolatedCodAttempt(id);
+      // The Worker atomically claims and records finalization; a second claim here
+      // would prevent the Worker from seeing its own request as eligible.
+      return Boolean(workerBaseUrl);
     },
     updatePaymentAttempt: async (id, patch) => {
-      if (isolatedCodE2E && !sb) {
+      if (isolatedCodE2E) {
         updateIsolatedCodAttempt(id, patch);
-        return;
       }
-      if (!sb) {
-        return;
-      }
-      await updatePaymentAttemptByCorrelationId(sb, id, patch).catch(() => {});
     },
     finalizeCheckout: async (activeCartId, correlationId) =>
       finalizeCheckoutFromServer(activeCartId, {
@@ -110,18 +129,16 @@ export async function POST(req: Request) {
       ),
     nowIso: () => new Date().toISOString(),
   });
-  if (sb && response.status === 200) {
-    const body = (await response
+  if (response.status === 200) {
+    const payload = await response
       .clone()
       .json()
-      .catch(() => null)) as { orderId?: unknown } | null;
-    const cartId = await readCartIdFromCookie();
-    if (cartId && typeof body?.orderId === "string") {
-      await linkCommerceAttributionOrder(sb, {
-        cartId,
-        orderId: body.orderId,
-        organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || null,
-      }).catch(() => {});
+      .catch(() => null);
+    if (!codPlaceOrderResponseSchema.safeParse(payload).success) {
+      return Response.json(
+        { error: "Order placement returned an invalid response" },
+        { status: 502 },
+      );
     }
   }
   return response;

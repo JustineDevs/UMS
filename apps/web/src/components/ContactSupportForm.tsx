@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   AlertDescription,
@@ -31,14 +31,17 @@ export function ContactSupportForm({
   const [body, setBody] = useState("");
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      if (submitStatus === "sending" || submittingRef.current) return;
       if (!body.trim() || !senderEmail.trim()) {
         setErrorMsg("Please fill in your email and message.");
         return;
       }
+      submittingRef.current = true;
       setSubmitStatus("sending");
       setErrorMsg(null);
       try {
@@ -68,9 +71,11 @@ export function ContactSupportForm({
       } catch (err) {
         setSubmitStatus("error");
         setErrorMsg(err instanceof Error ? err.message : "Submission failed. Please try again.");
+      } finally {
+        submittingRef.current = false;
       }
     },
-    [name, senderEmail, orderNumber, subject, body],
+    [name, senderEmail, orderNumber, subject, body, submitStatus],
   );
 
   return (

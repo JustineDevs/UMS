@@ -1,0 +1,3926 @@
+{
+  "generatedAt": "2026-09-21T11:00:35.614Z",
+  "purpose": "External acceptance proof blockers; not verification",
+  "rows": [
+    {
+      "matrixId": "C4-01",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "authenticated"
+      ],
+      "blockedBy": "External provider, authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-02",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-03",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-04",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "webhook",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, webhook, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-05",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-06",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "authenticated",
+        "medusa"
+      ],
+      "blockedBy": "External authenticated, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-07",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "load",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, load, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-08",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-09",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "load",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, live, load, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-10",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "load"
+      ],
+      "blockedBy": "External provider, live, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-11",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-12",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-13",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, live, medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-14",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "load",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, load, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-15",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-16",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "live",
+        "supabase",
+        "medusa",
+        "migration",
+        "database",
+        "concurrent"
+      ],
+      "blockedBy": "External deployed, live, supabase, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-17",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "browser proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, authenticated, browser proof, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-18",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-19",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "authenticated",
+        "medusa",
+        "migration",
+        "database",
+        "restore",
+        "concurrent"
+      ],
+      "blockedBy": "External authenticated, medusa, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C4-21",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "database",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, database, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-22",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "live",
+        "webhook",
+        "migration",
+        "database",
+        "concurrent"
+      ],
+      "blockedBy": "External live, webhook, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
+    },
+    {
+      "matrixId": "C4-23",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider",
+        "migration",
+        "load",
+        "database",
+        "concurrent"
+      ],
+      "blockedBy": "External production, provider, migration, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-24",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-25",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, medusa, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-27",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-28",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "database"
+      ],
+      "blockedBy": "External database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C4-29",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-30",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
+    },
+    {
+      "matrixId": "C4-31",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-32",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-33",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External deployed, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-34",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, live, webhook, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-35",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook",
+        "browser proof"
+      ],
+      "blockedBy": "External provider, live, webhook, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-36",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "webhook"
+      ],
+      "blockedBy": "External webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
+    },
+    {
+      "matrixId": "C4-38",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-39",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-40",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-42",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-43",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-44",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External production, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-45",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-46",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "load",
+        "browser proof"
+      ],
+      "blockedBy": "External provider, load, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-47",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "webhook",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External deployed, webhook, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-48",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa",
+        "webhook",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-49",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-51",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "browser/api",
+        "concurrent"
+      ],
+      "blockedBy": "External browser/api, concurrent evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-52",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, live, runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-53",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, live, webhook, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-54",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "runtime proof",
+        "outage/retry/replay",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, outage/retry/replay, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-55",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "provider",
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External deployed, provider, live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-56",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-57",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "authenticated",
+        "medusa",
+        "browser proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, medusa, browser proof, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-58",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "medusa",
+        "migration",
+        "load",
+        "database",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, live, medusa, migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C4-59",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-60",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-61",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "load"
+      ],
+      "blockedBy": "External provider, live, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-62",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-63",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "load",
+        "screen-reader",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, load, screen-reader, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-64",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-65",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External deployed, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-66",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider",
+        "load",
+        "lighthouse",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External production, provider, load, lighthouse evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-67",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live"
+      ],
+      "blockedBy": "External provider, live evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-68",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa",
+        "webhook",
+        "migration",
+        "database",
+        "alert"
+      ],
+      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-69",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "authenticated",
+        "live",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, authenticated, live, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-70",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-71",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "live",
+        "medusa",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External live, medusa, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-72",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-73",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider",
+        "authenticated"
+      ],
+      "blockedBy": "External production, provider, authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-75",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "webhook",
+        "migration"
+      ],
+      "blockedBy": "External production, webhook, migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-76",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-77",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook"
+      ],
+      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-78",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C4-79",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "webhook"
+      ],
+      "blockedBy": "External deployed, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-80",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider"
+      ],
+      "blockedBy": "External production, provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-81",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External production, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-82",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook",
+        "concurrent"
+      ],
+      "blockedBy": "External provider, live, webhook, concurrent evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C4-83",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "migration",
+        "restore"
+      ],
+      "blockedBy": "External production, migration, restore evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-84",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "production",
+        "live",
+        "alert"
+      ],
+      "blockedBy": "External production, live, alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C4-85",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "deployed",
+        "production",
+        "provider",
+        "load",
+        "concurrent"
+      ],
+      "blockedBy": "External deployed, production, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C4-86",
+      "matrix": ".omx/context/full-task(4).md",
+      "markers": [
+        "provider",
+        "load",
+        "infrastructure",
+        "restore"
+      ],
+      "blockedBy": "External provider, load, infrastructure, restore evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-01",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-04",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "screen-reader"
+      ],
+      "blockedBy": "External screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-06",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "alert"
+      ],
+      "blockedBy": "External alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-08",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "load"
+      ],
+      "blockedBy": "External deployed, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-09",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-11",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-14",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-15",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "provider"
+      ],
+      "blockedBy": "External deployed, provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-16",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-17",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-18",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-19",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-20",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-21",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "runtime proof"
+      ],
+      "blockedBy": "External deployed, medusa, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-22",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "migration"
+      ],
+      "blockedBy": "External migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-24",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-25",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-26",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-27",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-28",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "migration",
+        "database",
+        "concurrent",
+        "cross-account"
+      ],
+      "blockedBy": "External deployed, authenticated, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-29",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "authenticated",
+        "supabase",
+        "medusa",
+        "migration",
+        "database",
+        "restore",
+        "concurrent"
+      ],
+      "blockedBy": "External authenticated, supabase, medusa, migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C5-30",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "authenticated",
+        "medusa",
+        "runtime proof",
+        "proof remains pending",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, authenticated, medusa, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-31",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "load",
+        "runtime proof"
+      ],
+      "blockedBy": "External provider, medusa, load, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-32",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "production",
+        "medusa"
+      ],
+      "blockedBy": "External deployed, production, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-34",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "database",
+        "runtime proof"
+      ],
+      "blockedBy": "External deployed, medusa, database, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-35",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-39",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "runtime proof",
+        "cross-account"
+      ],
+      "blockedBy": "External deployed, medusa, runtime proof, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-40",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "restore"
+      ],
+      "blockedBy": "External provider, restore evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-41",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "runtime proof"
+      ],
+      "blockedBy": "External runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-42",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-43",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-44",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-45",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "database",
+        "runtime proof",
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External database, runtime proof, concurrent, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C5-46",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "load"
+      ],
+      "blockedBy": "External deployed, medusa, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-47",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-48",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-49",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "alert"
+      ],
+      "blockedBy": "External alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-51",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-52",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-54",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-57",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-59",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-63",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-64",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-65",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, authenticated, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-66",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, concurrent, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-87",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-67",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "restore"
+      ],
+      "blockedBy": "External deployed, restore evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-68",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "authenticated",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-69",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "authenticated",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External authenticated, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-70",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "authenticated",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-71",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-72",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "authoritative commerce",
+        "commerce data"
+      ],
+      "blockedBy": "External authoritative commerce, commerce data evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-73",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "load",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External load, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-74",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-75",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "authenticated"
+      ],
+      "blockedBy": "External provider, authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-76",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "webhook"
+      ],
+      "blockedBy": "External provider, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-77",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-78",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-79",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "medusa",
+        "database",
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, database, concurrent, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C5-80",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C5-81",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, cross-account, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-82",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "runtime proof",
+        "outage/retry/replay",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, outage/retry/replay, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-83",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External deployed, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-84",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "live",
+        "device matrix"
+      ],
+      "blockedBy": "External live, device matrix evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C5-85",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "deployed",
+        "production",
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External deployed, production, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C5-86",
+      "matrix": ".omx/context/full-task(5).md",
+      "markers": [
+        "production",
+        "provider",
+        "load"
+      ],
+      "blockedBy": "External production, provider, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "A6-01",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "migration",
+        "database",
+        "cross-account"
+      ],
+      "blockedBy": "External deployed, medusa, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-02",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-03",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-04",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-05",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider",
+        "authenticated",
+        "medusa",
+        "load",
+        "concurrent"
+      ],
+      "blockedBy": "External provider, authenticated, medusa, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "A6-06",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider",
+        "live",
+        "supabase",
+        "alert",
+        "still required"
+      ],
+      "blockedBy": "External provider, live, supabase, alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "A6-07",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "medusa"
+      ],
+      "blockedBy": "External deployed, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-08",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "browser proof"
+      ],
+      "blockedBy": "External deployed, authenticated, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-09",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "browser/api",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, browser/api, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-10",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "browser proof"
+      ],
+      "blockedBy": "External browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-11",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "provider",
+        "runtime proof"
+      ],
+      "blockedBy": "External deployed, provider, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-12",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "production",
+        "authenticated",
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External production, authenticated, live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "A6-13",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "screen-reader"
+      ],
+      "blockedBy": "External screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-14",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "still required"
+      ],
+      "blockedBy": "External authenticated, live, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-15",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-16",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "alert",
+        "browser proof"
+      ],
+      "blockedBy": "External medusa, alert, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-17",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "A6-18",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "screen-reader"
+      ],
+      "blockedBy": "External screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-19",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "lighthouse"
+      ],
+      "blockedBy": "External authenticated, lighthouse evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "A6-20",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed browser telemetry inspection"
+      ],
+      "blockedBy": "External deployed browser telemetry inspection evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the browser history/referrer/access-log inspection against the deployed tracking flow with real response headers and retain the trace artifact."
+    },
+    {
+      "matrixId": "C6-01",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-02",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-03",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-04",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-05",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-06",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "migration",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, migration, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C6-07",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "browser/api",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser/api, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-08",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "runtime proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, cross-account, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-09",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "browser proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External browser proof, cross-account, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-10",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-11",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "cross-account",
+        "response capture"
+      ],
+      "blockedBy": "External cross-account, response capture evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-12",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider",
+        "authenticated",
+        "medusa",
+        "load"
+      ],
+      "blockedBy": "External provider, authenticated, medusa, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C6-13",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "still required"
+      ],
+      "blockedBy": "External medusa, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-14",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "medusa"
+      ],
+      "blockedBy": "External deployed, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-15",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "medusa",
+        "database",
+        "concurrent"
+      ],
+      "blockedBy": "External authenticated, medusa, database, concurrent evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C6-16",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C6-17",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "runtime proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, medusa, runtime proof, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-18",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-19",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External deployed, live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-20",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "load"
+      ],
+      "blockedBy": "External deployed, medusa, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-21",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "supabase",
+        "medusa"
+      ],
+      "blockedBy": "External supabase, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-22",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "load"
+      ],
+      "blockedBy": "External authenticated, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-23",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "load",
+        "database",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, live, load, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C6-24",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "supabase",
+        "medusa",
+        "restore",
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, live, supabase, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-25",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "supabase",
+        "load",
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External supabase, load, alert, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-26",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "screen-reader",
+        "alert",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External authenticated, live, screen-reader, alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-27",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, authenticated, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-28",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "runtime proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, cross-account, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-29",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-30",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "database",
+        "alert",
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External database, alert, concurrent, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "C6-31",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "concurrent",
+        "proof remains pending"
+      ],
+      "blockedBy": "External concurrent, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-32",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "scope/expiry"
+      ],
+      "blockedBy": "External scope/expiry evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-33",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-34",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-35",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "evidence remains pending"
+      ],
+      "blockedBy": "External evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-37",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "production"
+      ],
+      "blockedBy": "External production evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C6-39",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "live",
+        "load"
+      ],
+      "blockedBy": "External live, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-40",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated account session"
+      ],
+      "blockedBy": "External authenticated account session evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the account navigation matrix with a real authenticated session at desktop and mobile widths, retaining keyboard/focus evidence."
+    },
+    {
+      "matrixId": "C6-41",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "load",
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, load, alert, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-42",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "device matrix"
+      ],
+      "blockedBy": "External authenticated, device matrix evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-43",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "proof remains pending"
+      ],
+      "blockedBy": "External authenticated, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-44",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated",
+        "screen-reader",
+        "alert",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External authenticated, screen-reader, alert, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-45",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated"
+      ],
+      "blockedBy": "External authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-46",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated"
+      ],
+      "blockedBy": "External authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-47",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-48",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-49",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "provider",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C6-50",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-51",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "authenticated",
+        "load",
+        "browser proof"
+      ],
+      "blockedBy": "External deployed, authenticated, load, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-52",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "authenticated"
+      ],
+      "blockedBy": "External deployed, authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-53",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "authenticated"
+      ],
+      "blockedBy": "External authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-54",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-55",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-56",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "supabase",
+        "proof remains pending"
+      ],
+      "blockedBy": "External supabase, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-57",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C6-58",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "production"
+      ],
+      "blockedBy": "External production evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C6-59",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C6-60",
+      "matrix": ".omx/context/full-task(6).md",
+      "markers": [
+        "deployed",
+        "production",
+        "authenticated",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External deployed, production, authenticated, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-02",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "load",
+        "still required"
+      ],
+      "blockedBy": "External provider, medusa, load, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "S7-03",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load",
+        "browser/api",
+        "still required"
+      ],
+      "blockedBy": "External load, browser/api, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-04",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "live",
+        "medusa",
+        "load",
+        "still required"
+      ],
+      "blockedBy": "External deployed, live, medusa, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-05",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "medusa",
+        "runtime proof",
+        "still required"
+      ],
+      "blockedBy": "External deployed, medusa, runtime proof, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-06",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "medusa",
+        "migration",
+        "database"
+      ],
+      "blockedBy": "External live, medusa, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "S7-07",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-08",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed telemetry dashboard"
+      ],
+      "blockedBy": "External deployed telemetry dashboard evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the deployed suggestion telemetry flow and retain dashboard/query evidence."
+    },
+    {
+      "matrixId": "S7-09",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "still required"
+      ],
+      "blockedBy": "External deployed, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-11",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "production",
+        "medusa"
+      ],
+      "blockedBy": "External production, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "S7-12",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "still required"
+      ],
+      "blockedBy": "External still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-14",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "medusa",
+        "load",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, medusa, load, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-17",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "screen-reader"
+      ],
+      "blockedBy": "External screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-18",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "screen-reader"
+      ],
+      "blockedBy": "External live, screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-19",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-20",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load",
+        "still required"
+      ],
+      "blockedBy": "External load, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-21",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "migration",
+        "database"
+      ],
+      "blockedBy": "External migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
+    },
+    {
+      "matrixId": "S7-22",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "still required"
+      ],
+      "blockedBy": "External still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-23",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "evidence remains pending"
+      ],
+      "blockedBy": "External evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-24",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "browser proof"
+      ],
+      "blockedBy": "External browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "S7-25",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "proof remains pending",
+        "still required"
+      ],
+      "blockedBy": "External deployed, proof remains pending, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-26",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "production",
+        "load",
+        "lighthouse"
+      ],
+      "blockedBy": "External deployed, production, load, lighthouse evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "S7-27",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "production",
+        "medusa",
+        "load",
+        "alert"
+      ],
+      "blockedBy": "External production, medusa, load, alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "S7-28",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-02",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "production"
+      ],
+      "blockedBy": "External production evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C7-03",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-04",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-05",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-06",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "medusa",
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, alert, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-07",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "medusa",
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, alert, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-08",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-09",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-10",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "seeded catalog facet fixture"
+      ],
+      "blockedBy": "External seeded catalog facet fixture evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the exhaustive facet-combination contract against a seeded catalog dataset and retain result-set and empty-state evidence."
+    },
+    {
+      "matrixId": "C7-11",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-12",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-13",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-14",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-15",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "screen-reader"
+      ],
+      "blockedBy": "External deployed, screen-reader evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-16",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External alert, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-17",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live catalog relevance integration"
+      ],
+      "blockedBy": "External live catalog relevance integration evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the bounded relevance fixture against the live catalog integration and retain endpoint plus ranking evidence."
+    },
+    {
+      "matrixId": "C7-18",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load"
+      ],
+      "blockedBy": "External load evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-19",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "load",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, load, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-20",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-21",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-22",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "browser proof"
+      ],
+      "blockedBy": "External deployed, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-23",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-24",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-25",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "migration",
+        "proof remains pending"
+      ],
+      "blockedBy": "External migration, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-26",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External load, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-27",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-28",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-29",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "alert",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External alert, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-30",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-31",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "production"
+      ],
+      "blockedBy": "External production evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C7-32",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "medusa",
+        "load",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External medusa, load, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-33",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "measured production query telemetry"
+      ],
+      "blockedBy": "External measured production query telemetry evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the catalog workload against a representative environment and retain scan/request/cache measurements."
+    },
+    {
+      "matrixId": "C7-34",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-35",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External runtime proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-37",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "load",
+        "device matrix"
+      ],
+      "blockedBy": "External load, device matrix evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-38",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "seeded catalog keyboard fixture"
+      ],
+      "blockedBy": "External seeded catalog keyboard fixture evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the complete keyboard listing matrix with seeded product cards and pagination at desktop and mobile widths; retain focus traces."
+    },
+    {
+      "matrixId": "C7-39",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live",
+        "screen-reader",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, screen-reader, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-41",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "published CMS media fixture"
+      ],
+      "blockedBy": "External published CMS media fixture evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the media alternative audit against published CMS banners and catalog image fixtures; retain the rendered accessibility report."
+    },
+    {
+      "matrixId": "C7-42",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-43",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "seeded collection crawler"
+      ],
+      "blockedBy": "External seeded collection crawler evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the structured-data crawler against a populated collection and compare JSON-LD items with visible product links; retain the crawl artifact."
+    },
+    {
+      "matrixId": "C7-44",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-45",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-46",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "production",
+        "load"
+      ],
+      "blockedBy": "External deployed, production, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-47",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "seeded catalog browser matrix"
+      ],
+      "blockedBy": "External seeded catalog browser matrix evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the complete desktop/mobile discovery matrix against a seeded catalog in CI or the mapped deployment and retain non-skipped traces."
+    },
+    {
+      "matrixId": "C7-48",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C7-49",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C7-50",
+      "matrix": ".omx/context/full-task(7).md",
+      "markers": [
+        "deployed",
+        "load"
+      ],
+      "blockedBy": "External deployed, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "T8-01",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live"
+      ],
+      "blockedBy": "External provider, live evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "T8-02",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "T8-03",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "authenticated"
+      ],
+      "blockedBy": "External authenticated evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-04",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "migration"
+      ],
+      "blockedBy": "External migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-06",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-07",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "medusa",
+        "migration",
+        "runtime proof",
+        "browser proof",
+        "cross-account"
+      ],
+      "blockedBy": "External production, medusa, migration, runtime proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "T8-08",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-09",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External production, provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "T8-10",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "still required"
+      ],
+      "blockedBy": "External live, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-11",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-12",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live",
+        "medusa"
+      ],
+      "blockedBy": "External provider, live, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "T8-13",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "medusa",
+        "still required"
+      ],
+      "blockedBy": "External live, medusa, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-14",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "valid tracking capability"
+      ],
+      "blockedBy": "External valid tracking capability evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the valid notification-capability recovery flow against a seeded order/provider session and retain the browser and response evidence."
+    },
+    {
+      "matrixId": "T8-15",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "authenticated",
+        "live",
+        "screen-reader",
+        "proof remains pending",
+        "still required"
+      ],
+      "blockedBy": "External authenticated, live, screen-reader, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "T8-16",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "still required"
+      ],
+      "blockedBy": "External production, still required evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C8-01",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "valid tracking capability"
+      ],
+      "blockedBy": "External valid tracking capability evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute full-link submission with a real valid capability plus mobile accessibility checks and retain browser/network artifacts."
+    },
+    {
+      "matrixId": "C8-02",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-03",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "load",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External load, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-05",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-07",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "migration",
+        "browser proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, migration, browser proof, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-10",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "production",
+        "migration",
+        "database",
+        "runtime proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, production, migration, database evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-12",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed"
+      ],
+      "blockedBy": "External deployed evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-13",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa"
+      ],
+      "blockedBy": "External medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-16",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "proof remains pending"
+      ],
+      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-17",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-18",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-19",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External live, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-20",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, live, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-21",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External provider, live, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-22",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "webhook",
+        "migration"
+      ],
+      "blockedBy": "External webhook, migration evidence is unavailable in this checkout",
+      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
+    },
+    {
+      "matrixId": "C8-23",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "webhook",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, webhook, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-24",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "webhook",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External webhook, evidence remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
+    },
+    {
+      "matrixId": "C8-25",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "proof remains pending"
+      ],
+      "blockedBy": "External live, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-26",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-27",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "authenticated",
+        "browser proof"
+      ],
+      "blockedBy": "External authenticated, browser proof evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-28",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-29",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-30",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-31",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "medusa"
+      ],
+      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-32",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live"
+      ],
+      "blockedBy": "External live evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-33",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "live",
+        "webhook",
+        "load"
+      ],
+      "blockedBy": "External deployed, live, webhook, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-34",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "provider",
+        "live",
+        "webhook",
+        "migration"
+      ],
+      "blockedBy": "External deployed, provider, live, webhook evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-35",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider"
+      ],
+      "blockedBy": "External provider evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-36",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live"
+      ],
+      "blockedBy": "External provider, live evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-39",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "medusa",
+        "proof remains pending"
+      ],
+      "blockedBy": "External medusa, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-40",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "cross-account"
+      ],
+      "blockedBy": "External production, cross-account evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C8-41",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "runtime proof",
+        "cross-account",
+        "proof remains pending"
+      ],
+      "blockedBy": "External production, runtime proof, cross-account, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C8-42",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "production",
+        "load"
+      ],
+      "blockedBy": "External deployed, production, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-43",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "seeded shipment tracking"
+      ],
+      "blockedBy": "External seeded shipment tracking evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the valid-token shipment mobile matrix against a seeded shipment and retain carrier-link and viewport evidence."
+    },
+    {
+      "matrixId": "C8-44",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "seeded shipment tracking"
+      ],
+      "blockedBy": "External seeded shipment tracking evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the valid-token keyboard traversal against a seeded shipment and retain focus and visible-focus evidence."
+    },
+    {
+      "matrixId": "C8-45",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "live",
+        "load",
+        "screen-reader",
+        "alert",
+        "evidence remains pending"
+      ],
+      "blockedBy": "External live, load, screen-reader, alert evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-46",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "load",
+        "proof remains pending"
+      ],
+      "blockedBy": "External load, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
+    },
+    {
+      "matrixId": "C8-48",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "medusa"
+      ],
+      "blockedBy": "External production, medusa evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C8-50",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live"
+      ],
+      "blockedBy": "External provider, live evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-51",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "live",
+        "webhook",
+        "load"
+      ],
+      "blockedBy": "External provider, live, webhook, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-52",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "signed carrier callback/provider reconciliation"
+      ],
+      "blockedBy": "External signed carrier callback/provider reconciliation evidence is unavailable in this checkout",
+      "recoveryCondition": "Execute the carrier sandbox callback lifecycle and retain signed callback, deduplication, and reconciliation artifacts."
+    },
+    {
+      "matrixId": "C8-53",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "proof remains pending"
+      ],
+      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    },
+    {
+      "matrixId": "C8-54",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "production",
+        "load"
+      ],
+      "blockedBy": "External production, load evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
+    },
+    {
+      "matrixId": "C8-55",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "provider",
+        "medusa",
+        "browser proof",
+        "proof remains pending"
+      ],
+      "blockedBy": "External provider, medusa, browser proof, proof remains pending evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
+    },
+    {
+      "matrixId": "C8-56",
+      "matrix": ".omx/context/full-task(8).md",
+      "markers": [
+        "deployed",
+        "production",
+        "provider",
+        "live"
+      ],
+      "blockedBy": "External deployed, production, provider, live evidence is unavailable in this checkout",
+      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
+    }
+  ],
+  "manualRows": [
+    {
+      "matrixId": "C4-20",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-20 | Checkout telemetry must never be financial authority | Client telemetry now uses a shared allowlist that excludes order/payment completion authority events; the route only logs/captures observability and does not mutate quote, payment, order, or fulfillment state | `commerce-observability.test.ts` rejects `order_created` and `payment_captured`; storefront full suite passes 181/181 on 2026-08-22 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C4-26",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-26 | Finalizer must handle stale quote | Expire attempt and route customer back to review | `finalizeCheckoutIntentRouteLogic.test.ts` covers stale quote mismatch and legacy rows without fingerprints; storefront suite passes 194/194 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C4-37",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-37 | PayPal cancellation handling is incomplete | Wire `onCancel`, keep attempt resumable, show retry state | PayPal sandbox cancellation browser test passed on 2026-08-22; no order | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C4-41",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-41 | PayPal declined/failure behavior is unproven | Verify no order, clear error, and retry path | PayPal sandbox declined-return browser test passed on 2026-08-22; no order | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C4-50",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-50 | COD success browser flow is not fully proven | Complete profile, quote, order, tracking, and inventory flow | COD auth-disabled browser success passed on 2026-08-22 with tracking redirect | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C4-74",
+      "matrix": ".omx/context/full-task(4).md",
+      "row": "| C4-74 | Storefront integration tests | Cart reconciliation, intent registration, finalization, recovery, tracking, receipt, and status-boundary coverage; storefront suite 241/241 passed on 2026-08-23 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-02",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-02 | Existing local variant increments by requested add quantity | `addCartLine` adds quantities for duplicate variant IDs | `cart.test.ts` proves two requested quantity-1 adds produce quantity 2, never stock maximum; storefront suite 162/162 passes on 2026-08-22 | Low | Add caller coverage and concurrency-safe browser test | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-03",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-03 | Wishlist add-to-bag independently increments existing local quantity | `WishlistPageClient.tsx` now delegates to shared `addCartLine` with `quantity: 1`; `cart.test.ts` proves the second wishlist-style add increments one and refreshes catalog metadata; storefront suite 170/170 passes on 2026-08-22 | Shared cart primitive prevents quantity/merge-key drift across PDP and wishlist callers | P1 | Reconcile behavior and test PDP/wishlist parity | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-05",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-05 | Quantity input has no explicit `max` from available stock | `cart-client.tsx` binds `max` to `availableQuantity`, preserves over-limit drafts, and renders the stock conflict warning; browser regression verifies 12 remains visible against availability 5 | Native constraint and explicit recovery guidance are present; server remains final authority | P1 | Keep requested quantity visible but add stock-aware guidance and server rejection | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-07",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-07 | Quantity commits only on blur | `onBlur` invokes commit | Enter and blur both commit in `cart-client.tsx`; browser regression proves Enter commit on 2026-08-22 | P2 | Commit on Enter and blur; announce update | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-10",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-10 | Cart displays local price while reconciliation is unavailable | `authoritativeTotal ?? local calculation` remains explicitly marked with `data-total-source=local-cache`; a visible reconciliation error and disabled checkout button prevent payment handoff; cart regression proves the outage state | Fixed and browser-verified | P1 | Show stale warning and disable checkout until refreshed | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-12",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-12 | Unavailable lines are preserved with `availableQuantity: 0` | `mergeReconciledCartLines` preserves the line with `availableQuantity: 0`; the cart renders “This item is no longer available. Remove it before checkout.” and disables checkout | Fresh Chromium regression passed on 2026-08-29 | Low | Make status explicit and prevent checkout | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-13",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-13 | Reconcile error does not expose which line failed | Reconcile 503 responses include only `variantId` and safe `status`; `cart-client.tsx` renders a per-line retry message without backend details; the cart regression covers the response in the running browser | Fixed and browser-verified | P2 | Return safe per-line error state without leaking internals | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-23",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-23 | Duplicate variants are merged by variant ID | `normalizeCartLines` merges duplicate IDs; `cart.test.ts` proves quantity aggregation and latest normalized metadata wins; storefront suite 170/170 passes on 2026-08-22 | Duplicate local rows cannot create a second variant line | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-33",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-33 | Shipping fallback silently picks first option | `resolveShippingOptionId` accepts the requested option, auto-selects only a sole option, and rejects ambiguous multi-option state | `shipping-option-resolution.test.ts` proves requested selection and refusal to silently choose among multiple options; storefront suite 165/165 and TypeScript pass on 2026-08-22 | P1 | Require explicit user-selected shipping or disclose fallback | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-36",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-36 | Cart total may display PHP regardless of response currency | Cart UI formats the reconciled response currency and each line's normalized currency code | `cart-client.tsx` uses `currencyCode` from `/api/cart/reconcile` for the total; `cart.test.ts` proves currency normalization survives reconciliation; storefront suite 163/163 on 2026-08-22 | P1 | Use authoritative currency code end-to-end | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-37",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-37 | Abandonment subtotal is calculated from client price | `buildCartAbandonmentRecord` persists only normalized email, line count, bounded context, and timestamp; `cart-abandonment.test.ts` proves client price/subtotal fields are absent; storefront suite 171/171 passes on 2026-08-22 | Recovery telemetry has no client price authority | P1 | Do not use subtotal for recovery or revenue metrics | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-38",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-38 | Cart recovery email contains no item price authority | Recovery email sends count only and now includes an expiring HMAC capability scoped to the server cart when configured; `/api/cart/resume` validates the token against the requested cart before hydration; `cart-recovery-email.test.ts` and `cart-session-boundary.test.ts` prove URL scoping and foreign/malformed token rejection; storefront suite 173/173 passes on 2026-08-22 | Recovery click rehydrates current server cart without trusting client prices or a raw cart ID | P2 | Rehydrate current server-side cart at click time | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-50",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-50 | Quantity limit differs across surfaces | Reconcile/merge use max 999 while checkout/start previously used max 99 | `checkout/start` now uses the shared cart maximum of 999; cart input and reconciliation preserve requested quantity, and storefront suite 163/163 on 2026-08-22 | P1 | Define product/business maximum and enforce consistently | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-53",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-53 | Wishlist add | `WishlistPageClient.tsx` delegates existing/new wishlist variants to `addCartLine({ quantity: 1 })`; `cart.test.ts` proves quantity 2 after two one-unit adds; storefront suite 170/170 passes on 2026-08-22 | One-unit behavior is shared with PDP/cart insertion rather than duplicated | P1 | Browser auth-backed wishlist click remains a separate external verification row | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-55",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-55 | Inline keyboard quantity | `cart-client.tsx` commits validated whole numbers on Enter and blur; `cart-quantity-regression.spec.ts` proves `1 -> 12` on Enter and retains the value; single-worker storefront UX smoke passed 7/7 on 2026-08-22 | Keyboard editing is explicit and accessible | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-56",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-56 | Zero removal | `updateLineQuantity` removes at zero; `cart-quantity-regression.spec.ts` proves Enter `0` removes the line and renders the empty state; single-worker storefront UX smoke passed 7/7 on 2026-08-22 | Zero is a supported removal operation | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-58",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-58 | Cross-tab persistence | `cart-client.tsx` listens for the cart storage key and reconciles on cross-tab updates; Playwright two-tab regression passed 3/3 on 2026-08-22 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-60",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-60 | Reconciliation outage | UI marks the total source as `local-cache`, shows the reconciliation error, exposes safe per-line errors when supplied, and disables checkout; cart regression passed 4/4 on 2026-08-22 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-61",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-61 | Stale price | Cart browser regression seeds a stale local price, returns a different server price, and verifies the fresh item and total replace the local snapshot | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C5-62",
+      "matrix": ".omx/context/full-task(5).md",
+      "row": "| C5-62 | Stale stock | Running cart browser regression keeps requested quantity `12`, displays availability `5`, and disables checkout instead of silently clamping | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "C6-36",
+      "matrix": ".omx/context/full-task(6).md",
+      "row": "| C6-36 | Tracking projection | Public response excludes email/address/payment/order metadata not needed | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C6-38",
+      "matrix": ".omx/context/full-task(6).md",
+      "row": "| C6-38 | Carrier URL safety | Only allowlisted HTTPS carrier URLs render | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "S7-01",
+      "matrix": ".omx/context/full-task(7).md",
+      "row": "| S7-01 | Critical | No dedicated About route; navigation labels homepage as About | Dedicated `/about` route has owned content and metadata, and the shared nav points to `/about` | Implement `/about` with owned content, metadata, organization/contact data, and explicit nav route; or rename label to Home | `storefront.spec.ts` dedicated About browser test passes on 2026-08-22 | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "S7-13",
+      "matrix": ".omx/context/full-task(7).md",
+      "row": "| S7-13 | Low | Collection pages lack visible breadcrumb/count/sort context | `NEEDS-VERIFICATION` | Collection detail now exposes a semantic breadcrumb, authoritative result count, explicit newest-first sort context, and existing pagination | `stress-test/e2e/smoke/storefront-ux.spec.ts` collection test passed 1/1 against local storefront on 2026-08-22 |"
+    },
+    {
+      "matrixId": "C7-01",
+      "matrix": ".omx/context/full-task(7).md",
+      "row": "| C7-01 | `/about` route decision | Dedicated About page exists and the primary navigation links to it | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C7-36",
+      "matrix": ".omx/context/full-task(7).md",
+      "row": "| C7-36 | Mobile filters | Filter drawer, focus trap, clear-all and result refresh work on mobile | Chromium `storefront-ux.spec.ts` mobile filter test passed in the corrected 16/17 suite on 2026-08-23; one environment-dependent test was skipped and the mobile filter scoped axe test passes independently | NEEDS-VERIFICATION |"
+    },
+    {
+      "matrixId": "T8-05",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| T8-05 | High | Token is placed in query string | `NEEDS-VERIFICATION` | Public tracking and confirmation now accept only opaque `cap_` path capabilities; legacy `?t=` access is rejected, and token pages use no-store/no-referrer | Chromium raw/forged capability tests 3/3; route source/typecheck |"
+    },
+    {
+      "matrixId": "C8-04",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-04 | Missing capability | No order existence/data disclosed | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-06",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-06 | Wrong-ID capability | `verifyTrackingCapability` binds the HMAC to the order/cart ID; SDK scope test passes 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-08",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-08 | Expired capability | Capability expiry is rejected in the SDK scope test; SDK 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-09",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-09 | Rotated key | Previous key version and legacy v1 compatibility are tested; SDK 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-11",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-11 | Purpose separation | Purpose and audience tampering are rejected before route data access; confirmation routes now require a distinct `confirmation` capability purpose, and SDK purpose-separation coverage passes on 2026-08-23 | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-14",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-14 | PII minimization | Email/address/items/totals are masked or withheld from public view | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-37",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-37 | Carrier URL allowlist | `buildCarrierTrackingUrl` emits only fixed HTTPS J&T/LBC/2GO hosts and encodes tracking numbers; known-carrier fixtures pass | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-38",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-38 | Malicious carrier URL | Unknown carrier slugs and empty tracking numbers return null, so untrusted metadata cannot create an external link | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-47",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-47 | Security headers | No-store/referrer/content/security headers are verified on token pages | `curl http://localhost:3000/track/order_missing` returned 200 with Cache-Control: no-store, must-revalidate and Referrer-Policy: no-referrer on 2026-08-22 | `NEEDS-VERIFICATION` |"
+    },
+    {
+      "matrixId": "C8-49",
+      "matrix": ".omx/context/full-task(8).md",
+      "row": "| C8-49 | Robots/crawl | `robots.ts` disallows `/track` and `/order-confirmation`, and `sitemap.ts` only emits public static/catalog/CMS/blog routes; the robots regression test passes in the storefront suite | `NEEDS-VERIFICATION` |"
+    }
+  ]
+}

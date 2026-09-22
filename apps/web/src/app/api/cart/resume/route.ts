@@ -10,6 +10,7 @@ import {
   resolveCartResumeCapability,
   validateCartResumeAccess,
 } from "@/lib/cart-session-boundary";
+import { cartResumeResponseSchema } from "@/lib/admin-api-contracts";
 
 export async function GET(req: Request) {
   // This is a read-only hydration request and can run more than once during
@@ -43,45 +44,45 @@ export async function GET(req: Request) {
         : "";
 
   if (!cartId) {
-    return NextResponse.json({
+    return NextResponse.json(cartResumeResponseSchema.parse({
       lines: [],
       cartId: null as string | null,
       source: "local",
       available: true,
       stale: false,
-    });
+    }));
   }
 
   // The Worker is the commerce authority after the backend cutover. Do not
   // gate its cart read on legacy Medusa client configuration.
   if (!process.env.API_URL?.trim()) {
-    return NextResponse.json({
+    return NextResponse.json(cartResumeResponseSchema.parse({
       lines: [],
       cartId,
       source: "server",
       available: false,
       stale: true,
       skipped: true,
-    });
+    }));
   }
 
   const lines = await retrieveCartLines(cartId);
   if (lines === null) {
-    return NextResponse.json({
+    return NextResponse.json(cartResumeResponseSchema.parse({
       lines: [],
       cartId,
       source: "server",
       available: false,
       stale: true,
       error: "unavailable",
-    });
+    }));
   }
 
-  return NextResponse.json({
+  return NextResponse.json(cartResumeResponseSchema.parse({
     lines,
     cartId,
     source: "server",
     available: true,
     stale: false,
-  });
+  }));
 }

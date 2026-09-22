@@ -1,6 +1,8 @@
 import type { CatalogProductMetadataFields } from "@/lib/catalog-product-metadata";
 import { z } from "zod";
 
+const customIssueCode = z.ZodIssueCode.custom;
+
 const CATALOG_PRODUCT_KEYS = new Set([
   "title",
   "handle",
@@ -95,7 +97,7 @@ function validateStructuredMetadata(
         ctx.addIssue({ code: z.ZodIssueCode.unrecognized_keys, path: ["storefrontMetadata", key], keys: [name] });
       }
       if (typeof value === "string" && value.length > 500) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Specification text is too long." });
+        ctx.addIssue({ code: customIssueCode, path: ["storefrontMetadata", key, name], message: "Specification text is too long." });
       }
       if (["scaleLengthMm", "nutWidthMm", "fretCount"].includes(name) && (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 10_000)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["storefrontMetadata", key, name], message: "Specification measurement is invalid." });
@@ -263,7 +265,7 @@ export const catalogProductRequestSchema = z
       if (value === undefined) continue;
       if (!Array.isArray(value) || value.length > 80) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: customIssueCode,
           path: [key],
           message: `${key} must be an array with at most 80 entries.`,
         });

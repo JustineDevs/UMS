@@ -1,5 +1,6 @@
 import type { ProductLabelPayload } from "@universal-music-store/printer-core";
 import { PH_VAT_RATE } from "@universal-music-store/sdk";
+import { readResponseJson } from "./read-response-json";
 
 export type PosReceiptPayload = {
   title: string;
@@ -99,7 +100,7 @@ async function printReceiptToTerminalAgent(
     body: JSON.stringify({ receipt, adapter }),
   });
   if (!res.ok) {
-    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    const j = await readResponseJson<{ error?: string }>(res, {});
     throw new Error(
       typeof j.error === "string" ? j.error : "Receipt print did not complete",
     );
@@ -136,7 +137,7 @@ async function printProductLabelToTerminalAgent(
     body: JSON.stringify({ label, adapter }),
   });
   if (!res.ok) {
-    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    const j = await readResponseJson<{ error?: string }>(res, {});
     throw new Error(
       typeof j.error === "string" ? j.error : "Label print did not complete",
     );
@@ -151,7 +152,7 @@ export async function openCashDrawerRequest(): Promise<void> {
     body: JSON.stringify({}),
   });
   if (!res.ok) {
-    const j = (await res.json().catch(() => ({}))) as { error?: string };
+    const j = await readResponseJson<{ error?: string }>(res, {});
     throw new Error(
       typeof j.error === "string" ? j.error : "Drawer command did not complete",
     );

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { withBotIdProtection } from "@/lib/botid-protection";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { readResponseJson } from "@/lib/read-response-json";
+import { backInStockResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +11,13 @@ async function handler(request: Request): Promise<Response> {
   const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
   if (!apiUrl) return NextResponse.json({ error: "Catalog unavailable" }, { status: 503 });
   try {
-    const upstream = await fetch(`${apiUrl}/store/back-in-stock`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: await request.clone().text(), cache: "no-store" });
-    return new Response(await upstream.text(), { status: upstream.status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    const upstream = await fetch(`${apiUrl}/store/back-in-stock`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: await request.clone().text(), cache: "no-store", signal: AbortSignal.timeout(10_000) });
+    if (!upstream.ok) return NextResponse.json({ error: "Back-in-stock request could not be completed" }, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
+    const payload = await readResponseJson<unknown>(upstream, null);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return NextResponse.json({ error: "Catalog service returned an invalid response" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    const parsed = backInStockResponseSchema.safeParse(payload);
+    if (!parsed.success) return NextResponse.json({ error: "Catalog service returned an invalid response" }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(parsed.data, { status: upstream.status, headers: { "Cache-Control": "no-store" } });
   } catch { return NextResponse.json({ error: "Catalog unavailable" }, { status: 503 }); }
 }
 export const POST = withBotIdProtection(handler);

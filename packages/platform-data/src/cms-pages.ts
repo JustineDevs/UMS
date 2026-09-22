@@ -335,7 +335,7 @@ export async function listCmsPages(
   supabase: SupabaseClient,
   opts?: { locale?: string; organizationId?: string },
 ): Promise<CmsPageRow[]> {
-  let q = supabase.from("cms_pages").select("*").order("updated_at", { ascending: false });
+  let q = supabase.from("cms_pages").select("*").order("updated_at", { ascending: false }).limit(500);
   if (opts?.locale) q = q.eq("locale", opts.locale);
   if (opts?.organizationId) q = q.eq("organization_id", opts.organizationId);
   const { data, error } = await q;

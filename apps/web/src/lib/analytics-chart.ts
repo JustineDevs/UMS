@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { MedusaOrderRow } from "@/lib/medusa-order-bridge";
+import type { WorkerAdminOrder } from "@/lib/worker-admin-bridge";
 
 const dailyPointSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -28,7 +28,7 @@ function utcDateKey(iso: string): string {
 }
 
 export function buildAnalyticsChartsPayload(
-  orders: MedusaOrderRow[],
+  orders: WorkerAdminOrder[],
   options?: { horizonDays?: number },
 ): { ok: true; data: AnalyticsChartsPayload } | { ok: false; error: z.ZodError } {
   const horizonDays = Math.min(Math.max(options?.horizonDays ?? 30, 7), 90);
@@ -47,7 +47,7 @@ export function buildAnalyticsChartsPayload(
     dailyMap.set(key, { revenue: 0, orderCount: 0 });
   }
 
-  const ordersInWindow: MedusaOrderRow[] = [];
+  const ordersInWindow: WorkerAdminOrder[] = [];
 
   for (const o of orders) {
     const key = utcDateKey(o.created_at);

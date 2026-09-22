@@ -54,6 +54,12 @@
 }
 
 @layer components {
+  /* Keep discovery links keyboard-visible even when a page-specific class only styles hover/active state. */
+  .storefront-page-shell :where(a, button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid var(--color-primary, #2563eb);
+    outline-offset: 2px;
+  }
+
   /**
    * Standard content page shell: horizontal padding + modest top pad (header offset is in layout).
    * Pair with max-w-* mx-auto on the same element or a child.

@@ -8,7 +8,7 @@ test("category content is tenant and locale scoped", async () => {
   assert.equal((await getCategoryContent(database, "guitars", "en", "org_1"))?.collection_handle, "guitars");
 });
 
-test("category content list is tenant and locale scoped", async () => {
-  const database: WorkerDatabaseClient = { async query<T extends Record<string, unknown> = Record<string, unknown>>(_text: string, values: readonly unknown[] = []) { assert.deepEqual(values, ["org_1", "en"]); return { rows: [{ collection_handle: "guitars", locale: "en" }] as unknown as T[], rowCount: 1 }; }, async end() {} };
+test("category content list is tenant and locale scoped and bounded", async () => {
+  const database: WorkerDatabaseClient = { async query<T extends Record<string, unknown> = Record<string, unknown>>(text: string, values: readonly unknown[] = []) { assert.match(text, /LIMIT 500/); assert.deepEqual(values, ["org_1", "en"]); return { rows: [{ collection_handle: "guitars", locale: "en" }] as unknown as T[], rowCount: 1 }; }, async end() {} };
   assert.equal((await listCategoryContent(database, "en", "org_1"))[0]?.collection_handle, "guitars");
 });

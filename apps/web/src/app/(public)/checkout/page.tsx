@@ -38,6 +38,7 @@ export default async function CheckoutPage({
   const guestMode = sp.guest === "1" || sp.guest === "true";
   return (
     <CheckoutClient
+      key={`${resume ?? ""}:${token ?? ""}:${stripeCancel ? "cancel" : ""}:${initialReviewMessage ?? ""}:${guestMode ? "guest" : ""}`}
       initialResumeCartId={resume}
       initialResumeToken={token}
       initialStripeCheckoutCancel={stripeCancel}

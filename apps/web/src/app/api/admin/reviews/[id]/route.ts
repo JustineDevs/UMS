@@ -1,84 +1,11 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { z } from "zod";
-import { parseAdminJson } from "@/lib/admin-api-security";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { insertStaffAuditLog } from "@/lib/staff-audit";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { saveWorkerAdminReviewForAdmin } from "@/lib/worker-admin-bridge";
 
 export const dynamic = "force-dynamic";
-const moderationSchema = z
-  .object({
-    status: z.enum(["approved", "rejected", "hidden", "pending"]),
-    moderation_note: z.string().trim().max(2000).optional().default(""),
-    shadow_banned: z.boolean().optional(),
-    expected_updated_at: z.string().datetime().optional(),
-  })
-  .strict();
-
-async function patch(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) {
-  const correlationId = getCorrelationId(req);
-  const staff = await requireStaffApiSession("content:write");
-  if (!staff.ok) return staff.response;
-  const reviewId = (await ctx.params).id?.trim();
-  if (!reviewId)
-    return correlatedJson(
-      correlationId,
-      { error: "Missing id" },
-      { status: 400 },
-    );
-  const parsed = await parseAdminJson(req, moderationSchema);
-  if (!parsed.ok)
-    return correlatedJson(
-      correlationId,
-      { error: parsed.error },
-      { status: parsed.status },
-    );
-  const sup = adminSupabaseOr503(correlationId);
-  if ("response" in sup) return sup.response;
-  const staffEmail =
-    staff.session.user?.email?.trim().toLowerCase() ?? "unknown";
-  let update = sup.client
-    .from("product_reviews")
-    .update({
-      status: parsed.data.status,
-      moderated_by_staff_email: staffEmail,
-      moderated_at: new Date().toISOString(),
-      moderation_note: parsed.data.moderation_note || null,
-      ...(parsed.data.shadow_banned === undefined ? {} : { shadow_banned: parsed.data.shadow_banned }),
-    })
-    .eq("id", reviewId);
-  if (parsed.data.expected_updated_at)
-    update = update.eq("updated_at", parsed.data.expected_updated_at);
-  const { data, error } = await update.select("id,status").maybeSingle();
-  if (error)
-    return correlatedJson(
-      correlationId,
-      { error: "Unable to update review", code: "REVIEW_UPDATE_FAILED" },
-      { status: 502 },
-    );
-  if (!data)
-    return correlatedJson(
-      correlationId,
-      {
-        error: parsed.data.expected_updated_at
-          ? "Review changed; reload before moderating"
-          : "Review not found",
-      },
-      { status: parsed.data.expected_updated_at ? 409 : 404 },
-    );
-  await insertStaffAuditLog(sup.client, {
-    actorEmail: staffEmail,
-    action: "review.moderate",
-    resource: "product_reviews",
-    resourceId: reviewId,
-    details: { status: parsed.data.status },
-  });
-  return correlatedJson(correlationId, { ok: true, review: data });
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+  const requestId = getCorrelationId(request); const { id } = await context.params; const key = request.headers.get("Idempotency-Key")?.trim();
+  if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400, headers: { "Content-Type": "application/json", "x-request-id": requestId } });
+  const length = Number(request.headers.get("content-length") ?? 0); if (length > 128 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413, headers: { "Content-Type": "application/json", "x-request-id": requestId } });
+  let body: Record<string, unknown>; try { const text = await request.text(); if (text.length > 128 * 1024) throw new Error("payload_too_large"); const parsed = JSON.parse(text) as unknown; if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid_payload"); body = parsed as Record<string, unknown>; } catch (error) { const status = error instanceof Error && error.message === "payload_too_large" ? 413 : 400; return new Response(JSON.stringify({ error: status === 413 ? "Payload too large" : "Invalid JSON body", requestId }), { status, headers: { "Content-Type": "application/json", "x-request-id": requestId } }); }
+  const response = await saveWorkerAdminReviewForAdmin(id, body, key); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": requestId } });
 }
-
-export const PATCH = withAdminMutationIdempotency("/admin/reviews/[id]:PATCH", patch);

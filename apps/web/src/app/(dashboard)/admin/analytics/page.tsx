@@ -1,14 +1,16 @@
+import { Suspense } from "react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Tabs, TabsContent, TabsList, TabsTrigger } from "@universal-music-store/ui";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { AnalyticsChartsPanel } from "@/components/AnalyticsChartsPanel";
-import { fetchAllMedusaOrdersForAnalytics, fetchAnalyticsSummary, fetchValidatedAnalyticsCharts } from "@/lib/analytics-bridge";
+import { fetchAllWorkerOrdersForAnalytics, fetchAnalyticsSummary, fetchValidatedAnalyticsCharts } from "@/lib/analytics-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 import { RetentionPanel } from "./RetentionPanel";
 import { SalesTrendsPanel } from "./SalesTrendsPanel";
 import { AnalyticsPeriodSelect } from "./AnalyticsPeriodSelect";
 import { MetricActions } from "./MetricActions";
+import { formatCurrency } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +18,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
   await requirePagePermission("analytics:read");
   const requestedPeriod = Number((await searchParams).period);
   const horizonDays = [30, 90, 365].includes(requestedPeriod) ? requestedPeriod : 30;
-  const [summary, charts, ordersResult] = await Promise.all([
-    fetchAnalyticsSummary(),
-    fetchValidatedAnalyticsCharts(horizonDays),
-    fetchAllMedusaOrdersForAnalytics(),
+  const ordersResult = await fetchAllWorkerOrdersForAnalytics();
+  const [summary, charts] = await Promise.all([
+    fetchAnalyticsSummary(ordersResult),
+    fetchValidatedAnalyticsCharts(horizonDays, ordersResult),
   ]);
-  const customerCount = new Set(ordersResult.map((order) => order.customer_id).filter(Boolean)).size;
+  const customerCount = new Set(ordersResult.flatMap((order) => order.customer_id ? [order.customer_id] : [])).size;
   const averageOrder = summary.orderCount ? summary.revenueTotal / summary.orderCount : 0;
-  const money = new Intl.NumberFormat("en-PH", { style: "currency", currency: summary.currency, maximumFractionDigits: 2 });
+  const money = { format: (value: number) => formatCurrency(value, { currency: summary.currency, maximumFractionDigits: 2 }) };
   const kpis = [
     ["Customer Accounts", customerCount.toLocaleString(), "Unique customers in orders", true],
     ["Orders", summary.orderCount.toLocaleString(), "Completed and pending orders", true],
@@ -34,7 +36,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
   return <AdminPageShell title="Analytics" subtitle="Monitor commerce performance, order health, and retention in one view." breadcrumbs={<AdminBreadcrumbs items={[{ label: "Dashboard", href: "/admin" }, { label: "Analytics" }]} />} inspector={<AuditTimeline title="Recent activity" />}>
     <Tabs defaultValue="overview">
-      <div className="flex flex-wrap items-center justify-between gap-3"><TabsList><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="orders">Orders</TabsTrigger><TabsTrigger value="retention">Retention</TabsTrigger><TabsTrigger value="trends">Trends</TabsTrigger></TabsList><div className="flex items-center gap-2"><AnalyticsPeriodSelect /><Link href="/admin/orders" aria-label="Open orders from analytics" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted"><ArrowUpRight className="size-3.5" />Orders</Link></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><TabsList><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="orders">Orders</TabsTrigger><TabsTrigger value="retention">Retention</TabsTrigger><TabsTrigger value="trends">Trends</TabsTrigger></TabsList><div className="flex items-center gap-2"><Suspense fallback={null}><AnalyticsPeriodSelect /></Suspense><Link href="/admin/orders" aria-label="Open orders from analytics" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm font-medium transition-colors hover:bg-muted"><ArrowUpRight className="size-3.5" />Orders</Link></div></div>
       <TabsContent value="overview" className="flex flex-col gap-4">
         <div className="overflow-hidden rounded-xl bg-card shadow-xs ring-1 ring-foreground/10"><div className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-5">{kpis.map(([label, value, detail, positive]) => <Card key={label} className="rounded-none border-0 ring-0"><CardHeader><CardTitle className="text-sm font-normal">{label}</CardTitle><div className="absolute right-4 top-4"><MetricActions label={label} value={String(value)} /></div></CardHeader><CardContent><div className="flex items-center justify-between gap-3"><div className="text-2xl leading-none tracking-tight tabular-nums">{value}</div><Badge variant={positive ? "outline" : "destructive"}><span className="material-symbols-outlined text-xs">{positive ? "north_east" : "south_east"}</span> {positive ? "Live" : "Review"}</Badge></div><p className="mt-3 text-xs text-muted-foreground">{detail}</p></CardContent></Card>)}</div></div>
         {charts ? <AnalyticsChartsPanel payload={charts} /> : <Card><CardContent className="p-6 text-sm text-muted-foreground">Analytics chart data is unavailable. Refresh after the store service is ready.</CardContent></Card>}

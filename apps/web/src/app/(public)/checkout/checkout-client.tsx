@@ -190,11 +190,10 @@ export function CheckoutClient({
           type="button"
           data-testid="checkout-profile-retry"
           className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
-          onClick={() => {
+          onClick={async () => {
             setProfileGate("loading");
-            void fetchProfileStatus().then((outcome) => {
-              setProfileGate(outcome === "error" ? "error" : outcome);
-            });
+            const outcome = await fetchProfileStatus();
+            setProfileGate(outcome === "error" ? "error" : outcome);
           }}
         >
           Retry
@@ -471,11 +470,11 @@ export function CheckoutClient({
               aria-label="How you will pay"
             >
               {(Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[])
-                .filter((key) => providerAvailable[key])
-                .map((key) => {
+                .flatMap((key) => {
                   const ok = providerAvailable[key];
+                  if (!ok) return [];
                   const selected = paymentMethod === key;
-                  return (
+                  return [(
                     <button
                       key={key}
                       type="button"
@@ -521,7 +520,7 @@ export function CheckoutClient({
                         />
                       </span>
                     </button>
-                  );
+                  )];
                 })}
             </div>
             {paymentMethod === "COD" ? (
@@ -597,7 +596,7 @@ export function CheckoutClient({
                 </>
               )}
             </p>
-            <label className="block text-xs font-medium text-on-surface-variant mt-4 mb-2">
+            <label htmlFor="checkout-loyalty-points" className="block text-xs font-medium text-on-surface-variant mt-4 mb-2">
               Loyalty points to use (optional)
             </label>
             <div className="flex items-center justify-between mb-1">
@@ -606,6 +605,7 @@ export function CheckoutClient({
               </span>
             </div>
             <input
+              id="checkout-loyalty-points"
               type="number"
               min={0}
               max={loyaltyBalance}
@@ -626,7 +626,7 @@ export function CheckoutClient({
             </p>
 
             <div className="mt-6 border-t border-outline-variant/15 pt-5">
-              <label className="block text-xs font-medium text-on-surface-variant mb-2">
+              <label htmlFor="checkout-promo-code" className="block text-xs font-medium text-on-surface-variant mb-2">
                 Promotion code (optional)
               </label>
               {promoApplied ? (
@@ -665,6 +665,7 @@ export function CheckoutClient({
               ) : (
                 <div className="flex gap-2">
                   <input
+                    id="checkout-promo-code"
                     type="text"
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
@@ -701,8 +702,8 @@ export function CheckoutClient({
               )}
               {!medusaPricePreview?.cartId && !promoApplied && (
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  A Medusa cart must be initialised before a code can be
-                  applied. The code field is active once your bag totals load.
+                  Your live cart totals must finish loading before a code can
+                  be applied. The code field is active once your bag totals are ready.
                 </p>
               )}
             </div>
@@ -1217,13 +1218,13 @@ export function CheckoutClient({
               />
               <span className="text-on-surface-variant leading-snug">
                 I agree to the{" "}
-                <a href="/terms" className="text-primary underline">
+                <Link href="/terms" className="text-primary underline">
                   Terms and Conditions
-                </a>{" "}
+                </Link>{" "}
                 and{" "}
-                <a href="/privacy" className="text-primary underline">
+                <Link href="/privacy" className="text-primary underline">
                   Privacy Policy
-                </a>
+                </Link>
                 .
               </span>
             </label>
@@ -1244,7 +1245,7 @@ export function CheckoutClient({
                 !termsAccepted
               }
               onClick={handlePay}
-              className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full mt-6 py-4 bg-primary text-on-primary font-headline font-bold text-sm uppercase tracking-widest rounded hover:opacity-90 active:scale-[0.99] transition-[transform,opacity] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {loading
                 ? paymentMethod === "COD"

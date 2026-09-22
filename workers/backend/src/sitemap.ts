@@ -1,6 +1,7 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 
 type SitemapRow = { slug: string; locale: string; updated_at: string; kind: "page" | "post"; status: string; published_at: string | null; scheduled_publish_at: string | null };
+const MAX_NATIVE_SITEMAP_ENTRIES = 5_000;
 
 function visible(row: SitemapRow): boolean {
   const now = Date.now();
@@ -8,7 +9,7 @@ function visible(row: SitemapRow): boolean {
 }
 
 export async function listNativeCmsSitemap(database: WorkerDatabaseClient, organizationId: string): Promise<SitemapRow[]> {
-  const result = await database.query<SitemapRow>(`SELECT slug, locale, updated_at, 'page' AS kind, status, published_at, scheduled_publish_at FROM public.cms_pages WHERE organization_id = $1 UNION ALL SELECT slug, locale, updated_at, 'post' AS kind, status, published_at, scheduled_publish_at FROM public.cms_blog_posts WHERE organization_id = $1`, [organizationId]);
+  const result = await database.query<SitemapRow>(`SELECT slug, locale, updated_at, 'page' AS kind, status, published_at, scheduled_publish_at FROM public.cms_pages WHERE organization_id = $1 UNION ALL SELECT slug, locale, updated_at, 'post' AS kind, status, published_at, scheduled_publish_at FROM public.cms_blog_posts WHERE organization_id = $1 ORDER BY updated_at DESC, slug LIMIT ${MAX_NATIVE_SITEMAP_ENTRIES}`, [organizationId]);
   return result.rows.filter(visible).map(({ slug, locale, updated_at, kind }) => ({ slug, locale, updated_at, kind, status: "published", published_at: null, scheduled_publish_at: null }));
 }
 

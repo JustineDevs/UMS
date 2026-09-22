@@ -169,10 +169,11 @@ export function ChatIntakeForm() {
         </p>
       ) : null}
       <div>
-        <label className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
+        <label htmlFor="chat-intake-source" className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
           Source
         </label>
         <input
+          id="chat-intake-source"
           value={source}
           onChange={(e) => setSource(e.target.value)}
           className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
@@ -180,10 +181,11 @@ export function ChatIntakeForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
+        <label htmlFor="chat-intake-message" className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
           Customer message (notes)
         </label>
         <textarea
+          id="chat-intake-message"
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm min-h-[96px]"
@@ -191,10 +193,11 @@ export function ChatIntakeForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
+        <label htmlFor="chat-intake-phone" className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
           Phone
         </label>
         <input
+          id="chat-intake-phone"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
@@ -202,10 +205,11 @@ export function ChatIntakeForm() {
         />
       </div>
       <div>
-        <label className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
+        <label htmlFor="chat-intake-address" className="block text-xs font-bold uppercase text-on-surface-variant mb-1">
           Address (optional)
         </label>
         <textarea
+          id="chat-intake-address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
           className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm min-h-[72px]"
@@ -214,7 +218,7 @@ export function ChatIntakeForm() {
       </div>
 
       <div className="space-y-3">
-        <label className="block text-xs font-bold uppercase text-on-surface-variant">
+        <label htmlFor="chat-intake-product-search" className="block text-xs font-bold uppercase text-on-surface-variant">
           Products from catalog
         </label>
         <p className="text-xs text-on-surface-variant">
@@ -223,6 +227,7 @@ export function ChatIntakeForm() {
         </p>
         <div className="relative">
           <input
+            id="chat-intake-product-search"
             type="search"
             className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
             placeholder="Type at least 2 characters…"

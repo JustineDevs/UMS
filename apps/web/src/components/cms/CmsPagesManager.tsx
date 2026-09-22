@@ -12,6 +12,7 @@ import {
   type CmsNode,
 } from "@universal-music-store/platform-data";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readResponseJson } from "@/lib/read-response-json";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { cmsPagePreviewUrl } from "@/lib/cms-preview-url";
 
@@ -179,7 +180,11 @@ export function CmsPagesManager({
 
   useEffect(() => {
     if (!startInBuilder || editing || loadingRows || showStorefrontHome || newPageDialogOpen) return;
-    if (rows.length) openPage(rows[0]);
+    const homepage = rows.find((page) => {
+      const slug = page.slug.trim().toLowerCase();
+      return slug === "home" || slug === "/";
+    });
+    if (homepage) openPage(homepage);
     else setShowStorefrontHome(true);
   }, [editing, loadingRows, newPageDialogOpen, rows, showStorefrontHome, startInBuilder]);
   const openNewPage = () => {
@@ -352,7 +357,7 @@ export function CmsPagesManager({
         },
         body: JSON.stringify(payload),
       });
-      const savedJson = (await response.json().catch(() => ({}))) as { data?: CmsPageRow; error?: string };
+      const savedJson = await readResponseJson(response, {} as { data?: CmsPageRow; error?: string });
       if (!response.ok || !savedJson.data) throw new Error(savedJson.error ?? `Unable to save (${response.status})`);
       const saved = { data: savedJson.data };
       if (saved.data) {
@@ -662,6 +667,7 @@ export function CmsPagesManager({
           </button>
           {showBlocksAdvancedJson ? (
             <textarea
+              aria-label="Advanced blocks JSON"
               className="mt-2 min-h-40 w-full rounded border border-slate-200 bg-white p-2 font-mono text-[11px] text-slate-700"
               value={blocksJson}
               onChange={(e) => setBlocksJson(e.target.value)}

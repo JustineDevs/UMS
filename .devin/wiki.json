@@ -7,7 +7,7 @@
   "pages": [
     {
       "title": "Overview",
-      "purpose": "High-level introduction to the Universal Music Store (UVS) monorepo: what it is, its dual-database architecture (Medusa + Supabase), the apps and packages it contains, and how to navigate the wiki.",
+      "purpose": "High-level introduction to UVS: the Vercel-hosted Next.js storefront/admin, Cloudflare Worker backend, two Supabase Cloud PostgreSQL databases, and shared packages.",
       "page_notes": [
         {
           "content": ""
@@ -16,7 +16,7 @@
     },
     {
       "title": "Architecture & Data Ownership",
-      "purpose": "Deep dive into the two-database split (Medusa as commerce SoR, Supabase as platform/identity SoR), ADR decisions, data ownership rules, and how the apps and packages relate to each other.",
+      "purpose": "The two-database boundary: MEDUSA_DB_URL owns commerce records, APP_DB_URL owns application/platform records, and production Worker access uses Hyperdrive. Supabase Auth SSR provides identity; it is not a third database.",
       "parent": "Overview",
       "page_notes": [
         {
@@ -26,7 +26,7 @@
     },
     {
       "title": "Getting Started & Environment Setup",
-      "purpose": "How to set up the local development environment: pnpm workspace, environment variables, Docker for Medusa, DevContainer, and the monorepo root env loader script.",
+      "purpose": "Local development uses pnpm dev to start the Wrangler Worker and apps/web. Storefront and admin run on port 3000; the local Worker runs on port 8787. Root .env.local supplies local Hyperdrive connection strings.",
       "parent": "Overview",
       "page_notes": [
         {
@@ -55,7 +55,7 @@
     },
     {
       "title": "Checkout & Payment Flow",
-      "purpose": "End-to-end checkout lifecycle: cart preparation, payment intent creation, provider-specific flows (Stripe, PayPal, Xendit, COD), finalization, and the cron-based recovery mechanism for stuck payments.",
+      "purpose": "Worker-owned checkout lifecycle: cart preparation, provider session creation, return/finalization, webhook reconciliation, and scheduled recovery through the configured GitHub Actions workflow.",
       "parent": "Storefront Application",
       "page_notes": [
         {
@@ -65,7 +65,7 @@
     },
     {
       "title": "Cart Management",
-      "purpose": "Cart API routes: attaching customers, merging guest carts, Medusa-bind on sign-in, cart abandonment beacon, and the CartSyncOnSignIn/WishlistSyncOnLogin lifecycle hooks.",
+      "purpose": "Worker-owned cart routes: guest/customer ownership, merge and replay behavior, inventory-aware quantity changes, and persisted cart state across reloads.",
       "parent": "Storefront Application",
       "page_notes": [
         {
@@ -133,8 +133,8 @@
       ]
     },
     {
-      "title": "Medusa Commerce Engine",
-      "purpose": "Overview of apps/medusa — the Medusa 2.x headless commerce backend. Links to child pages covering payment modules, webhooks, subscribers, and configuration.",
+      "title": "Cloudflare Worker Commerce Backend",
+      "purpose": "The only backend runtime: typed Worker routes, Hyperdrive database access, queues, authorization, webhook verification, and durable commerce operations.",
       "page_notes": [
         {
           "content": ""
@@ -142,9 +142,9 @@
       ]
     },
     {
-      "title": "Payment Provider Modules",
-      "purpose": "The four custom Medusa payment modules: Stripe Checkout, PayPal, Xendit, and COD. Covers service implementations, webhook handling, HMAC verification, and deduplication logic.",
-      "parent": "Medusa Commerce Engine",
+      "title": "Payment and Provider Contracts",
+      "purpose": "Worker fetch/Web Crypto provider adapters, authenticated webhook handling, idempotent event persistence, reconciliation, and the status of sandbox/live evidence.",
+      "parent": "Cloudflare Worker Commerce Backend",
       "page_notes": [
         {
           "content": ""
@@ -152,9 +152,9 @@
       ]
     },
     {
-      "title": "Medusa Subscribers, Workflows & Logistics",
-      "purpose": "Event-driven subscribers (order placed, fulfillment, loyalty points, digital receipts, SMS), the J&T Express webhook integration, and the notify-order-shipped workflow.",
-      "parent": "Medusa Commerce Engine",
+      "title": "Queues, Fulfillment & Logistics",
+      "purpose": "Worker queue consumers, retry and dead-letter behavior, Pancake-mediated logistics callbacks, shipment state changes, and reconciliation evidence.",
+      "parent": "Cloudflare Worker Commerce Backend",
       "page_notes": [
         {
           "content": ""
@@ -201,18 +201,8 @@
       ]
     },
     {
-      "title": "Auxiliary Services",
-      "purpose": "Overview of the two auxiliary runtime services: the Express API sidecar (apps/api) and the Terminal Agent (apps/terminal-agent). Links to child pages for each.",
-      "page_notes": [
-        {
-          "content": ""
-        }
-      ]
-    },
-    {
-      "title": "Express API Sidecar (apps/api)",
-      "purpose": "The Node.js/Express sidecar service: health/readiness endpoints, compliance routes (DSAR export and erasure), internal API key auth, rate limiting, and deployment on Render.",
-      "parent": "Auxiliary Services",
+      "title": "Worker Operations & Compliance",
+      "purpose": "Worker health, access control, audit logging, DSAR/privacy operations, migration boundaries, and operational recovery. There is no separately deployed API sidecar.",
       "page_notes": [
         {
           "content": ""
@@ -222,7 +212,7 @@
     {
       "title": "Terminal Agent (apps/terminal-agent)",
       "purpose": "The local HTTP agent for POS hardware: ESC/POS receipt and label printing, cash drawer control, multi-adapter support (TCP, HTTP relay, QZ Tray, Epson ePOS, Star CloudPRNT), and Supabase device heartbeat.",
-      "parent": "Auxiliary Services",
+      "parent": "Overview",
       "page_notes": [
         {
           "content": ""

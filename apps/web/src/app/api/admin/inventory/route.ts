@@ -1,9 +1,10 @@
 import { fetchWorkerInventoryPage } from "@/lib/worker-admin-bridge";
 import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson, tagResponse } from "@/lib/staff-api-response";
 import { requireStaffSessionWithPermission } from "@/lib/requireStaffSession";
 import { buildAdminPagination } from "@/lib/admin-pagination";
+import { adminInventoryResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -49,8 +50,11 @@ export async function GET(req: Request) {
     detail: { rowCount: result.rows.length, total: result.total },
   });
 
-  return correlatedJson(correlationId, {
+  const response = {
     rows: result.rows,
     ...buildAdminPagination(page, pageSize, result.total),
-  });
+  };
+  const parsed = adminInventoryResponseSchema.safeParse(response);
+  if (!parsed.success) return correlatedError(correlationId, 502, "Inventory response is invalid", "SERVICE_UNAVAILABLE");
+  return correlatedJson(correlationId, parsed.data);
 }

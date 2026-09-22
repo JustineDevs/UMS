@@ -1,10 +1,6 @@
-import { createStorefrontMedusaSdk } from "./medusa-sdk";
-import {
-  getMedusaPublishableKey,
-  getMedusaRegionId,
-} from "./storefront-medusa-env";
 import { createHash, randomUUID } from "node:crypto";
 import type { ResolvedTrackingCapability } from "@universal-music-store/sdk";
+import { readResponseJson } from "./read-response-json";
 
 type PublicTrackOrder = {
   id?: string;
@@ -59,12 +55,12 @@ export async function fetchWorkerTrackByToken(
       cache: "no-store",
     });
     if (!response.ok) return trackReadFailure(response.status);
-    const body = (await response.json()) as {
+    const body = await readResponseJson<{
       order?: { order_number?: unknown; status?: unknown; updated_at?: unknown };
       shipments?: unknown;
       capabilityScope?: TrackPayload["capabilityScope"];
       confirmationOrder?: ConfirmationOrder;
-    };
+    }> (response, {});
     if (!body.order || typeof body.order !== "object") return trackReadFailure(502);
     const shipments = Array.isArray(body.shipments)
       ? body.shipments.flatMap((value): TrackPayload["shipments"] => {
@@ -210,26 +206,6 @@ export function maskConfirmationEmail(
   if (at <= 0 || at === value.length - 1) return undefined;
   return `${value.slice(0, 1)}***${value.slice(at)}`;
 }
-
-/** Keep unscoped public tracking reads from fetching customer identity data. */
-export function buildPublicTrackOrderFields(includeCustomerEmail = false): string {
-  return [
-    "id",
-    "display_id",
-    "updated_at",
-    "payment_status",
-    "fulfillment_status",
-    ...(includeCustomerEmail ? ["email"] : []),
-    "+metadata",
-    "*fulfillments",
-    "*fulfillments.labels",
-  ].join(",");
-}
-
-type TrackFetchOptions = {
-  includePrivate?: boolean;
-  includeCustomerEmail?: boolean;
-};
 
 type CarrierTrackingAdapter = {
   version: 1;
@@ -605,102 +581,4 @@ export function mapMedusaOrderToTrack(
     shipments,
     ...(capabilityScope ? { capabilityScope } : {}),
   };
-}
-
-export function medusaReadFailureStatus(error: unknown): number {
-  if (error && typeof error === "object" && "status" in error) {
-    const status = (error as { status?: unknown }).status;
-    if (typeof status === "number" && Number.isInteger(status)) {
-      if (
-        status === 401 ||
-        status === 403 ||
-        status === 404 ||
-        status === 408 ||
-        status === 409 ||
-        status === 429
-      ) {
-        return status;
-      }
-      if (status >= 500 && status <= 599) return status;
-    }
-  }
-  return 503;
-}
-
-export async function fetchMedusaTrackByOrderId(
-  orderId: string,
-  options?: TrackFetchOptions,
-): Promise<TrackReadResult> {
-  const key = getMedusaPublishableKey();
-  if (!key) {
-    return trackReadFailure(503);
-  }
-  try {
-    const sdk = createStorefrontMedusaSdk();
-    const { order } = await sdk.store.order.retrieve(orderId, {
-      fields:
-        options?.includePrivate === true
-          ? "id,display_id,updated_at,payment_status,fulfillment_status,+metadata,email,total,currency_code,shipping_address,*items"
-          : buildPublicTrackOrderFields(options?.includeCustomerEmail),
-    } as never);
-    if (!order) {
-      return trackReadFailure(404);
-    }
-    return {
-      ok: true,
-      data: mapMedusaOrderToTrack(
-        order as unknown as Record<string, unknown>,
-        options?.includePrivate === true,
-      ),
-      status: 200,
-    };
-  } catch (error) {
-    return trackReadFailure(medusaReadFailureStatus(error));
-  }
-}
-
-export async function fetchMedusaTrackByCartId(
-  cartId: string,
-  options?: TrackFetchOptions,
-): Promise<TrackReadResult> {
-  const key = getMedusaPublishableKey();
-  const regionId = getMedusaRegionId();
-  if (!key || !regionId) {
-    return trackReadFailure(503);
-  }
-  try {
-    const sdk = createStorefrontMedusaSdk();
-    const { cart } = await sdk.store.cart.retrieve(cartId, {
-      fields:
-        "id,completed_at,+order_id,*customer,*items,+total,*order,*order.fulfillments,*order.fulfillments.labels,+order.metadata,+order.payment_status,+order.fulfillment_status,+order.display_id",
-    } as never);
-
-    const cartRec = cart as unknown as Record<string, unknown> | undefined;
-    const orderRaw = cartRec?.order as Record<string, unknown> | undefined;
-    const linkedOrderId =
-      orderRaw && typeof orderRaw.id === "string"
-        ? orderRaw.id
-        : typeof cartRec?.order_id === "string"
-          ? cartRec.order_id
-          : undefined;
-    if (linkedOrderId) {
-      return fetchMedusaTrackByOrderId(linkedOrderId, options);
-    }
-
-    if (cart?.completed_at) {
-      return {
-        ok: true,
-        data: pendingCartTrackPayload(),
-        status: 200,
-      };
-    }
-
-    return {
-      ok: true,
-      data: pendingCartTrackPayload(),
-      status: 200,
-    };
-  } catch (error) {
-    return trackReadFailure(medusaReadFailureStatus(error));
-  }
 }

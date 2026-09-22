@@ -1,4 +1,5 @@
 import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
+import { readResponseJson } from "@/lib/read-response-json";
 import { unstable_cache } from "next/cache";
 
 export type HomepageSocialProof = {
@@ -14,12 +15,12 @@ async function fetchHomepageCustomerCountUncached(): Promise<number> {
     if (!res.ok) {
       return 0;
     }
-    const json = (await res.json()) as {
+    const json = await readResponseJson<{
       customerCount?: number;
       count?: number;
       total?: number;
       customers?: unknown[];
-    };
+    }>(res, {});
     if (typeof json.customerCount === "number") return json.customerCount;
     if (typeof json.count === "number") {
       return json.count;

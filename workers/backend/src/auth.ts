@@ -74,6 +74,30 @@ export async function verifyWorkerBearerToken(
       (!Number.isSafeInteger(claims.exp) || claims.exp <= nowSeconds)
     )
       return null;
+    // Server-to-Worker calls use a short-lived internal token carrying the
+    // already-authorized staff scope. It is deliberately distinct from a
+    // Supabase user token and is accepted only with the explicit issuer/aud.
+    if (
+      parsedHeader.alg === "HS256" &&
+      config.secret &&
+      claims.iss === "uvs.internal" &&
+      claims.aud === "uvs-worker"
+    ) {
+      const key = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(config.secret),
+        { name: "HMAC", hash: "SHA-256" },
+        false,
+        ["verify"],
+      );
+      const valid = await crypto.subtle.verify(
+        "HMAC",
+        key,
+        signature as unknown as BufferSource,
+        encoder.encode(`${parts[0]}.${parts[1]}`),
+      );
+      return valid ? (claims as WorkerAuthClaims) : null;
+    }
     if (config.supabaseUrl) {
       if (
         (parsedHeader.alg !== "RS256" && parsedHeader.alg !== "ES256") ||

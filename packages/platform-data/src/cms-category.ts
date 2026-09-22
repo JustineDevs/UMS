@@ -46,7 +46,8 @@ export async function listCmsCategoryContent(supabase: SupabaseClient, organizat
   let query = supabase
     .from("cms_category_content")
     .select("*")
-    .order("collection_handle");
+    .order("collection_handle")
+    .limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

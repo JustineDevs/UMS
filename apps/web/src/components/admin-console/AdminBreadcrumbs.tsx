@@ -16,7 +16,7 @@ export function AdminBreadcrumbs({ items }: { items: Crumb[] }) {
     <Breadcrumb>
       <BreadcrumbList>
         {items.map((c, i) => (
-          <Fragment key={`${c.label}-${i}`}>
+          <Fragment key={`${c.href ?? "current"}-${c.label}`}>
             {i > 0 ? <BreadcrumbSeparator /> : null}
             <BreadcrumbItem>
               {c.href ? (

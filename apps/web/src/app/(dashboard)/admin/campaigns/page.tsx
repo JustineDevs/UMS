@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminBreadcrumbs, AdminEmptyState, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,6 +32,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function CampaignsPage() {
+  const creatingRef = useRef(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,25 +50,30 @@ export default function CampaignsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [campRes, segRes] = await Promise.all([
-      fetch("/api/admin/campaigns"),
-      fetch("/api/admin/segments"),
-    ]);
-    if (campRes.ok) {
-      const { data } = await campRes.json();
-      setCampaigns(data ?? []);
+    try {
+      const [campRes, segRes] = await Promise.all([
+        fetch("/api/admin/campaigns"),
+        fetch("/api/admin/segments"),
+      ]);
+      if (campRes.ok) {
+        const { data } = await campRes.json();
+        setCampaigns(data ?? []);
+      }
+      if (segRes.ok) {
+        const { data } = await segRes.json();
+        setSegments(data ?? []);
+      }
+    } finally {
+      setLoading(false);
     }
-    if (segRes.ok) {
-      const { data } = await segRes.json();
-      setSegments(data ?? []);
-    }
-    setLoading(false);
   }, []);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (creating || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     setError(null);
     try {
@@ -85,11 +91,13 @@ export default function CampaignsPage() {
       setForm({ name: "", type: "custom", segment_id: "", subject: "", body_template: "" });
       void fetchData();
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   }
 
   async function handleExecute(id: string) {
+    if (executing) return;
     setExecuting(id);
     setError(null);
     try {

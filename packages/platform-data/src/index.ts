@@ -290,6 +290,8 @@ export {
   appendDeliveryLogisticsEvent,
   listDeliveryLogisticsEvents,
   listDeliveryLogisticsShipments,
+  normalizeDeliveryLogisticsEventRow,
+  normalizeDeliveryLogisticsShipmentRow,
   upsertDeliveryLogisticsShipment,
   type DeliveryLogisticsEventRow,
   type DeliveryLogisticsSettlementStatus,

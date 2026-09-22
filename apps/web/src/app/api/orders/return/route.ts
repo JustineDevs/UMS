@@ -12,6 +12,8 @@ import { isSameOriginMutation } from "@/lib/request-origin";
 import { accountMutationFailure } from "@/lib/account-mutation-error";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { normalizeReturnRequestLines } from "@/lib/account-return-policy";
+import { storefrontReturnResponseSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 
 const MAX_RETURN_BODY_BYTES = 32 * 1024;
 
@@ -107,9 +109,12 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload),
       cache: "no-store",
     });
-    const body = await response
-      .json()
-      .catch(() => ({ error: "invalid_worker_response" }));
+    const body = await readResponseJson(response, { error: "invalid_worker_response" });
+    if (response.ok) {
+      const validated = storefrontReturnResponseSchema.safeParse(body);
+      if (!validated.success) return jsonNoStore({ error: "Return service returned an invalid result" }, { status: 502 });
+      return jsonNoStore(validated.data, { status: response.status });
+    }
     return jsonNoStore(body, { status: response.status });
   } catch (error) {
     const correlationId = crypto.randomUUID();

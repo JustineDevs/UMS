@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 
 export function OverviewKpis({
   processedVolume,
@@ -14,7 +15,7 @@ export function OverviewKpis({
   successRate: number;
   currency: string;
 }) {
-  const money = new Intl.NumberFormat("en-PH", { style: "currency", currency, maximumFractionDigits: 2 });
+  const money = { format: (value: number) => formatCurrency(value, { currency, maximumFractionDigits: 2 }) };
   return (
     <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
       <div className="grid grid-cols-1 xl:grid-cols-8">

@@ -30,6 +30,7 @@ import {
   buildJsonLdBreadcrumb,
   buildPageMetadata,
   canonicalUrl,
+  serializeJsonLd,
   SEO_KEYWORDS,
   SITE_NAME,
 } from "@/lib/seo";
@@ -138,13 +139,13 @@ export default async function ProductPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(productJsonLd),
+          __html: serializeJsonLd(productJsonLd),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd),
+          __html: serializeJsonLd(breadcrumbJsonLd),
         }}
       />
       <main className="storefront-page-shell storefront-pdp-shell w-full">
@@ -168,6 +169,7 @@ export default async function ProductPage({ params }: Props) {
         <div className="grid w-full grid-cols-1 items-start gap-10 lg:gap-14 xl:grid-cols-2 xl:gap-16 2xl:gap-20">
           <div className="min-w-0 space-y-8 xl:max-w-none">
             <ProductGalleryCarousel
+              key={product.id}
               slides={product.gallerySlides}
               productName={product.name}
             />
@@ -269,9 +271,9 @@ export default async function ProductPage({ params }: Props) {
               sizes="(max-width: 1024px) 100vw, 896px"
               unoptimized={shouldUnoptimizeImage(product.lifestyleImageUrl)}
             />
-            {product.hotspots.map((h, i) => (
+            {product.hotspots.map((h) => (
               <Link
-                key={`${h.productSlug}-${i}`}
+                key={`${h.productSlug}-${h.xPct}-${h.yPct}`}
                 href={`/shop/${h.productSlug}`}
                 className="absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-on-primary bg-primary text-[10px] font-bold uppercase text-on-primary shadow-md hover:bg-on-primary hover:text-primary"
                 style={{ left: `${h.xPct}%`, top: `${h.yPct}%` }}
@@ -306,6 +308,7 @@ export default async function ProductPage({ params }: Props) {
       <ProductQaSection entries={qaEntries} />
 
       <ProductReviewsSection
+        key={`${product.id}:${slug}`}
         productSlug={slug}
         medusaProductId={product.id}
         reviews={reviews}

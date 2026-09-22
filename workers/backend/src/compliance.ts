@@ -33,6 +33,16 @@ async function configuredRetentionDays(env: ComplianceEnv): Promise<number> {
 
 type QueryRow = Record<string, unknown>;
 
+const COMPLIANCE_EXPORT_LIMITS = {
+  appRows: 500,
+  wishlistRows: 100,
+  deliveryRows: 500,
+  orders: 500,
+  orderItems: 5_000,
+  addresses: 100,
+  payments: 1_000,
+} as const;
+
 async function withComplianceDatabase<T>(
   env: ComplianceEnv,
   role: "app" | "medusa",
@@ -109,7 +119,7 @@ async function appExport(
     [email],
   );
   const loyalty = await database.query<QueryRow>(
-    `SELECT row_to_json(l) AS value FROM public.loyalty_accounts l WHERE lower(l.customer_email) = $1`,
+    `SELECT row_to_json(l) AS value FROM public.loyalty_accounts l WHERE lower(l.customer_email) = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.appRows}`,
     [email],
   );
   const customerId =
@@ -118,25 +128,25 @@ async function appExport(
     null;
   const wishlist = customerId
     ? await database.query<QueryRow>(
-        `SELECT row_to_json(w) AS value FROM public.wishlists w WHERE w.medusa_customer_id = $1`,
+        `SELECT row_to_json(w) AS value FROM public.wishlists w WHERE w.medusa_customer_id = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.wishlistRows}`,
         [customerId],
       )
     : { rows: [] as QueryRow[] };
   const [marketing, newsletter, backInStock, delivery] = await Promise.all([
     database.query<QueryRow>(
-      `SELECT row_to_json(m) AS value FROM public.marketing_preferences m WHERE lower(m.email) = $1`,
+      `SELECT row_to_json(m) AS value FROM public.marketing_preferences m WHERE lower(m.email) = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.appRows}`,
       [email],
     ),
     database.query<QueryRow>(
-      `SELECT row_to_json(n) AS value FROM public.newsletter_confirmations n WHERE lower(n.email) = $1`,
+      `SELECT row_to_json(n) AS value FROM public.newsletter_confirmations n WHERE lower(n.email) = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.appRows}`,
       [email],
     ),
     database.query<QueryRow>(
-      `SELECT row_to_json(b) AS value FROM public.back_in_stock_notifications b WHERE lower(b.email) = $1`,
+      `SELECT row_to_json(b) AS value FROM public.back_in_stock_notifications b WHERE lower(b.email) = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.appRows}`,
       [email],
     ),
     database.query<QueryRow>(
-      `SELECT row_to_json(d) AS value FROM public.public_delivery_attempts d WHERE lower(d.recipient) = $1`,
+      `SELECT row_to_json(d) AS value FROM public.public_delivery_attempts d WHERE lower(d.recipient) = $1 LIMIT ${COMPLIANCE_EXPORT_LIMITS.deliveryRows}`,
       [email],
     ),
   ]);
@@ -169,7 +179,7 @@ async function medusaExport(
     return { customer: null, orders: [], orderItems: [], addresses: [], payments: [] };
   }
   const orders = await database.query<QueryRow>(
-    `SELECT row_to_json(o) AS value FROM public."order" o WHERE o.customer_id = $1 AND o.deleted_at IS NULL ORDER BY o.created_at DESC`,
+    `SELECT row_to_json(o) AS value FROM public."order" o WHERE o.customer_id = $1 AND o.deleted_at IS NULL ORDER BY o.created_at DESC LIMIT ${COMPLIANCE_EXPORT_LIMITS.orders}`,
     [customerId],
   );
   const orderIds = orders.rows
@@ -177,17 +187,17 @@ async function medusaExport(
     .filter((id): id is string => typeof id === "string");
   const orderItems = orderIds.length
     ? await database.query<QueryRow>(
-        `SELECT row_to_json(oi) AS value FROM public.order_item oi WHERE oi.order_id = ANY($1::text[]) AND oi.deleted_at IS NULL`,
+        `SELECT row_to_json(oi) AS value FROM public.order_item oi WHERE oi.order_id = ANY($1::text[]) AND oi.deleted_at IS NULL LIMIT ${COMPLIANCE_EXPORT_LIMITS.orderItems}`,
         [orderIds],
       )
     : { rows: [] as QueryRow[] };
   const addresses = await database.query<QueryRow>(
-    `SELECT row_to_json(a) AS value FROM public.customer_address a WHERE a.customer_id = $1 AND a.deleted_at IS NULL`,
+    `SELECT row_to_json(a) AS value FROM public.customer_address a WHERE a.customer_id = $1 AND a.deleted_at IS NULL LIMIT ${COMPLIANCE_EXPORT_LIMITS.addresses}`,
     [customerId],
   );
   const payments = orderIds.length
     ? await database.query<QueryRow>(
-        `SELECT row_to_json(pc) AS value FROM public.payment_collection pc JOIN public.order_payment_collection opc ON opc.payment_collection_id = pc.id WHERE opc.order_id = ANY($1::text[]) AND pc.deleted_at IS NULL`,
+        `SELECT row_to_json(pc) AS value FROM public.payment_collection pc JOIN public.order_payment_collection opc ON opc.payment_collection_id = pc.id WHERE opc.order_id = ANY($1::text[]) AND pc.deleted_at IS NULL LIMIT ${COMPLIANCE_EXPORT_LIMITS.payments}`,
         [orderIds],
       )
     : { rows: [] as QueryRow[] };
@@ -316,6 +326,7 @@ export async function handleComplianceRequest(
       exportedAt: new Date().toISOString(),
       app: app.data,
       medusa: { customer: medusa.customer, orders: medusa.orders, orderItems: medusa.orderItems, addresses: medusa.addresses, payments: medusa.payments },
+      limits: COMPLIANCE_EXPORT_LIMITS,
     });
   }
   if (request.method === "POST" && path === "/compliance/erasure") {

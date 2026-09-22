@@ -14,6 +14,10 @@ type CheckBotId = () => Promise<BotIdVerification>;
 
 const checkBotId: CheckBotId = runBotIdCheck;
 
+function isLocalE2EBotIdBypassed(): boolean {
+  return process.env.UVS_E2E_BOTID_BYPASS === "1" && process.env.VERCEL !== "1";
+}
+
 export function withBotIdProtection<
   TArgs extends readonly [Request, ...unknown[]],
 >(
@@ -27,7 +31,7 @@ export function withBotIdProtection<
         { status: 403 },
       );
     }
-    if (isStorefrontAuthDisabled()) {
+    if (isStorefrontAuthDisabled() || isLocalE2EBotIdBypassed()) {
       return handler(..._args);
     }
     let verification: BotIdVerification;

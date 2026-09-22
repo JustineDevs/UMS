@@ -9,7 +9,7 @@
  *   SQL is idempotent (`IF NOT EXISTS`, `DROP IF EXISTS`, etc.) where possible.
  * - Subsequent runs: only pending files run.
  * ` pnpm --filter @universal-music-store/database migrate`
- * Append new `supabase/migrations/*.sql` names to MIGRATION_FILES in numeric order.
+ * Register each reviewed `supabase/migrations/*.sql` file in numeric order.
  * Uses APP_DB_URL from repo root `.env.local`.
  *
  * Flags:
@@ -148,6 +148,17 @@ const MIGRATION_FILES = [
   "114_platform_runtime_settings.sql",
   "115_customer_notification_preference_channels.sql",
   "116_customer_order_preferences.sql",
+  "117_chat_order_worker_contract.sql",
+  "118_employee_tenant_scope.sql",
+  "119_operator_notes_tenant_scope.sql",
+  "120_offline_queue_tenant_scope.sql",
+  "121_pos_devices_tenant_identity.sql",
+  "122_payment_refund_audit_tenant_scope.sql",
+  "123_payment_refund_provider_reconciliation.sql",
+  "124_payment_refund_idempotency_reservations.sql",
+  "125_order_fulfillment_notifications.sql",
+  "126_cms_media_storage_cleanup_saga.sql",
+  "127_customer_order_preferences_organization_text.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
@@ -272,13 +283,19 @@ async function printStatusAndExit(
 async function main(): Promise<void> {
   const { client } = await connectWithPoolerFallback();
   try {
-    await ensureMigrationsTable(client);
-    const applied = await getAppliedSet(client);
-
     if (statusOnly) {
+      const table = await client.query<{ present: boolean }>(
+        "SELECT to_regclass($1) IS NOT NULL AS present",
+        [`public.${MIGRATIONS_TABLE}`],
+      );
+      const applied = table.rows[0]?.present
+        ? await getAppliedSet(client)
+        : new Set<string>();
       await printStatusAndExit(client, applied);
     }
 
+    await ensureMigrationsTable(client);
+    const applied = await getAppliedSet(client);
     const dir = join(__dirname, "..", "supabase", "migrations");
     let ran = 0;
     for (const name of MIGRATION_FILES) {

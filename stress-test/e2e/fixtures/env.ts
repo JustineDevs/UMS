@@ -4,7 +4,6 @@
 
 const storefrontBase = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 export const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
-const medusaBase = process.env.PLAYWRIGHT_MEDUSA_URL ?? "http://localhost:9000";
 
 export function strictCatalog(): boolean {
   return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
@@ -21,7 +20,7 @@ export function isE2eStrictPayments(): boolean {
   );
 }
 
-/** When set, every PSP enabled in Medusa payment-health must have matching E2E_* credentials. */
+/** When set, every PSP exposed by Worker-backed checkout must have matching E2E credentials. */
 export function isE2eExpectAllPsps(): boolean {
   return process.env.E2E_EXPECT_ALL_PSPS === "1";
 }

@@ -16,6 +16,7 @@ The backend runs as a Worker with Hyperdrive and Cloudflare Queues.
 
 1. Install Wrangler or use `pnpm dlx wrangler` and run `wrangler login`.
 2. Configure the required Worker secrets listed in the Cloudflare deployment checklist. Do not create `MEDUSA_ORIGIN_URL` or `COMPLIANCE_ORIGIN_URL`; route handlers run in the Worker runtime.
+   The `AUTH_SECRET` value must match the Vercel server-side `AUTH_SECRET`; it authenticates signed storefront-to-Worker forwarding for cart abandonment and review CSRF assertions. Receipt uploads additionally require `SUPABASE_STORAGE_URL` (or `SUPABASE_URL`) and `SUPABASE_SERVICE_ROLE_KEY`. Keep these as Wrangler secrets, never vars.
 3. Deploy the preview Worker from the `dev` branch with `pnpm backend:worker:deploy`.
 4. Deploy production only after the reviewed `dev` to `main` pull request with `pnpm backend:worker:deploy:production`.
 5. Verify `${API_URL}/healthz` returns HTTP 200 before pointing Vercel at it.

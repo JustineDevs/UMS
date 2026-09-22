@@ -12,7 +12,6 @@ export type {
 export {
   fetchCategorySummaries,
   fetchFeaturedProducts,
-  fetchProductById,
   fetchProductBySlug,
   fetchProductSlugsForSitemap,
   fetchProductsPage,

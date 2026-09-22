@@ -46,7 +46,8 @@ export async function listSegments(
   let query = supabase
     .from("customer_segments")
     .select("*")
-    .order("name");
+    .order("name")
+    .limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {
@@ -128,7 +129,10 @@ export async function getSegmentMembers(
   let query = supabase
     .from("customer_segment_members")
     .select("customer_email, medusa_customer_id")
-    .eq("segment_id", segmentId);
+    .eq("segment_id", segmentId)
+    // Keep this legacy array-shaped contract bounded. Large segment execution
+    // uses the paged worker in campaigns.ts instead of this admin detail read.
+    .limit(10_000);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) throw error;

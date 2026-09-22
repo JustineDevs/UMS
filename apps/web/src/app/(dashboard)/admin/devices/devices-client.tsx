@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
 
@@ -101,16 +101,20 @@ export function DevicesPageClient() {
   const [editing, setEditing] = useState<Device | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
+  const creatingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchDevices = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/admin/devices");
-    if (res.ok) {
-      const { data } = await res.json();
-      setDevices(data ?? []);
+    try {
+      const res = await fetch("/api/admin/devices");
+      if (res.ok) {
+        const { data } = await res.json();
+        setDevices(data ?? []);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -119,20 +123,26 @@ export function DevicesPageClient() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (creatingRef.current) return;
+    creatingRef.current = true;
     setError(null);
-    const response = await fetch("/api/admin/devices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "Device could not be registered.");
-      return;
+    try {
+      const response = await fetch("/api/admin/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Device could not be registered.");
+        return;
+      }
+      setShowForm(false);
+      setForm({ name: "", type: "terminal", ip_address: "" });
+      void fetchDevices();
+    } finally {
+      creatingRef.current = false;
     }
-    setShowForm(false);
-    setForm({ name: "", type: "terminal", ip_address: "" });
-    void fetchDevices();
   }
 
   async function handleSaveEdit(e: React.FormEvent) {
@@ -141,24 +151,26 @@ export function DevicesPageClient() {
     setSaving(true);
     setError(null);
     const config = buildConfigPatch(editForm);
-    const response = await fetch(`/api/admin/devices/${editing.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ip_address: editForm.ip_address.trim() || null,
-        config,
-      }),
-    });
-    if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
-      setError(body.error ?? "Device could not be updated.");
+    try {
+      const response = await fetch(`/api/admin/devices/${editing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip_address: editForm.ip_address.trim() || null,
+          config,
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Device could not be updated.");
+        return;
+      }
+      setEditing(null);
+      setEditForm(null);
+      void fetchDevices();
+    } finally {
       setSaving(false);
-      return;
     }
-    setSaving(false);
-    setEditing(null);
-    setEditForm(null);
-    void fetchDevices();
   }
 
   function openEdit(d: Device) {
@@ -241,14 +253,14 @@ export function DevicesPageClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">Add Device</h2>
-            <input required placeholder="Device name (e.g. Terminal 01)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+            <input aria-label="Device name" required placeholder="Device name (e.g. Terminal 01)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <select aria-label="Device type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
               <option value="terminal">Terminal</option>
               <option value="printer">Printer</option>
               <option value="kds">Kitchen Display</option>
               <option value="scanner">Scanner</option>
             </select>
-            <input placeholder="IP Address (optional)" value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            <input aria-label="IP address" placeholder="IP Address (optional)" value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
               <Button type="submit">Add</Button>
@@ -261,30 +273,34 @@ export function DevicesPageClient() {
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <form onSubmit={handleSaveEdit} className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-4 my-8">
             <h2 className="text-lg font-bold font-headline">Edit device: {editing.name}</h2>
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">IP address</label>
+            <label htmlFor="device-edit-ip-address" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">IP address</label>
             <input
+              id="device-edit-ip-address"
               value={editForm.ip_address}
               onChange={(e) => setEditForm({ ...editForm, ip_address: e.target.value })}
               className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
               placeholder="Optional"
             />
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant pt-2">Printer TCP (ESC/POS)</label>
+            <span className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant pt-2">Printer TCP (ESC/POS)</span>
             <div className="grid grid-cols-2 gap-3">
               <input
+                aria-label="Printer host"
                 value={editForm.printerHost}
                 onChange={(e) => setEditForm({ ...editForm, printerHost: e.target.value })}
                 className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
                 placeholder="Host"
               />
               <input
+                aria-label="Printer port"
                 value={editForm.printerPort}
                 onChange={(e) => setEditForm({ ...editForm, printerPort: e.target.value })}
                 className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
                 placeholder="Port (e.g. 9100)"
               />
             </div>
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Default adapter</label>
+            <label htmlFor="device-edit-default-adapter" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Default adapter</label>
             <select
+              id="device-edit-default-adapter"
               value={editForm.defaultAdapter}
               onChange={(e) => setEditForm({ ...editForm, defaultAdapter: e.target.value })}
               className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
@@ -293,22 +309,25 @@ export function DevicesPageClient() {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">HTTP relay URL</label>
+            <label htmlFor="device-edit-http-relay-url" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">HTTP relay URL</label>
             <input
+              id="device-edit-http-relay-url"
               value={editForm.httpRelayUrl}
               onChange={(e) => setEditForm({ ...editForm, httpRelayUrl: e.target.value })}
               className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
               placeholder="https://... or http://127.0.0.1:..."
             />
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Epson raw print URL</label>
+            <label htmlFor="device-edit-epson-url" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">Epson raw print URL</label>
             <input
+              id="device-edit-epson-url"
               value={editForm.epsonEposUrl}
               onChange={(e) => setEditForm({ ...editForm, epsonEposUrl: e.target.value })}
               className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"
               placeholder="Optional"
             />
-            <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">QZ Tray relay URL</label>
+            <label htmlFor="device-edit-qz-url" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">QZ Tray relay URL</label>
             <input
+              id="device-edit-qz-url"
               value={editForm.qzTrayRelayUrl}
               onChange={(e) => setEditForm({ ...editForm, qzTrayRelayUrl: e.target.value })}
               className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm"

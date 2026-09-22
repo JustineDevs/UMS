@@ -131,7 +131,11 @@ export function buildMedusaMetadataPatch(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
 
-  if (fields.mediaIds.length > 0) out.media_ids = [...new Set(fields.mediaIds.map((id) => id.trim()).filter(Boolean))];
+  const mediaIds = fields.mediaIds.flatMap((id) => {
+    const trimmed = id.trim();
+    return trimmed ? [trimmed] : [];
+  });
+  if (mediaIds.length > 0) out.media_ids = [...new Set(mediaIds)];
 
   const setStr = (key: string, val: string | null) => {
     if (val != null && val.trim()) out[key] = val.trim();
@@ -256,23 +260,6 @@ function parseHotspotsJsonInput(
     cleaned.push(item);
   }
   return cleaned;
-}
-
-/** Non-empty JSON that fails to parse or is not an array. */
-export function validateHotspotsJsonField(
-  hotspotsJson: string,
-): string | null {
-  const t = hotspotsJson.trim();
-  if (!t) return null;
-  try {
-    const p = JSON.parse(t) as unknown;
-    if (!Array.isArray(p)) {
-      return "Hotspots must be a JSON array.";
-    }
-  } catch {
-    return "Hotspots must be valid JSON.";
-  }
-  return null;
 }
 
 /**

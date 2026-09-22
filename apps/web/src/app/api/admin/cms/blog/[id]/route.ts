@@ -1,84 +1,28 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
 import { NextRequest } from "next/server";
-import { getStaffSession } from "@/lib/requireStaffSession";
-import { staffSessionAllows } from "@universal-music-store/database";
-import {
-  deleteCmsBlogPost,
-  getCmsBlogPostById,
-  upsertCmsBlogPost,
-  type UpsertCmsBlogInput,
-} from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedJson } from "@/lib/staff-api-response";
-import { cmsBlogSchema } from "@/lib/cms-route-contracts";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { deleteWorkerCmsBlogForAdmin, fetchWorkerCmsBlogDetailForAdmin, saveWorkerCmsBlogForAdmin } from "@/lib/worker-admin-bridge";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
 export async function GET(req: NextRequest, ctx: RouteCtx) {
-  const cid = getCorrelationId(req);
   const { id } = await ctx.params;
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:read")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
-  const data = await getCmsBlogPostById(sup.client, id, organization.id);
-  if (!data) return correlatedJson(cid, { error: "Not found" }, { status: 404 });
-  return correlatedJson(cid, { data });
+  const response = await fetchWorkerCmsBlogDetailForAdmin(id);
+  return response ?? correlatedJson(getCorrelationId(req), { error: "Worker backend is unavailable" }, { status: 503 });
 }
 
-async function put(req: NextRequest, ctx: RouteCtx) {
-  const cid = getCorrelationId(req);
-  const { id } = await ctx.params;
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const body = await parseBoundedJson(req, 512 * 1024);
-  if (body.tooLarge) return correlatedJson(cid, { error: "Payload too large" }, { status: 413 });
-  const parsed = cmsBlogSchema.safeParse(body.valid ? body.value : null);
-  if (!parsed.success || (parsed.data.id && parsed.data.id !== id)) {
-    return correlatedJson(cid, { error: "Invalid blog payload" }, { status: 400 });
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
-  const data = await upsertCmsBlogPost(sup.client, { ...parsed.data, id, organization_id: organization.id } as UpsertCmsBlogInput);
-  if (!data) return correlatedJson(cid, { error: "Unable to save" }, { status: 500 });
-  return correlatedJson(cid, { data });
+export async function PUT(req: NextRequest, ctx: RouteCtx) {
+  const correlationId = getCorrelationId(req);
+  const [{ id }, body] = await Promise.all([ctx.params, parseBoundedJson(req, 512 * 1024)]);
+  if (body.tooLarge) return correlatedJson(correlationId, { error: "Payload too large" }, { status: 413 });
+  if (!body.valid || !body.value || typeof body.value !== "object" || Array.isArray(body.value)) return correlatedJson(correlationId, { error: "Invalid blog payload" }, { status: 400 });
+  const response = await saveWorkerCmsBlogForAdmin({ blogId: id, body: body.value as Record<string, unknown>, idempotencyKey: req.headers.get("idempotency-key")?.trim() ?? "" });
+  return response ?? correlatedJson(correlationId, { error: "Worker backend is unavailable" }, { status: 503 });
 }
 
-async function deleteHandler(req: NextRequest, ctx: RouteCtx) {
-  const cid = getCorrelationId(req);
+export async function DELETE(req: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params;
-  const session = await getStaffSession();
-  if (!session?.user) {
-    return correlatedJson(cid, { error: "Unauthorized" }, { status: 401 });
-  }
-  if (!staffSessionAllows(session, "content:write")) {
-    return correlatedJson(cid, { error: "Forbidden" }, { status: 403 });
-  }
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, session.user.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization required" }, { status: 403 });
-  const ok = await deleteCmsBlogPost(sup.client, id, organization.id);
-  if (!ok) return correlatedJson(cid, { error: "Unable to delete" }, { status: 500 });
-  return correlatedJson(cid, { ok: true });
+  const response = await deleteWorkerCmsBlogForAdmin(id, req.headers.get("idempotency-key")?.trim() ?? "");
+  return response ?? correlatedJson(getCorrelationId(req), { error: "Worker backend is unavailable" }, { status: 503 });
 }
-
-export const PUT = withAdminMutationIdempotency("/admin/cms/blog/[id]:PUT", put);
-export const DELETE = withAdminMutationIdempotency("/admin/cms/blog/[id]:DELETE", deleteHandler);

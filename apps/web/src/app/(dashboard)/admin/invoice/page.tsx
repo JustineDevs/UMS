@@ -10,15 +10,16 @@ export const dynamic = "force-dynamic";
 export default async function InvoicePage() {
   await requirePagePermission("receipts:send");
   const customers = await fetchCustomersForAdmin();
-  const invoiceClients = customers
-    .filter((customer) => customer.id && customer.email)
-    .map((customer) => ({
+  const invoiceClients = customers.flatMap((customer) => {
+    if (!customer.id || !customer.email) return [];
+    return [{
       id: customer.id,
-      name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email!,
-      email: customer.email!,
+      name: [customer.first_name, customer.last_name].filter(Boolean).join(" ") || customer.email,
+      email: customer.email,
       addressLines: [],
       taxId: "",
-    }));
+    }];
+  });
 
   return (
     <div className="flex min-w-0 flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">

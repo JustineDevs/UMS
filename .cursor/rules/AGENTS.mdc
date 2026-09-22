@@ -1,48 +1,39 @@
 ---
-description: Monorepo agent contract — apps, boundaries, local dev (pnpm run dev), terminal-agent on loopback.
+description: Repository guidance for the UVS Vercel frontend and Cloudflare Worker backend.
 globs:
 alwaysApply: true
 ---
 
 # Agent rules
 
-## Application map (this repository)
+## Runtime topology
 
-Turborepo monorepo. Main surfaces:
+- `apps/web` is the storefront and staff/admin Next.js application. It deploys to Vercel.
+- `workers/backend` is the only backend runtime. It runs on Cloudflare Workers; do not add a Medusa HTTP runtime, sidecar service, container, ECS, Fly.io, or Render deployment.
+- Supabase Cloud owns exactly two PostgreSQL databases: `MEDUSA_DB_URL` for commerce data and `APP_DB_URL` for application/platform data. Worker production access uses the corresponding Hyperdrive bindings. Do not add a third database or generic database URL alias.
+- Redis-backed needs use the existing Worker-compatible storage and queue contracts; do not introduce a Redis TCP service.
+- Supabase Auth SSR is the identity provider. Staff and customer authorization must still be enforced by the Worker/API contract for each operation.
 
-| Area | Package / app | Role |
-|------|-----------------|------|
-| Commerce API | `apps/medusa` | Medusa v2 backend (products, carts, orders, payments, inventory, regions). Default dev URL `http://localhost:9000`. |
-| Storefront | `apps/storefront` | Public Next.js shop. Dev `http://localhost:3000`. |
-| Staff admin | `apps/admin` | Next.js staff UI, POS, devices, API routes with session + RBAC. Dev `http://localhost:3001`. |
-| Internal Express | `apps/api` | Health, compliance, webhooks; uses `PORT` or **4000**. Dev `http://localhost:4000`. |
-| Local POS agent | `apps/terminal-agent` | Loopback HTTP print/drawer agent. Default **`http://127.0.0.1:17711`** (`TERMINAL_AGENT_PORT`). |
-| Shared libs | `packages/*` | `sdk`, `platform-data`, `database`, `printer-core`, `validation`, etc. |
+## Local development
 
-## Data and security boundaries
+From the repository root, `pnpm dev` starts the local Wrangler Worker and `apps/web` together. The default local URLs are:
 
-- **Medusa** is the source of truth for products, carts, orders, payments, and inventory.
-- **Supabase** holds platform data (identity, RBAC, POS devices, offline queue metadata, CMS copy where wired) per ADR patterns in the repo.
-- **`packages/database/src/data-boundaries.ts`** lists application/platform table wiring (storefront vs admin vs API) and Medusa-exclusive table names. New work must follow it; do not add Supabase tables that mirror Medusa core entities (`orders`, `carts`, `products`, `inventory_level`, `payment_session`, etc.). CI: `pnpm check:migration-boundary`. Migration `015_drop_accidental_medusa_core_tables_from_legacy.sql` removes mistaken Medusa-named `public` tables from **application/platform** only (never run that migration against Medusa `MEDUSA_DB_URL`).
-- Dashboard index dumps (e.g. Supabase Indexes export) may list **Medusa** tables if the project shares a host; commerce tables still **belong to Medusa** at runtime. The storefront and admin apps read commerce via **Medusa APIs/SDK**, not duplicate legacy tables.
-- Security audits and checklists that assume **Supabase owns product or variant rows** do not match this repo: use **`docs/spec.md`** and **`docs/data-ownership.md`** (Medusa commerce DB vs Supabase platform data).
-- Do not move commerce-of-record writes into Supabase.
-- Staff actions go through Next.js admin API routes with session checks.
-- Storefront env must not expose server-only secrets (`MEDUSA_SECRET_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, internal API keys).
-- Local POS hardware uses `apps/terminal-agent` on loopback only; browsers or admin call it **after** Medusa-backed sale success (or documented offline flows).
-- Prefer extending existing modules over parallel utilities (DRY).
+- Storefront and admin: `http://localhost:3000` (`/admin` is part of the same app).
+- Worker API: `http://localhost:8787`.
 
-## Local development: single command
+The local supervisor reads database URLs from the root `.env.local` and supplies them to Wrangler's local Hyperdrive bindings. Never run migrations, seeds, destructive SQL, or live provider operations as part of a routine browser check. Use isolated test data and explicit test-mode configuration.
 
-From the **repository root**, use:
+## Data and change boundaries
 
-```bash
-pnpm run dev
-```
+- Follow `packages/database/src/data-boundaries.ts` and the existing APP/commerce schema ownership. Commerce entities must not be duplicated into APP tables.
+- Prefer the existing typed Worker routes, shared clients, validation schemas, tenant guards, audit trail, and idempotency contracts. Do not add a Vercel-side database or provider mutation path when a Worker contract owns the operation.
+- Preserve unknown CMS content and user-uploaded media. Do not remove records, storage objects, caches, or generated output unless the requested task specifically requires it and ownership/safety are established.
+- Keep provider and production claims tied to actual sandbox/live evidence; unit tests do not prove external delivery.
 
-This runs **`pnpm kill-ports`** then **`turbo dev`**, which starts **every workspace that defines a `dev` script** in parallel (storefront, admin, Medusa, API, terminal-agent, and any other package with `dev`). Treat it as the default way to run the **full local application stack** for integration work.
+## Delivery topology
 
-- **Terminal agent URL:** `http://127.0.0.1:17711` (receipt print, open drawer, `/health`, `/status`). Configure via `.env` / `.env.example` (`TERMINAL_AGENT_PORT`, `NEXT_PUBLIC_TERMINAL_AGENT_*`, device name, Supabase sync for `pos_devices` when used).
-- Other common dev ports (see `stress-test/scripts/kill-project-ports.js` for what gets cleared before dev): **3000**, **3001**, **4000**, **9000**, **17711** (terminal-agent).
-
-If you only need one app, use filters (e.g. `pnpm --filter @universal-music-store/terminal-agent dev`) instead of the root command.
+- Make application changes on `dev`; `main` is production. Promote only through a reviewed PR after CI and review findings pass.
+- Before pushing, run `pnpm ci:local`. Do not push or deploy production unless explicitly requested.
+- Deploy the backend only with `pnpm backend:worker:deploy` after Wrangler authentication and required Cloudflare bindings are configured. This targets the dev environment.
+- Scheduled storefront recovery belongs in `.github/workflows/storefront-cron.yml`; Vercel Cron is not part of this topology.
+- Docker may be required locally by `act` for CI emulation, but it is not an application runtime or backend deployment path.

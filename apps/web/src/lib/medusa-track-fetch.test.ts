@@ -4,27 +4,16 @@ import test from "node:test";
 import {
   pendingCartTrackPayload,
   buildCarrierTrackingUrl,
-  buildPublicTrackOrderFields,
   formatTrackingNumber,
   latestShipmentEventStatus,
   mapMedusaOrderToTrack,
   maskConfirmationEmail,
-  medusaReadFailureStatus,
   orderTrackStatusFromMedusa,
   projectConfirmationOrder,
   trackFreshness,
   trackReadFailure,
   trackingCapabilityScopeMatches,
 } from "./medusa-track-fetch";
-
-test("public tracking fields fetch customer email only for scoped capabilities", () => {
-  assert.equal(buildPublicTrackOrderFields().includes("email"), false);
-  assert.equal(
-    buildPublicTrackOrderFields(true).includes("email"),
-    true,
-  );
-  assert.match(buildPublicTrackOrderFields(), /\*fulfillments\.labels/);
-});
 
 test("tracking scope comparison fails closed for wrong customer or store", () => {
   const capability = {
@@ -64,15 +53,6 @@ test("track freshness distinguishes current, stale, invalid, and future timestam
   assert.equal(trackFreshness("2026-08-19T11:00:00.000Z", now), "stale");
   assert.equal(trackFreshness("not-a-date", now), "unknown");
   assert.equal(trackFreshness("2026-08-23T11:00:00.000Z", now), "unknown");
-});
-
-test("tracking fetch preserves safe upstream error taxonomy", () => {
-  assert.equal(medusaReadFailureStatus({ status: 404 }), 404);
-  assert.equal(medusaReadFailureStatus({ status: 429 }), 429);
-  assert.equal(medusaReadFailureStatus({ status: 503 }), 503);
-  assert.equal(medusaReadFailureStatus({ status: 401 }), 401);
-  assert.equal(medusaReadFailureStatus({ status: 418 }), 503);
-  assert.equal(medusaReadFailureStatus(new Error("network")), 503);
 });
 
 test("tracking failures receive opaque support correlation ids", () => {

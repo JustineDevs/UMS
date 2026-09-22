@@ -1,6 +1,5 @@
 "use client";
 
-import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { Analytics } from "@vercel/analytics/next";
 import { CartAbandonmentBeacon } from "@/components/CartAbandonmentBeacon";
@@ -20,6 +19,8 @@ const BotIdClient = dynamic(
 );
 
 const botIdDisabledForLocalAuthBypass =
+  process.env.NODE_ENV !== "production" ||
+  process.env.UVS_E2E_LOCAL === "1" ||
   process.env.AUTH_DISABLED === "true" ||
   process.env.AUTH_DISABLE === "true" ||
   process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
@@ -40,14 +41,13 @@ export function StorefrontRuntimeProviders({
               { path: "/api/checkout", method: "POST" },
               { path: "/api/checkout/cod-cart-payload", method: "POST" },
               { path: "/api/checkout/cod-place-order", method: "POST" },
-              { path: "/api/checkout/complete", method: "POST" },
               { path: "/api/checkout/apply-promo", method: "POST" },
               { path: "/api/checkout/verify-stock", method: "POST" },
               { path: "/api/checkout/upload-payment-receipt", method: "POST" },
               { path: "/api/account/profile", method: "PATCH" },
               { path: "/api/account/orders/*/cancel", method: "POST" },
               { path: "/api/reviews", method: "POST" },
-              { path: "/api/cart/medusa-bind", method: "POST" },
+              { path: "/api/cart/bind", method: "POST" },
               { path: "/api/cart/abandonment", method: "POST" },
               { path: "/api/newsletter", method: "POST" },
               { path: "/api/back-in-stock", method: "POST" },
@@ -58,11 +58,9 @@ export function StorefrontRuntimeProviders({
         <WishlistSyncOnLogin disabled={botIdDisabledForLocalAuthBypass} />
         <StorefrontPreferenceSync />
         <CartAbandonmentBeacon />
-        <Suspense fallback={null}>
-          <OnboardingGuard>
-            <SmoothScrollProvider>{children}</SmoothScrollProvider>
-          </OnboardingGuard>
-        </Suspense>
+        <OnboardingGuard>
+          <SmoothScrollProvider>{children}</SmoothScrollProvider>
+        </OnboardingGuard>
         <CookieConsentBanner />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
       </CartProvider>

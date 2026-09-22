@@ -11,6 +11,7 @@
 const path = require("path");
 const fs = require("fs");
 const { spawn, spawnSync } = require("child_process");
+const http = require("http");
 const { attach } = require("./lib/runtime-log-tee.cjs");
 attach(__filename);
 
@@ -105,8 +106,46 @@ function runChild(execPath, argv, useShell) {
   });
 }
 
-if (fs.existsSync(cli)) {
-  runChild(process.execPath, [cli, "test", ...args], false);
-} else {
-  runChild("npx", ["playwright", "test", ...args], true);
+function probeHttp(url) {
+  return new Promise((resolve) => {
+    const request = http.get(url, { timeout: 1200 }, (response) => {
+      response.resume();
+      resolve((response.statusCode ?? 500) < 400);
+    });
+    request.on("error", () => resolve(false));
+    request.on("timeout", () => {
+      request.destroy();
+      resolve(false);
+    });
+  });
 }
+
+async function configureExistingStackReuse() {
+  if (process.env.PLAYWRIGHT_SKIP_WEBSERVER) return;
+  if (process.env.CI || process.env.PLAYWRIGHT_SERVER_MODE === "production") return;
+
+  const storefrontBase = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3000";
+  const workerBase = process.env.PLAYWRIGHT_WORKER_URL || "http://127.0.0.1:8787";
+  const [storefrontReady, workerReady] = await Promise.all([
+    probeHttp(`${storefrontBase}/api/health`),
+    probeHttp(`${workerBase}/healthz`),
+  ]);
+
+  if (storefrontReady && workerReady) {
+    process.env.PLAYWRIGHT_SKIP_WEBSERVER = "1";
+    console.log(
+      "[run-e2e] Reusing the healthy local Worker + storefront stack; no duplicate dev servers will be started.",
+    );
+  }
+}
+
+configureExistingStackReuse().then(() => {
+  if (fs.existsSync(cli)) {
+    runChild(process.execPath, [cli, "test", ...args], false);
+  } else {
+    runChild("npx", ["playwright", "test", ...args], true);
+  }
+}).catch((error) => {
+  console.error("[run-e2e] Failed to inspect the local stack before starting Playwright:", error);
+  process.exit(1);
+});

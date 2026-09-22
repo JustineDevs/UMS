@@ -98,8 +98,7 @@ export default async function AccountOrderPage({
 }: {
   params: Promise<{ orderId: string }>;
 }) {
-  const { orderId } = await params;
-  const session = await getStorefrontSession();
+  const [{ orderId }, session] = await Promise.all([params, getStorefrontSession()]);
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!session || !userEmail) {
     redirect(
@@ -218,9 +217,9 @@ export default async function AccountOrderPage({
             Items
           </h2>
           <ul className="mt-5 divide-y divide-outline-variant/10">
-            {(order.items ?? []).map((item, index) => (
+            {(order.items ?? []).map((item) => (
               <li
-                key={item.id ?? `${item.title ?? "item"}-${index}`}
+                key={item.id ?? JSON.stringify(item)}
                 className="py-4 first:pt-0 last:pb-0"
               >
                 <div className="flex items-start justify-between gap-4">
@@ -328,7 +327,7 @@ export default async function AccountOrderPage({
             </h2>
             <div className="mt-4 space-y-4 text-sm text-on-surface-variant">
               {(order.fulfillments ?? []).length > 0 ? (
-                (order.fulfillments ?? []).map((fulfillment, index) => {
+                (order.fulfillments ?? []).map((fulfillment) => {
                   const trackingNumbers = [
                     ...(fulfillment.tracking_numbers ?? []),
                     ...(fulfillment.labels ?? [])
@@ -337,7 +336,7 @@ export default async function AccountOrderPage({
                   ].filter(Boolean);
                   return (
                     <div
-                      key={fulfillment.id ?? `fulfillment-${index}`}
+                      key={fulfillment.id ?? JSON.stringify(fulfillment)}
                       className="rounded-xl border border-outline-variant/15 p-4"
                     >
                       <p className="font-medium text-on-surface">

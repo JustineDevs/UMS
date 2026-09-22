@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
-import type { MedusaPaymentSummary } from "@/lib/medusa-order-bridge";
+import type { WorkerAdminPayment as MedusaPaymentSummary } from "@/lib/worker-admin-bridge";
 
 function minorToMajor(minor: number): number {
   return Math.round(minor) / 100;
@@ -27,6 +27,7 @@ export function OrderRefundPanel({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const idempotencyKey = useRef<string | null>(null);
 
   const selected = payments.find((p) => p.id === paymentId) ?? payments[0];
   const captured =
@@ -52,10 +53,15 @@ export function OrderRefundPanel({
       return;
     }
     const amountMinor = Math.round(major * 100);
+    const requestIdempotencyKey = idempotencyKey.current ?? crypto.randomUUID();
+    idempotencyKey.current = requestIdempotencyKey;
     try {
       const res = await fetch(`/api/admin/orders/${encodeURIComponent(orderId)}/refund`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": requestIdempotencyKey,
+        },
         body: JSON.stringify({
           payment_id: paymentId,
           amount_minor: amountMinor,
@@ -65,14 +71,18 @@ export function OrderRefundPanel({
       const body = (await res.json()) as { error?: string; ok?: boolean };
       if (!res.ok) {
         setMessage(body.error ?? "Refund did not complete");
-        setBusy(false);
+        if (res.status < 500) idempotencyKey.current = null;
         return;
       }
-      setMessage("Refund submitted. Refresh the page to see updated payment status.");
+      idempotencyKey.current = null;
+      setMessage(res.status === 202
+        ? "Refund accepted and awaiting payment-provider confirmation."
+        : "Refund completed by the payment provider. Refresh to see updated payment status.");
     } catch {
       setMessage("Request was not completed");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   if (payments.length === 0) {

@@ -14,6 +14,7 @@ import {
   productMatchesPriceRange,
   productMatchesVariantFilters,
 } from "./medusa-catalog-mapper";
+import { readResponseJson } from "./read-response-json";
 
 export type CatalogQuery = {
   limit?: number;
@@ -198,13 +199,18 @@ async function fetchWorkerProducts(
         kind: "service_error",
         message: `Worker catalog returned ${response.status}`,
       };
-    const payload = (await response.json()) as {
-      products?: WorkerCatalogProduct[];
-      count?: number;
-    };
+    const payload = await readResponseJson(
+      response,
+      {} as {
+        products?: WorkerCatalogProduct[];
+        count?: number;
+      },
+    );
     let products = (payload.products ?? [])
-      .map(mapWorkerCatalogProduct)
-      .filter((product): product is Product => product !== null)
+      .flatMap((rawProduct) => {
+        const product = mapWorkerCatalogProduct(rawProduct);
+        return product ? [product] : [];
+      })
       .filter((product) => productMatchesVariantFilters(product, options))
       .filter((product) => productMatchesBrand(product, options.brand))
       .filter((product) =>
@@ -272,16 +278,20 @@ export async function fetchRelatedProducts(
   current: Product,
   limit = 4,
 ): Promise<FeaturedProductsResult> {
-  const related: Product[] = [];
-  for (const handle of current.relatedHandles
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .slice(0, 8)) {
-    const result = await fetchProductBySlug(handle);
-    if (result.kind === "ok" && result.product.id !== current.id)
-      related.push(result.product);
-    if (related.length >= limit) break;
-  }
+  const relatedResults = await Promise.all(
+    current.relatedHandles
+      .flatMap((value) => {
+        const normalized = value.trim();
+        return normalized ? [normalized] : [];
+      })
+      .slice(0, 8)
+      .map((handle) => fetchProductBySlug(handle)),
+  );
+  const related = relatedResults.flatMap((result) =>
+    result.kind === "ok" && result.product.id !== current.id
+      ? [result.product]
+      : [],
+  );
   if (related.length >= limit || !current.category?.trim())
     return { kind: "ok", products: related.slice(0, limit) };
   const catalog = await fetchProductsPage(limit + 10, {
@@ -313,38 +323,14 @@ export async function fetchProductBySlug(
         kind: "service_error",
         message: `Worker catalog returned ${response.status}`,
       };
-    const payload = (await response.json()) as {
-      product?: WorkerCatalogProduct;
-    };
+    const payload = await readResponseJson(
+      response,
+      {} as {
+        product?: WorkerCatalogProduct;
+      },
+    );
     const product = payload.product
       ? mapWorkerCatalogProduct(payload.product)
-      : null;
-    return product ? { kind: "ok", product } : { kind: "not_found" };
-  } catch (error) {
-    return catalogServiceError(error);
-  }
-}
-
-export async function fetchProductById(
-  productId: string,
-): Promise<ProductBySlugResult> {
-  const url = workerUrl(`/store/products?id=${encodeURIComponent(productId)}`);
-  if (!url) return misconfigured("Set API_URL to the deployed Worker address.");
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!response.ok)
-      return {
-        kind: "service_error",
-        message: `Worker catalog returned ${response.status}`,
-      };
-    const payload = (await response.json()) as {
-      products?: WorkerCatalogProduct[];
-    };
-    const product = payload.products?.[0]
-      ? mapWorkerCatalogProduct(payload.products[0])
       : null;
     return product ? { kind: "ok", product } : { kind: "not_found" };
   } catch (error) {
@@ -391,6 +377,7 @@ export async function fetchProductSlugsForSitemap(
 ): Promise<string[]> {
   if (!workerBaseUrl()) return [];
   const slugs: string[] = [];
+  const seenSlugs = new Set<string>();
   const pageSize = 100;
   for (
     let offset = 0;
@@ -400,8 +387,10 @@ export async function fetchProductSlugsForSitemap(
     const result = await fetchWorkerProducts(pageSize, { offset });
     if (result.kind !== "ok") return [];
     for (const product of result.products)
-      if (product.slug && !slugs.includes(product.slug))
+      if (product.slug && !seenSlugs.has(product.slug)) {
+        seenSlugs.add(product.slug);
         slugs.push(product.slug);
+      }
     if (result.products.length < pageSize) break;
   }
   return maxItems == null ? slugs : slugs.slice(0, maxItems);

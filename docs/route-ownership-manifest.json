@@ -1,0 +1,2291 @@
+{
+  "version": 1,
+  "generatedFrom": "apps/web/src/app/api",
+  "topology": {
+    "frontend": "Vercel Next.js",
+    "commerceBackend": "Cloudflare Worker",
+    "databases": [
+      "APP_DB_URL",
+      "MEDUSA_DB_URL"
+    ]
+  },
+  "entries": [
+    {
+      "route": "/account/loyalty",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/account/loyalty/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/marketing-preferences",
+      "methods": [
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/account/marketing-preferences/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/order-preferences",
+      "methods": [
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/account/order-preferences/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/orders/{orderId}/cancel",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/account/orders/[orderId]/cancel/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/privacy/erasure",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/account/privacy/erasure/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/privacy/export",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/account/privacy/export/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/profile",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/account/profile/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/account/profile/status",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/account/profile/status/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/analytics/clv",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/analytics/clv/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/analytics/retention",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/analytics/retention/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/analytics/sales-trends",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/analytics/sales-trends/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/audit-logs",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/audit-logs/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/campaigns/{id}/execute",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/campaigns/[id]/execute/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/campaigns/{id}",
+      "methods": [
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/campaigns/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/campaigns",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/campaigns/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/categories",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/categories/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/media",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/media/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/products/{id}",
+      "methods": [
+        "delete",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/products/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/products",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/products/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/products/suggestions",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/products/suggestions/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/channels/events/{id}/process",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/channels/events/[id]/process/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/channels/events",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/channels/events/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/chat-orders/{id}/status",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/chat-orders/[id]/status/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/chat-orders/variant-suggestions",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/chat-orders/variant-suggestions/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/announcement",
+      "methods": [
+        "delete",
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/announcement/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/block-presets/{id}",
+      "methods": [
+        "delete"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/block-presets/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/block-presets",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/block-presets/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/blog/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/blog/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/blog/bulk",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/blog/bulk/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/blog/export",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/blog/export/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/blog",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/blog/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/category-content/catalog-categories",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/category-content/catalog-categories/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/category-content/catalog-gaps",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/category-content/catalog-gaps/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/category-content",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/category-content/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/category-content/sync-from-catalog",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/category-content/sync-from-catalog/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/components/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "patch",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/components/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/components",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/components/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/experiments/{id}",
+      "methods": [
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/experiments/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/experiments",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/experiments/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/forms/settings",
+      "methods": [
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/forms/settings/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/forms/submissions/{id}",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/forms/submissions/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/forms/submissions/export",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/forms/submissions/export/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/forms/submissions",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/forms/submissions/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/media/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/media/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/media",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/media/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/navigation/publish",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/navigation/publish/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/navigation",
+      "methods": [
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/navigation/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/pages/{id}/mutations",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/pages/[id]/mutations/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/pages/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/pages/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/pages",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/pages/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects/{id}",
+      "methods": [
+        "delete",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects/bulk",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/bulk/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects/export",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/export/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects/import",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/import/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects/resolve",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/resolve/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cms/redirects",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/cms/redirects/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/commerce-recovery-metrics",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/commerce-recovery-metrics/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/commerce/products/lookup",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/commerce/products/lookup/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/commerce/products/search",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/commerce/products/search/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/cost-visibility",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/cost-visibility/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/crm/bridge",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/bridge/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/crm/nango/connect-session",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/nango/connect-session/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/crm/nango",
+      "methods": [
+        "delete",
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/nango/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/crm/notes/{id}",
+      "methods": [
+        "delete"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/notes/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/crm/notes",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/notes/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/crm/operations",
+      "methods": [
+        "delete",
+        "get",
+        "patch",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/crm/operations/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/delivery-logistics/operations",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/delivery-logistics/operations/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/delivery-logistics",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/delivery-logistics/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/delivery-logistics/shipments",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/delivery-logistics/shipments/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/devices/{id}",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/devices/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/devices",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/devices/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/employees/{id}/pin",
+      "methods": [
+        "post",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/employees/[id]/pin/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/employees/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/employees/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/employees",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/employees/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/feature-mappings",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/feature-mappings/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/integration-health",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/integration-health/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/integrations/pancake",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/integrations/pancake/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/adjust",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/adjust/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/cycle-counts/{id}",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/cycle-counts/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/cycle-counts",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/cycle-counts/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/ledger",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/ledger/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/purchase-orders/{id}",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/purchase-orders/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/purchase-orders",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/purchase-orders/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/reservations/{id}",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/reservations/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/reservations",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/reservations/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/stream",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/stream/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/inventory/transfers/{id}",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/transfers/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/inventory/transfers",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/inventory/transfers/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/invoices/{id}/lifecycle",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/invoices/[id]/lifecycle/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/invoices",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/invoices/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/loyalty/lookup",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/loyalty/lookup/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/loyalty/points",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/loyalty/points/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/loyalty/rewards",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/loyalty/rewards/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/loyalty",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/loyalty/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/offline-queue",
+      "methods": [
+        "get",
+        "patch",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/offline-queue/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/operator-notes",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/operator-notes/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/orders/{orderId}/refund",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/orders/[orderId]/refund/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/orders/{orderId}/status",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/orders/[orderId]/status/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/orders/bulk-fulfill",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/orders/bulk-fulfill/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payment-attempts/export",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/payment-attempts/export/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payment-health",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/payment-health/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/{id}/mark-review",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/[id]/mark-review/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/{id}/retry",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/[id]/retry/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/capabilities",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/capabilities/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/connect-session",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/connect-session/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/connections/reconnect",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/connections/reconnect/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments/connections",
+      "methods": [
+        "delete",
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/connections/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/payments",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/payments/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/pin-approval",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/pin-approval/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/pos/enterprise",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/pos/enterprise/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/pos/feature-mappings",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/pos/feature-mappings/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/profile/avatar",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/profile/avatar/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/profile",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/profile/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/receipts",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/receipts/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/reconciliation",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/reconciliation/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/reviews/{id}",
+      "methods": [
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/reviews/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/reviews",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/reviews/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/roles",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/roles/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/runtime-settings",
+      "methods": [
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/runtime-settings/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/segments/{id}/members",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/segments/[id]/members/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/segments",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/segments/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/shifts/{id}/close",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/shifts/[id]/close/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/shifts/{id}/reconciliation",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/shifts/[id]/reconciliation/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/shifts",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/shifts/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/sse",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/sse/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/storefront-home",
+      "methods": [
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/storefront-home/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/storefront-public-metadata",
+      "methods": [
+        "get",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/admin/storefront-public-metadata/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/tasks/today",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/tasks/today/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/terminal-open-drawer",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/terminal-open-drawer/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/terminal-print-label",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/terminal-print-label/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/terminal-print",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/terminal-print/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/admin/tracking-capabilities/revoke",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/tracking-capabilities/revoke/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/voids",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/voids/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/workflow/entities",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/admin/workflow/entities/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/workflow/transition",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/admin/workflow/transition/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/auth/callback",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/auth/callback/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/auth/e2e",
+      "methods": [
+        "delete",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/auth/e2e/route.ts",
+      "owner": "web-platform-database",
+      "signals": [
+        "direct-database"
+      ]
+    },
+    {
+      "route": "/auth/session",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/auth/session/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/back-in-stock",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/back-in-stock/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/abandonment",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cart/abandonment/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/attach-customer",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cart/attach-customer/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/bind-token",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cart/bind-token/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/cart/bind",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cart/bind/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/line",
+      "methods": [
+        "delete",
+        "put"
+      ],
+      "source": "apps/web/src/app/api/cart/line/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/merge",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cart/merge/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/reconcile",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cart/reconcile/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/cart/resume",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cart/resume/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/catalog/product-default-variant",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/catalog/product-default-variant/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/apply-promo",
+      "methods": [
+        "delete",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/apply-promo/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/available-payment-methods",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/checkout/available-payment-methods/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/cod-cart-payload",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/cod-cart-payload/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/cod-place-order",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/cod-place-order/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/commerce-telemetry",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/commerce-telemetry/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/complete",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/complete/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/loyalty-balance",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/checkout/loyalty-balance/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/paypal/confirm",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/paypal/confirm/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/preview",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/preview/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/start",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/start/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/upload-payment-receipt",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/upload-payment-receipt/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/checkout/verify-stock",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/checkout/verify-stock/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/cms/announcement/track",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cms/announcement/track/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/cms/experiments/impression",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/cms/experiments/impression/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/cms/preview",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cms/preview/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/cron/back-in-stock",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cron/back-in-stock/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/cron/campaigns",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cron/campaigns/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/cron/finalize-payment-attempts",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cron/finalize-payment-attempts/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/cron/inventory-reservations",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cron/inventory-reservations/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/cron/payment-reconciliation",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/cron/payment-reconciliation/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/feature-mappings",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/feature-mappings/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/forms/{formKey}",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/forms/[formKey]/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/health",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/health/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/health/sop",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/health/sop/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/integrations/channels/webhook",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/integrations/channels/webhook/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/integrations/chat-orders/intake",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/integrations/chat-orders/intake/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/integrations/couriers",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/integrations/couriers/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/integrations/couriers/telemetry",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/integrations/couriers/telemetry/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/internal/dev-diagnostics",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/internal/dev-diagnostics/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/internal/invalidate-commerce-state",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/internal/invalidate-commerce-state/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/internal/reconcile-payment-attempt",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/internal/reconcile-payment-attempt/route.ts",
+      "owner": "web-service-boundary",
+      "signals": [
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/newsletter/confirm",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/newsletter/confirm/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/newsletter",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/newsletter/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/newsletter/unsubscribe",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/newsletter/unsubscribe/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/orders/return",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/orders/return/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/payments/checkout-intents/{correlationId}/finalize",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/payments/checkout-intents/[correlationId]/finalize/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/payments/checkout-intents/{correlationId}",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/payments/checkout-intents/[correlationId]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/payments/checkout-intents/recover",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/payments/checkout-intents/recover/route.ts",
+      "owner": "web-bff-worker-origin",
+      "signals": [
+        "worker-proxy",
+        "direct-database"
+      ]
+    },
+    {
+      "route": "/payments/checkout-intents",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/payments/checkout-intents/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/pos/commerce/commit-sale",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/commit-sale/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/pos/commerce/draft-order",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/draft-order/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/pos/commerce/lookup",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/lookup/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/pos/commerce/quick-products",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/quick-products/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/pos/commerce/search",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/search/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/pos/commerce/suggestions",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/pos/commerce/suggestions/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/reviews/csrf",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/reviews/csrf/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/reviews/feed",
+      "methods": [],
+      "source": "apps/web/src/app/api/reviews/feed/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/reviews/helpful/{id}",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/reviews/helpful/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/reviews/report/{id}",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/reviews/report/[id]/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/reviews",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/reviews/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/shop/product",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/shop/product/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/shop/search-suggest",
+      "methods": [
+        "get"
+      ],
+      "source": "apps/web/src/app/api/shop/search-suggest/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/tracking-link/resolve",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/tracking-link/resolve/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/tracking-link",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/tracking-link/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/webhooks/nango",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/webhooks/nango/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy",
+        "service-or-callback-boundary"
+      ]
+    },
+    {
+      "route": "/wishlist",
+      "methods": [
+        "delete",
+        "get",
+        "post"
+      ],
+      "source": "apps/web/src/app/api/wishlist/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/wishlist/sync",
+      "methods": [
+        "post"
+      ],
+      "source": "apps/web/src/app/api/wishlist/sync/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    }
+  ]
+}

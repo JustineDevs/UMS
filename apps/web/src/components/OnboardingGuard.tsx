@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const PROFILE_REQUIRED_PREFIXES = ["/account", "/checkout", "/wishlist"];
@@ -31,10 +31,10 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [search, setSearch] = useState("");
   const guestCheckout = isExplicitGuestCheckout(
     pathname ?? "",
-    searchParams?.toString() ?? "",
+    search,
   );
   const [checked, setChecked] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -43,6 +43,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setHydrated(true);
+    setSearch(window.location.search.slice(1));
   }, []);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
         !redirecting.current
       ) {
         redirecting.current = true;
-        const next = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
+        const next = `${pathname}${search ? `?${search}` : ""}`;
         router.replace(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
         return;
       }
@@ -73,39 +74,48 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     setGuardError(null);
-    void fetch("/api/account/profile/status", {
-      credentials: "same-origin",
-      cache: "no-store",
-    })
-      .then(async (r) => {
-        if (!r.ok)
-          throw new Error(`Profile status request failed (${r.status})`);
-        const j = (await r.json()) as { complete?: boolean };
-        if (cancelled) return;
-        if (j.complete === true) {
-          setChecked(true);
+    void (async () => {
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const response = await fetch("/api/account/profile/status", {
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+          if (!response.ok) {
+            throw new Error(`Profile status request failed (${response.status})`);
+          }
+          const j = (await response.json()) as { complete?: boolean };
+          if (cancelled) return;
+          if (j.complete === true) {
+            setChecked(true);
+            return;
+          }
+          if (redirecting.current) return;
+          redirecting.current = true;
+          const next = `${pathname}${search ? `?${search}` : ""}`;
+          router.replace(`/onboarding?next=${encodeURIComponent(next)}`);
           return;
+        } catch (error: unknown) {
+          lastError = error;
+          if (cancelled || attempt === 2) break;
+          await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
         }
-        if (redirecting.current) return;
-        redirecting.current = true;
-        const next = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`;
-        router.replace(`/onboarding?next=${encodeURIComponent(next)}`);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setGuardError(
-            error instanceof Error
-              ? error.message
-              : "Profile status unavailable",
-          );
-          setChecked(true);
-        }
-      });
+      }
+      if (!cancelled) {
+        setGuardError(
+          lastError instanceof Error
+            ? lastError.message
+            : "Profile status unavailable",
+        );
+        setChecked(true);
+      }
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [status, session, pathname, router, searchParams]);
+  }, [status, session, pathname, router, search, guestCheckout]);
 
   if (
     hydrated &&

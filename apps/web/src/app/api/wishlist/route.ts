@@ -2,10 +2,10 @@ import { applyRateLimit } from "@/lib/cart-api-helpers";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { z } from "zod";
+import { readResponseJson } from "@/lib/read-response-json";
+import { wishlistCreateResponseSchema, wishlistDeleteResponseSchema, wishlistRequestSchema, wishlistResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
-const wishlistIdentitySchema = z.object({ medusaProductId: z.string().trim().min(1).max(200) }).strict();
 const MAX_WISHLIST_BODY_BYTES = 16 * 1024;
 
 function json(value: unknown, status = 200) {
@@ -30,8 +30,12 @@ async function proxyWorkerWishlist(request: Request, body?: string): Promise<Res
   }
   try {
     const response = await fetch(`${baseUrl}/store/wishlist`, { method: request.method, headers, body, cache: "no-store" });
-    const payload = await response.json().catch(() => ({ error: "invalid_worker_response" }));
-    return json(payload, response.status);
+    if (!response.ok) return json({ error: "Saved items request failed" }, response.status);
+    const payload = await readResponseJson(response, { error: "invalid_worker_response" });
+    const schema = request.method === "GET" ? wishlistResponseSchema : request.method === "POST" ? wishlistCreateResponseSchema : wishlistDeleteResponseSchema;
+    const parsed = schema.safeParse(payload);
+    if (!parsed.success) return json({ error: "invalid_worker_response" }, 502);
+    return json(parsed.data, 200);
   } catch { return json({ error: "Saved items are temporarily unavailable" }, 503); }
 }
 export async function GET(request: Request) { return proxyWorkerWishlist(request); }
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
   const rl = await applyRateLimit(request, "wishlist-add", 60, 60_000); if (!rl.ok) return rl.response;
   const body = await parseBoundedJson(request, MAX_WISHLIST_BODY_BYTES);
   if (body.tooLarge) return json({ error: "Request body too large" }, 413);
-  const parsed = wishlistIdentitySchema.safeParse(body.valid ? body.value : null);
+  const parsed = wishlistRequestSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return json({ error: "Invalid wishlist item" }, 400);
   return proxyWorkerWishlist(request, JSON.stringify(parsed.data));
 }
@@ -49,7 +53,7 @@ export async function DELETE(request: Request) {
   const rl = await applyRateLimit(request, "wishlist-remove", 60, 60_000); if (!rl.ok) return rl.response;
   const body = await parseBoundedJson(request, MAX_WISHLIST_BODY_BYTES);
   if (body.tooLarge) return json({ error: "Request body too large" }, 413);
-  const parsed = wishlistIdentitySchema.safeParse(body.valid ? body.value : null);
+  const parsed = wishlistRequestSchema.safeParse(body.valid ? body.value : null);
   if (!parsed.success) return json({ error: "Invalid wishlist item" }, 400);
   return proxyWorkerWishlist(request, JSON.stringify(parsed.data));
 }

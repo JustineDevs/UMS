@@ -79,7 +79,7 @@ export async function syncPendingSales(): Promise<{
 
   for (const sale of pending) {
     try {
-      const res = await fetch("/api/pos/medusa/commit-sale", {
+      const res = await fetch("/api/pos/commerce/commit-sale", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,7 +103,7 @@ export async function syncPendingSales(): Promise<{
 
         await fetch("/api/admin/offline-queue", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Idempotency-Key": `offline-queue-${sale.id}` },
           body: JSON.stringify({
             device_name: sale.device_name,
             employee_id: sale.employee_id,
@@ -116,7 +116,7 @@ export async function syncPendingSales(): Promise<{
               if (data?.id) {
                 await fetch("/api/admin/offline-queue", {
                   method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
+                  headers: { "Content-Type": "application/json", "Idempotency-Key": `offline-queue-sync-${data.id}` },
                   body: JSON.stringify({ id: data.id, action: "synced" }),
                 });
               }

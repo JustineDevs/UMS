@@ -8,8 +8,7 @@ import { ProductEditorLoader } from "@/components/catalog/ProductEditorLoader";
 import { Button } from "@/components/ui/button";
 import {
   fetchCatalogProductDetail,
-} from "@/lib/medusa-catalog-service";
-import { getAdminProductEditUrl } from "@/lib/catalog-admin-bridge";
+} from "@/lib/catalog-product-service";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const dynamic = "force-dynamic";
@@ -45,8 +44,6 @@ export default async function CatalogEditPage({
     );
   }
 
-  const adminProductUrl = getAdminProductEditUrl(product.id);
-
   return (
     <AdminPageShell
       title="Edit product"
@@ -64,11 +61,6 @@ export default async function CatalogEditPage({
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href="/admin/catalog">Back to products</Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <a href={adminProductUrl}>
-              Open in store admin
-            </a>
           </Button>
         </div>
       }

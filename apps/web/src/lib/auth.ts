@@ -1,10 +1,16 @@
 import type { User } from "@supabase/supabase-js";
 import { isStaffRole, resolveStaffPermissionsForUserId, tryCreateSupabaseClient, upsertOAuthUser } from "@universal-music-store/database";
 import { createSupabaseServerClient } from "./supabase/server";
+import { getE2eSessionEmail } from "./e2e-session";
 
 export type Session = { user: { id?: string; email?: string; name?: string | null; image?: string | null; role?: string; permissions?: string[] }; expires: string; authenticatedAt?: number };
-const authDisabled = process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
+const localE2eAuthDisabled =
+  process.env.UVS_E2E_LOCAL === "1" && process.env.VERCEL !== "1";
+const authDisabled =
+  localE2eAuthDisabled ||
+  (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production");
 export function isStorefrontAuthDisabled() {
+  if (localE2eAuthDisabled) return true;
   if (process.env.NODE_ENV === "production") return false;
   return [
     process.env.AUTH_DISABLED,
@@ -18,7 +24,7 @@ function localAdminSession(): Session { return { user: { id: "local-admin", name
 type StaffClaims = { role: string; permissions: string[] };
 type AuthEnrichmentCacheEntry = StaffClaims & { expiresAt: number };
 
-export const AUTH_ENRICHMENT_CACHE_TTL_MS = 60_000;
+const AUTH_ENRICHMENT_CACHE_TTL_MS = 60_000;
 export const AUTH_ENRICHMENT_CACHE_MAX_ENTRIES = 1_000;
 
 export interface AuthEnrichmentCache {
@@ -104,7 +110,31 @@ async function enrich(user: User): Promise<Session> {
   return session;
 }
 
+async function getLocalE2eSession(): Promise<Session | null> {
+  const email = await getE2eSessionEmail();
+  if (!email) return null;
+  const supabase = tryCreateSupabaseClient();
+  if (!supabase) return null;
+  const { data: row } = await supabase.from("users").select("id,email").eq("email", email).maybeSingle();
+  if (!row?.id) return null;
+  const [permissions, roleRow] = await Promise.all([
+    resolveStaffPermissionsForUserId(supabase, row.id as string),
+    supabase.from("user_roles").select("role").eq("user_id", row.id).maybeSingle(),
+  ]);
+  return {
+    user: {
+      id: row.id as string,
+      email,
+      role: (roleRow.data?.role as string | undefined) ?? "customer",
+      permissions,
+    },
+    expires: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
 export async function getAdminSession(): Promise<Session | null> {
+  const localE2e = await getLocalE2eSession();
+  if (localE2e && isStaffRole(localE2e.user.role ?? "")) return localE2e;
   if (authDisabled) return localAdminSession();
   if (!process.env.SUPABASE_URL?.trim() || !process.env.SUPABASE_ANON_KEY?.trim()) return null;
   const supabase = await createSupabaseServerClient();
@@ -127,6 +157,8 @@ export async function completeAdminOAuth(user: User, googleSub?: string): Promis
 
 /** Returns an authenticated user for public routes, enriched with staff claims when applicable. */
 export async function getStorefrontSession(): Promise<Session | null> {
+  const localE2e = await getLocalE2eSession();
+  if (localE2e) return localE2e;
   if (authDisabled) return { user: { id: "e2e-test-user", email: "e2e-test@example.com", name: "Local QA" }, expires: "2099-12-31T23:59:59.999Z" };
   if (!process.env.SUPABASE_URL?.trim() || !process.env.SUPABASE_ANON_KEY?.trim()) return null;
   const supabase = await createSupabaseServerClient();

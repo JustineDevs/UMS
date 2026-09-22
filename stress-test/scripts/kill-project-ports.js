@@ -8,7 +8,7 @@ const { execSync } = require("child_process");
 const { attach } = require("./lib/runtime-log-tee.cjs");
 attach(__filename);
 
-const ports = [3000, 4000, 8787, 9000, 17711];
+const ports = [3000, 4000, 8787, 9000, 9229, 17711];
 const isWin = process.platform === "win32";
 
 function killPortWindows(port) {
@@ -74,5 +74,5 @@ for (const port of ports) {
 }
 
 console.log(
-  "[kill-ports] Done. Ports 3000, 4000, 8787, 9000, 17711 should be free.",
+  "[kill-ports] Done. Ports 3000, 4000, 8787, 9000, 9229, 17711 should be free.",
 );

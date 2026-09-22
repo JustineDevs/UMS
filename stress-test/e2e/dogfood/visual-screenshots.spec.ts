@@ -30,7 +30,7 @@ const ROUTES: { path: string; file: string }[] = [
   { path: "/returns", file: "returns" },
   { path: "/preferences", file: "preferences" },
   { path: "/accessibility", file: "accessibility" },
-  { path: "/sitemap", file: "sitemap" },
+  { path: "/site-map", file: "sitemap" },
   { path: "/account", file: "account" },
 ];
 

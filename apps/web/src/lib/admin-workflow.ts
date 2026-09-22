@@ -35,7 +35,7 @@ export function isAllowedTransition(from: string, to: string): boolean {
 
 const WORKFLOW_UPSERT_ATTEMPTS = 3;
 
-export async function upsertEntityWorkflow(
+async function upsertEntityWorkflow(
   client: SupabaseClient,
   input: {
     organizationId: string;

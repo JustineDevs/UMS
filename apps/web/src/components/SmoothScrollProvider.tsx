@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
@@ -87,8 +88,10 @@ export function SmoothScrollProvider({
     }
   }, [scrollLocked, lenis]);
 
+  const contextValue = useMemo(() => ({ lenis, setScrollLocked }), [lenis, setScrollLocked]);
+
   return (
-    <SmoothScrollContext.Provider value={{ lenis, setScrollLocked }}>
+    <SmoothScrollContext.Provider value={contextValue}>
       {children}
     </SmoothScrollContext.Provider>
   );

@@ -212,6 +212,13 @@ export async function executeIdempotently(
     try {
       const response = await operation();
       const snapshot = await snapshotResponse(response);
+      // Transient upstream failures must remain retryable. Validation and
+      // business failures are replay-safe, but caching a 5xx would turn an
+      // outage into a permanent idempotency replay until the record expires.
+      if (response.status >= 500) {
+        await store.release?.(normalizedKey, requestHash);
+        return { kind: "executed", response };
+      }
       await store.put({
         key: normalizedKey,
         requestHash,
@@ -248,6 +255,9 @@ export async function executeIdempotently(
 
   const response = await operation();
   const snapshot = await snapshotResponse(response);
+  if (response.status >= 500) {
+    return { kind: "executed", response };
+  }
   await store.put({
     key: normalizedKey,
     requestHash,

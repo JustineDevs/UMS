@@ -71,7 +71,7 @@ test.describe("Storefront commerce API hardening", () => {
   });
 
   test("cart bind and resume do not accept bearer-like identifiers without session ownership", async ({ request }) => {
-    const bind = await request.post(`${base}/api/cart/medusa-bind`, {
+    const bind = await request.post(`${base}/api/cart/bind`, {
       data: { cartId: "cart_01HZABC" },
       failOnStatusCode: false,
     });

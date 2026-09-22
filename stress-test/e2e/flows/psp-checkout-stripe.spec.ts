@@ -54,7 +54,7 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
 
   test("complete checkout with Stripe test card reaches /track/:orderId", async ({ page }) => {
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page);
+    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "stripe");
@@ -65,6 +65,10 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
     }
+    // The checkout defaults to COD, whose email field is disabled. Re-run the
+    // shared form fill after selecting Stripe so the receipt email is populated
+    // before the hosted handoff is requested.
+    await fillCheckoutShippingInfo(page);
     await payWithStripeSandboxCard(page, STRIPE_SANDBOX_TEST_CARD_SUCCESS ?? STRIPE_SUCCESS_CARD);
     await expectOrderConfirmation(page);
 
@@ -113,7 +117,7 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
 
   test("Stripe checkout handles declined card and shows error", async ({ page }) => {
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page);
+    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "stripe");
@@ -124,6 +128,7 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
     }
+    await fillCheckoutShippingInfo(page);
 
     await clickPayButton(page);
     await ensureStripeHostedCheckout(page);

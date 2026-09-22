@@ -17,7 +17,7 @@
     "e2e:ensure-staff": "tsx scripts/e2e-ensure-staff-user.ts",
     "apply-rls": "tsx scripts/apply-sql.ts supabase/migrations/enable_rls.sql",
     "lint": "eslint src --ext .ts",
-    "test": "node --import tsx/esm --test src/compliance.test.ts"
+    "test": "node --import tsx/esm --test src/compliance.test.ts scripts/migration-files.test.mjs"
   },
   "dependencies": {
     "@universal-music-store/platform-data": "workspace:*",

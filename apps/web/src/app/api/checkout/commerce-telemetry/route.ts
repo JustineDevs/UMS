@@ -9,6 +9,7 @@ import { capturePostHogEvent } from "@universal-music-store/sdk";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { sanitizeCommerceObservabilityPayload } from "@/lib/commerce-observability";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { checkoutCommerceTelemetrySchema, commerceTelemetryResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,9 @@ export async function POST(req: Request) {
   if (!parsedBody.valid || !parsedBody.value || typeof parsedBody.value !== "object" || Array.isArray(parsedBody.value)) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const body = parsedBody.value as Record<string, unknown>;
+  const parsed = checkoutCommerceTelemetrySchema.safeParse(parsedBody.value);
+  if (!parsed.success) return Response.json({ error: "Invalid telemetry payload" }, { status: 400 });
+  const body = parsed.data;
 
   const event = body.event;
   if (
@@ -65,5 +68,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return Response.json({ ok: true });
+  return Response.json(commerceTelemetryResponseSchema.parse({ ok: true }));
 }

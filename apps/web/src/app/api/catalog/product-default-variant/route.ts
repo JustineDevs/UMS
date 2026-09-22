@@ -1,4 +1,6 @@
 import { minorUnitDivisor } from "@/lib/medusa-money";
+import { readResponseJson } from "@/lib/read-response-json";
+import { catalogDefaultVariantResponseSchema } from "@/lib/admin-api-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -55,10 +57,10 @@ export async function GET(req: Request) {
       return Response.json({ error: "Product not found or has no variants" }, { status: 404 });
     }
     if (!response.ok) throw new Error(`worker_catalog_${response.status}`);
-    const payload = (await response.json()) as {
+    const payload = await readResponseJson<{
       product?: { variants?: unknown[] };
       products?: Array<{ variants?: unknown[] }>;
-    };
+    }>(response, {});
     const variants = (payload.product?.variants ?? payload.products?.[0]?.variants ?? [])
       .filter((variant): variant is {
         id: string;
@@ -75,7 +77,7 @@ export async function GET(req: Request) {
     // When quantity is unavailable in this scope, fall back to the first variant.
     const chosen = variants[0];
     const amount = chosen.calculated_price?.calculated_amount;
-    return Response.json({
+    return Response.json(catalogDefaultVariantResponseSchema.parse({
       variantId: chosen.id,
       sku: chosen.sku ?? "",
       price:
@@ -84,7 +86,7 @@ export async function GET(req: Request) {
             minorUnitDivisor(chosen.calculated_price?.currency_code ?? "PHP")
           : null,
       currency: chosen.calculated_price?.currency_code ?? "PHP",
-    });
+    }));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to resolve variant";
     return Response.json(

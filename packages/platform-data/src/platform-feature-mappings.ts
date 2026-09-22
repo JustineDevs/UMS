@@ -37,7 +37,7 @@ export const PLATFORM_FEATURE_MAPPINGS: readonly PlatformFeatureMapping[] = [
     systemOfRecord: "Medusa orders and inventory; Supabase staff, shift, device, and audit records",
     adminSurfaces: ["/admin/pos", "/admin/orders", "/admin/inventory", "/admin/receipts"],
     storefrontSurfaces: ["/checkout", "/account/orders"],
-    apiSurfaces: ["/api/pos/medusa/commit-sale", "/api/admin/pos/enterprise", "/api/admin/shifts", "/api/admin/pos/feature-mappings"],
+    apiSurfaces: ["/api/pos/commerce/commit-sale", "/api/admin/pos/enterprise", "/api/admin/shifts", "/api/admin/pos/feature-mappings"],
     dataFlow: [
       "staff session -> shift/device authorization -> commit-sale",
       "commit-sale -> Medusa order -> inventory reservation",

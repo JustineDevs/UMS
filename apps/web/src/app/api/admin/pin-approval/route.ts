@@ -1,45 +1,16 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { requirePinApproval } from "@universal-music-store/platform-data";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
+import { mutateWorkerPinApprovalForAdmin } from "@/lib/worker-admin-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
-import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
-import { parseAdminJson } from "@/lib/admin-api-security";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-import { z } from "zod";
+import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { adminPinApprovalSchema } from "@/lib/admin-api-contracts";
 
-const pinApprovalSchema = z.object({
-  approver_employee_id: z.string().uuid(),
-  pin: z.string().regex(/^\d{4,8}$/),
-  required_role: z.enum(["admin", "manager"]).default("manager"),
-}).strict();
+export const dynamic = "force-dynamic";
 
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const staff = await requireStaffApiSession("pos:use");
-  if (!staff.ok) {
-    return tagResponse(staff.response, cid);
-  }
-
-  const parsed = await parseAdminJson(req, pinApprovalSchema);
-  if (!parsed.ok) return correlatedJson(cid, { error: parsed.error }, { status: parsed.status });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const sb = sup.client;
-  const sessionOrganization = await resolveStaffOrganization(sb, staff.session.user?.email);
-  if (!sessionOrganization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  try {
-    const result = await requirePinApproval(
-      sb,
-      parsed.data.approver_employee_id,
-      parsed.data.pin,
-      parsed.data.required_role,
-    );
-    return correlatedJson(cid, result);
-  } catch {
-    return correlatedJson(cid, { error: "Unable to verify PIN approval" }, { status: 503 });
-  }
+export async function POST(request: Request) {
+  const requestId = getCorrelationId(request); const key = request.headers.get("Idempotency-Key")?.trim();
+  if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const parsed = await parseBoundedJson(request, 16 * 1024);
+  if (parsed.tooLarge) return new Response(JSON.stringify({ error: "Payload too large", requestId }), { status: 413, headers: { "Content-Type": "application/json" } });
+  if (!parsed.valid || !parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return new Response(JSON.stringify({ error: "Invalid JSON", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const validated = adminPinApprovalSchema.safeParse(parsed.value); if (!validated.success) return new Response(JSON.stringify({ error: "Invalid payload", requestId }), { status: 400, headers: { "Content-Type": "application/json" } });
+  return await mutateWorkerPinApprovalForAdmin(validated.data, key) ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId }), { status: 503, headers: { "Content-Type": "application/json" } });
 }
-
-export const POST = withAdminMutationIdempotency("/admin/pin-approval:POST", post);

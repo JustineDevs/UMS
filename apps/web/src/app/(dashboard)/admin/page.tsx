@@ -72,8 +72,7 @@ export default async function AdminDashboardPage({
 }: {
   searchParams: Promise<{ denied?: string }>;
 }) {
-  const { denied } = await searchParams;
-  const session = await getAdminSession();
+  const [{ denied }, session] = await Promise.all([searchParams, getAdminSession()]);
 
   const authDisabled = process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
   if (!authDisabled && (!session?.user || !isStaffRole(session.user.role ?? ""))) {
@@ -103,7 +102,10 @@ export default async function AdminDashboardPage({
   ]);
   const { orders } = ordersResult;
   const totalSales = orders.reduce((sum, order) => sum + order.grand_total, 0);
-  const customerGrowth = new Set(orders.map((order) => order.customer_id ?? order.email).filter(Boolean)).size;
+  const customerGrowth = new Set(orders.flatMap((order) => {
+    const customer = order.customer_id ?? order.email;
+    return customer ? [customer] : [];
+  })).size;
   const averageOrder = orders.length ? totalSales / orders.length : 0;
   const returnRequests = orders.filter((order) => /return|refund/i.test(order.status)).length;
   const inventory = inventoryPage.rows.reduce(

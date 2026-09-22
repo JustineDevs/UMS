@@ -8,6 +8,7 @@ function visible(row: BlogRow): boolean {
 }
 
 const fields = `id, slug, locale, title, excerpt, body, cover_image_url, author_name, tags, status, published_at, scheduled_publish_at, meta_title, meta_description, og_image_url, json_ld, created_at, updated_at`;
+const MAX_PUBLIC_BLOG_POSTS = 100;
 
 export async function getPublishedBlogPost(database: WorkerDatabaseClient, slug: string, locale: string, organizationId: string): Promise<BlogRow | null> {
   const result = await database.query<BlogRow>(`SELECT ${fields} FROM public.cms_blog_posts WHERE organization_id = $1 AND slug = $2 AND locale = $3 LIMIT 1`, [organizationId, slug, locale]);
@@ -16,7 +17,7 @@ export async function getPublishedBlogPost(database: WorkerDatabaseClient, slug:
 }
 
 async function listPublishedBlogPosts(database: WorkerDatabaseClient, locale: string, organizationId: string): Promise<BlogRow[]> {
-  const result = await database.query<BlogRow>(`SELECT ${fields} FROM public.cms_blog_posts WHERE organization_id = $1 AND locale = $2 ORDER BY published_at DESC NULLS LAST, updated_at DESC`, [organizationId, locale]);
+  const result = await database.query<BlogRow>(`SELECT ${fields} FROM public.cms_blog_posts WHERE organization_id = $1 AND locale = $2 ORDER BY published_at DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${MAX_PUBLIC_BLOG_POSTS}`, [organizationId, locale]);
   return result.rows.filter(visible);
 }
 

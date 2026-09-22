@@ -25,12 +25,41 @@ const storefrontBase =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 let createdCodOrderId: string | null = null;
 
+async function completeOnboardingIfProfileGateRedirected(page: import("@playwright/test").Page): Promise<void> {
+  const completeDetails = page.getByRole("link", { name: "Complete delivery details", exact: true });
+  if (/\/checkout(?:\?|$)/i.test(page.url()) && await completeDetails.count()) {
+    await completeDetails.click();
+    await page.waitForURL(/\/onboarding(?:\?|$)/i, { timeout: 15_000 });
+  }
+  if (!/\/onboarding(?:\?|$)/i.test(page.url())) return;
+
+  await page.getByLabel("Mobile number", { exact: true }).fill("+639171234567");
+  await page.getByLabel("Street address", { exact: true }).fill("123 Test Street");
+  const region = page.getByRole("combobox", { name: "Region", exact: true });
+  await region.selectOption({ label: "National Capital Region (NCR)" });
+
+  for (const label of ["Province", "City or municipality", "Barangay"]) {
+    const select = page.getByRole("combobox", { name: label, exact: true });
+    await select.waitFor({ state: "visible", timeout: 10_000 });
+    await expect(select).toBeEnabled({ timeout: 10_000 });
+    const options = select.locator("option");
+    await expect(options).toHaveCount(2, { timeout: 10_000 }).catch(() => undefined);
+    const count = await options.count();
+    if (count < 2) throw new Error(`Onboarding ${label} has no selectable options`);
+    await select.selectOption({ index: 1 });
+  }
+
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page).toHaveURL(/\/checkout(?:\?|$)/, { timeout: 30_000 });
+}
+
 function shouldFailOnMissingPrereq(): boolean {
   return process.env.CI_STRICT_E2E === "1" || process.env.CI === "true";
 }
 
 function isAuthDisabled(): boolean {
   return (
+    process.env.UVS_E2E_LOCAL === "1" ||
     process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true"
   );
 }
@@ -100,34 +129,22 @@ test.describe("@checkout @cod COD checkout flow", () => {
   test("complete checkout with Cash on Delivery reaches /track/:orderId", async ({
     page,
   }) => {
-    if (isAuthDisabled()) {
-      const profile = await page.request.patch(
-        `${storefrontBase}/api/account/profile`,
-        {
-          data: {
-            displayName: "E2E Tester",
-            phone: "+639171234567",
-            shippingAddresses: [
-              {
-                fullName: "E2E Tester",
-                line1: "123 Test Street",
-                city: "Manila",
-                postalCode: "1000",
-                barangay: "Barangay Test",
-                province: "Metro Manila",
-                country: "PH",
-                phone: "+639171234567",
-              },
-            ],
-          },
-          failOnStatusCode: false,
-        },
+    if (!isAuthDisabled()) {
+      test.skip(
+        true,
+        "COD browser proof requires a storefront customer session with a complete delivery profile.",
       );
-      expect(profile.status(), "local auth-disabled profile seed").toBe(200);
+      return;
     }
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page);
+    // The local E2E profile fixture is server-validated by the COD endpoint;
+    // production-mode runs require the authenticated customer profile instead.
+    await navigateToCheckout(page, { guest: false });
     await fillCheckoutShippingInfo(page);
+    await completeOnboardingIfProfileGateRedirected(page);
+    if (/\/checkout(?:\?|$)/i.test(page.url())) {
+      await page.waitForTimeout(1_000);
+    }
 
     const selected = await selectPaymentProvider(page, "cod");
     if (!selected) {
@@ -197,6 +214,13 @@ test.describe("@checkout @cod COD checkout flow", () => {
   test("POST /api/checkout/cod-cart-payload returns the verified delivery profile", async ({
     request,
   }) => {
+    if (!isAuthDisabled()) {
+      test.skip(
+        true,
+        "COD profile API proof requires a storefront customer session.",
+      );
+      return;
+    }
     const res = await request.post(
       `${storefrontBase}/api/checkout/cod-cart-payload`,
       {

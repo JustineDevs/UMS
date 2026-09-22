@@ -18,6 +18,7 @@ import {
   selectHydratedCart,
   writeCart,
 } from "@/lib/cart";
+import { readResponseJson } from "@/lib/read-response-json";
 
 type CartContextValue = {
   cartId: string | null;
@@ -52,13 +53,13 @@ export function CartProvider({
     const hydrationRevision = readCartRevision();
     try {
       const res = await fetch("/api/cart/resume");
-      const data = (await res.json()) as {
+      const data = await readResponseJson(res, {} as {
         lines?: CartLine[];
         cartId?: string | null;
         error?: string;
         skipped?: boolean;
         available?: boolean;
-      };
+      });
       // Read after the request resolves so an add made during hydration wins
       // over a stale server snapshot returned by the navigation request.
       const localDraft = readCart();

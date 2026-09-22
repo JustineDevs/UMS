@@ -4,8 +4,10 @@ import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { terminalPrintLabelBodySchema } from "@/lib/terminal-print-schemas";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { callTerminalAgent, TerminalAgentError } from "@/lib/terminal-agent-client";
+import { adminTerminalMutationResponseSchema } from "@/lib/admin-api-contracts";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -32,30 +34,18 @@ async function post(req: NextRequest) {
     );
   }
 
-  const base =
-    process.env.TERMINAL_AGENT_URL?.trim() ||
-    process.env.NEXT_PUBLIC_TERMINAL_AGENT_URL?.trim() ||
-    "http://127.0.0.1:17711";
-  const secret = process.env.TERMINAL_AGENT_SECRET?.trim();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (secret) {
-    headers["X-Terminal-Agent-Secret"] = secret;
-  }
-  const res = await fetch(`${base.replace(/\/$/, "")}/print-label`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(parsed.data),
-  });
-  const text = await res.text();
-  let parsedOut: unknown = text;
   try {
-    parsedOut = JSON.parse(text) as unknown;
-  } catch {
-    parsedOut = { raw: text };
+    const result = await callTerminalAgent("/print-label", parsed.data);
+    if (result.status >= 200 && result.status < 300) {
+      const validated = adminTerminalMutationResponseSchema.safeParse(result.payload);
+      if (!validated.success) return correlatedError(cid, 502, "Terminal agent returned an invalid response", "SERVICE_UNAVAILABLE");
+      return correlatedJson(cid, validated.data, { status: result.status });
+    }
+    return correlatedJson(cid, result.payload && typeof result.payload === "object" ? result.payload : { error: "Terminal agent request failed" }, { status: result.status });
+  } catch (error) {
+    const status = error instanceof TerminalAgentError ? error.status : 503;
+    return correlatedError(cid, status, "Terminal agent is unavailable", "SERVICE_UNAVAILABLE");
   }
-  return correlatedJson(cid, parsedOut, { status: res.status });
 }
 
 export const POST = withAdminMutationIdempotency("/admin/terminal-print-label:POST", post);

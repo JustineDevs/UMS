@@ -13,6 +13,7 @@ import {
   buildJsonLdOrganization,
   buildJsonLdWebSite,
   buildPageMetadata,
+  serializeJsonLd,
   SEO_KEYWORDS,
   SITE_NAME,
 } from "@/lib/seo";
@@ -102,11 +103,11 @@ export default async function HomePage({
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(orgJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(webJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(webJsonLd) }}
       />
       {isAdminPreview ? (
         <StorefrontHomePreviewBridge

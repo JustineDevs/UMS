@@ -45,7 +45,8 @@ export async function listCmsPaymentLinks(
     .select("*")
     .eq("organization_id", organizationId)
     .order("sort_order", { ascending: true })
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(500);
   if (error) {
     if (isMissingTableOrSchemaError(error)) return [];
     console.error("[cms-payment-links] list", error.message);

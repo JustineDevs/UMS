@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { ReconciliationSummary } from "@/app/api/admin/reconciliation/route";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -21,11 +22,13 @@ export default function ReconciliationPage() {
   const [data, setData] = useState<ReconciliationSummary | null>(null);
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
     setLoading(true);
+    setError(null);
     fetch(`/api/admin/reconciliation?days=${days}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Reconciliation request failed (${response.status})`);
@@ -36,7 +39,10 @@ export default function ReconciliationPage() {
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
-        if (active) setData(null);
+        if (active) {
+          setData(null);
+          setError("Reconciliation data is temporarily unavailable.");
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -55,7 +61,9 @@ export default function ReconciliationPage() {
           <h1 className="text-2xl font-semibold text-gray-900">Payment Reconciliation</h1>
           <p className="text-sm text-gray-500 mt-1">Payment provider payouts compared with store orders</p>
         </div>
+        <label htmlFor="reconciliation-days" className="sr-only">Reconciliation period</label>
         <select
+          id="reconciliation-days"
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
           className="border border-gray-300 rounded px-3 py-1.5 text-sm"
@@ -69,6 +77,12 @@ export default function ReconciliationPage() {
 
 
       {loading && <p className="text-gray-500">Loading reconciliation data...</p>}
+
+      {error && !loading && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          {error} Refresh the page or choose another period to retry.
+        </div>
+      )}
 
       {data && !loading && (
         <>
@@ -102,12 +116,12 @@ export default function ReconciliationPage() {
               <p className="mt-2 text-xs text-amber-900/80">
                 Provider-confirmed totals below come from the current payment ledger, not external settlement files.
               </p>
-              <a
+              <Link
                 href="/admin/payments"
                 className="mt-3 inline-flex rounded border border-amber-500 px-3 py-2 text-xs font-bold uppercase tracking-widest text-amber-900 transition-colors hover:bg-amber-100"
               >
                 Open payment attempts
-              </a>
+              </Link>
             </div>
           )}
 
@@ -127,8 +141,8 @@ export default function ReconciliationPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.rows.map((row, i) => (
-                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                {data.rows.map((row) => (
+                  <tr key={`${row.date}-${row.provider}`} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-700">{row.date}</td>
                     <td className="px-4 py-3 text-gray-700 capitalize">{row.provider}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{row.medusaOrderCount}</td>

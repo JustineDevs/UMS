@@ -60,10 +60,10 @@ Runs Stripe, PayPal, Xendit, and COD (unless `E2E_STRESS_EXCLUDE_COD=1`) for `E2
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `PLAYWRIGHT_STOREFRONT_STORAGE_STATE`        | Customer session (required for PDP add-to-bag)                                                    |
 | `E2E_STRICT_PAYMENTS=1` / `E2E_STRICT_E2E=1` | Missing PSP env throws instead of skip                                                            |
-| `E2E_EXPECT_ALL_PSPS=1`                      | Every provider enabled in Medusa `payment-health` must have matching `E2E_*` keys                 |
+| `E2E_EXPECT_ALL_PSPS=1`                      | Every provider exposed by Worker-backed checkout must have matching `E2E_*` keys                |
 | `E2E_STRESS_ITERATIONS`                      | Repeat count per provider (default 1, max 50)                                                     |
 | `E2E_STRESS_PARALLEL=1`                      | Parallel tests (higher cart collision risk)                                                       |
-| `E2E_VERIFY_MEDUSA_ORDER=1`                  | After redirect, `GET /admin/orders/:id` with `MEDUSA_SECRET_API_KEY` or `E2E_MEDUSA_ADMIN_SECRET` |
+| `E2E_VERIFY_WORKER_ORDER=1`                  | After redirect, check Worker `GET /api/admin/orders/:id` using `E2E_WORKER_ADMIN_TOKEN`         |
 
 PSP sandbox keys match the existing PSP specs (`E2E_STRIPE_API_KEY`, `E2E_PAYPAL_CLIENT_ID` + `E2E_PAYPAL_CLIENT_SECRET`, `E2E_XENDIT_SECRET_KEY`, etc.).
 

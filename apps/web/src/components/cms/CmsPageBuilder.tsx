@@ -70,11 +70,22 @@ import {
   type CmsHistory,
   type CmsMutation,
 } from "@/lib/cms-tree-commands";
-import { LiveCanvasEditor } from "@/lib/visual-builder/live-canvas-editor";
-import { StyleManager, type StyleTheme } from "@/lib/visual-builder/style-manager";
-import { getAllCSSVariableNames, type ColorPalette, type PaletteVariableType } from "@/lib/visual-builder/color-palette";
+import type { StyleTheme } from "@/lib/visual-builder/style-manager";
+import type {
+  ColorPalette,
+  PaletteVariableType,
+} from "@/lib/visual-builder/color-palette";
 import { UvsCmsClient } from "@/lib/visual-builder/cms-rest-client";
-import { UVS_DEFINITIONS, type VisualComponentDefinition } from "@/lib/visual-builder/component-definitions";
+import {
+  UVS_DEFINITIONS,
+  type VisualComponentDefinition,
+} from "@/lib/visual-builder/component-definitions";
+import { readResponseJson } from "@/lib/read-response-json";
+import {
+  cmsPreviewSandbox,
+  cmsPreviewTargetOrigin,
+  isCmsPreviewMessageFromFrame,
+} from "@/lib/cms-preview-frame";
 import { mapCmsPreviewRectToCanvas } from "./cms-preview-geometry";
 
 const BLOCK_TYPES = [
@@ -99,7 +110,11 @@ const BLOCK_TYPES = [
   { type: "contact_strip", label: "Contact strip", group: "Bootstrap 5" },
   { type: "newsletter", label: "Newsletter", group: "Ecommerce" },
   { type: "featured_products", label: "Featured products", group: "Ecommerce" },
-  { type: "home_tiles", label: "Homepage category tiles", group: "Bootstrap 5" },
+  {
+    type: "home_tiles",
+    label: "Homepage category tiles",
+    group: "Bootstrap 5",
+  },
   {
     type: "latest_section",
     label: "Latest products section",
@@ -170,18 +185,28 @@ const VVVEB_PALETTE_GROUP_ORDER = [
   "Ecommerce",
 ];
 
-function comparePaletteGroups([left]: [string, unknown], [right]: [string, unknown]) {
+function comparePaletteGroups(
+  [left]: [string, unknown],
+  [right]: [string, unknown],
+) {
   const leftRank = VVVEB_PALETTE_GROUP_ORDER.indexOf(left);
   const rightRank = VVVEB_PALETTE_GROUP_ORDER.indexOf(right);
-  return (leftRank === -1 ? VVVEB_PALETTE_GROUP_ORDER.length : leftRank) -
-    (rightRank === -1 ? VVVEB_PALETTE_GROUP_ORDER.length : rightRank) ||
-    left.localeCompare(right);
+  return (
+    (leftRank === -1 ? VVVEB_PALETTE_GROUP_ORDER.length : leftRank) -
+      (rightRank === -1 ? VVVEB_PALETTE_GROUP_ORDER.length : rightRank) ||
+    left.localeCompare(right)
+  );
 }
 
 function visualIconPath(definition: VisualComponentDefinition) {
-  const icon = definition.image?.replace(/^icons\//, "") ??
+  const icon =
+    definition.image?.replace(/^icons\//, "") ??
     definition.markup.match(/icons\/([^"'\s]+)/i)?.[1] ??
-    (definition.type.includes("image") ? "image.svg" : definition.type.includes("video") ? "video.svg" : "icon.svg");
+    (definition.type.includes("image")
+      ? "image.svg"
+      : definition.type.includes("video")
+        ? "video.svg"
+        : "icon.svg");
   return `/vvveb-icons/${icon}`;
 }
 
@@ -189,14 +214,16 @@ function visualDefinitionForBlock(block: CmsBlock | null | undefined) {
   const type = block?.componentId?.startsWith("visual:")
     ? block.componentId.slice("visual:".length)
     : undefined;
-  return type ? UVS_DEFINITIONS.find((definition) => definition.type === type) : undefined;
+  return type
+    ? UVS_DEFINITIONS.find((definition) => definition.type === type)
+    : undefined;
 }
 
 function visualMarkupTarget(
   root: Element,
   property: VisualComponentDefinition["properties"][number],
 ) {
-  return property.child ? root.querySelector(property.child) ?? root : root;
+  return property.child ? (root.querySelector(property.child) ?? root) : root;
 }
 
 function visualMarkupWithProperty(
@@ -206,17 +233,24 @@ function visualMarkupWithProperty(
   value: string,
 ) {
   if (typeof DOMParser === "undefined") return markup;
-  const document = new DOMParser().parseFromString(`<body>${markup}</body>`, "text/html");
+  const document = new DOMParser().parseFromString(
+    `<body>${markup}</body>`,
+    "text/html",
+  );
   const root = document.body.firstElementChild;
   const property = definition.properties.find((item) => item.key === key);
   if (!root || !property) return markup;
-  if (!property.child && definition.lifecycle?.onChange(root as HTMLElement, key, value)) {
+  if (
+    !property.child &&
+    definition.lifecycle?.onChange(root as HTMLElement, key, value)
+  ) {
     return document.body.innerHTML;
   }
   if (key === "size" && /^H[1-6]$/i.test(root.tagName)) {
     const replacement = document.createElement(`h${value}`);
     replacement.innerHTML = root.innerHTML;
-    for (const attribute of Array.from(root.attributes)) replacement.setAttribute(attribute.name, attribute.value);
+    for (const attribute of Array.from(root.attributes))
+      replacement.setAttribute(attribute.name, attribute.value);
     root.replaceWith(replacement);
   } else {
     const target = visualMarkupTarget(root, property);
@@ -225,7 +259,8 @@ function visualMarkupWithProperty(
     else if (attribute === "nodeName") {
       const replacement = document.createElement(value.toLowerCase());
       replacement.innerHTML = target.innerHTML;
-      for (const item of Array.from(target.attributes)) replacement.setAttribute(item.name, item.value);
+      for (const item of Array.from(target.attributes))
+        replacement.setAttribute(item.name, item.value);
       target.replaceWith(replacement);
     } else if (property.inputtype === "checkbox") {
       if (value === "true") target.setAttribute(attribute, "");
@@ -238,16 +273,23 @@ function visualMarkupWithProperty(
 function visualInitialProps(definition: VisualComponentDefinition) {
   const props: Record<string, unknown> = {};
   if (typeof DOMParser === "undefined") return props;
-  const document = new DOMParser().parseFromString(`<body>${definition.markup}</body>`, "text/html");
+  const document = new DOMParser().parseFromString(
+    `<body>${definition.markup}</body>`,
+    "text/html",
+  );
   const root = document.body.firstElementChild;
   if (!root) return props;
   for (const property of definition.properties) {
     const target = visualMarkupTarget(root, property);
     const attribute = property.htmlAttr ?? property.key;
     if (attribute === "innerHTML") props[property.key] = target.innerHTML;
-    else if (attribute === "nodeName") props[property.key] = root.tagName.slice(1);
-    else if (property.inputtype === "checkbox") props[property.key] = target.hasAttribute(attribute);
-    else props[property.key] = target.getAttribute(attribute) ?? property.options?.[0]?.value ?? "";
+    else if (attribute === "nodeName")
+      props[property.key] = root.tagName.slice(1);
+    else if (property.inputtype === "checkbox")
+      props[property.key] = target.hasAttribute(attribute);
+    else
+      props[property.key] =
+        target.getAttribute(attribute) ?? property.options?.[0]?.value ?? "";
   }
   return props;
 }
@@ -257,7 +299,11 @@ type BrowserSpeechRecognition = {
   lang: string;
   interimResults: boolean;
   start: () => void;
-  onresult: ((_event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult:
+    | ((_event: {
+        results: ArrayLike<ArrayLike<{ transcript: string }>>;
+      }) => void)
+    | null;
   onerror: ((_event?: unknown) => void) | null;
   onend: (() => void) | null;
 };
@@ -294,9 +340,29 @@ type ComponentNode = {
   children?: ComponentNode[];
 };
 type CmsMutationShape =
-  | { type: "insert" | "remove" | "move"; nodeId?: string; parentId?: string | null; beforeParentId?: string | null; index?: number; slot?: string; node?: CmsBlock | CmsComponentInstance }
-  | { type: "set-prop" | "set-style"; nodeId: string; key: string; before?: unknown; after?: unknown }
-  | { type: "set-attribute" | "set-text" | "set-html"; nodeId: string; key?: string; before?: unknown; after?: unknown };
+  | {
+      type: "insert" | "remove" | "move";
+      nodeId?: string;
+      parentId?: string | null;
+      beforeParentId?: string | null;
+      index?: number;
+      slot?: string;
+      node?: CmsBlock | CmsComponentInstance;
+    }
+  | {
+      type: "set-prop" | "set-style";
+      nodeId: string;
+      key: string;
+      before?: unknown;
+      after?: unknown;
+    }
+  | {
+      type: "set-attribute" | "set-text" | "set-html";
+      nodeId: string;
+      key?: string;
+      before?: unknown;
+      after?: unknown;
+    };
 const LABELS: Record<string, string> = Object.fromEntries(
   BLOCK_TYPES.map((b) => [b.type, b.label]),
 );
@@ -312,7 +378,13 @@ function VvvebIcon({
   name,
   className = "size-4",
 }: {
-  name: "file-manager-layout" | "left-column-layout" | "right-column-layout" | "folder" | "icon-list" | "file";
+  name:
+    | "file-manager-layout"
+    | "left-column-layout"
+    | "right-column-layout"
+    | "folder"
+    | "icon-list"
+    | "file";
   className?: string;
 }) {
   return (
@@ -327,22 +399,47 @@ function VvvebIcon({
   );
 }
 
-function mutationForBlocks(before: CmsBlock[], after: CmsBlock[]): CmsMutationShape {
+function mutationForBlocks(
+  before: CmsBlock[],
+  after: CmsBlock[],
+): CmsMutationShape {
   const beforeIds = before.map((block) => block.id);
   const afterIds = after.map((block) => block.id);
   const beforeIdSet = new Set(beforeIds);
   const afterIdSet = new Set(afterIds);
-  if (after.length === before.length && beforeIds.join("|") !== afterIds.join("|")) {
+  if (
+    after.length === before.length &&
+    beforeIds.join("|") !== afterIds.join("|")
+  ) {
     const moved = afterIds.find((id, index) => beforeIds[index] !== id);
-    return { type: "move", nodeId: moved, parentId: null, beforeParentId: null, index: moved ? afterIds.indexOf(moved) : undefined, node: after.find((block) => block.id === moved) };
+    return {
+      type: "move",
+      nodeId: moved,
+      parentId: null,
+      beforeParentId: null,
+      index: moved ? afterIds.indexOf(moved) : undefined,
+      node: after.find((block) => block.id === moved),
+    };
   }
   if (after.length === before.length + 1) {
     const node = after.find((block) => !beforeIdSet.has(block.id));
-    return { type: "insert", nodeId: node?.id, parentId: null, index: node ? afterIds.indexOf(node.id) : undefined, node };
+    return {
+      type: "insert",
+      nodeId: node?.id,
+      parentId: null,
+      index: node ? afterIds.indexOf(node.id) : undefined,
+      node,
+    };
   }
   if (after.length + 1 === before.length) {
     const node = before.find((block) => !afterIdSet.has(block.id));
-    return { type: "remove", nodeId: node?.id, parentId: null, index: node ? beforeIds.indexOf(node.id) : undefined, node };
+    return {
+      type: "remove",
+      nodeId: node?.id,
+      parentId: null,
+      index: node ? beforeIds.indexOf(node.id) : undefined,
+      node,
+    };
   }
   const beforeNodes = flattenCmsNodes(before);
   const afterNodes = flattenCmsNodes(after);
@@ -352,7 +449,13 @@ function mutationForBlocks(before: CmsBlock[], after: CmsBlock[]): CmsMutationSh
   });
   if (changed) {
     const old = beforeNodes.find((node) => node.id === changed.id)!;
-    return { type: "set-prop", nodeId: changed.id, key: "__props", before: old.props, after: changed.props };
+    return {
+      type: "set-prop",
+      nodeId: changed.id,
+      key: "__props",
+      before: old.props,
+      after: changed.props,
+    };
   }
   const styled = afterNodes.find((node) => {
     const old = beforeNodes.find((candidate) => candidate.id === node.id);
@@ -360,28 +463,61 @@ function mutationForBlocks(before: CmsBlock[], after: CmsBlock[]): CmsMutationSh
   });
   if (styled) {
     const old = beforeNodes.find((node) => node.id === styled.id)!;
-    return { type: "set-style", nodeId: styled.id, key: "__styles", before: old.styles, after: styled.styles };
+    return {
+      type: "set-style",
+      nodeId: styled.id,
+      key: "__styles",
+      before: old.styles,
+      after: styled.styles,
+    };
   }
-  return { type: "set-prop", nodeId: after[0]?.id ?? before[0]?.id ?? "", key: "__noop", before: null, after: null };
+  return {
+    type: "set-prop",
+    nodeId: after[0]?.id ?? before[0]?.id ?? "",
+    key: "__noop",
+    before: null,
+    after: null,
+  };
 }
 
 function flattenCmsNodes(blocks: CmsBlock[]) {
-  const nodes: Array<{ id: string; props: Record<string, unknown>; styles: Record<string, string> }> = [];
+  const nodes: Array<{
+    id: string;
+    props: Record<string, unknown>;
+    styles: Record<string, string>;
+  }> = [];
   const visit = (instance: CmsComponentInstance) => {
-    nodes.push({ id: instance.id, props: instance.props, styles: instance.styleOverrides ?? {} });
-    Object.values(instance.slots ?? {}).flat().forEach(visit);
+    nodes.push({
+      id: instance.id,
+      props: instance.props,
+      styles: instance.styleOverrides ?? {},
+    });
+    Object.values(instance.slots ?? {})
+      .flat()
+      .forEach(visit);
   };
   blocks.forEach((block) => {
-    nodes.push({ id: block.id, props: block.props, styles: block.styleOverrides ?? {} });
-    Object.values(block.slots ?? {}).flat().forEach(visit);
+    nodes.push({
+      id: block.id,
+      props: block.props,
+      styles: block.styleOverrides ?? {},
+    });
+    Object.values(block.slots ?? {})
+      .flat()
+      .forEach(visit);
   });
   return nodes;
 }
 
-function findCmsNode(blocks: CmsBlock[], nodeId: string): CmsBlock | CmsComponentInstance | undefined {
+function findCmsNode(
+  blocks: CmsBlock[],
+  nodeId: string,
+): CmsBlock | CmsComponentInstance | undefined {
   for (const block of blocks) {
     if (block.id === nodeId) return block;
-    const visit = (items: CmsComponentInstance[]): CmsComponentInstance | undefined => {
+    const visit = (
+      items: CmsComponentInstance[],
+    ): CmsComponentInstance | undefined => {
       for (const item of items) {
         if (item.id === nodeId) return item;
         const nested = visit(Object.values(item.slots ?? {}).flat());
@@ -395,17 +531,35 @@ function findCmsNode(blocks: CmsBlock[], nodeId: string): CmsBlock | CmsComponen
   return undefined;
 }
 
-function cmsMutationValue(blocks: CmsBlock[], mutation: CmsMutationShape, direction: "before" | "after") {
-  if (mutation.type !== "set-prop" && mutation.type !== "set-style") return undefined;
-  if (direction === "before" && mutation.before !== undefined) return mutation.before;
-  if (direction === "after" && mutation.after !== undefined) return mutation.after;
+function cmsMutationValue(
+  blocks: CmsBlock[],
+  mutation: CmsMutationShape,
+  direction: "before" | "after",
+) {
+  if (mutation.type !== "set-prop" && mutation.type !== "set-style")
+    return undefined;
+  if (direction === "before" && mutation.before !== undefined)
+    return mutation.before;
+  if (direction === "after" && mutation.after !== undefined)
+    return mutation.after;
   const node = findCmsNode(blocks, mutation.nodeId);
   if (!node) return undefined;
-  if (mutation.type === "set-prop") return mutation.key === "__props" ? node.props : node.props[mutation.key];
-  return mutation.key === "__styles" ? ("type" in node ? node.styleOverrides ?? {} : node.styleOverrides ?? {}) : ("type" in node ? node.styleOverrides?.[mutation.key] : node.styleOverrides?.[mutation.key]);
+  if (mutation.type === "set-prop")
+    return mutation.key === "__props" ? node.props : node.props[mutation.key];
+  return mutation.key === "__styles"
+    ? "type" in node
+      ? (node.styleOverrides ?? {})
+      : (node.styleOverrides ?? {})
+    : "type" in node
+      ? node.styleOverrides?.[mutation.key]
+      : node.styleOverrides?.[mutation.key];
 }
 
-function persistedCmsMutation(before: CmsBlock[], after: CmsBlock[], mutation?: CmsMutationShape): CmsMutationShape | undefined {
+function persistedCmsMutation(
+  before: CmsBlock[],
+  after: CmsBlock[],
+  mutation?: CmsMutationShape,
+): CmsMutationShape | undefined {
   const next = mutation ?? mutationForBlocks(before, after);
   if (!next) return undefined;
   if (next.type === "set-prop" || next.type === "set-style") {
@@ -415,7 +569,10 @@ function persistedCmsMutation(before: CmsBlock[], after: CmsBlock[], mutation?: 
       after: next.after ?? cmsMutationValue(after, next, "after"),
     };
   }
-  const structural = next as Extract<CmsMutationShape, { type: "insert" | "remove" | "move" }>;
+  const structural = next as Extract<
+    CmsMutationShape,
+    { type: "insert" | "remove" | "move" }
+  >;
   if (structural.node || !structural.nodeId) return structural;
   return { ...structural, node: findCmsNode(before, structural.nodeId) };
 }
@@ -521,7 +678,11 @@ function normalize(raw: unknown): CmsBlock[] {
           : undefined,
       props:
         type === "unknown_component"
-          ? { ...props, originalType: requestedType || "unknown", originalNode: row }
+          ? {
+              ...props,
+              originalType: requestedType || "unknown",
+              originalNode: row,
+            }
           : props,
     } as CmsBlock;
   });
@@ -568,7 +729,8 @@ function instanceOverrides(
   const inherited = resolvedComponentProps(definition, variantId, {});
   return Object.fromEntries(
     Object.entries(props).filter(
-      ([key, value]) => JSON.stringify(value) !== JSON.stringify(inherited[key]),
+      ([key, value]) =>
+        JSON.stringify(value) !== JSON.stringify(inherited[key]),
     ),
   );
 }
@@ -662,7 +824,10 @@ function applyDomMutation(
         ...block.props,
         domOverrides: {
           ...domOverrides,
-          [overrideId]: { ...(domOverrides[overrideId] ?? {}), [property]: value },
+          [overrideId]: {
+            ...(domOverrides[overrideId] ?? {}),
+            [property]: value,
+          },
         },
       },
     };
@@ -738,7 +903,10 @@ function updateComponentInstances(
 function removeInstanceFromSlots(
   slots: Record<string, CmsComponentInstance[]>,
   id: string,
-): { slots: Record<string, CmsComponentInstance[]>; removed: CmsComponentInstance | null } {
+): {
+  slots: Record<string, CmsComponentInstance[]>;
+  removed: CmsComponentInstance | null;
+} {
   let removed: CmsComponentInstance | null = null;
   const next = Object.fromEntries(
     Object.entries(slots).map(([slot, items]) => {
@@ -778,7 +946,13 @@ function insertInstanceIntoSlots(
           inserted = true;
           return { ...item, slots: { ...item.slots, [slotName]: target } };
         }
-        const result = insertInstanceIntoSlots(item.slots ?? {}, ownerId, slotName, child, index);
+        const result = insertInstanceIntoSlots(
+          item.slots ?? {},
+          ownerId,
+          slotName,
+          child,
+          index,
+        );
         if (result.inserted) inserted = true;
         return result.inserted ? { ...item, slots: result.slots } : item;
       });
@@ -806,11 +980,21 @@ function _moveInstanceBetweenSlots(
       const sourceSlots = removed.slots;
       if (targetOwnerId === sourceBlockId) {
         const target = [...(sourceSlots[targetSlot] ?? [])];
-        target.splice(Math.max(0, Math.min(targetIndex, target.length)), 0, removed.removed!);
+        target.splice(
+          Math.max(0, Math.min(targetIndex, target.length)),
+          0,
+          removed.removed!,
+        );
         inserted = true;
         return { ...block, slots: { ...sourceSlots, [targetSlot]: target } };
       }
-      const result = insertInstanceIntoSlots(sourceSlots, targetOwnerId, targetSlot, removed.removed!, targetIndex);
+      const result = insertInstanceIntoSlots(
+        sourceSlots,
+        targetOwnerId,
+        targetSlot,
+        removed.removed!,
+        targetIndex,
+      );
       if (result.inserted) {
         inserted = true;
         return { ...block, slots: result.slots };
@@ -818,7 +1002,13 @@ function _moveInstanceBetweenSlots(
       return block;
     }
     if (targetOwnerId !== block.id) {
-      const target = insertInstanceIntoSlots(block.slots ?? {}, targetOwnerId, targetSlot, removed.removed!, targetIndex);
+      const target = insertInstanceIntoSlots(
+        block.slots ?? {},
+        targetOwnerId,
+        targetSlot,
+        removed.removed!,
+        targetIndex,
+      );
       if (target.inserted) {
         inserted = true;
         return { ...block, slots: target.slots };
@@ -826,13 +1016,16 @@ function _moveInstanceBetweenSlots(
       return block;
     }
     const target = [...(block.slots?.[targetSlot] ?? [])];
-    target.splice(Math.max(0, Math.min(targetIndex, target.length)), 0, removed.removed!);
+    target.splice(
+      Math.max(0, Math.min(targetIndex, target.length)),
+      0,
+      removed.removed!,
+    );
     inserted = true;
     return { ...block, slots: { ...block.slots, [targetSlot]: target } };
   });
   return inserted ? nextBlocks : blocks;
 }
-
 
 export function createComponentCanvasPreviewBlock(
   definition: CmsComponentDefinition,
@@ -844,9 +1037,7 @@ export function createComponentCanvasPreviewBlock(
     componentId: definition.id,
     variantId,
     props: resolvedComponentProps(definition, variantId, {}),
-    slots: Object.fromEntries(
-      definition.slots.map((slot) => [slot.name, []]),
-    ),
+    slots: Object.fromEntries(definition.slots.map((slot) => [slot.name, []])),
   };
 }
 
@@ -854,11 +1045,22 @@ export function componentCanvasDocument(
   block: CmsBlock,
   suppliedDefinition?: CmsComponentDefinition,
 ) {
-  const definition = suppliedDefinition ?? getCmsComponentDefinition(block.componentId ?? block.type);
-  const props = resolvedComponentProps(definition, block.variantId, block.props ?? {});
+  const definition =
+    suppliedDefinition ??
+    getCmsComponentDefinition(block.componentId ?? block.type);
+  const props = resolvedComponentProps(
+    definition,
+    block.variantId,
+    block.props ?? {},
+  );
   const escape = (value: unknown) => escapeHtml(String(value ?? ""));
   const generatedFields = (definition?.props ?? [])
-    .filter((item) => item.type === "text" || item.type === "rich-text" || item.type === "url")
+    .filter(
+      (item) =>
+        item.type === "text" ||
+        item.type === "rich-text" ||
+        item.type === "url",
+    )
     .slice(0, 8)
     .map((item) => {
       const value = escape(props[item.key]);
@@ -873,41 +1075,101 @@ export function componentCanvasDocument(
     .replace(/<\/style/gi, "")
     .replace(/@import[^;]+;?/gi, "")
     .replace(/url\s*\([^)]*\)/gi, "none");
-  const serializedProps = JSON.stringify(props).replace(/</g, "\\u003c");
-  const serializedSlots = JSON.stringify(definition?.slots ?? []).replace(/</g, "\\u003c");
+  const serializeScriptData = (value: unknown) =>
+    JSON.stringify(value)
+      .replace(/</g, "\\u003c")
+      .replace(/>/g, "\\u003e")
+      .replace(/&/g, "\\u0026")
+      .replace(/\u2028/g, "\\u2028")
+      .replace(/\u2029/g, "\\u2029");
+  const serializedBlockId = serializeScriptData(block.id);
+  const serializedProps = serializeScriptData(props);
+  const serializedSlots = serializeScriptData(definition?.slots ?? []);
   const rootMarkup = markup.includes("data-cms-node")
     ? markup
     : `<div data-cms-node="${escape(block.id)}">${markup}</div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:24px;font:14px/1.5 system-ui;color:#172033;background:#f8fafc}[data-cms-node]{min-height:32px;outline:1px solid #d9e0ea;outline-offset:3px}[data-cms-slot]{margin-top:16px;padding:18px;border:2px dashed #93c5fd;border-radius:8px;display:grid;gap:4px;color:#475569}${styles}</style></head><body>${rootMarkup}<script>const blockId=${JSON.stringify(block.id)};const props=${serializedProps};const slots=${serializedSlots};const targetOrigin=()=>{try{return document.referrer?new URL(document.referrer).origin:location.origin}catch{return location.origin}};const emit=(payload)=>parent.postMessage({source:'cms-component-canvas-mutation',id:blockId,...payload},targetOrigin());document.querySelectorAll('[data-cms-prop]').forEach((node)=>{const key=node.dataset.cmsProp;if(props[key]!==undefined&&node.innerHTML!==props[key]&&node.children.length===0)node.textContent=String(props[key]);if(node.matches('[contenteditable=true]'))node.addEventListener('input',()=>emit({property:key,value:node.innerHTML}));});const root=document.querySelector('[data-cms-node]');slots.forEach((slot)=>{if(!root.querySelector('[data-cms-slot="'+CSS.escape(slot.name)+'"]')){const drop=document.createElement('div');drop.dataset.cmsSlot=slot.name;drop.dataset.cmsNode=blockId+'::slot::'+slot.name;drop.tabIndex=0;drop.innerHTML='<strong>'+String(slot.label||slot.name)+'</strong><span>Drop a component here</span>';drop.addEventListener('dragover',(event)=>{event.preventDefault();drop.dataset.dragover='true'});drop.addEventListener('dragleave',()=>delete drop.dataset.dragover);drop.addEventListener('drop',(event)=>{event.preventDefault();delete drop.dataset.dragover;const componentId=event.dataTransfer&&event.dataTransfer.getData('application/x-cms-component-id');if(componentId)emit({event:'slot-drop',slot:slot.name,componentId})});root.append(drop);}});emit({event:'ready'});</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;padding:24px;font:14px/1.5 system-ui;color:#172033;background:#f8fafc}[data-cms-node]{min-height:32px;outline:1px solid #d9e0ea;outline-offset:3px}[data-cms-slot]{margin-top:16px;padding:18px;border:2px dashed #93c5fd;border-radius:8px;display:grid;gap:4px;color:#475569}${styles}</style></head><body>${rootMarkup}<script>const blockId=${serializedBlockId};const props=${serializedProps};const slots=${serializedSlots};const targetOrigin=()=>{try{return document.referrer?new URL(document.referrer).origin:location.origin}catch{return location.origin}};const emit=(payload)=>parent.postMessage({source:'cms-component-canvas-mutation',id:blockId,...payload},targetOrigin());document.querySelectorAll('[data-cms-prop]').forEach((node)=>{const key=node.dataset.cmsProp;if(props[key]!==undefined&&node.innerHTML!==props[key]&&node.children.length===0)node.textContent=String(props[key]);if(node.matches('[contenteditable=true]'))node.addEventListener('input',()=>emit({property:key,value:node.innerHTML}));});const root=document.querySelector('[data-cms-node]');slots.forEach((slot)=>{if(!root.querySelector('[data-cms-slot="'+CSS.escape(slot.name)+'"]')){const drop=document.createElement('div');drop.dataset.cmsSlot=slot.name;drop.dataset.cmsNode=blockId+'::slot::'+slot.name;drop.tabIndex=0;const label=document.createElement('strong');label.textContent=String(slot.label||slot.name);const hint=document.createElement('span');hint.textContent='Drop a component here';drop.append(label,hint);drop.addEventListener('dragover',(event)=>{event.preventDefault();drop.dataset.dragover='true'});drop.addEventListener('dragleave',()=>delete drop.dataset.dragover);drop.addEventListener('drop',(event)=>{event.preventDefault();delete drop.dataset.dragover;const componentId=event.dataTransfer&&event.dataTransfer.getData('application/x-cms-component-id');if(componentId)emit({event:'slot-drop',slot:slot.name,componentId})});root.append(drop);}});emit({event:'ready'});</script></body></html>`;
 }
 const PROPERTY_KEYS: Record<string, string[]> = {
-  hero: ["title", "subtitle", "imageUrl", "mediaType", "videoUrl", "href", "ctaLabel"],
-  rich_text: ["html"], image: ["src", "alt"], two_column: ["html", "imageUrl", "imageAlt", "reverse"],
-  cta_row: ["label", "href"], trust_strip: ["col1Title", "col1Body", "col2Title", "col2Body", "col3Title", "col3Body"],
-  contact_strip: ["phone", "email", "hours"], newsletter: ["heading", "subtitle", "actionUrl"],
-  featured_products: ["slugs"], home_tiles: ["tiles"], latest_section: ["title", "viewAllLabel", "viewAllHref"],
-  faq: ["items"], video: ["url", "title"], divider: ["heightPx"],
+  hero: [
+    "title",
+    "subtitle",
+    "imageUrl",
+    "mediaType",
+    "videoUrl",
+    "href",
+    "ctaLabel",
+  ],
+  rich_text: ["html"],
+  image: ["src", "alt"],
+  two_column: ["html", "imageUrl", "imageAlt", "reverse"],
+  cta_row: ["label", "href"],
+  trust_strip: [
+    "col1Title",
+    "col1Body",
+    "col2Title",
+    "col2Body",
+    "col3Title",
+    "col3Body",
+  ],
+  contact_strip: ["phone", "email", "hours"],
+  newsletter: ["heading", "subtitle", "actionUrl"],
+  featured_products: ["slugs"],
+  home_tiles: ["tiles"],
+  latest_section: ["title", "viewAllLabel", "viewAllHref"],
+  faq: ["items"],
+  video: ["url", "title"],
+  divider: ["heightPx"],
 };
 
 const LAYOUT_FIELDS = [
-  ["maxWidth", "Max width"], ["minHeight", "Min height"],
-  ["paddingBlock", "Vertical padding"], ["paddingInline", "Horizontal padding"],
-  ["marginBlock", "Vertical margin"], ["marginInline", "Horizontal margin"],
-  ["display", "Display"], ["position", "Position"], ["inset", "Inset"],
-  ["fontSize", "Font size"], ["fontWeight", "Font weight"], ["color", "Text color"],
-  ["backgroundColor", "Background"], ["borderRadius", "Radius"], ["gap", "Gap"],
-  ["gridTemplateColumns", "Grid columns"], ["alignItems", "Align items"],
-  ["justifyContent", "Justify content"], ["boxShadow", "Shadow"],
-  ["backgroundSize", "Background size"], ["backgroundPosition", "Background position"],
+  ["maxWidth", "Max width"],
+  ["minHeight", "Min height"],
+  ["paddingBlock", "Vertical padding"],
+  ["paddingInline", "Horizontal padding"],
+  ["marginBlock", "Vertical margin"],
+  ["marginInline", "Horizontal margin"],
+  ["display", "Display"],
+  ["position", "Position"],
+  ["inset", "Inset"],
+  ["fontSize", "Font size"],
+  ["fontWeight", "Font weight"],
+  ["color", "Text color"],
+  ["backgroundColor", "Background"],
+  ["borderRadius", "Radius"],
+  ["gap", "Gap"],
+  ["gridTemplateColumns", "Grid columns"],
+  ["alignItems", "Align items"],
+  ["justifyContent", "Justify content"],
+  ["boxShadow", "Shadow"],
+  ["backgroundSize", "Background size"],
+  ["backgroundPosition", "Background position"],
 ] as const;
 
 function propertyLabel(key: string) {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase()).replace(/^Col(\d)/, "Column $1");
+  return key
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (value) => value.toUpperCase())
+    .replace(/^Col(\d)/, "Column $1");
 }
 
 function componentChildren(block: CmsBlock): ComponentNode[] {
-  const child = (key: string, label: string, propertyKey?: string, arrayIndex?: number): ComponentNode => ({ id: componentChildId(block, key), label, blockId: block.id, depth: 1, propertyKey, arrayIndex });
-  return (PROPERTY_KEYS[block.type] ?? []).map((key) => child(key, propertyLabel(key), key));
+  const child = (
+    key: string,
+    label: string,
+    propertyKey?: string,
+    arrayIndex?: number,
+  ): ComponentNode => ({
+    id: componentChildId(block, key),
+    label,
+    blockId: block.id,
+    depth: 1,
+    propertyKey,
+    arrayIndex,
+  });
+  return (PROPERTY_KEYS[block.type] ?? []).map((key) =>
+    child(key, propertyLabel(key), key),
+  );
 }
 
 function buildComponentTree(blocks: CmsBlock[]): ComponentNode[] {
@@ -1065,21 +1327,40 @@ function ComponentTree({
                 aria-label={`${expandedIds.has(node.id) ? "Collapse" : "Expand"} ${node.label}`}
                 aria-expanded={expandedIds.has(node.id)}
               >
-                {expandedIds.has(node.id) ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                {expandedIds.has(node.id) ? (
+                  <ChevronDown className="size-3" />
+                ) : (
+                  <ChevronRight className="size-3" />
+                )}
               </button>
-            ) : <span className="size-6 shrink-0" aria-hidden="true" />}
+            ) : (
+              <span className="size-6 shrink-0" aria-hidden="true" />
+            )}
             <button
               type="button"
               onClick={() => onSelect(node)}
               className={`flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1.5 text-left ${selectedId === node.id ? "font-medium text-slate-900" : "text-slate-600 hover:text-slate-900"}`}
             >
-              <span className="size-1.5 shrink-0 rounded-full bg-slate-300" aria-hidden="true" />
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-slate-300"
+                aria-hidden="true"
+              />
               <span className="min-w-0 flex-1 truncate">{node.label}</span>
-              {node.fixed ? <span className="text-[9px] text-slate-400">global</span> : null}
+              {node.fixed ? (
+                <span className="text-[9px] text-slate-400">global</span>
+              ) : null}
             </button>
           </div>
           {node.children?.length ? (
-            expandedIds.has(node.id) ? <ComponentTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} expandedIds={expandedIds} onToggle={onToggle} /> : null
+            expandedIds.has(node.id) ? (
+              <ComponentTree
+                nodes={node.children}
+                selectedId={selectedId}
+                onSelect={onSelect}
+                expandedIds={expandedIds}
+                onToggle={onToggle}
+              />
+            ) : null
           ) : null}
         </div>
       ))}
@@ -1132,30 +1413,48 @@ function LayoutFields({
             className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
             value={text(accessibility.semanticTag, "section")}
             onChange={(event) =>
-              onAccessibilityChange({ ...accessibility, semanticTag: event.target.value })
+              onAccessibilityChange({
+                ...accessibility,
+                semanticTag: event.target.value,
+              })
             }
             disabled={disabled}
           >
-            {['div', 'section', 'article', 'header', 'nav', 'main', 'aside', 'footer'].map((tag) => (
-              <option key={tag} value={tag}>{tag}</option>
+            {[
+              "div",
+              "section",
+              "article",
+              "header",
+              "nav",
+              "main",
+              "aside",
+              "footer",
+            ].map((tag) => (
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
             ))}
           </select>
         </label>
-        {['ariaLabel', 'ariaDescription', 'role', 'tabIndex'].map((key) => (
+        {["ariaLabel", "ariaDescription", "role", "tabIndex"].map((key) => (
           <label key={key} className="text-[10px] text-slate-500">
             {propertyLabel(key)}
             <input
               className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
               value={text(accessibility[key])}
               onChange={(event) =>
-                onAccessibilityChange({ ...accessibility, [key]: event.target.value })
+                onAccessibilityChange({
+                  ...accessibility,
+                  [key]: event.target.value,
+                })
               }
               disabled={disabled}
             />
           </label>
         ))}
         <p className="col-span-2 text-[10px] leading-4 text-slate-400">
-          Responsive overrides are stored with the component instance and applied by the storefront preview.
+          Responsive overrides are stored with the component instance and
+          applied by the storefront preview.
         </p>
       </div>
     </details>
@@ -1186,7 +1485,8 @@ function BlockPropertyFields({
   if (!keys.length)
     return (
       <p className="text-xs text-slate-500">
-        This custom block has no typed controls. Use the structured settings below.
+        This custom block has no typed controls. Use the structured settings
+        below.
       </p>
     );
   return (
@@ -1202,26 +1502,44 @@ function BlockPropertyFields({
           return (() => {
             const arrayIndex = focus.arrayIndex;
             const item = rawValue[arrayIndex];
-            if (key === "tiles" && item && typeof item === "object" && !Array.isArray(item)) {
+            if (
+              key === "tiles" &&
+              item &&
+              typeof item === "object" &&
+              !Array.isArray(item)
+            ) {
               const tile = item as Record<string, unknown>;
               return (
-                <div key={key} className="space-y-2 rounded border border-slate-200 bg-slate-50 p-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Category tile {arrayIndex + 1}</p>
-                  {(["title", "subtitle", "linkLabel", "href"] as const).map((field) => (
-                    <label key={field} className="block text-[11px] text-slate-500">
-                      {propertyLabel(field)}
-                      <input
-                        className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                        value={text(tile[field])}
-                        onChange={(event) => {
-                          const next = [...rawValue];
-                          next[arrayIndex] = { ...tile, [field]: event.target.value };
-                          onChange(key, next);
-                        }}
-                        disabled={disabled}
-                      />
-                    </label>
-                  ))}
+                <div
+                  key={key}
+                  className="space-y-2 rounded border border-slate-200 bg-slate-50 p-2.5"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Category tile {arrayIndex + 1}
+                  </p>
+                  {(["title", "subtitle", "linkLabel", "href"] as const).map(
+                    (field) => (
+                      <label
+                        key={field}
+                        className="block text-[11px] text-slate-500"
+                      >
+                        {propertyLabel(field)}
+                        <input
+                          className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                          value={text(tile[field])}
+                          onChange={(event) => {
+                            const next = [...rawValue];
+                            next[arrayIndex] = {
+                              ...tile,
+                              [field]: event.target.value,
+                            };
+                            onChange(key, next);
+                          }}
+                          disabled={disabled}
+                        />
+                      </label>
+                    ),
+                  )}
                   <label className="block text-[11px] text-slate-500">
                     Background image URL
                     <input
@@ -1229,7 +1547,10 @@ function BlockPropertyFields({
                       value={text(tile.imageUrl)}
                       onChange={(event) => {
                         const next = [...rawValue];
-                        next[arrayIndex] = { ...tile, imageUrl: event.target.value };
+                        next[arrayIndex] = {
+                          ...tile,
+                          imageUrl: event.target.value,
+                        };
                         onChange(key, next);
                       }}
                       disabled={disabled}
@@ -1237,7 +1558,12 @@ function BlockPropertyFields({
                     />
                   </label>
                   {onPickMedia ? (
-                    <button type="button" className="h-8 w-full rounded border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={() => onPickMedia(`tiles:${arrayIndex}`)} disabled={disabled}>
+                    <button
+                      type="button"
+                      className="h-8 w-full rounded border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                      onClick={() => onPickMedia(`tiles:${arrayIndex}`)}
+                      disabled={disabled}
+                    >
                       Choose from catalog media
                     </button>
                   ) : null}
@@ -1276,7 +1602,7 @@ function BlockPropertyFields({
                 onChange={(event) => onChange(key, event.target.checked)}
                 disabled={disabled}
               />
-                {registryProp?.label ?? propertyLabel(key)}
+              {registryProp?.label ?? propertyLabel(key)}
             </label>
           );
         if (Array.isArray(value))
@@ -1349,8 +1675,14 @@ function BlockPropertyFields({
                 }
               />
             )}
-            {onPickMedia && (key === "imageUrl" || key === "videoUrl" || key === "src") ? (
-              <button type="button" className="mt-1 h-8 w-full rounded border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50" onClick={() => onPickMedia(key)} disabled={disabled}>
+            {onPickMedia &&
+            (key === "imageUrl" || key === "videoUrl" || key === "src") ? (
+              <button
+                type="button"
+                className="mt-1 h-8 w-full rounded border border-slate-200 bg-slate-50 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                onClick={() => onPickMedia(key)}
+                disabled={disabled}
+              >
                 Choose from catalog media
               </button>
             ) : null}
@@ -1377,7 +1709,8 @@ function VisualPropertyFields({
   return (
     <div className="space-y-3">
       <p className="text-[10px] leading-4 text-slate-400">
-        Properties are copied from the Vvveb component registration and apply to the source markup.
+        Properties are copied from the Vvveb component registration and apply to
+        the source markup.
       </p>
       {definition.properties.map((property) => {
         const raw = block.props[property.key];
@@ -1387,11 +1720,16 @@ function VisualPropertyFields({
           : property.validValues?.map((item) => ({ value: item, text: item }));
         if (property.inputtype === "checkbox") {
           return (
-            <label key={property.key} className="flex items-center gap-2 text-xs text-slate-600">
+            <label
+              key={property.key}
+              className="flex items-center gap-2 text-xs text-slate-600"
+            >
               <input
                 type="checkbox"
                 checked={Boolean(raw)}
-                onChange={(event) => onChange(property.key, event.target.checked)}
+                onChange={(event) =>
+                  onChange(property.key, event.target.checked)
+                }
                 disabled={disabled}
               />
               {property.name}
@@ -1400,7 +1738,10 @@ function VisualPropertyFields({
         }
         if (property.inputtype === "select" && options?.length) {
           return (
-            <label key={property.key} className="block text-[11px] text-slate-500">
+            <label
+              key={property.key}
+              className="block text-[11px] text-slate-500"
+            >
               {property.name}
               <select
                 className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
@@ -1409,15 +1750,21 @@ function VisualPropertyFields({
                 disabled={disabled}
               >
                 {options.map((option) => (
-                  <option key={option.value} value={option.value}>{option.text}</option>
+                  <option key={option.value} value={option.value}>
+                    {option.text}
+                  </option>
                 ))}
               </select>
             </label>
           );
         }
-        const multiline = property.inputtype === "textarea" || property.key === "innerHTML";
+        const multiline =
+          property.inputtype === "textarea" || property.key === "innerHTML";
         return (
-          <label key={property.key} className="block text-[11px] text-slate-500">
+          <label
+            key={property.key}
+            className="block text-[11px] text-slate-500"
+          >
             {property.name}
             {multiline ? (
               <textarea
@@ -1428,7 +1775,13 @@ function VisualPropertyFields({
               />
             ) : (
               <input
-                type={property.inputtype === "number" ? "number" : property.inputtype === "url" ? "url" : "text"}
+                type={
+                  property.inputtype === "number"
+                    ? "number"
+                    : property.inputtype === "url"
+                      ? "url"
+                      : "text"
+                }
                 className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
                 value={String(value)}
                 onChange={(event) => onChange(property.key, event.target.value)}
@@ -1466,20 +1819,70 @@ type CmsToolId =
   | "commerce";
 
 const CatalogMediaPickerDialog = dynamic(
-  () => import("@/components/catalog/CatalogMediaPickerDialog").then((module) => module.CatalogMediaPickerDialog),
+  () =>
+    import("@/components/catalog/CatalogMediaPickerDialog").then(
+      (module) => module.CatalogMediaPickerDialog,
+    ),
   { ssr: false },
 );
-const CmsPagesManager = dynamic(() => import("./CmsPagesManager").then((module) => module.CmsPagesManager), { ssr: false });
-const CmsSiteMapPanel = dynamic(() => import("./CmsSiteMapPanel").then((module) => module.CmsSiteMapPanel), { ssr: false });
-const CmsNavigationEditor = dynamic(() => import("./CmsNavigationEditor").then((module) => module.CmsNavigationEditor), { ssr: false });
-const CmsAnnouncementEditor = dynamic(() => import("./CmsAnnouncementEditor").then((module) => module.CmsAnnouncementEditor), { ssr: false });
-const CmsCategoryEditor = dynamic(() => import("./CmsCategoryEditor").then((module) => module.CmsCategoryEditor), { ssr: false });
-const CmsMediaManager = dynamic(() => import("./CmsMediaManager").then((module) => module.CmsMediaManager), { ssr: false });
-const CmsBlogManager = dynamic(() => import("./CmsBlogManager").then((module) => module.CmsBlogManager), { ssr: false });
-const CmsFormsTable = dynamic(() => import("./CmsFormsTable").then((module) => module.CmsFormsTable), { ssr: false });
-const CmsRedirectsManager = dynamic(() => import("./CmsRedirectsManager").then((module) => module.CmsRedirectsManager), { ssr: false });
-const CmsExperimentsManager = dynamic(() => import("./CmsExperimentsManager").then((module) => module.CmsExperimentsManager), { ssr: false });
-const CmsCommerceSearch = dynamic(() => import("./CmsCommerceSearch").then((module) => module.CmsCommerceSearch), { ssr: false });
+const CmsPagesManager = dynamic(
+  () => import("./CmsPagesManager").then((module) => module.CmsPagesManager),
+  { ssr: false },
+);
+const CmsSiteMapPanel = dynamic(
+  () => import("./CmsSiteMapPanel").then((module) => module.CmsSiteMapPanel),
+  { ssr: false },
+);
+const CmsNavigationEditor = dynamic(
+  () =>
+    import("./CmsNavigationEditor").then(
+      (module) => module.CmsNavigationEditor,
+    ),
+  { ssr: false },
+);
+const CmsAnnouncementEditor = dynamic(
+  () =>
+    import("./CmsAnnouncementEditor").then(
+      (module) => module.CmsAnnouncementEditor,
+    ),
+  { ssr: false },
+);
+const CmsCategoryEditor = dynamic(
+  () =>
+    import("./CmsCategoryEditor").then((module) => module.CmsCategoryEditor),
+  { ssr: false },
+);
+const CmsMediaManager = dynamic(
+  () => import("./CmsMediaManager").then((module) => module.CmsMediaManager),
+  { ssr: false },
+);
+const CmsBlogManager = dynamic(
+  () => import("./CmsBlogManager").then((module) => module.CmsBlogManager),
+  { ssr: false },
+);
+const CmsFormsTable = dynamic(
+  () => import("./CmsFormsTable").then((module) => module.CmsFormsTable),
+  { ssr: false },
+);
+const CmsRedirectsManager = dynamic(
+  () =>
+    import("./CmsRedirectsManager").then(
+      (module) => module.CmsRedirectsManager,
+    ),
+  { ssr: false },
+);
+const CmsExperimentsManager = dynamic(
+  () =>
+    import("./CmsExperimentsManager").then(
+      (module) => module.CmsExperimentsManager,
+    ),
+  { ssr: false },
+);
+const CmsCommerceSearch = dynamic(
+  () =>
+    import("./CmsCommerceSearch").then((module) => module.CmsCommerceSearch),
+  { ssr: false },
+);
 
 const CMS_TOOL_SURFACES: Record<CmsToolId, ComponentType> = {
   pages: CmsPagesManager,
@@ -1551,15 +1954,23 @@ export function CmsPageBuilder({
 }) {
   const blocks = useMemo(() => normalize(value), [value]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
-  const [device, setDevice] = useState<"desktop" | "laptop" | "tablet-landscape" | "tablet" | "mobile" | null>(
-    "desktop",
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(
+    null,
   );
+  const [device, setDevice] = useState<
+    "desktop" | "laptop" | "tablet-landscape" | "tablet" | "mobile" | null
+  >("desktop");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [leftTab, setLeftTab] = useState<"pages" | "components" | "sections" | "layers" | "files" | "configuration" | "ai">(
-    "pages",
-  );
+  const [leftTab, setLeftTab] = useState<
+    | "pages"
+    | "components"
+    | "sections"
+    | "layers"
+    | "files"
+    | "configuration"
+    | "ai"
+  >("pages");
   const [activeTool, setActiveTool] = useState<CmsToolId | null>(null);
   // Kept internally for the existing component-definition editor state; the
   // reference workflow exposes components from the Components panel rather
@@ -1567,7 +1978,9 @@ export function CmsPageBuilder({
   const [builderMode, setBuilderMode] = useState<"instance" | "canvas">(
     "instance",
   );
-  const [componentCanvasId, _setComponentCanvasId] = useState<string | null>(null);
+  const [componentCanvasId, _setComponentCanvasId] = useState<string | null>(
+    null,
+  );
   const [zoom, setZoom] = useState(100);
   const [breakpointsOpen, setBreakpointsOpen] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -1575,10 +1988,14 @@ export function CmsPageBuilder({
   const [styleTheme, setStyleTheme] = useState<StyleTheme>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [rightTab, setRightTab] = useState<
-    "content" | "layout" | "style" | "responsive" | "advanced" | "code" | "settings"
-  >(
-    "content",
-  );
+    | "content"
+    | "layout"
+    | "style"
+    | "responsive"
+    | "advanced"
+    | "code"
+    | "settings"
+  >("content");
   const [history, setHistory] = useState<CmsHistory>(() => createCmsHistory());
   const [presets, setPresets] = useState<CmsPageBlockPresetRow[]>([]);
   const [presetId, setPresetId] = useState("");
@@ -1588,39 +2005,56 @@ export function CmsPageBuilder({
   const [paletteTab, setPaletteTab] = useState<"components" | "sections">(
     "components",
   );
-  const [sectionPaletteTab, setSectionPaletteTab] = useState<"sections" | "page-sections">("sections");
+  const [sectionPaletteTab, setSectionPaletteTab] = useState<
+    "sections" | "page-sections"
+  >("sections");
   const [paletteQuery, setPaletteQuery] = useState("");
-  const [configurationTab, setConfigurationTab] = useState<"styles" | "variables">("styles");
+  const [configurationTab, setConfigurationTab] = useState<
+    "styles" | "variables"
+  >("styles");
   const [stylesBaseOpen, setStylesBaseOpen] = useState(true);
   const [configurationQuery, setConfigurationQuery] = useState("");
   const [assistantPrompt, setAssistantPrompt] = useState("");
-  const [assistantAttachment, setAssistantAttachment] = useState<string | null>(null);
+  const [assistantAttachment, setAssistantAttachment] = useState<string | null>(
+    null,
+  );
   const [voiceListening, setVoiceListening] = useState(false);
   const [assistantOptionsOpen, setAssistantOptionsOpen] = useState(false);
   const [assistantSessionsOpen, setAssistantSessionsOpen] = useState(false);
   const [assistantShowThinking, setAssistantShowThinking] = useState(true);
   const [assistantShowToolCalls, setAssistantShowToolCalls] = useState(false);
-  const [assistantAllowScreenshots, setAssistantAllowScreenshots] = useState(true);
+  const [assistantAllowScreenshots, setAssistantAllowScreenshots] =
+    useState(true);
   const [assistantContextOpen, setAssistantContextOpen] = useState(false);
   const [assistantUsageOpen, setAssistantUsageOpen] = useState(false);
-  const [cssVariables, setCssVariables] = useState<ColorPalette>({ font: {}, color: {}, dimensions: {} });
+  const [cssVariables, setCssVariables] = useState<ColorPalette>({
+    font: {},
+    color: {},
+    dimensions: {},
+  });
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [collapsedPaletteGroups, setCollapsedPaletteGroups] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [collapsedPaletteGroups, setCollapsedPaletteGroups] = useState<
+    Set<string>
+  >(() => new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
   const [revisionRows, setRevisionRows] = useState<CmsRevisionRow[]>([]);
-  const [mediaPickerTarget, setMediaPickerTarget] = useState<string | null>(null);
-  const [propsDraft, setPropsDraft] = useState("");
-  const [componentDefinitions, setComponentDefinitions] = useState<CmsComponentDefinition[]>(
-    () => listCmsComponentDefinitions(),
+  const [mediaPickerTarget, setMediaPickerTarget] = useState<string | null>(
+    null,
   );
-  const [componentVersions, setComponentVersions] = useState<Record<string, number>>({});
-  const [componentStatuses, setComponentStatuses] = useState<Record<string, string>>({});
+  const [propsDraft, setPropsDraft] = useState("");
+  const [componentDefinitions, setComponentDefinitions] = useState<
+    CmsComponentDefinition[]
+  >(() => listCmsComponentDefinitions());
+  const [componentVersions, setComponentVersions] = useState<
+    Record<string, number>
+  >({});
+  const [componentStatuses, setComponentStatuses] = useState<
+    Record<string, string>
+  >({});
   const [canvasDraft, setCanvasDraft] = useState("");
   const [canvasVariantId, setCanvasVariantId] = useState<string | null>(null);
   const [canvasSavePending, setCanvasSavePending] = useState(false);
@@ -1630,9 +2064,12 @@ export function CmsPageBuilder({
   const [selectedPreview, setSelectedPreview] = useState<PreviewTarget | null>(
     null,
   );
+  const visibleSelectedPreview =
+    selectedPreview && selectedPreview.id === selectedComponentId
+      ? selectedPreview
+      : null;
   const rawPreviewRef = useRef<PreviewTarget | null>(null);
   const rawHoveredPreviewRef = useRef<PreviewTarget | null>(null);
-  const styleManagerRef = useRef<StyleManager | null>(null);
   const selectedMessageKeyRef = useRef("");
   const sendDraftRef = useRef<(() => void) | null>(null);
   const previewReadyRef = useRef(false);
@@ -1640,65 +2077,47 @@ export function CmsPageBuilder({
   const surfaceRef = useRef<HTMLDivElement>(null);
   const assistantFileInputRef = useRef<HTMLInputElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const liveCanvasRef = useRef<LiveCanvasEditor | null>(null);
   const canvasScrollRef = useRef<HTMLElement>(null);
   const canvasVisualRef = useRef<HTMLIFrameElement>(null);
-  const addInstanceToSlotRef = useRef<((_slot: string, _componentId: string) => void) | null>(null);
+  const addInstanceToSlotRef = useRef<
+    ((_slot: string, _componentId: string) => void) | null
+  >(null);
   const addBlockRef = useRef<((_type: string) => void) | null>(null);
   const addVisualPrimitiveRef = useRef<((_type: string) => void) | null>(null);
   const blocksRef = useRef(blocks);
   const componentNodesRef = useRef<ComponentNode[]>([]);
-  const commitRef = useRef<((..._args: [CmsBlock[], string?, CmsMutationShape?]) => void) | null>(null);
+  const commitRef = useRef<
+    ((..._args: [CmsBlock[], string?, CmsMutationShape?]) => void) | null
+  >(null);
   const previewOriginRef = useRef("");
   const zoomRef = useRef(zoom);
   const refreshCssVariables = useCallback(() => {
-    const document = iframeRef.current?.contentDocument;
-    if (!document) return;
-    try {
-      setCssVariables(
-        getAllCSSVariableNames(
-          Array.from(document.styleSheets) as Parameters<typeof getAllCSSVariableNames>[0],
-        ),
-      );
-    } catch {
-      // Stylesheets from a different origin are unavailable to the editor.
-    }
+    const frame = iframeRef.current;
+    if (!frame) return;
+    frame.contentWindow?.postMessage(
+      { source: "cms-builder-css-request" },
+      cmsPreviewTargetOrigin(frame, previewOriginRef.current),
+    );
   }, []);
   const applyEditorFrameState = useCallback(() => {
-    const document = iframeRef.current?.contentDocument;
-    if (!document) return;
-
-    const manager = styleManagerRef.current ?? new StyleManager();
-    styleManagerRef.current = manager;
-    const breakpointByDevice = {
-      mobile: "sm",
-      tablet: "md",
-      "tablet-landscape": "lg",
-      laptop: "xl",
-      desktop: "xxl",
-    } as const;
-    manager.currentBreakpoint = device ? breakpointByDevice[device] : "none";
-    manager.setState(styleState);
-    manager.setTheme(styleTheme);
-
-    const html = document.documentElement;
-    if (styleTheme) html.setAttribute("data-bs-theme", styleTheme);
-    else html.removeAttribute("data-bs-theme");
-
-    const styleId = "vvveb-show-hidden-elements";
-    document.getElementById(styleId)?.remove();
-    if (showHidden) {
-      const style = document.createElement("style");
-      style.id = styleId;
-      style.textContent =
-        '[hidden],[style*="display: none"],[style*="display:none"]' +
-        "{display:block!important;visibility:visible!important;opacity:.55!important;outline:1px dashed #f59e0b!important}";
-      document.head.append(style);
-    }
-  }, [device, showHidden, styleState, styleTheme]);
+    const frame = iframeRef.current;
+    if (!frame) return;
+    frame.contentWindow?.postMessage(
+      {
+        source: "cms-builder-frame-state",
+        state: styleState,
+        theme: styleTheme,
+        showHidden,
+      },
+      cmsPreviewTargetOrigin(frame, previewOriginRef.current),
+    );
+  }, [showHidden, styleState, styleTheme]);
   const componentTree = useMemo(() => buildComponentTree(blocks), [blocks]);
   const revisions = useMemo(
-    () => Array.from(new Map(revisionRows.map((row) => [row.revision, row])).values()),
+    () =>
+      Array.from(
+        new Map(revisionRows.map((row) => [row.revision, row])).values(),
+      ),
     [revisionRows],
   );
   const restoreRevision = useCallback(
@@ -1710,7 +2129,9 @@ export function CmsPageBuilder({
       for (const row of laterMutations) {
         const restored = applyCmsMutation(next, row.mutation, "before");
         if (!restored) {
-          setMessage(`Revision ${revision} cannot be restored from the saved mutation history.`);
+          setMessage(
+            `Revision ${revision} cannot be restored from the saved mutation history.`,
+          );
           return;
         }
         next = restored;
@@ -1718,7 +2139,9 @@ export function CmsPageBuilder({
       onChange(next);
       setHistory(createCmsHistory());
       setRevisionsOpen(false);
-      setMessage(`Revision ${revision} loaded. Save the page to keep this version.`);
+      setMessage(
+        `Revision ${revision} loaded. Save the page to keep this version.`,
+      );
     },
     [blocks, onChange, revisionRows],
   );
@@ -1748,23 +2171,27 @@ export function CmsPageBuilder({
     if (!revisionsOpen || !currentPageId) return;
     let active = true;
     setRevisionsLoading(true);
-    void fetch(`/api/admin/cms/pages/${encodeURIComponent(currentPageId)}/mutations`)
-      .then(async (response) => {
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/cms/pages/${encodeURIComponent(currentPageId)}/mutations`,
+          { signal: controller.signal },
+        );
         if (!response.ok) throw new Error("Unable to load revisions");
-        const payload = (await response.json()) as { data?: CmsRevisionRow[] };
-        return payload.data ?? [];
-      })
-      .then((data) => {
-        if (active) setRevisionRows(data);
-      })
-      .catch(() => {
+        const payload = await readResponseJson<{
+          data?: CmsRevisionRow[];
+        } | null>(response, null);
+        if (active) setRevisionRows(payload?.data ?? []);
+      } catch {
         if (active) setRevisionRows([]);
-      })
-      .finally(() => {
+      } finally {
         if (active) setRevisionsLoading(false);
-      });
+      }
+    })();
     return () => {
       active = false;
+      controller.abort();
     };
   }, [currentPageId, revisionsOpen]);
   const selectedEditorBlock = useMemo(
@@ -1776,7 +2203,10 @@ export function CmsPageBuilder({
             componentId: selectedInstance.componentId,
             variantId: selectedInstance.variantId,
             props: resolvedComponentProps(
-              resolveCmsComponentDefinition(componentDefinitions, selectedInstance.componentId),
+              resolveCmsComponentDefinition(
+                componentDefinitions,
+                selectedInstance.componentId,
+              ),
               selectedInstance.variantId,
               selectedInstance.props,
             ),
@@ -1787,27 +2217,22 @@ export function CmsPageBuilder({
   );
   const selectedPreviewFocus = useMemo<ComponentNode | undefined>(() => {
     if (
-      !selectedPreview?.propertyKey ||
-      selectedPreview.arrayIndex === null ||
-      selectedPreview.arrayIndex === undefined ||
+      !visibleSelectedPreview?.propertyKey ||
+      visibleSelectedPreview.arrayIndex === null ||
+      visibleSelectedPreview.arrayIndex === undefined ||
       !selected
     ) {
       return undefined;
     }
     return {
-      id: selectedPreview.parentId ?? selectedPreview.id,
-      label: selectedPreview.label,
+      id: visibleSelectedPreview.parentId ?? visibleSelectedPreview.id,
+      label: visibleSelectedPreview.label,
       blockId: selected.id,
       depth: 1,
-      propertyKey: selectedPreview.propertyKey,
-      arrayIndex: selectedPreview.arrayIndex,
+      propertyKey: visibleSelectedPreview.propertyKey,
+      arrayIndex: visibleSelectedPreview.arrayIndex,
     };
-  }, [selected, selectedPreview]);
-  useEffect(() => {
-    setSelectedPreview((current) =>
-      current && current.id === selectedComponentId ? current : null,
-    );
-  }, [selectedComponentId]);
+  }, [selected, visibleSelectedPreview]);
   const grouped = useMemo(
     () =>
       BLOCK_TYPES.reduce<Record<string, (typeof BLOCK_TYPES)[number][]>>(
@@ -1837,7 +2262,8 @@ export function CmsPageBuilder({
         (acc, definition) => {
           const group = sourcePaletteGroup(definition.type);
           const items = (acc[group] ??= []);
-          if (!items.some((item) => item.type === definition.type)) items.push(definition);
+          if (!items.some((item) => item.type === definition.type))
+            items.push(definition);
           return acc;
         },
         {},
@@ -1861,7 +2287,9 @@ export function CmsPageBuilder({
     const id =
       selectedEditorBlock?.componentId ??
       selectedEditorBlock?.type.replaceAll("_", "-");
-    return id ? resolveCmsComponentDefinition(componentDefinitions, id) : undefined;
+    return id
+      ? resolveCmsComponentDefinition(componentDefinitions, id)
+      : undefined;
   }, [componentDefinitions, selectedEditorBlock]);
   const selectedVisualDefinition = useMemo(
     () => visualDefinitionForBlock(selectedEditorBlock),
@@ -1876,46 +2304,69 @@ export function CmsPageBuilder({
   );
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/admin/cms/components", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const payload = (await response.json().catch(() => null)) as {
+    void (async () => {
+      try {
+        const response = await fetch("/api/admin/cms/components", {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await readResponseJson<{
           data?: CmsComponentDefinition[];
-          meta?: { records?: Array<{ id: string; version: number; status?: string }> };
-        } | null;
-        if (!payload?.data?.length) return null;
+          meta?: {
+            records?: Array<{ id: string; version: number; status?: string }>;
+          };
+        } | null>(response, null);
+        if (!payload?.data?.length) return;
         setComponentDefinitions(payload.data);
         setComponentVersions(
           Object.fromEntries(
-            (payload.meta?.records ?? []).map((record) => [record.id, record.version]),
+            (payload.meta?.records ?? []).map((record) => [
+              record.id,
+              record.version,
+            ]),
           ),
         );
         setComponentStatuses(
           Object.fromEntries(
-            (payload.meta?.records ?? []).map((record) => [record.id, record.status ?? "draft"]),
+            (payload.meta?.records ?? []).map((record) => [
+              record.id,
+              record.status ?? "draft",
+            ]),
           ),
         );
-      })
-      .catch(() => undefined);
+      } catch {
+        // The editor can continue with the local component registry when the CMS API is unavailable.
+      }
+    })();
     return () => controller.abort();
   }, []);
   useEffect(() => {
-    setCanvasDraft(canvasDefinition ? JSON.stringify(canvasDefinition, null, 2) : "");
-    setCanvasVariantId(canvasDefinition?.defaultVariantId ?? canvasDefinition?.variants[0]?.id ?? null);
+    setCanvasDraft(
+      canvasDefinition ? JSON.stringify(canvasDefinition, null, 2) : "",
+    );
+    setCanvasVariantId(
+      canvasDefinition?.defaultVariantId ??
+        canvasDefinition?.variants[0]?.id ??
+        null,
+    );
   }, [canvasDefinition]);
   const canvasDraftDefinition = useMemo<CmsComponentDefinition | null>(() => {
     try {
       const parsed = JSON.parse(canvasDraft) as unknown;
       return parsed && typeof parsed === "object" && !Array.isArray(parsed)
         ? (parsed as CmsComponentDefinition)
-        : canvasDefinition ?? null;
+        : (canvasDefinition ?? null);
     } catch {
       return canvasDefinition ?? null;
     }
   }, [canvasDefinition, canvasDraft]);
   const canvasVisualBlock = useMemo<CmsBlock | null>(() => {
     if (!canvasDraftDefinition) return null;
-    const variantId = canvasVariantId ?? canvasDraftDefinition.defaultVariantId ?? canvasDraftDefinition.variants[0]?.id ?? "default";
+    const variantId =
+      canvasVariantId ??
+      canvasDraftDefinition.defaultVariantId ??
+      canvasDraftDefinition.variants[0]?.id ??
+      "default";
     return {
       id: `canvas-${canvasDraftDefinition.id}-${variantId}`,
       type: canvasDraftDefinition.id.replaceAll("-", "_"),
@@ -1930,7 +2381,10 @@ export function CmsPageBuilder({
   const canvasVisualDocument = useMemo(
     () =>
       canvasVisualBlock
-        ? componentCanvasDocument(canvasVisualBlock, canvasDraftDefinition ?? undefined)
+        ? componentCanvasDocument(
+            canvasVisualBlock,
+            canvasDraftDefinition ?? undefined,
+          )
         : "",
     [canvasDraftDefinition, canvasVisualBlock],
   );
@@ -1946,63 +2400,52 @@ export function CmsPageBuilder({
       ]),
     );
   }, [canvasDefinition]);
-  const updateCanvasVisualProp = useCallback((key: string, value: string) => {
-    if (!canvasDefinition || !canvasVisualBlock) return;
-    let raw: unknown;
-    try {
-      raw = JSON.parse(canvasDraft);
-    } catch {
-      return;
-    }
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
-    const definition = raw as CmsComponentDefinition;
-    const variantId = canvasVisualBlock.variantId ?? definition.defaultVariantId ?? definition.variants[0]?.id;
-    const variant = definition.variants.find((item) => item.id === variantId);
-    if (!variant || !definition.props.some((item) => item.key === key)) return;
-    variant.props = { ...(variant.props ?? {}), [key]: value };
-    setCanvasDraft(JSON.stringify(definition, null, 2));
-  }, [canvasDefinition, canvasDraft, canvasVisualBlock]);
+  const updateCanvasVisualProp = useCallback(
+    (key: string, value: string) => {
+      if (!canvasDefinition || !canvasVisualBlock) return;
+      let raw: unknown;
+      try {
+        raw = JSON.parse(canvasDraft);
+      } catch {
+        return;
+      }
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+      const definition = raw as CmsComponentDefinition;
+      const variantId =
+        canvasVisualBlock.variantId ??
+        definition.defaultVariantId ??
+        definition.variants[0]?.id;
+      const variant = definition.variants.find((item) => item.id === variantId);
+      if (!variant || !definition.props.some((item) => item.key === key))
+        return;
+      variant.props = { ...(variant.props ?? {}), [key]: value };
+      setCanvasDraft(JSON.stringify(definition, null, 2));
+    },
+    [canvasDefinition, canvasDraft, canvasVisualBlock],
+  );
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const frame = canvasVisualRef.current?.contentWindow;
-      if (!frame || event.source !== frame || (event.origin !== window.location.origin && event.origin !== "null")) return;
+      if (
+        !frame ||
+        event.source !== frame ||
+        (event.origin !== window.location.origin && event.origin !== "null")
+      )
+        return;
       const message = cmsComponentCanvasMutationSchema.safeParse(event.data);
       if (!message.success) return;
       if ("event" in message.data && message.data.event === "slot-drop") {
-        addInstanceToSlotRef.current?.(message.data.slot, message.data.componentId);
+        addInstanceToSlotRef.current?.(
+          message.data.slot,
+          message.data.componentId,
+        );
         return;
       }
-      if ("property" in message.data) updateCanvasVisualProp(message.data.property, message.data.value);
+      if ("property" in message.data)
+        updateCanvasVisualProp(message.data.property, message.data.value);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [updateCanvasVisualProp]);
-  useEffect(() => {
-    const frame = canvasVisualRef.current;
-    if (!frame) return;
-    let document: Document | null = null;
-    let onInput: ((_event: Event) => void) | null = null;
-    const bind = () => {
-      if (document || !frame.contentDocument?.body) return;
-      document = frame.contentDocument;
-      onInput = (event: Event) => {
-        const target = event.target instanceof HTMLElement
-          ? event.target.closest<HTMLElement>("[data-cms-prop]")
-          : null;
-        if (target?.dataset.cmsProp) updateCanvasVisualProp(target.dataset.cmsProp, target.innerText);
-      };
-      document.oninput = onInput;
-      document.onblur = onInput;
-    };
-    const timer = window.setInterval(bind, 50);
-    bind();
-    return () => {
-      window.clearInterval(timer);
-      if (document && onInput) {
-        if (document.oninput === onInput) document.oninput = null;
-        if (document.onblur === onInput) document.onblur = null;
-      }
-    };
   }, [updateCanvasVisualProp]);
   const saveCanvasDefinition = useCallback(async () => {
     let raw: unknown;
@@ -2014,17 +2457,24 @@ export function CmsPageBuilder({
     }
     const parsed = cmsComponentDefinitionSchema.safeParse(raw);
     if (!parsed.success) {
-      setMessage("Component definition is invalid. Check required fields and variants.");
+      setMessage(
+        "Component definition is invalid. Check required fields and variants.",
+      );
       return;
     }
     setCanvasSavePending(true);
     try {
-      const payload = await new UvsCmsClient(fetch, window.location.origin).saveComponentDefinition(
+      const payload = await new UvsCmsClient(
+        fetch,
+        window.location.origin,
+      ).saveComponentDefinition(
         parsed.data,
         componentVersions[parsed.data.id],
         `cms-component-${parsed.data.id}-${Date.now()}`,
       );
-      const saved = cmsComponentDefinitionSchema.parse(payload.definition) as CmsComponentDefinition;
+      const saved = cmsComponentDefinitionSchema.parse(
+        payload.definition,
+      ) as CmsComponentDefinition;
       setComponentDefinitions((current) =>
         current.some((item) => item.id === saved.id)
           ? current.map((item) => (item.id === saved.id ? saved : item))
@@ -2049,16 +2499,34 @@ export function CmsPageBuilder({
     }
     setCanvasSavePending(true);
     try {
-      const payload = await new UvsCmsClient(fetch, window.location.origin).publishComponent(
+      const payload = await new UvsCmsClient(
+        fetch,
+        window.location.origin,
+      ).publishComponent(
         canvasDefinition.id,
         version,
         `cms-component-publish-${canvasDefinition.id}-${Date.now()}`,
       );
-      const data = payload && typeof payload === "object" ? payload as { definition?: unknown; version?: number } : {};
-      const published = data.definition ? cmsComponentDefinitionSchema.parse(data.definition) as CmsComponentDefinition : canvasDefinition;
-      setComponentDefinitions((current) => current.map((item) => (item.id === published.id ? published : item)));
-      setComponentVersions((current) => ({ ...current, [published.id]: data.version ?? version }));
-      setComponentStatuses((current) => ({ ...current, [published.id]: "published" }));
+      const data =
+        payload && typeof payload === "object"
+          ? (payload as { definition?: unknown; version?: number })
+          : {};
+      const published = data.definition
+        ? (cmsComponentDefinitionSchema.parse(
+            data.definition,
+          ) as CmsComponentDefinition)
+        : canvasDefinition;
+      setComponentDefinitions((current) =>
+        current.map((item) => (item.id === published.id ? published : item)),
+      );
+      setComponentVersions((current) => ({
+        ...current,
+        [published.id]: data.version ?? version,
+      }));
+      setComponentStatuses((current) => ({
+        ...current,
+        [published.id]: "published",
+      }));
       setCanvasDraft(JSON.stringify(published, null, 2));
       setMessage("Component definition published.");
     } finally {
@@ -2069,7 +2537,7 @@ export function CmsPageBuilder({
   const commit = useCallback(
     (next: CmsBlock[], select?: string, mutation?: CmsMutationShape) => {
       const persistedMutation = persistedCmsMutation(blocks, next, mutation);
-      setHistory((current) => recordCmsCommand(current, blocks, next, persistedMutation));
+      setHistory(recordCmsCommand(history, blocks, next, persistedMutation));
       onChange(next);
       if (persistedMutation) onMutation?.(persistedMutation);
       if (select) {
@@ -2077,7 +2545,7 @@ export function CmsPageBuilder({
         setSelectedComponentId(select);
       }
     },
-    [blocks, onChange, onMutation],
+    [blocks, history, onChange, onMutation],
   );
   useEffect(() => {
     blocksRef.current = blocks;
@@ -2106,15 +2574,20 @@ export function CmsPageBuilder({
   }, [selectedEditorBlock]);
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/admin/cms/block-presets", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as { data?: CmsPageBlockPresetRow[] };
-      })
-      .then((payload) => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/admin/cms/block-presets", {
+          signal: controller.signal,
+        });
+        if (!response.ok) return;
+        const payload = await readResponseJson<{
+          data?: CmsPageBlockPresetRow[];
+        } | null>(response, null);
         if (payload) setPresets(payload.data ?? []);
-      })
-      .catch(() => undefined);
+      } catch {
+        // Presets are an enhancement; an unavailable endpoint must not block the editor.
+      }
+    })();
     return () => controller.abort();
   }, []);
   const previewOrigin = useMemo(() => {
@@ -2126,11 +2599,15 @@ export function CmsPageBuilder({
       return window.location.origin;
     }
   }, [previewUrl]);
+  const previewSandbox =
+    typeof window === "undefined"
+      ? "allow-scripts"
+      : cmsPreviewSandbox(previewOrigin, window.location.origin);
   useEffect(() => {
     previewOriginRef.current = previewOrigin;
   }, [previewOrigin]);
   const sendDomMutation = (property: string, value: string) => {
-    const target = selectedPreview;
+    const target = visibleSelectedPreview;
     if (!target?.id) return;
     const blockId = target.blockId ?? target.id.split("::", 1)[0];
     const current = blocksRef.current;
@@ -2147,88 +2624,22 @@ export function CmsPageBuilder({
     });
     setMessage("Live element change recorded.");
   };
-  const attachLiveCanvas = useCallback(() => {
-    const frame = iframeRef.current;
-    const document = frame?.contentDocument;
-    if (!document) return;
-    liveCanvasRef.current?.detach();
-    const editor = new LiveCanvasEditor(document, {
-      onSelection: (selection) => {
-        if (!selection || selection.source !== "click") return;
-        const id = selection.element.dataset.cmsId;
-        if (!id) return;
-        const blockId = id.split("::", 1)[0];
-        const iframeRect = {
-          x: selection.rect.left,
-          y: selection.rect.top,
-          width: selection.rect.width,
-          height: selection.rect.height,
-        };
-        const frameRect = iframeRef.current?.getBoundingClientRect();
-        const canvasRect = iframeRef.current?.parentElement?.getBoundingClientRect();
-        const rect = frameRect && canvasRect && iframeRef.current
-          ? mapCmsPreviewRectToCanvas(iframeRect, {
-              frameLeft: frameRect.left,
-              frameTop: frameRect.top,
-              frameWidth: frameRect.width,
-              frameHeight: frameRect.height,
-              clientWidth: iframeRef.current.clientWidth,
-              clientHeight: iframeRef.current.clientHeight,
-              canvasLeft: canvasRect.left,
-              canvasTop: canvasRect.top,
-              zoom: zoomRef.current,
-            })
-          : iframeRect;
-        rawPreviewRef.current = {
-          id,
-          blockId,
-          label: selection.element.tagName.toLowerCase(),
-          rect: iframeRect,
-          tagName: selection.element.tagName.toLowerCase(),
-          text: selection.element.textContent ?? undefined,
-          parentId: selection.element.parentElement?.dataset.cmsId ?? null,
-        };
-        setSelectedPreview((current) => ({
-          id,
-          blockId,
-          label: selection.element.tagName.toLowerCase(),
-          rect,
-          tagName: selection.element.tagName.toLowerCase(),
-          text: selection.element.textContent ?? undefined,
-          parentId: selection.element.parentElement?.dataset.cmsId ?? null,
-          propertyKey: current?.propertyKey ?? null,
-          arrayIndex: current?.arrayIndex ?? null,
-        }));
-        setSelectedId(blockId);
-        setSelectedComponentId(id);
-        setRightOpen(true);
-      },
-      onDrop: (parent, _index, componentId) => {
-        const slot = parent.dataset.cmsSlot;
-        if (slot) addInstanceToSlotRef.current?.(slot, componentId);
-        else if (componentId.startsWith("visual:")) addVisualPrimitiveRef.current?.(componentId.slice(7));
-        else addBlockRef.current?.(componentId.replaceAll("-", "_"));
-      },
-    });
-    editor.attach();
-    liveCanvasRef.current = editor;
-  }, []);
   useEffect(() => {
     const frame = iframeRef.current;
     if (!frame) return;
     const onLoad = () => {
-      attachLiveCanvas();
       refreshCssVariables();
       applyEditorFrameState();
     };
     frame.addEventListener("load", onLoad);
-    if (frame.contentDocument?.readyState === "complete") attachLiveCanvas();
+    if (frame.contentWindow) {
+      refreshCssVariables();
+      applyEditorFrameState();
+    }
     return () => {
       frame.removeEventListener("load", onLoad);
-      liveCanvasRef.current?.detach();
-      liveCanvasRef.current = null;
     };
-  }, [applyEditorFrameState, attachLiveCanvas, previewUrl, refreshCssVariables]);
+  }, [applyEditorFrameState, previewUrl, refreshCssVariables]);
   useEffect(() => {
     if (leftTab === "configuration") refreshCssVariables();
   }, [leftTab, refreshCssVariables]);
@@ -2311,8 +2722,11 @@ export function CmsPageBuilder({
       }>,
     ) => {
       const frame = iframeRef.current;
-      if (!frame || event.source !== frame.contentWindow) return;
-      if (!previewOriginRef.current || event.origin !== previewOriginRef.current) return;
+      if (
+        !frame ||
+        !previewOriginRef.current ||
+        !isCmsPreviewMessageFromFrame(event, frame, previewOriginRef.current)
+      ) return;
       const parsedMessage = cmsPreviewMessageSchema.safeParse(event.data);
       if (!parsedMessage.success) return;
       const data = parsedMessage.data as {
@@ -2336,6 +2750,11 @@ export function CmsPageBuilder({
         componentId?: string;
       };
       const { source, id, blockId, rect, label, visualPath } = data;
+      if (source === "cms-preview-css-variables") {
+        const palette = (data as { palette?: ColorPalette }).palette;
+        if (palette && typeof palette === "object") setCssVariables(palette);
+        return;
+      }
       if (source === "cms-preview-ready") {
         previewReadyRef.current = true;
         sendDraftRef.current?.();
@@ -2344,8 +2763,14 @@ export function CmsPageBuilder({
       if (source === "cms-builder-mutation") {
         const property = typeof data.prop === "string" ? data.prop : "";
         const value = typeof data.value === "string" ? data.value : "";
-        if (!id || !property || property.length > 80 || value.length > 100_000) return;
-        const next = applyPreviewMutation(blocksRef.current, id, property, value);
+        if (!id || !property || property.length > 80 || value.length > 100_000)
+          return;
+        const next = applyPreviewMutation(
+          blocksRef.current,
+          id,
+          property,
+          value,
+        );
         if (next !== blocksRef.current) {
           commitRef.current?.(next, id.split("::", 1)[0], {
             type: "set-prop",
@@ -2361,7 +2786,14 @@ export function CmsPageBuilder({
         const property = typeof data.prop === "string" ? data.prop : "";
         const value = typeof data.value === "string" ? data.value : "";
         if (!id || !blockId || !property || value.length > 100_000) return;
-        const next = applyDomMutation(blocksRef.current, blockId, id, property, value, visualPath);
+        const next = applyDomMutation(
+          blocksRef.current,
+          blockId,
+          id,
+          property,
+          value,
+          visualPath,
+        );
         if (next !== blocksRef.current) {
           // Keep the live DOM selection; selecting the owning block here makes
           // the inspector jump away from the element that was just edited.
@@ -2377,8 +2809,13 @@ export function CmsPageBuilder({
       }
       if (source === "cms-builder-dom-drop") {
         if (!data.componentId || !data.parentId) return;
-        if (data.componentId.startsWith("visual:")) addVisualPrimitiveRef.current?.(data.componentId.slice(7));
-        else if (data.parentId.startsWith("slot:")) addInstanceToSlotRef.current?.(data.parentId.slice(5), data.componentId);
+        if (data.componentId.startsWith("visual:"))
+          addVisualPrimitiveRef.current?.(data.componentId.slice(7));
+        else if (data.parentId.startsWith("slot:"))
+          addInstanceToSlotRef.current?.(
+            data.parentId.slice(5),
+            data.componentId,
+          );
         else addBlockRef.current?.(data.componentId.replaceAll("-", "_"));
         return;
       }
@@ -2388,7 +2825,20 @@ export function CmsPageBuilder({
           setHoveredPreview((current) => (current ? null : current));
           return;
         }
-        const target = { id, blockId, label: label ?? id, rect, tagName: data.tagName, text: data.text, href: data.href, src: data.src, style: data.style, parentId: data.parentId, propertyKey: data.propertyKey, arrayIndex: data.arrayIndex };
+        const target = {
+          id,
+          blockId,
+          label: label ?? id,
+          rect,
+          tagName: data.tagName,
+          text: data.text,
+          href: data.href,
+          src: data.src,
+          style: data.style,
+          parentId: data.parentId,
+          propertyKey: data.propertyKey,
+          arrayIndex: data.arrayIndex,
+        };
         rawHoveredPreviewRef.current = target;
         const mapped = toCanvasRect(rect);
         setHoveredPreview((current) => {
@@ -2405,7 +2855,20 @@ export function CmsPageBuilder({
       }
       if (source !== "cms-builder" || !id) return;
       if (rect) {
-        const target = { id, blockId, label: label ?? id, rect, tagName: data.tagName, text: data.text, href: data.href, src: data.src, style: data.style, parentId: data.parentId, propertyKey: data.propertyKey, arrayIndex: data.arrayIndex };
+        const target = {
+          id,
+          blockId,
+          label: label ?? id,
+          rect,
+          tagName: data.tagName,
+          text: data.text,
+          href: data.href,
+          src: data.src,
+          style: data.style,
+          parentId: data.parentId,
+          propertyKey: data.propertyKey,
+          arrayIndex: data.arrayIndex,
+        };
         rawPreviewRef.current = target;
         const mapped = toCanvasRect(rect);
         const key = `${id}:${Math.round(mapped.x)}:${Math.round(mapped.y)}:${Math.round(mapped.width)}:${Math.round(mapped.height)}`;
@@ -2422,15 +2885,18 @@ export function CmsPageBuilder({
           return { ...target, rect: mapped };
         });
       }
-      const component = componentNodesRef.current.find((node) => node.id === id);
+      const component = componentNodesRef.current.find(
+        (node) => node.id === id,
+      );
       const resolvedBlockId =
         blockId && blocksRef.current.some((block) => block.id === blockId)
           ? blockId
-          :
-        component?.blockId ??
-        (blocksRef.current.some((block) => block.id === id) ? id : null);
+          : (component?.blockId ??
+            (blocksRef.current.some((block) => block.id === id) ? id : null));
       if (!resolvedBlockId) return;
-      setSelectedId((current) => (current === resolvedBlockId ? current : resolvedBlockId));
+      setSelectedId((current) =>
+        current === resolvedBlockId ? current : resolvedBlockId,
+      );
       setSelectedComponentId((current) => (current === id ? current : id));
       setRightTab((current) => (current === "settings" ? current : "content"));
       setRightOpen((current) => (current ? current : true));
@@ -2449,9 +2915,13 @@ export function CmsPageBuilder({
     };
     scrollContainer?.addEventListener("scroll", remeasure, { passive: true });
     window.addEventListener("resize", remeasure);
-    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(remeasure);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(remeasure);
     resizeObserver?.observe(iframeRef.current as Element);
-    if (canvasScrollRef.current) resizeObserver?.observe(canvasScrollRef.current);
+    if (canvasScrollRef.current)
+      resizeObserver?.observe(canvasScrollRef.current);
     const visualViewport = window.visualViewport;
     visualViewport?.addEventListener("resize", remeasure);
     visualViewport?.addEventListener("scroll", remeasure);
@@ -2480,7 +2950,7 @@ export function CmsPageBuilder({
           blocks,
           tree: cmsBlocksToTree(blocks),
         },
-        previewOrigin,
+        cmsPreviewTargetOrigin(frame, previewOrigin),
       );
       if (selectedId) {
         frame.contentWindow?.postMessage(
@@ -2488,7 +2958,7 @@ export function CmsPageBuilder({
             source: "cms-builder-select",
             id: selectedComponentId ?? selectedId,
           },
-          previewOrigin,
+          cmsPreviewTargetOrigin(frame, previewOrigin),
         );
       }
     };
@@ -2496,7 +2966,6 @@ export function CmsPageBuilder({
     previewReadyRef.current = false;
     const onLoad = () => {
       previewReadyRef.current = true;
-      attachLiveCanvas();
       sendDraft();
     };
     frame.addEventListener("load", onLoad);
@@ -2514,52 +2983,57 @@ export function CmsPageBuilder({
     previewUrl,
     selectedComponentId,
     selectedId,
-    attachLiveCanvas,
   ]);
-  const addBlock = useCallback((type: string) => {
-    if (FIXED_COMPONENT_TYPES.has(type)) return;
-    const definition = componentDefinitions.find(
-      (item) => item.id === type.replaceAll("_", "-"),
-    );
-    const block = {
-      id: makeId(),
-      type,
-      componentId: definition?.id,
-      variantId: definition?.defaultVariantId,
-      props: {
-        ...defaults(type),
-        ...(definition?.props ?? []).reduce<Record<string, unknown>>(
-          (acc, item) => {
-            if (item.defaultValue !== undefined)
-              acc[item.key] = item.defaultValue;
-            return acc;
-          },
-          {},
-        ),
-        ...(definition?.variants.find(
-          (variant) => variant.id === definition.defaultVariantId,
-        )?.props ?? {}),
-      },
-      slots: definition?.slots.length ? {} : undefined,
-    } satisfies CmsBlock;
-    commit([...blocks, block], block.id);
-  }, [blocks, commit, componentDefinitions]);
-  const addVisualPrimitive = useCallback((type: string) => {
-    const definition = UVS_DEFINITIONS.find((item) => item.type === type);
-    if (!definition) return;
-    const block: CmsBlock = {
-      id: makeId(),
-      type: "visual_primitive",
-      componentId: `visual:${definition.type}`,
-      props: {
-        sourceType: definition.type,
-        sourceName: definition.name,
-        markup: definition.markup,
-        ...visualInitialProps(definition),
-      },
-    };
-    commit([...blocks, block], block.id);
-  }, [blocks, commit]);
+  const addBlock = useCallback(
+    (type: string) => {
+      if (FIXED_COMPONENT_TYPES.has(type)) return;
+      const definition = componentDefinitions.find(
+        (item) => item.id === type.replaceAll("_", "-"),
+      );
+      const block = {
+        id: makeId(),
+        type,
+        componentId: definition?.id,
+        variantId: definition?.defaultVariantId,
+        props: {
+          ...defaults(type),
+          ...(definition?.props ?? []).reduce<Record<string, unknown>>(
+            (acc, item) => {
+              if (item.defaultValue !== undefined)
+                acc[item.key] = item.defaultValue;
+              return acc;
+            },
+            {},
+          ),
+          ...(definition?.variants.find(
+            (variant) => variant.id === definition.defaultVariantId,
+          )?.props ?? {}),
+        },
+        slots: definition?.slots.length ? {} : undefined,
+      } satisfies CmsBlock;
+      commit([...blocks, block], block.id);
+    },
+    [blocks, commit, componentDefinitions],
+  );
+  const addVisualPrimitive = useCallback(
+    (type: string) => {
+      const definition = UVS_DEFINITIONS.find((item) => item.type === type);
+      if (!definition) return;
+      const block: CmsBlock = {
+        id: makeId(),
+        type: "visual_primitive",
+        componentId: `visual:${definition.type}`,
+        props: {
+          sourceType: definition.type,
+          sourceName: definition.name,
+          markup: definition.markup,
+          ...visualInitialProps(definition),
+        },
+      };
+      commit([...blocks, block], block.id);
+    },
+    [blocks, commit],
+  );
   useEffect(() => {
     addBlockRef.current = addBlock;
     return () => {
@@ -2569,7 +3043,8 @@ export function CmsPageBuilder({
   useEffect(() => {
     addVisualPrimitiveRef.current = addVisualPrimitive;
     return () => {
-      if (addVisualPrimitiveRef.current === addVisualPrimitive) addVisualPrimitiveRef.current = null;
+      if (addVisualPrimitiveRef.current === addVisualPrimitive)
+        addVisualPrimitiveRef.current = null;
     };
   }, [addVisualPrimitive]);
   const addComponentVariant = (
@@ -2586,7 +3061,8 @@ export function CmsPageBuilder({
       props: {
         ...defaults(type),
         ...definition.props.reduce<Record<string, unknown>>((acc, item) => {
-          if (item.defaultValue !== undefined) acc[item.key] = item.defaultValue;
+          if (item.defaultValue !== undefined)
+            acc[item.key] = item.defaultValue;
           return acc;
         }, {}),
         ...(variant?.props ?? {}),
@@ -2597,94 +3073,134 @@ export function CmsPageBuilder({
     setBuilderMode("instance");
     setMessage(`${definition.name} added to the page.`);
   };
-  const addInstanceToSlot = useCallback((slotName: string, componentId: string) => {
-    if (!selected || !selectedDefinition) {
-      setMessage("Select the matching component instance before adding a slot item.");
-      return;
-    }
-    const definition = componentDefinitions.find((item) => item.id === componentId);
-    if (!definition) return;
-    const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
-    if (!slot) return;
-    const existing = selectedInstance?.slots?.[slotName] ?? selected?.slots?.[slotName] ?? [];
-    if (!slot.multiple && existing.length) {
-      setMessage(`${slot.label} accepts one component.`);
-      return;
-    }
-    const type = definition.id.replaceAll("-", "_");
-    const child = componentInstanceFromBlock({
-      id: makeId(),
-      type,
-      componentId: definition.id,
-      variantId: definition.defaultVariantId,
-      props: {},
-      slots: definition.slots.length ? {} : undefined,
-    });
-    const slotError =
-      slot.allowedComponentIds?.length && !slot.allowedComponentIds.includes(child.componentId)
-        ? `${selectedDefinition.name} does not allow ${child.componentId} in ${slot.label}.`
-        : !slot.multiple && existing.length
-          ? `${slot.label} accepts one component.`
-          : null;
-    if (slotError) {
-      setMessage(slotError);
-      return;
-    }
-    const update = (instance: CmsComponentInstance): CmsComponentInstance => ({
-      ...instance,
-      slots: {
-        ...instance.slots,
-        [slotName]: [...(instance.slots?.[slotName] ?? []), child],
-      },
-    });
-    const nextSlots = selectedInstance
-      ? Object.fromEntries(
-          Object.entries(selected.slots ?? {}).map(([slot, items]) => [
-            slot,
-            updateComponentInstances(items, selectedInstance.id, update) ?? [],
-          ]),
-        )
-      : {
-          ...(selected.slots ?? {}),
-          [slotName]: [...(selected.slots?.[slotName] ?? []), child],
-        };
-    commit(
-      blocks.map((block) =>
-        block.id === selected.id ? { ...block, slots: nextSlots } : block,
-      ),
-      undefined,
-      {
-        type: "insert",
-        nodeId: child.id,
-        parentId: selectedInstance?.id ?? selected.id,
-        slot: slotName,
-        index: existing.length,
-      },
-    );
-    setMessage(`${definition.name} added to ${slotName}.`);
-  }, [blocks, commit, componentDefinitions, selected, selectedDefinition, selectedInstance]);
+  const addInstanceToSlot = useCallback(
+    (slotName: string, componentId: string) => {
+      if (!selected || !selectedDefinition) {
+        setMessage(
+          "Select the matching component instance before adding a slot item.",
+        );
+        return;
+      }
+      const definition = componentDefinitions.find(
+        (item) => item.id === componentId,
+      );
+      if (!definition) return;
+      const slot = selectedDefinition?.slots.find(
+        (item) => item.name === slotName,
+      );
+      if (!slot) return;
+      const existing =
+        selectedInstance?.slots?.[slotName] ??
+        selected?.slots?.[slotName] ??
+        [];
+      if (!slot.multiple && existing.length) {
+        setMessage(`${slot.label} accepts one component.`);
+        return;
+      }
+      const type = definition.id.replaceAll("-", "_");
+      const child = componentInstanceFromBlock({
+        id: makeId(),
+        type,
+        componentId: definition.id,
+        variantId: definition.defaultVariantId,
+        props: {},
+        slots: definition.slots.length ? {} : undefined,
+      });
+      const slotError =
+        slot.allowedComponentIds?.length &&
+        !slot.allowedComponentIds.includes(child.componentId)
+          ? `${selectedDefinition.name} does not allow ${child.componentId} in ${slot.label}.`
+          : !slot.multiple && existing.length
+            ? `${slot.label} accepts one component.`
+            : null;
+      if (slotError) {
+        setMessage(slotError);
+        return;
+      }
+      const update = (
+        instance: CmsComponentInstance,
+      ): CmsComponentInstance => ({
+        ...instance,
+        slots: {
+          ...instance.slots,
+          [slotName]: [...(instance.slots?.[slotName] ?? []), child],
+        },
+      });
+      const nextSlots = selectedInstance
+        ? Object.fromEntries(
+            Object.entries(selected.slots ?? {}).map(([slot, items]) => [
+              slot,
+              updateComponentInstances(items, selectedInstance.id, update) ??
+                [],
+            ]),
+          )
+        : {
+            ...(selected.slots ?? {}),
+            [slotName]: [...(selected.slots?.[slotName] ?? []), child],
+          };
+      commit(
+        blocks.map((block) =>
+          block.id === selected.id ? { ...block, slots: nextSlots } : block,
+        ),
+        undefined,
+        {
+          type: "insert",
+          nodeId: child.id,
+          parentId: selectedInstance?.id ?? selected.id,
+          slot: slotName,
+          index: existing.length,
+        },
+      );
+      setMessage(`${definition.name} added to ${slotName}.`);
+    },
+    [
+      blocks,
+      commit,
+      componentDefinitions,
+      selected,
+      selectedDefinition,
+      selectedInstance,
+    ],
+  );
   useEffect(() => {
     addInstanceToSlotRef.current = addInstanceToSlot;
     return () => {
-      if (addInstanceToSlotRef.current === addInstanceToSlot) addInstanceToSlotRef.current = null;
+      if (addInstanceToSlotRef.current === addInstanceToSlot)
+        addInstanceToSlotRef.current = null;
     };
   }, [addInstanceToSlot]);
-  const onDropSlot = (event: DragEvent<HTMLDivElement>, slotName: string, dropIndex?: number) => {
+  const onDropSlot = (
+    event: DragEvent<HTMLDivElement>,
+    slotName: string,
+    dropIndex?: number,
+  ) => {
     event.preventDefault();
     if (!selected) return;
     const targetOwnerId = selectedInstance?.id ?? selected.id;
-    const encodedInstance = event.dataTransfer.getData("application/x-cms-component-instance");
+    const encodedInstance = event.dataTransfer.getData(
+      "application/x-cms-component-instance",
+    );
     if (encodedInstance) {
       try {
-        const payload = JSON.parse(encodedInstance) as { id?: string; blockId?: string; componentId?: string };
+        const payload = JSON.parse(encodedInstance) as {
+          id?: string;
+          blockId?: string;
+          componentId?: string;
+        };
         if (payload.id && payload.blockId) {
-          const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
+          const slot = selectedDefinition?.slots.find(
+            (item) => item.name === slotName,
+          );
           if (!slot) return;
           const moving = findCmsNode(blocks, payload.id);
-          if (!moving || !("componentId" in moving) || !moving.componentId) return;
+          if (!moving || !("componentId" in moving) || !moving.componentId)
+            return;
           const currentItems = selectedEditorBlock?.slots?.[slotName] ?? [];
-          const movingWithinSameSlot = payload.blockId === selected.id && currentItems.some((item) => item.id === payload.id);
-          if (!slot.multiple && currentItems.length && !movingWithinSameSlot) return;
+          const movingWithinSameSlot =
+            payload.blockId === selected.id &&
+            currentItems.some((item) => item.id === payload.id);
+          if (!slot.multiple && currentItems.length && !movingWithinSameSlot)
+            return;
           const result = moveCmsInstance(
             blocks,
             payload.id,
@@ -2713,15 +3229,24 @@ export function CmsPageBuilder({
         return;
       }
     }
-    const componentId = event.dataTransfer.getData("application/x-cms-component");
+    const componentId = event.dataTransfer.getData(
+      "application/x-cms-component",
+    );
     if (componentId) {
       if (!selectedDefinition) {
         setMessage("Select a component before dropping into a slot.");
         return;
       }
-      const slot = selectedDefinition?.slots.find((item) => item.name === slotName);
-      if (slot?.allowedComponentIds?.length && !slot.allowedComponentIds.includes(componentId)) {
-        setMessage(`${selectedDefinition.name} does not allow ${componentId} in ${slot.label}.`);
+      const slot = selectedDefinition?.slots.find(
+        (item) => item.name === slotName,
+      );
+      if (
+        slot?.allowedComponentIds?.length &&
+        !slot.allowedComponentIds.includes(componentId)
+      ) {
+        setMessage(
+          `${selectedDefinition.name} does not allow ${componentId} in ${slot.label}.`,
+        );
         return;
       }
       addInstanceToSlot(slotName, componentId);
@@ -2733,7 +3258,9 @@ export function CmsPageBuilder({
     mutation?: CmsMutationShape,
   ) => {
     if (!selected) return;
-    const updateOwner = (owner: CmsComponentInstance): CmsComponentInstance => ({
+    const updateOwner = (
+      owner: CmsComponentInstance,
+    ): CmsComponentInstance => ({
       ...owner,
       slots: {
         ...owner.slots,
@@ -2744,10 +3271,8 @@ export function CmsPageBuilder({
       ? Object.fromEntries(
           Object.entries(selected.slots ?? {}).map(([slot, items]) => [
             slot,
-            updateComponentInstances(
-              items,
-              selectedInstance.id,
-              (instance) => updateOwner(instance),
+            updateComponentInstances(items, selectedInstance.id, (instance) =>
+              updateOwner(instance),
             ) ?? [],
           ]),
         )
@@ -2780,21 +3305,31 @@ export function CmsPageBuilder({
     );
     setMessage("Slot item removed.");
   };
-  const moveInstanceInSlot = (slotName: string, index: number, delta: number) => {
+  const moveInstanceInSlot = (
+    slotName: string,
+    index: number,
+    delta: number,
+  ) => {
     const child = (selectedEditorBlock?.slots?.[slotName] ?? [])[index];
-    updateSelectedSlot(slotName, (items) => {
-      const target = index + delta;
-      if (index < 0 || target < 0 || target >= items.length) return items;
-      const next = [...items];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    }, child ? {
-      type: "move",
-      nodeId: child.id,
-      parentId: selectedInstance?.id ?? selected?.id,
-      slot: slotName,
-      index: index + delta,
-    } : undefined);
+    updateSelectedSlot(
+      slotName,
+      (items) => {
+        const target = index + delta;
+        if (index < 0 || target < 0 || target >= items.length) return items;
+        const next = [...items];
+        [next[index], next[target]] = [next[target], next[index]];
+        return next;
+      },
+      child
+        ? {
+            type: "move",
+            nodeId: child.id,
+            parentId: selectedInstance?.id ?? selected?.id,
+            slot: slotName,
+            index: index + delta,
+          }
+        : undefined,
+    );
     setMessage("Slot order updated.");
   };
   const updateSelected = (props: Record<string, unknown>) => {
@@ -2832,36 +3367,55 @@ export function CmsPageBuilder({
     setMediaPickerTarget(target);
   }, []);
 
-  const applyPickedMedia = useCallback((media: PickedMedia[]) => {
-    const picked = media[0];
-    const block = selectedEditorBlock;
-    if (!picked || !block || mediaPickerTarget === null) return;
-    if (mediaPickerTarget.startsWith("tiles:")) {
-      const index = Number(mediaPickerTarget.slice("tiles:".length));
-      const tiles = Array.isArray(block.props.tiles) ? [...block.props.tiles] : [];
-      const tile = tiles[index];
-      if (tile && typeof tile === "object" && !Array.isArray(tile)) {
-        const nextTile: Record<string, unknown> = { ...(tile as Record<string, unknown>), imageMediaId: picked.id };
-        delete nextTile.imageUrl;
-        tiles[index] = nextTile;
-        updateSelected({ ...block.props, tiles });
+  const applyPickedMedia = useCallback(
+    (media: PickedMedia[]) => {
+      const picked = media[0];
+      const block = selectedEditorBlock;
+      if (!picked || !block || mediaPickerTarget === null) return;
+      if (mediaPickerTarget.startsWith("tiles:")) {
+        const index = Number(mediaPickerTarget.slice("tiles:".length));
+        const tiles = Array.isArray(block.props.tiles)
+          ? [...block.props.tiles]
+          : [];
+        const tile = tiles[index];
+        if (tile && typeof tile === "object" && !Array.isArray(tile)) {
+          const nextTile: Record<string, unknown> = {
+            ...(tile as Record<string, unknown>),
+            imageMediaId: picked.id,
+          };
+          delete nextTile.imageUrl;
+          tiles[index] = nextTile;
+          updateSelected({ ...block.props, tiles });
+        }
+      } else if (selectedVisualDefinition) {
+        const sourceMarkup = text(
+          block.props.markup,
+          selectedVisualDefinition.markup,
+        );
+        updateSelected({
+          ...block.props,
+          [mediaPickerTarget]: picked.public_url,
+          [`${mediaPickerTarget}MediaId`]: picked.id,
+          markup: visualMarkupWithProperty(
+            sourceMarkup,
+            selectedVisualDefinition,
+            mediaPickerTarget,
+            picked.public_url,
+          ),
+        });
+      } else {
+        const nextProps = {
+          ...block.props,
+          [`${mediaPickerTarget.replace(/Url$/, "")}MediaId`]: picked.id,
+        };
+        delete nextProps[mediaPickerTarget];
+        updateSelected(nextProps);
       }
-    } else if (selectedVisualDefinition) {
-      const sourceMarkup = text(block.props.markup, selectedVisualDefinition.markup);
-      updateSelected({
-        ...block.props,
-        [mediaPickerTarget]: picked.public_url,
-        [`${mediaPickerTarget}MediaId`]: picked.id,
-        markup: visualMarkupWithProperty(sourceMarkup, selectedVisualDefinition, mediaPickerTarget, picked.public_url),
-      });
-    } else {
-      const nextProps = { ...block.props, [`${mediaPickerTarget.replace(/Url$/, "")}MediaId`]: picked.id };
-      delete nextProps[mediaPickerTarget];
-      updateSelected(nextProps);
-    }
-    setMediaPickerTarget(null);
-    setMessage("Media selected from the shared catalog library.");
-  }, [mediaPickerTarget, selectedEditorBlock, selectedVisualDefinition]);
+      setMediaPickerTarget(null);
+      setMessage("Media selected from the shared catalog library.");
+    },
+    [mediaPickerTarget, selectedEditorBlock, selectedVisualDefinition],
+  );
   const updateSelectedVariant = (variantId: string) => {
     if (!selected) return;
     if (selectedInstance) {
@@ -2974,17 +3528,34 @@ export function CmsPageBuilder({
     const movingId = event.dataTransfer.getData("application/x-cms-block-id");
     if (movingId) {
       const from = blocks.findIndex((block) => block.id === movingId);
-      if (from >= 0 && from !== index && !FIXED_COMPONENT_TYPES.has(blocks[from].type)) {
+      if (
+        from >= 0 &&
+        from !== index &&
+        !FIXED_COMPONENT_TYPES.has(blocks[from].type)
+      ) {
         const next = [...blocks];
         const [moving] = next.splice(from, 1);
-        next.splice(Math.max(0, Math.min(index > from ? index - 1 : index, next.length)), 0, moving);
-        commit(next, moving.id, { type: "move", nodeId: moving.id, parentId: null, index: next.indexOf(moving) });
+        next.splice(
+          Math.max(0, Math.min(index > from ? index - 1 : index, next.length)),
+          0,
+          moving,
+        );
+        commit(next, moving.id, {
+          type: "move",
+          nodeId: moving.id,
+          parentId: null,
+          index: next.indexOf(moving),
+        });
       }
       return;
     }
-    const visualType = event.dataTransfer.getData("application/x-uvs-component");
+    const visualType = event.dataTransfer.getData(
+      "application/x-uvs-component",
+    );
     if (visualType.startsWith("visual:")) {
-      const definition = UVS_DEFINITIONS.find((item) => item.type === visualType.slice("visual:".length));
+      const definition = UVS_DEFINITIONS.find(
+        (item) => item.type === visualType.slice("visual:".length),
+      );
       if (!definition) return;
       const block: CmsBlock = {
         id: makeId(),
@@ -3002,7 +3573,9 @@ export function CmsPageBuilder({
       commit(next, block.id);
       return;
     }
-    const componentType = event.dataTransfer.getData("application/x-cms-component");
+    const componentType = event.dataTransfer.getData(
+      "application/x-cms-component",
+    );
     if (componentType) {
       addBlockAt(componentType.replaceAll("-", "_"), index);
       return;
@@ -3084,7 +3657,9 @@ export function CmsPageBuilder({
   const navigatorPanel = (
     <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-200 bg-white p-3">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Navigator</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          Navigator
+        </p>
         <button
           type="button"
           onClick={() => setNavigatorOpen(false)}
@@ -3214,17 +3789,38 @@ export function CmsPageBuilder({
             {revisionsOpen ? (
               <div className="absolute left-0 top-9 z-40 w-72 rounded border border-slate-200 bg-white p-2 shadow-xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-2 pb-2">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Revisions</span>
-                  <span className="text-[10px] text-slate-400">{revisions.length}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Revisions
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {revisions.length}
+                  </span>
                 </div>
-                {revisionsLoading ? <p className="px-2 py-3 text-xs text-slate-500">Loading revisions...</p> : null}
-                {!revisionsLoading && !revisions.length ? <p className="px-2 py-3 text-xs text-slate-500">No saved revisions.</p> : null}
+                {revisionsLoading ? (
+                  <p className="px-2 py-3 text-xs text-slate-500">
+                    Loading revisions...
+                  </p>
+                ) : null}
+                {!revisionsLoading && !revisions.length ? (
+                  <p className="px-2 py-3 text-xs text-slate-500">
+                    No saved revisions.
+                  </p>
+                ) : null}
                 {!revisionsLoading && revisions.length ? (
                   <div className="max-h-64 overflow-y-auto py-1">
                     {revisions.map((revision) => (
-                      <button key={revision.id} type="button" onClick={() => restoreRevision(revision.revision)} className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left text-xs hover:bg-slate-50">
-                        <span className="text-slate-700">Revision {revision.revision}</span>
-                        <span className="text-[10px] text-slate-400">{new Date(revision.created_at).toLocaleString()}</span>
+                      <button
+                        key={revision.id}
+                        type="button"
+                        onClick={() => restoreRevision(revision.revision)}
+                        className="flex w-full items-center justify-between gap-3 rounded px-2 py-2 text-left text-xs hover:bg-slate-50"
+                      >
+                        <span className="text-slate-700">
+                          Revision {revision.revision}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(revision.created_at).toLocaleString()}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -3255,13 +3851,15 @@ export function CmsPageBuilder({
             </button>
             {breakpointsOpen ? (
               <div className="absolute right-0 top-9 z-50 w-44 rounded border border-slate-200 bg-white p-1 shadow-xl">
-                {([
-                  ["mobile", Smartphone, "Mobile view"],
-                  ["tablet", Tablet, "Tablet view"],
-                  ["tablet-landscape", Tablet, "Tablet landscape view"],
-                  ["laptop", Laptop, "Laptop view"],
-                  ["desktop", Monitor, "Desktop view"],
-                ] as const).map(([name, Icon, label]) => (
+                {(
+                  [
+                    ["mobile", Smartphone, "Mobile view"],
+                    ["tablet", Tablet, "Tablet view"],
+                    ["tablet-landscape", Tablet, "Tablet landscape view"],
+                    ["laptop", Laptop, "Laptop view"],
+                    ["desktop", Monitor, "Desktop view"],
+                  ] as const
+                ).map(([name, Icon, label]) => (
                   <button
                     key={name}
                     type="button"
@@ -3272,7 +3870,9 @@ export function CmsPageBuilder({
                     className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-[11px] hover:bg-slate-100 ${device === name ? "bg-slate-100 text-slate-900" : "text-slate-600"}`}
                     aria-label={label}
                   >
-                    <Icon className={`size-3.5 ${name === "tablet" ? "rotate-90" : ""}`} />
+                    <Icon
+                      className={`size-3.5 ${name === "tablet" ? "rotate-90" : ""}`}
+                    />
                     <span>{label}</span>
                   </button>
                 ))}
@@ -3336,7 +3936,11 @@ export function CmsPageBuilder({
           <button
             type="button"
             className={`grid size-8 place-items-center rounded hover:bg-slate-100 ${styleTheme ? "bg-slate-100 text-slate-900" : ""}`}
-            onClick={() => setStyleTheme((current) => (current === "dark" ? "light" : "dark"))}
+            onClick={() =>
+              setStyleTheme((current) =>
+                current === "dark" ? "light" : "dark",
+              )
+            }
             aria-label="Toggle color theme"
             aria-pressed={styleTheme === "dark"}
             title="Toggle color theme"
@@ -3381,7 +3985,12 @@ export function CmsPageBuilder({
             aria-label="Vvveb"
             title="Vvveb"
           >
-            <span aria-hidden="true" className="text-[10px] font-semibold leading-none tracking-[-0.12em] text-lime-500">\vvveb</span>
+            <span
+              aria-hidden="true"
+              className="text-[10px] font-semibold leading-none tracking-[-0.12em] text-lime-500"
+            >
+              \vvveb
+            </span>
           </button>
           <button
             type="button"
@@ -3393,20 +4002,28 @@ export function CmsPageBuilder({
             <Menu className="size-3.5" />
           </button>
           <span className="my-1 h-px w-5 bg-slate-200" />
-          {([
-            ["Pages", FileText],
-            ["Components", Box],
-            ["Sections", Layers],
-            ["Style", Paintbrush],
-            ["Ai Assistant", Sparkles],
-          ] as const).map(([label, Icon]) => (
+          {(
+            [
+              ["Pages", FileText],
+              ["Components", Box],
+              ["Sections", Layers],
+              ["Style", Paintbrush],
+              ["Ai Assistant", Sparkles],
+            ] as const
+          ).map(([label, Icon]) => (
             <button
               key={label}
               type="button"
               className={`grid size-8 place-items-center rounded hover:bg-slate-100 ${
-                (label === "Style"
-                  ? leftOpen && leftTab === "configuration"
-                  : leftOpen && ((label === "Pages" && leftTab === "pages") || (label === "Components" && leftTab === "components") || (label === "Sections" && leftTab === "sections") || (label === "Ai Assistant" && leftTab === "ai")))
+                (
+                  label === "Style"
+                    ? leftOpen && leftTab === "configuration"
+                    : leftOpen &&
+                      ((label === "Pages" && leftTab === "pages") ||
+                        (label === "Components" && leftTab === "components") ||
+                        (label === "Sections" && leftTab === "sections") ||
+                        (label === "Ai Assistant" && leftTab === "ai"))
+                )
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-400"
               }`}
@@ -3422,7 +4039,13 @@ export function CmsPageBuilder({
                   return;
                 }
                 setLeftOpen(true);
-                setLeftTab(label === "Pages" ? "pages" : label === "Components" ? "components" : "sections");
+                setLeftTab(
+                  label === "Pages"
+                    ? "pages"
+                    : label === "Components"
+                      ? "components"
+                      : "sections",
+                );
               }}
               aria-label={label}
             >
@@ -3471,74 +4094,74 @@ export function CmsPageBuilder({
                   </div>
                   <div className="space-y-1">
                     {pages
-                      .filter((page) =>
+                      .flatMap((page) =>
                         `${page.title} ${page.slug}`
                           .toLowerCase()
-                          .includes(pageQuery.trim().toLowerCase()),
+                          .includes(pageQuery.trim().toLowerCase())
+                          ? [page]
+                          : [],
                       )
                       .map((page) => (
-                      <div
-                        key={page.id}
-                        onClick={() => onSelectPage?.(page.id)}
-                        className={`flex w-full cursor-pointer items-center gap-1 rounded px-1.5 py-1.5 text-left text-xs ${page.id === currentPageId ? "bg-slate-100 text-slate-900" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
-                      >
-                        <label className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1">
-                          <VvvebIcon name="file" className="size-3 shrink-0" />
-                          <input
-                            type="checkbox"
-                            checked={page.id === currentPageId}
-                            onChange={() => onSelectPage?.(page.id)}
-                            aria-label={page.title || page.slug}
-                            className="size-3 accent-slate-700"
-                          />
-                          <span className="min-w-0 truncate">
-                            {page.title || page.slug}
-                          </span>
-                        </label>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          {onDeletePage ? (
-                            <button
-                              type="button"
-                              onClick={() => onDeletePage(page.id)}
-                              aria-label={`Delete ${page.title || page.slug}`}
-                              title="Delete page"
-                              className="grid size-6 place-items-center rounded text-slate-400 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          ) : null}
-                          {onPreviewPage ? (
-                            <button
-                              type="button"
-                              onClick={() => onPreviewPage(page.id)}
-                              aria-label={`Preview ${page.title || page.slug}`}
-                              title="Preview page"
-                              className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                            >
-                              <Eye className="size-3" />
-                            </button>
-                          ) : null}
-                          {onDuplicatePage ? (
-                            <button
-                              type="button"
-                              onClick={() => onDuplicatePage(page.id)}
-                              aria-label={`Duplicate ${page.title || page.slug}`}
-                              title="Duplicate page"
-                              className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-                            >
-                              <Copy className="size-3" />
-                            </button>
-                          ) : null}
+                        <div
+                          key={page.id}
+                          className={`flex w-full items-center gap-1 rounded px-1.5 py-1.5 text-left text-xs ${page.id === currentPageId ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => onSelectPage?.(page.id)}
+                            aria-pressed={page.id === currentPageId}
+                            className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left hover:bg-slate-50 hover:text-slate-900"
+                          >
+                            <VvvebIcon
+                              name="file"
+                              className="size-3 shrink-0"
+                            />
+                            <span className="min-w-0 truncate">
+                              {page.title || page.slug}
+                            </span>
+                          </button>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            {onDeletePage ? (
+                              <button
+                                type="button"
+                                onClick={() => onDeletePage(page.id)}
+                                aria-label={`Delete ${page.title || page.slug}`}
+                                title="Delete page"
+                                className="grid size-6 place-items-center rounded text-slate-400 hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            ) : null}
+                            {onPreviewPage ? (
+                              <button
+                                type="button"
+                                onClick={() => onPreviewPage(page.id)}
+                                aria-label={`Preview ${page.title || page.slug}`}
+                                title="Preview page"
+                                className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                              >
+                                <Eye className="size-3" />
+                              </button>
+                            ) : null}
+                            {onDuplicatePage ? (
+                              <button
+                                type="button"
+                                onClick={() => onDuplicatePage(page.id)}
+                                aria-label={`Duplicate ${page.title || page.slug}`}
+                                title="Duplicate page"
+                                className="grid size-6 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                              >
+                                <Copy className="size-3" />
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
                       ))}
                   </div>
                   {navigatorOpen ? navigatorPanel : null}
                 </div>
               ) : null}
-              {leftTab === "layers" ? (
-                navigatorPanel
-              ) : null}
+              {leftTab === "layers" ? navigatorPanel : null}
               {leftTab === "files" ? (
                 <div className="-m-3 min-h-full">
                   <CmsMediaManager />
@@ -3546,7 +4169,11 @@ export function CmsPageBuilder({
               ) : null}
               {leftTab === "configuration" ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-1 border-b border-slate-200 pb-2" role="tablist" aria-label="Style panels">
+                  <div
+                    className="flex items-center gap-1 border-b border-slate-200 pb-2"
+                    role="tablist"
+                    aria-label="Style panels"
+                  >
                     {(["styles", "variables"] as const).map((tab) => (
                       <button
                         key={tab}
@@ -3556,62 +4183,126 @@ export function CmsPageBuilder({
                         aria-selected={configurationTab === tab}
                         className={`rounded px-2 py-1 text-[11px] capitalize ${configurationTab === tab ? "bg-slate-100 font-medium text-slate-900" : "text-slate-500 hover:bg-slate-50"}`}
                       >
-                        <span className="mr-1 text-slate-400">{tab === "styles" ? "▤" : "♢"}</span> {tab === "styles" ? "Styles" : "Variables"}
+                        <span className="mr-1 text-slate-400">
+                          {tab === "styles" ? "▤" : "♢"}
+                        </span>{" "}
+                        {tab === "styles" ? "Styles" : "Variables"}
                       </button>
                     ))}
                   </div>
                   {configurationTab === "styles" ? (
-                    <div role="tabpanel" aria-label="Styles" className="space-y-2">
+                    <div
+                      role="tabpanel"
+                      aria-label="Styles"
+                      className="space-y-2"
+                    >
                       <div className="flex items-center gap-1 border-b border-slate-200 pb-2">
-                        <button type="button" aria-label="Collapse Base styles" aria-expanded={stylesBaseOpen} onClick={() => setStylesBaseOpen((open) => !open)} className="rounded p-1 text-slate-500 hover:bg-slate-100"><Minus className="size-3.5" /></button>
+                        <button
+                          type="button"
+                          aria-label="Collapse Base styles"
+                          aria-expanded={stylesBaseOpen}
+                          onClick={() => setStylesBaseOpen((open) => !open)}
+                          className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                        >
+                          <Minus className="size-3.5" />
+                        </button>
                         <input
                           type="search"
                           value={configurationQuery}
-                          onChange={(event) => setConfigurationQuery(event.target.value)}
+                          onChange={(event) =>
+                            setConfigurationQuery(event.target.value)
+                          }
                           placeholder="Search styles"
                           aria-label="Search styles"
                           className="h-8 min-w-0 flex-1 rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
                         />
-                        <button type="button" aria-label="Clear style search" disabled={!configurationQuery} onClick={() => setConfigurationQuery("")} className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"><X className="size-3.5" /></button>
+                        <button
+                          type="button"
+                          aria-label="Clear style search"
+                          disabled={!configurationQuery}
+                          onClick={() => setConfigurationQuery("")}
+                          className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                        >
+                          <X className="size-3.5" />
+                        </button>
                       </div>
                       <div className="rounded border border-slate-200">
-                        <button type="button" onClick={() => setStylesBaseOpen((open) => !open)} className="flex w-full items-center justify-between px-2.5 py-2 text-left text-[11px] font-medium text-slate-700">
-                          <span className="flex items-center gap-2"><input type="checkbox" checked={stylesBaseOpen} readOnly aria-label="Base" className="size-3 accent-slate-600" />Base</span><ChevronDown className={`size-3.5 transition-transform ${stylesBaseOpen ? "" : "-rotate-90"}`} />
+                        <button
+                          type="button"
+                          onClick={() => setStylesBaseOpen((open) => !open)}
+                          className="flex w-full items-center justify-between px-2.5 py-2 text-left text-[11px] font-medium text-slate-700"
+                        >
+                          <span>Base</span>
+                          <ChevronDown
+                            className={`size-3.5 transition-transform ${stylesBaseOpen ? "" : "-rotate-90"}`}
+                          />
                         </button>
-                        {stylesBaseOpen ? <div className="border-t border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">No registered styles.</div> : null}
+                        {stylesBaseOpen ? (
+                          <div className="border-t border-slate-200 px-2.5 py-2 text-[11px] text-slate-400">
+                            No registered styles.
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ) : (
-                    <div role="tabpanel" aria-label="Variables" className="space-y-2">
-                    <input
-                      type="search"
-                      value={configurationQuery}
-                      onChange={(event) => setConfigurationQuery(event.target.value)}
-                      placeholder="Search variables"
-                      aria-label="Search variables"
-                      className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
-                    />
-                    {(["font", "color", "dimensions"] as const).map((type: PaletteVariableType) => {
-                      const variables = Object.entries(cssVariables[type]).filter(([name, variable]) =>
-                        `${name} ${variable.friendlyName} ${variable.value}`.toLowerCase().includes(configurationQuery.trim().toLowerCase()),
-                      );
-                      if (!variables.length) return null;
-                      return (
-                        <details key={type} className="rounded border border-slate-200" open>
-                          <summary className="cursor-pointer px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            {type}
-                          </summary>
-                          <div className="space-y-1 border-t border-slate-200 p-2">
-                            {variables.map(([name, variable]) => (
-                              <div key={name} className="rounded bg-slate-50 px-2 py-1.5">
-                                <p className="truncate text-[11px] font-medium text-slate-700">{variable.friendlyName}</p>
-                                <p className="truncate font-mono text-[10px] text-slate-400" title={name}>{variable.value}</p>
+                    <div
+                      role="tabpanel"
+                      aria-label="Variables"
+                      className="space-y-2"
+                    >
+                      <input
+                        type="search"
+                        value={configurationQuery}
+                        onChange={(event) =>
+                          setConfigurationQuery(event.target.value)
+                        }
+                        placeholder="Search variables"
+                        aria-label="Search variables"
+                        className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
+                      />
+                      {(["font", "color", "dimensions"] as const).map(
+                        (type: PaletteVariableType) => {
+                          const variables = Object.entries(
+                            cssVariables[type],
+                          ).filter(([name, variable]) =>
+                            `${name} ${variable.friendlyName} ${variable.value}`
+                              .toLowerCase()
+                              .includes(
+                                configurationQuery.trim().toLowerCase(),
+                              ),
+                          );
+                          if (!variables.length) return null;
+                          return (
+                            <details
+                              key={type}
+                              className="rounded border border-slate-200"
+                              open
+                            >
+                              <summary className="cursor-pointer px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                {type}
+                              </summary>
+                              <div className="space-y-1 border-t border-slate-200 p-2">
+                                {variables.map(([name, variable]) => (
+                                  <div
+                                    key={name}
+                                    className="rounded bg-slate-50 px-2 py-1.5"
+                                  >
+                                    <p className="truncate text-[11px] font-medium text-slate-700">
+                                      {variable.friendlyName}
+                                    </p>
+                                    <p
+                                      className="truncate font-mono text-[10px] text-slate-400"
+                                      title={name}
+                                    >
+                                      {variable.value}
+                                    </p>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </details>
-                      );
-                    })}
+                            </details>
+                          );
+                        },
+                      )}
                     </div>
                   )}
                 </div>
@@ -3620,27 +4311,103 @@ export function CmsPageBuilder({
                 <section aria-label="Ai Assistant" className="space-y-3">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="relative">
-                      <button type="button" onClick={() => setAssistantSessionsOpen((open) => !open)} aria-expanded={assistantSessionsOpen} aria-label="Sessions" title="Sessions" className={`grid size-7 place-items-center rounded hover:bg-slate-100 ${assistantSessionsOpen ? "bg-slate-100 text-slate-900" : ""}`}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setAssistantSessionsOpen((open) => !open)
+                        }
+                        aria-expanded={assistantSessionsOpen}
+                        aria-label="Sessions"
+                        title="Sessions"
+                        className={`grid size-7 place-items-center rounded hover:bg-slate-100 ${assistantSessionsOpen ? "bg-slate-100 text-slate-900" : ""}`}
+                      >
                         <Sparkles className="size-3.5 text-slate-500" />
                       </button>
-                      {assistantSessionsOpen ? <div role="list" className="absolute left-0 top-8 z-40 w-48 rounded border border-slate-200 bg-white p-2 shadow-xl"><button type="button" onClick={() => { setAssistantPrompt(""); setAssistantAttachment(null); setAssistantSessionsOpen(false); }} className="w-full rounded px-2 py-1.5 text-left text-[11px] text-slate-700 hover:bg-slate-50">New session</button><div className="my-1 border-t border-slate-100" /><p className="px-2 py-1 text-[10px] text-slate-400">No previous sessions</p></div> : null}
+                      {assistantSessionsOpen ? (
+                        <div
+                          role="list"
+                          className="absolute left-0 top-8 z-40 w-48 rounded border border-slate-200 bg-white p-2 shadow-xl"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAssistantPrompt("");
+                              setAssistantAttachment(null);
+                              setAssistantSessionsOpen(false);
+                            }}
+                            className="w-full rounded px-2 py-1.5 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                          >
+                            New session
+                          </button>
+                          <div className="my-1 border-t border-slate-100" />
+                          <p className="px-2 py-1 text-[10px] text-slate-400">
+                            No previous sessions
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-700">AI assistant</span>
-                    <button type="button" onClick={() => setAssistantOptionsOpen((open) => !open)} aria-expanded={assistantOptionsOpen} className={`grid size-7 place-items-center rounded hover:bg-slate-100 ${assistantOptionsOpen ? "bg-slate-100 text-slate-900" : ""}`} aria-label="Assistant options" title="Options">
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      AI assistant
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAssistantOptionsOpen((open) => !open)}
+                      aria-expanded={assistantOptionsOpen}
+                      className={`grid size-7 place-items-center rounded hover:bg-slate-100 ${assistantOptionsOpen ? "bg-slate-100 text-slate-900" : ""}`}
+                      aria-label="Assistant options"
+                      title="Options"
+                    >
                       <Settings2 className="size-3.5 text-slate-500" />
                     </button>
                   </div>
                   {assistantOptionsOpen ? (
-                    <div role="list" aria-label="Assistant options" className="space-y-1 rounded border border-slate-200 bg-white p-2 shadow-sm">
+                    <div
+                      role="list"
+                      aria-label="Assistant options"
+                      className="space-y-1 rounded border border-slate-200 bg-white p-2 shadow-sm"
+                    >
                       {[
-                        ["Show thinking", assistantShowThinking, setAssistantShowThinking, "Thinking"],
-                        ["Show tool calls", assistantShowToolCalls, setAssistantShowToolCalls, "Tool calls"],
-                        ["Allow screenshots", assistantAllowScreenshots, setAssistantAllowScreenshots, "Screenshots"],
+                        [
+                          "Show thinking",
+                          assistantShowThinking,
+                          setAssistantShowThinking,
+                          "Thinking",
+                        ],
+                        [
+                          "Show tool calls",
+                          assistantShowToolCalls,
+                          setAssistantShowToolCalls,
+                          "Tool calls",
+                        ],
+                        [
+                          "Allow screenshots",
+                          assistantAllowScreenshots,
+                          setAssistantAllowScreenshots,
+                          "Screenshots",
+                        ],
                       ].map(([label, checked, setChecked, detail]) => (
-                        <div key={label as string} className="flex items-center justify-between gap-3 px-1 py-1 text-[11px] text-slate-600">
+                        <div
+                          key={label as string}
+                          className="flex items-center justify-between gap-3 px-1 py-1 text-[11px] text-slate-600"
+                        >
                           <span>{detail as string}</span>
-                          <button type="button" role="switch" aria-label={label as string} aria-checked={checked as boolean} onClick={() => (setChecked as (_value: (_current: boolean) => boolean) => void)((current) => !current)} className={`relative h-5 w-9 rounded-full ${checked ? "bg-slate-900" : "bg-slate-200"}`}>
-                            <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition ${checked ? "left-4" : "left-0.5"}`} />
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-label={label as string}
+                            aria-checked={checked as boolean}
+                            onClick={() =>
+                              (
+                                setChecked as (
+                                  _value: (_current: boolean) => boolean,
+                                ) => void
+                              )((current) => !current)
+                            }
+                            className={`relative h-5 w-9 rounded-full ${checked ? "bg-slate-900" : "bg-slate-200"}`}
+                          >
+                            <span
+                              className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition ${checked ? "left-4" : "left-0.5"}`}
+                            />
                           </button>
                         </div>
                       ))}
@@ -3648,12 +4415,29 @@ export function CmsPageBuilder({
                   ) : null}
                   <div className="flex items-center justify-between rounded border border-slate-200 px-2.5 py-2 text-[11px] text-slate-600">
                     <span>Context</span>
-                    <button type="button" onClick={() => setAssistantContextOpen((open) => !open)} aria-expanded={assistantContextOpen} aria-label="Context" className="rounded px-1.5 py-0.5 hover:bg-slate-100">⌄</button>
+                    <button
+                      type="button"
+                      onClick={() => setAssistantContextOpen((open) => !open)}
+                      aria-expanded={assistantContextOpen}
+                      aria-label="Context"
+                      className="rounded px-1.5 py-0.5 hover:bg-slate-100"
+                    >
+                      ⌄
+                    </button>
                   </div>
-                  {assistantContextOpen ? <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-2 text-[10px] leading-4 text-slate-500">Selected page and element context</div> : null}
+                  {assistantContextOpen ? (
+                    <div className="rounded border border-slate-200 bg-slate-50 px-2.5 py-2 text-[10px] leading-4 text-slate-500">
+                      Selected page and element context
+                    </div>
+                  ) : null}
                   <div className="rounded border border-slate-200 bg-slate-50 p-3">
-                    <h2 className="text-sm font-medium text-slate-800">Ask me to build or edit this page</h2>
-                    <p className="mt-1 text-[11px] leading-4 text-slate-500">I can see what&apos;s selected, attach a reference image, or talk through it by voice.</p>
+                    <h2 className="text-sm font-medium text-slate-800">
+                      Ask me to build or edit this page
+                    </h2>
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                      I can see what&apos;s selected, attach a reference image,
+                      or talk through it by voice.
+                    </p>
                   </div>
                   <div className="grid gap-1.5">
                     {[
@@ -3668,7 +4452,8 @@ export function CmsPageBuilder({
                         type="button"
                         onClick={() => {
                           if (prompt === "Add new page") onNewPage?.();
-                          else if (prompt === "Add a hero section") addBlock("hero");
+                          else if (prompt === "Add a hero section")
+                            addBlock("hero");
                           else setAssistantPrompt(prompt);
                         }}
                         className="rounded border border-slate-200 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:bg-slate-50"
@@ -3677,69 +4462,178 @@ export function CmsPageBuilder({
                       </button>
                     ))}
                   </div>
-                  <textarea value={assistantPrompt} onChange={(event) => setAssistantPrompt(event.target.value)} placeholder="Describe what to build or change…" aria-label="Describe what to build or change…" className="min-h-24 w-full resize-y rounded border border-slate-200 bg-white p-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400" />
+                  <textarea
+                    value={assistantPrompt}
+                    onChange={(event) => setAssistantPrompt(event.target.value)}
+                    placeholder="Describe what to build or change…"
+                    aria-label="Describe what to build or change…"
+                    className="min-h-24 w-full resize-y rounded border border-slate-200 bg-white p-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
+                  />
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => assistantFileInputRef.current?.click()} className="grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Attach file" title="Attach file"><Paperclip className="size-3.5" /></button>
-                    <button type="button" onClick={() => setAssistantOptionsOpen((open) => !open)} aria-expanded={assistantOptionsOpen} className="grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Assistant tools" title="Assistant tools"><Settings2 className="size-3.5" /></button>
-                    <button type="button" onClick={() => assistantFileInputRef.current?.click()} className="h-8 rounded border border-slate-200 px-2 text-[10px] text-slate-600 hover:bg-slate-50">Choose File</button>
-                    <button type="button" aria-pressed={voiceListening} onClick={() => {
-                      if (voiceListening) return;
-                      const speechWindow = window as Window & {
-                        SpeechRecognition?: BrowserSpeechRecognitionConstructor;
-                        webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
-                      };
-                      const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-                      if (!Recognition) {
-                        setMessage("Voice input is not supported by this browser.");
-                        return;
-                      }
-                      const recognition = new Recognition();
-                      recognition.lang = "en-US";
-                      recognition.interimResults = false;
-                      recognition.onresult = (event) => {
-                        const transcript = event.results[0]?.[0]?.transcript?.trim();
-                        if (transcript) setAssistantPrompt((current) => `${current}${current ? " " : ""}${transcript}`);
-                      };
-                      recognition.onerror = () => {
-                        setVoiceListening(false);
-                        setMessage("Voice input could not be started.");
-                      };
-                      recognition.onend = () => setVoiceListening(false);
-                      setVoiceListening(true);
-                      recognition.start();
-                    }} className={`grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50 ${voiceListening ? "bg-slate-100 text-slate-900" : ""}`} aria-label="Voice input" title="Voice input"><Mic className="size-3.5" /></button>
-                    <input ref={assistantFileInputRef} type="file" accept="image/*" className="hidden" tabIndex={-1} onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (!file) return;
-                      setAssistantAttachment(file.name);
-                      setAssistantPrompt("Convert attached image to design");
-                    }} />
+                    <button
+                      type="button"
+                      onClick={() => assistantFileInputRef.current?.click()}
+                      className="grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50"
+                      aria-label="Attach file"
+                      title="Attach file"
+                    >
+                      <Paperclip className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAssistantOptionsOpen((open) => !open)}
+                      aria-expanded={assistantOptionsOpen}
+                      className="grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50"
+                      aria-label="Assistant tools"
+                      title="Assistant tools"
+                    >
+                      <Settings2 className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => assistantFileInputRef.current?.click()}
+                      className="h-8 rounded border border-slate-200 px-2 text-[10px] text-slate-600 hover:bg-slate-50"
+                    >
+                      Choose File
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={voiceListening}
+                      onClick={() => {
+                        if (voiceListening) return;
+                        const speechWindow = window as Window & {
+                          SpeechRecognition?: BrowserSpeechRecognitionConstructor;
+                          webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+                        };
+                        const Recognition =
+                          speechWindow.SpeechRecognition ??
+                          speechWindow.webkitSpeechRecognition;
+                        if (!Recognition) {
+                          setMessage(
+                            "Voice input is not supported by this browser.",
+                          );
+                          return;
+                        }
+                        const recognition = new Recognition();
+                        recognition.lang = "en-US";
+                        recognition.interimResults = false;
+                        recognition.onresult = (event) => {
+                          const transcript =
+                            event.results[0]?.[0]?.transcript?.trim();
+                          if (transcript)
+                            setAssistantPrompt(
+                              (current) =>
+                                `${current}${current ? " " : ""}${transcript}`,
+                            );
+                        };
+                        recognition.onerror = () => {
+                          setVoiceListening(false);
+                          setMessage("Voice input could not be started.");
+                        };
+                        recognition.onend = () => setVoiceListening(false);
+                        setVoiceListening(true);
+                        recognition.start();
+                      }}
+                      className={`grid size-8 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50 ${voiceListening ? "bg-slate-100 text-slate-900" : ""}`}
+                      aria-label="Voice input"
+                      title="Voice input"
+                    >
+                      <Mic className="size-3.5" />
+                    </button>
+                    <input
+                      ref={assistantFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      tabIndex={-1}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        setAssistantAttachment(file.name);
+                        setAssistantPrompt("Convert attached image to design");
+                      }}
+                    />
                   </div>
-                  {assistantAttachment ? <p className="truncate text-[10px] text-slate-500" title={assistantAttachment}>Attached: {assistantAttachment}</p> : null}
-                  <button type="button" disabled={!assistantPrompt.trim()} onClick={() => { setMessage("AI assistant is not configured for this workspace."); setAssistantPrompt(""); }} title="Send" className="h-8 w-full rounded bg-slate-900 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Send message</button>
-                  <p className="text-center text-[10px] text-slate-400">Enter to send · Shift+Enter for newline</p>
-                  <button type="button" onClick={() => setAssistantUsageOpen((open) => !open)} aria-expanded={assistantUsageOpen} aria-label="Toggle usage details" title="Show usage details" className="mx-auto block text-[10px] text-slate-400 hover:text-slate-700">Toggle usage details</button>
-                  {assistantUsageOpen ? <p className="text-center text-[10px] text-slate-400">No usage recorded in this session.</p> : null}
+                  {assistantAttachment ? (
+                    <p
+                      className="truncate text-[10px] text-slate-500"
+                      title={assistantAttachment}
+                    >
+                      Attached: {assistantAttachment}
+                    </p>
+                  ) : null}
+                  <button
+                    type="button"
+                    disabled={!assistantPrompt.trim()}
+                    onClick={() => {
+                      setMessage(
+                        "AI assistant is not configured for this workspace.",
+                      );
+                      setAssistantPrompt("");
+                    }}
+                    title="Send"
+                    className="h-8 w-full rounded bg-slate-900 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Send message
+                  </button>
+                  <p className="text-center text-[10px] text-slate-400">
+                    Enter to send · Shift+Enter for newline
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAssistantUsageOpen((open) => !open)}
+                    aria-expanded={assistantUsageOpen}
+                    aria-label="Toggle usage details"
+                    title="Show usage details"
+                    className="mx-auto block text-[10px] text-slate-400 hover:text-slate-700"
+                  >
+                    Toggle usage details
+                  </button>
+                  {assistantUsageOpen ? (
+                    <p className="text-center text-[10px] text-slate-400">
+                      No usage recorded in this session.
+                    </p>
+                  ) : null}
                 </section>
               ) : null}
               {leftTab === "components" || leftTab === "sections" ? (
                 <>
-                  {leftTab === "components" ? <div role="tablist" aria-label="Component palette" className="mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
-                  {([ ["components", "Components"], ["sections", "Blocks"] ] as const).map(([tab, label]) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setPaletteTab(tab)}
-                        role="tab"
-                        aria-selected={paletteTab === tab}
-                        className={`rounded px-2 py-1 text-[11px] capitalize ${paletteTab === tab ? "bg-slate-100 font-medium text-slate-900" : "text-slate-500 hover:bg-slate-50"}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div> : (
-                    <div role="tablist" aria-label="Section palette" className="mb-3 flex items-center gap-1 border-b border-slate-200 pb-2">
-                      {([ ["sections", "Sections"], ["page-sections", "Page Sections"] ] as const).map(([tab, label]) => (
+                  {leftTab === "components" ? (
+                    <div
+                      role="tablist"
+                      aria-label="Component palette"
+                      className="mb-3 flex items-center gap-1 border-b border-slate-200 pb-2"
+                    >
+                      {(
+                        [
+                          ["components", "Components"],
+                          ["sections", "Blocks"],
+                        ] as const
+                      ).map(([tab, label]) => (
+                        <button
+                          key={tab}
+                          type="button"
+                          onClick={() => setPaletteTab(tab)}
+                          role="tab"
+                          aria-selected={paletteTab === tab}
+                          className={`rounded px-2 py-1 text-[11px] capitalize ${paletteTab === tab ? "bg-slate-100 font-medium text-slate-900" : "text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div
+                      role="tablist"
+                      aria-label="Section palette"
+                      className="mb-3 flex items-center gap-1 border-b border-slate-200 pb-2"
+                    >
+                      {(
+                        [
+                          ["sections", "Sections"],
+                          ["page-sections", "Page Sections"],
+                        ] as const
+                      ).map(([tab, label]) => (
                         <button
                           key={tab}
                           type="button"
@@ -3753,197 +4647,310 @@ export function CmsPageBuilder({
                       ))}
                     </div>
                   )}
-                  {leftTab !== "sections" || sectionPaletteTab === "sections" ? <div className="mb-3 flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="grid size-7 place-items-center rounded text-slate-500 hover:bg-slate-100"
-                      aria-label={leftTab === "sections" ? "Collapse section palette" : "Collapse component palette"}
-                      title={leftTab === "sections" ? "Collapse section palette" : "Collapse component palette"}
-                      onClick={() => setLeftOpen(false)}
-                    >
-                      <Minus className="size-3" />
-                    </button>
-                    <input
-                      type="search"
-                      value={paletteQuery}
-                      onChange={(event) => setPaletteQuery(event.target.value)}
-                      placeholder={leftTab === "sections" ? (sectionPaletteTab === "page-sections" ? "Search page sections" : "Search sections") : (paletteTab === "sections" ? "Search blocks" : "Search components")}
-                      aria-label={leftTab === "sections" ? (sectionPaletteTab === "page-sections" ? "Search page sections" : "Search sections") : (paletteTab === "sections" ? "Search blocks" : "Search components")}
-                      className="h-8 min-w-0 flex-1 rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
-                    />
-                    <button
-                      type="button"
-                      className="grid size-7 place-items-center rounded text-slate-500 hover:bg-slate-100"
-                      aria-label="Clear palette search"
-                      title="Clear search"
-                      onClick={() => setPaletteQuery("")}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </div> : null}
+                  {leftTab !== "sections" ||
+                  sectionPaletteTab === "sections" ? (
+                    <div className="mb-3 flex items-center gap-1">
+                      <button
+                        type="button"
+                        className="grid size-7 place-items-center rounded text-slate-500 hover:bg-slate-100"
+                        aria-label={
+                          leftTab === "sections"
+                            ? "Collapse section palette"
+                            : "Collapse component palette"
+                        }
+                        title={
+                          leftTab === "sections"
+                            ? "Collapse section palette"
+                            : "Collapse component palette"
+                        }
+                        onClick={() => setLeftOpen(false)}
+                      >
+                        <Minus className="size-3" />
+                      </button>
+                      <input
+                        type="search"
+                        value={paletteQuery}
+                        onChange={(event) =>
+                          setPaletteQuery(event.target.value)
+                        }
+                        placeholder={
+                          leftTab === "sections"
+                            ? sectionPaletteTab === "page-sections"
+                              ? "Search page sections"
+                              : "Search sections"
+                            : paletteTab === "sections"
+                              ? "Search blocks"
+                              : "Search components"
+                        }
+                        aria-label={
+                          leftTab === "sections"
+                            ? sectionPaletteTab === "page-sections"
+                              ? "Search page sections"
+                              : "Search sections"
+                            : paletteTab === "sections"
+                              ? "Search blocks"
+                              : "Search components"
+                        }
+                        className="h-8 min-w-0 flex-1 rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-400"
+                      />
+                      <button
+                        type="button"
+                        className="grid size-7 place-items-center rounded text-slate-500 hover:bg-slate-100"
+                        aria-label="Clear palette search"
+                        title="Clear search"
+                        onClick={() => setPaletteQuery("")}
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </div>
+                  ) : null}
                   {leftTab === "components" && paletteTab === "components" ? (
                     <div className="space-y-5">
                       {paletteGroups.map((group) => {
                         const definitions = groupedDefinitions[group] ?? [];
-                        const sourceDefinitions = groupedSourceDefinitions[group] ?? [];
+                        const sourceDefinitions =
+                          groupedSourceDefinitions[group] ?? [];
                         return (
-                        <div key={group}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCollapsedPaletteGroups((current) => {
-                                const next = new Set(current);
-                                if (next.has(group)) next.delete(group);
-                                else next.add(group);
-                                return next;
-                              })
-                            }
-                            className="mb-2 flex w-full items-center justify-between text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-                            aria-expanded={!collapsedPaletteGroups.has(group)}
-                            aria-label={`${collapsedPaletteGroups.has(group) ? "Expand" : "Collapse"} ${group}`}
-                          >
-                            <span>{group}</span>
-                            {collapsedPaletteGroups.has(group) ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-                          </button>
-                          {!collapsedPaletteGroups.has(group) ? <div className="space-y-1.5">
-                            {definitions
-                              .filter((definition) =>
-                                `${definition.name} ${definition.category}`
+                          <div key={group}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCollapsedPaletteGroups((current) => {
+                                  const next = new Set(current);
+                                  if (next.has(group)) next.delete(group);
+                                  else next.add(group);
+                                  return next;
+                                })
+                              }
+                              className="mb-2 flex w-full items-center justify-between text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                              aria-expanded={!collapsedPaletteGroups.has(group)}
+                              aria-label={`${collapsedPaletteGroups.has(group) ? "Expand" : "Collapse"} ${group}`}
+                            >
+                              <span>{group}</span>
+                              {collapsedPaletteGroups.has(group) ? (
+                                <ChevronRight className="size-3" />
+                              ) : (
+                                <ChevronDown className="size-3" />
+                              )}
+                            </button>
+                            {!collapsedPaletteGroups.has(group) ? (
+                              <div className="space-y-1.5">
+                                {definitions
+                                  .flatMap((definition) =>
+                                    `${definition.name} ${definition.category}`
+                                      .toLowerCase()
+                                      .includes(
+                                        paletteQuery.trim().toLowerCase(),
+                                      )
+                                      ? [definition]
+                                      : [],
+                                  )
+                                  .map((definition) => (
+                                    <div
+                                      key={definition.id}
+                                      className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1.5"
+                                    >
+                                      <button
+                                        type="button"
+                                        className="min-w-0 flex-1 text-left"
+                                        data-testid={`cms-component-drag-${definition.id}`}
+                                        draggable={!disabled}
+                                        onDragStart={(event) => {
+                                          event.dataTransfer.setData(
+                                            "application/x-cms-component",
+                                            definition.id,
+                                          );
+                                          event.dataTransfer.setData(
+                                            "application/x-cms-component-id",
+                                            definition.id,
+                                          );
+                                          event.dataTransfer.setData(
+                                            "application/x-uvs-component",
+                                            definition.id,
+                                          );
+                                        }}
+                                        onClick={() =>
+                                          setMessage(
+                                            `${definition.name} is ready to drag into the page.`,
+                                          )
+                                        }
+                                      >
+                                        <span className="block truncate text-[11px] font-medium text-slate-700">
+                                          {definition.name}
+                                        </span>
+                                        <span className="block truncate text-[10px] text-slate-400">
+                                          {definition.category} ·{" "}
+                                          {definition.variants.length} variants
+                                        </span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={disabled}
+                                        className="grid size-6 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+                                        onClick={() =>
+                                          addBlock(
+                                            definition.id.replaceAll("-", "_"),
+                                          )
+                                        }
+                                        aria-label={`Add ${definition.name}`}
+                                      >
+                                        <Plus className="size-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                {sourceDefinitions.map((definition) => (
+                                  <div
+                                    key={definition.type}
+                                    className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1.5"
+                                  >
+                                    <button
+                                      type="button"
+                                      className="min-w-0 flex-1 text-left"
+                                      data-testid={`cms-visual-component-drag-${definition.type}`}
+                                      draggable={!disabled}
+                                      onDragStart={(event) => {
+                                        event.dataTransfer.setData(
+                                          "application/x-uvs-component",
+                                          `visual:${definition.type}`,
+                                        );
+                                      }}
+                                      onClick={() =>
+                                        setMessage(
+                                          `${definition.name ?? definition.type} is ready to add.`,
+                                        )
+                                      }
+                                    >
+                                      <Image
+                                        src={visualIconPath(definition)}
+                                        alt=""
+                                        aria-hidden="true"
+                                        width={28}
+                                        height={28}
+                                        className="mr-2 size-7 shrink-0 object-contain"
+                                      />
+                                      <span className="block truncate text-[11px] font-medium text-slate-700">
+                                        {definition.name ?? definition.type}
+                                      </span>
+                                      <span className="block truncate text-[10px] text-slate-400">
+                                        {definition.type}
+                                      </span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  {Object.entries(grouped).map(([group, items]) =>
+                    (paletteTab === "sections") !==
+                    (group === "Bootstrap 5") ? null : (
+                      <div key={group} className="mb-5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCollapsedPaletteGroups((current) => {
+                              const next = new Set(current);
+                              if (next.has(group)) next.delete(group);
+                              else next.add(group);
+                              return next;
+                            })
+                          }
+                          className="mb-2 flex w-full items-center justify-between text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
+                          aria-expanded={!collapsedPaletteGroups.has(group)}
+                          aria-label={`${collapsedPaletteGroups.has(group) ? "Expand" : "Collapse"} ${group}`}
+                        >
+                          <span>{group}</span>
+                          {collapsedPaletteGroups.has(group) ? (
+                            <ChevronRight className="size-3" />
+                          ) : (
+                            <ChevronDown className="size-3" />
+                          )}
+                        </button>
+                        {!collapsedPaletteGroups.has(group) ? (
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {items
+                              .flatMap((item) =>
+                                !FIXED_COMPONENT_TYPES.has(item.type) &&
+                                `${item.label} ${group}`
                                   .toLowerCase()
-                                  .includes(paletteQuery.trim().toLowerCase()),
+                                  .includes(paletteQuery.trim().toLowerCase())
+                                  ? [item]
+                                  : [],
                               )
-                              .map((definition) => (
-                                <div key={definition.id} className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1.5">
-                                  <button
-                                    type="button"
-                                    className="min-w-0 flex-1 text-left"
-                                    data-testid={`cms-component-drag-${definition.id}`}
-                                    draggable={!disabled}
-                                    onDragStart={(event) => {
-                                      event.dataTransfer.setData("application/x-cms-component", definition.id);
-                                      event.dataTransfer.setData("application/x-cms-component-id", definition.id);
-                                      event.dataTransfer.setData("application/x-uvs-component", definition.id);
-                                    }}
-                                    onClick={() => setMessage(`${definition.name} is ready to drag into the page.`)}
-                                  >
-                                    <span className="block truncate text-[11px] font-medium text-slate-700">{definition.name}</span>
-                                    <span className="block truncate text-[10px] text-slate-400">{definition.category} · {definition.variants.length} variants</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={disabled}
-                                    className="grid size-6 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
-                                    onClick={() => addBlock(definition.id.replaceAll("-", "_"))}
-                                    aria-label={`Add ${definition.name}`}
-                                  >
-                                    <Plus className="size-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            {sourceDefinitions.map((definition) => (
-                              <div key={definition.type} className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1.5">
+                              .map((item) => (
                                 <button
+                                  key={item.type}
                                   type="button"
-                                  className="min-w-0 flex-1 text-left"
-                                  data-testid={`cms-visual-component-drag-${definition.type}`}
+                                  disabled={disabled}
+                                  onClick={() => addBlock(item.type)}
                                   draggable={!disabled}
                                   onDragStart={(event) => {
-                                    event.dataTransfer.setData("application/x-uvs-component", `visual:${definition.type}`);
+                                    event.dataTransfer.setData(
+                                      "application/x-cms-block",
+                                      item.type,
+                                    );
+                                    event.dataTransfer.setData(
+                                      "application/x-uvs-component",
+                                      item.type,
+                                    );
                                   }}
-                                  onClick={() => setMessage(`${definition.name ?? definition.type} is ready to add.`)}
-                                  >
-                                    <Image src={visualIconPath(definition)} alt="" aria-hidden="true" width={28} height={28} className="mr-2 size-7 shrink-0 object-contain" />
-                                    <span className="block truncate text-[11px] font-medium text-slate-700">{definition.name ?? definition.type}</span>
-                                  <span className="block truncate text-[10px] text-slate-400">{definition.type}</span>
+                                  className="rounded border border-slate-200 bg-white px-2 py-2.5 text-left text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-40"
+                                >
+                                  <Plus className="mb-1 size-3 text-slate-400" />
+                                  {item.label}
                                 </button>
-                              </div>
-                            ))}
-                          </div> : null}
-                        </div>
-                      )})}
-                    </div>
-                  ) : null}
-                  {Object.entries(grouped).map(([group, items]) => (
-                    (paletteTab === "sections") !== (group === "Bootstrap 5") ? null : (
-                    <div key={group} className="mb-5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setCollapsedPaletteGroups((current) => {
-                            const next = new Set(current);
-                            if (next.has(group)) next.delete(group);
-                            else next.add(group);
-                            return next;
-                          })
-                        }
-                        className="mb-2 flex w-full items-center justify-between text-left text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
-                        aria-expanded={!collapsedPaletteGroups.has(group)}
-                        aria-label={`${collapsedPaletteGroups.has(group) ? "Expand" : "Collapse"} ${group}`}
-                      >
-                        <span>{group}</span>
-                        {collapsedPaletteGroups.has(group) ? <ChevronRight className="size-3" /> : <ChevronDown className="size-3" />}
-                      </button>
-                      {!collapsedPaletteGroups.has(group) ? <div className="grid grid-cols-2 gap-1.5">
-                        {items
-                          .filter(
-                            (item) =>
-                              !FIXED_COMPONENT_TYPES.has(item.type) &&
-                              `${item.label} ${group}`
-                                .toLowerCase()
-                                .includes(paletteQuery.trim().toLowerCase()),
-                          )
-                          .map((item) => (
-                            <button
-                              key={item.type}
-                              type="button"
-                              disabled={disabled}
-                              onClick={() => addBlock(item.type)}
-                              draggable={!disabled}
-                              onDragStart={(event) => {
-                                event.dataTransfer.setData("application/x-cms-block", item.type);
-                                event.dataTransfer.setData("application/x-uvs-component", item.type);
-                              }}
-                              className="rounded border border-slate-200 bg-white px-2 py-2.5 text-left text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-40"
-                            >
-                              <Plus className="mb-1 size-3 text-slate-400" />
-                              {item.label}
-                            </button>
-                          ))}
-                      </div> : null}
-                    </div>
-                    )
-                  ))}
+                              ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ),
+                  )}
                 </>
               ) : null}
-                  {leftTab === "sections" && sectionPaletteTab === "page-sections" ? (
-                    <div className="min-h-0 flex-1 overflow-y-auto">
-                      <ComponentTree
-                        nodes={componentTree}
-                        selectedId={selectedComponentId}
-                        expandedIds={expandedNodeIds}
-                        onToggle={(id) =>
-                          setExpandedNodeIds((current) => {
-                            const next = new Set(current);
-                            if (next.has(id)) next.delete(id);
-                            else next.add(id);
-                            return next;
-                          })
-                        }
-                        onSelect={(node) => {
-                          setSelectedId(node.blockId);
-                          setSelectedComponentId(node.id);
-                          setRightTab("content");
-                          setRightOpen(true);
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                  {(leftTab === "components" || leftTab === "sections") && (leftTab === "components" ? paletteTab === "sections" : sectionPaletteTab === "sections") ? (
+              {leftTab === "sections" &&
+              sectionPaletteTab === "page-sections" ? (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <ComponentTree
+                    nodes={componentTree}
+                    selectedId={selectedComponentId}
+                    expandedIds={expandedNodeIds}
+                    onToggle={(id) =>
+                      setExpandedNodeIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      })
+                    }
+                    onSelect={(node) => {
+                      setSelectedId(node.blockId);
+                      setSelectedComponentId(node.id);
+                      setRightTab("content");
+                      setRightOpen(true);
+                    }}
+                  />
+                </div>
+              ) : null}
+              {(leftTab === "components" || leftTab === "sections") &&
+              (leftTab === "components"
+                ? paletteTab === "sections"
+                : sectionPaletteTab === "sections") ? (
                 <div className="border-t border-slate-200 pt-4">
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Reusable
                   </p>
+                  <label
+                    htmlFor="cms-reusable-section-preset"
+                    className="sr-only"
+                  >
+                    Reusable section preset
+                  </label>
                   <select
+                    id="cms-reusable-section-preset"
+                    aria-label="Reusable section preset"
                     className="h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-600"
                     value={presetId}
                     onChange={(e) => setPresetId(e.target.value)}
@@ -3964,6 +4971,7 @@ export function CmsPageBuilder({
                     Add reusable section
                   </button>
                   <input
+                    aria-label="New reusable section name"
                     className="mt-3 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs"
                     value={presetName}
                     onChange={(e) => setPresetName(e.target.value)}
@@ -3990,10 +4998,18 @@ export function CmsPageBuilder({
             <div className="mx-auto w-full max-w-6xl">
               <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">CMS workspace</p>
-                  <p className="mt-1 text-sm font-medium text-slate-800">Content tool</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    CMS workspace
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">
+                    Content tool
+                  </p>
                 </div>
-                <button type="button" className="h-8 rounded border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50" onClick={() => setActiveTool(null)}>
+                <button
+                  type="button"
+                  className="h-8 rounded border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  onClick={() => setActiveTool(null)}
+                >
                   Back to canvas
                 </button>
               </div>
@@ -4068,9 +5084,18 @@ export function CmsPageBuilder({
                             <input
                               className="mt-2 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
                               value={String(
-                                (canvasDraftDefinition?.variants.find((variant) => variant.id === canvasVariantId)?.props ?? {})[item.key] ?? item.defaultValue ?? "",
+                                (canvasDraftDefinition?.variants.find(
+                                  (variant) => variant.id === canvasVariantId,
+                                )?.props ?? {})[item.key] ??
+                                  item.defaultValue ??
+                                  "",
                               )}
-                              onChange={(event) => updateCanvasVisualProp(item.key, event.target.value)}
+                              onChange={(event) =>
+                                updateCanvasVisualProp(
+                                  item.key,
+                                  event.target.value,
+                                )
+                              }
                               disabled={disabled}
                               aria-label={item.label}
                             />
@@ -4078,17 +5103,30 @@ export function CmsPageBuilder({
                         ))}
                       </div>
                       <div className="mt-4 space-y-2">
-                        <p className="text-[10px] text-slate-500">Style tokens</p>
-                        {Object.entries(canvasDraftDefinition?.styleTokens ?? canvasDefinition.styleTokens).map(([key, value]) => (
-                          <label key={key} className="block text-[10px] text-slate-500">
+                        <p className="text-[10px] text-slate-500">
+                          Style tokens
+                        </p>
+                        {Object.entries(
+                          canvasDraftDefinition?.styleTokens ??
+                            canvasDefinition.styleTokens,
+                        ).map(([key, value]) => (
+                          <label
+                            key={key}
+                            className="block text-[10px] text-slate-500"
+                          >
                             --cms-{key}
                             <input
                               className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
                               value={value}
                               onChange={(event) => {
                                 try {
-                                  const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
-                                  next.styleTokens = { ...next.styleTokens, [key]: event.target.value };
+                                  const next = JSON.parse(
+                                    canvasDraft,
+                                  ) as CmsComponentDefinition;
+                                  next.styleTokens = {
+                                    ...next.styleTokens,
+                                    [key]: event.target.value,
+                                  };
                                   setCanvasDraft(JSON.stringify(next, null, 2));
                                 } catch {
                                   // Keep invalid JSON in the code editor until it is repaired.
@@ -4104,7 +5142,9 @@ export function CmsPageBuilder({
                             checked={Boolean(canvasDraftDefinition?.responsive)}
                             onChange={(event) => {
                               try {
-                                const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                                const next = JSON.parse(
+                                  canvasDraft,
+                                ) as CmsComponentDefinition;
                                 next.responsive = event.target.checked;
                                 setCanvasDraft(JSON.stringify(next, null, 2));
                               } catch {
@@ -4127,7 +5167,8 @@ export function CmsPageBuilder({
                                 {slot.label}
                                 {slot.multiple ? " · multiple" : ""}
                               </span>
-                              {selectedEditorBlock?.componentId === canvasDefinition.id ? (
+                              {selectedEditorBlock?.componentId ===
+                              canvasDefinition.id ? (
                                 (slot.allowedComponentIds?.length
                                   ? slot.allowedComponentIds
                                   : componentDefinitions.map((item) => item.id)
@@ -4141,7 +5182,10 @@ export function CmsPageBuilder({
                                       type="button"
                                       className="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 hover:border-slate-400 hover:text-slate-900"
                                       onClick={() =>
-                                        addInstanceToSlot(slot.name, componentId)
+                                        addInstanceToSlot(
+                                          slot.name,
+                                          componentId,
+                                        )
                                       }
                                     >
                                       <Plus className="mr-1 inline size-3" />
@@ -4171,7 +5215,8 @@ export function CmsPageBuilder({
                           Component definition
                         </p>
                         <p className="mt-1 text-xs text-slate-300">
-                          Edit the reusable structure, props, slots, variants, and tokens. Changes apply to future instances.
+                          Edit the reusable structure, props, slots, variants,
+                          and tokens. Changes apply to future instances.
                         </p>
                       </div>
                       <button
@@ -4186,9 +5231,15 @@ export function CmsPageBuilder({
                         type="button"
                         className="h-8 shrink-0 rounded border border-slate-600 px-3 text-xs font-medium text-slate-100 hover:bg-slate-800 disabled:opacity-50"
                         onClick={() => void publishCanvasDefinition()}
-                        disabled={disabled || canvasSavePending || componentStatuses[canvasDefinition.id] === "published"}
+                        disabled={
+                          disabled ||
+                          canvasSavePending ||
+                          componentStatuses[canvasDefinition.id] === "published"
+                        }
                       >
-                        {componentStatuses[canvasDefinition.id] === "published" ? "Published" : "Publish version"}
+                        {componentStatuses[canvasDefinition.id] === "published"
+                          ? "Published"
+                          : "Publish version"}
                       </button>
                     </div>
                     {canvasVisualBlock ? (
@@ -4199,16 +5250,23 @@ export function CmsPageBuilder({
                               Visual component canvas
                             </p>
                             <p className="mt-1 text-xs text-slate-500">
-                              Edit the isolated DOM directly. Text changes update the selected reusable variant.
+                              Edit the isolated DOM directly. Text changes
+                              update the selected reusable variant.
                             </p>
                           </div>
-                          <div className="flex flex-wrap gap-1" role="tablist" aria-label="Component variants">
+                          <div
+                            className="flex flex-wrap gap-1"
+                            role="tablist"
+                            aria-label="Component variants"
+                          >
                             {canvasDefinition.variants.map((variant) => (
                               <button
                                 key={variant.id}
                                 type="button"
                                 role="tab"
-                                aria-selected={canvasVisualBlock.variantId === variant.id}
+                                aria-selected={
+                                  canvasVisualBlock.variantId === variant.id
+                                }
                                 className={`rounded border px-2 py-1 text-[10px] ${canvasVisualBlock.variantId === variant.id ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                                 onClick={() => setCanvasVariantId(variant.id)}
                               >
@@ -4221,10 +5279,13 @@ export function CmsPageBuilder({
                           ref={canvasVisualRef}
                           title="Isolated component definition canvas"
                           className="h-72 w-full rounded border border-dashed border-slate-300 bg-slate-50"
+                          sandbox="allow-scripts"
                           srcDoc={canvasVisualDocument}
                         />
                         <p className="mt-2 text-[10px] text-slate-500">
-                          Editable fields are marked from the component property registry. Structure, slots, and unsupported elements remain protected.
+                          Editable fields are marked from the component property
+                          registry. Structure, slots, and unsupported elements
+                          remain protected.
                         </p>
                       </div>
                     ) : null}
@@ -4232,7 +5293,9 @@ export function CmsPageBuilder({
                       value={canvasDraftDefinition?.markup ?? ""}
                       onChange={(event) => {
                         try {
-                          const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                          const next = JSON.parse(
+                            canvasDraft,
+                          ) as CmsComponentDefinition;
                           next.markup = event.target.value || undefined;
                           setCanvasDraft(JSON.stringify(next, null, 2));
                         } catch {
@@ -4248,7 +5311,9 @@ export function CmsPageBuilder({
                       value={canvasDraftDefinition?.styles ?? ""}
                       onChange={(event) => {
                         try {
-                          const next = JSON.parse(canvasDraft) as CmsComponentDefinition;
+                          const next = JSON.parse(
+                            canvasDraft,
+                          ) as CmsComponentDefinition;
                           next.styles = event.target.value || undefined;
                           setCanvasDraft(JSON.stringify(next, null, 2));
                         } catch {
@@ -4287,7 +5352,10 @@ export function CmsPageBuilder({
                         <iframe
                           title={`${variant.label} component definition preview`}
                           className="h-32 w-full rounded border border-slate-200 bg-white"
-                          srcDoc={canvasVariantPreviewDocuments.get(variant.id) ?? ""}
+                          sandbox="allow-scripts"
+                          srcDoc={
+                            canvasVariantPreviewDocuments.get(variant.id) ?? ""
+                          }
                         />
                       </div>
                       <div className="flex items-center justify-between px-4 py-3">
@@ -4350,8 +5418,8 @@ export function CmsPageBuilder({
                   <iframe
                     ref={iframeRef}
                     title="Storefront canvas"
+                    sandbox={previewSandbox}
                     src={previewUrl}
-                    onLoad={attachLiveCanvas}
                     className="block min-h-[720px] w-full border-0 bg-white"
                     style={{ pointerEvents: "auto" }}
                   />
@@ -4370,22 +5438,22 @@ export function CmsPageBuilder({
                       </span>
                     </div>
                   ) : null}
-                  {selectedPreview ? (
+                  {visibleSelectedPreview ? (
                     <div
                       className="pointer-events-none absolute z-10 border-2 border-blue-600 bg-blue-500/5 shadow-[0_0_0_1px_rgba(255,255,255,0.8)]"
                       style={{
-                        left: selectedPreview.rect.x,
-                        top: selectedPreview.rect.y,
-                        width: selectedPreview.rect.width,
-                        height: selectedPreview.rect.height,
+                        left: visibleSelectedPreview.rect.x,
+                        top: visibleSelectedPreview.rect.y,
+                        width: visibleSelectedPreview.rect.width,
+                        height: visibleSelectedPreview.rect.height,
                       }}
                     >
                       <span className="absolute -top-6 left-0 rounded bg-blue-600 px-1.5 py-1 text-[10px] font-medium leading-none text-white shadow-sm">
-                        {selectedPreview.label}
+                        {visibleSelectedPreview.label}
                       </span>
                     </div>
                   ) : null}
-                  {!hoveredPreview && !selectedPreview ? (
+                  {!hoveredPreview && !visibleSelectedPreview ? (
                     <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[10px] text-slate-500 shadow-sm">
                       <MousePointer2 className="mr-1 inline size-3" />
                       Select a section to edit it
@@ -4409,7 +5477,11 @@ export function CmsPageBuilder({
         </main>
         {rightOpen ? (
           <aside className="z-30 flex min-h-0 w-[310px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white max-sm:absolute max-sm:right-0 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(310px,calc(100vw-40px))] max-sm:shadow-xl">
-            <div role="tablist" aria-label="Element inspector" className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-200 px-3">
+            <div
+              role="tablist"
+              aria-label="Element inspector"
+              className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-200 px-3"
+            >
               <button
                 type="button"
                 onClick={() => setRightTab("content")}
@@ -4456,102 +5528,77 @@ export function CmsPageBuilder({
               ) : null}
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-            {rightTab === "settings" ? (
-              <div className="p-4">{settings}</div>
-            ) : rightTab === "code" ? (
-              <div className="space-y-3 p-4">
-                <div>
-                  <p className="text-xs font-medium text-slate-700">Page body</p>
-                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
-                    This source is sanitized before storefront rendering. Save after editing to publish the page body.
-                  </p>
+              {rightTab === "settings" ? (
+                <div className="p-4">{settings}</div>
+              ) : rightTab === "code" ? (
+                <div className="space-y-3 p-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-700">
+                      Page body
+                    </p>
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                      This source is sanitized before storefront rendering. Save
+                      after editing to publish the page body.
+                    </p>
+                  </div>
+                  {onPageBodyChange ? (
+                    <textarea
+                      className="min-h-[420px] w-full rounded border border-slate-200 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-100 outline-none focus:border-blue-500"
+                      value={pageBody ?? ""}
+                      onChange={(event) => onPageBodyChange(event.target.value)}
+                      disabled={disabled}
+                      spellCheck={false}
+                      aria-label="Page body source"
+                    />
+                  ) : (
+                    <p className="rounded border border-slate-200 bg-slate-50 p-3 text-[11px] leading-4 text-slate-500">
+                      Homepage content is managed by structured components and
+                      has no raw page body.
+                    </p>
+                  )}
                 </div>
-                {onPageBodyChange ? (
-                  <textarea
-                    className="min-h-[420px] w-full rounded border border-slate-200 bg-slate-950 p-3 font-mono text-[11px] leading-5 text-slate-100 outline-none focus:border-blue-500"
-                    value={pageBody ?? ""}
-                    onChange={(event) => onPageBodyChange(event.target.value)}
-                    disabled={disabled}
-                    spellCheck={false}
-                    aria-label="Page body source"
-                  />
-                ) : (
-                  <p className="rounded border border-slate-200 bg-slate-50 p-3 text-[11px] leading-4 text-slate-500">
-                    Homepage content is managed by structured components and has no raw page body.
-                  </p>
-                )}
-              </div>
-            ) : selected ? (
-              <div className="space-y-4 p-4">
-                {selectedPreview?.id ? (
-                  <div
-                    key={selectedPreview.id}
-                    className="space-y-3 rounded border border-blue-200 bg-blue-50/60 p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600">
-                          Live DOM element
-                        </p>
-                        <p className="mt-0.5 text-xs font-medium text-slate-700">
-                          {selectedPreview.tagName ?? "element"}
-                        </p>
+              ) : selected ? (
+                <div className="space-y-4 p-4">
+                  {visibleSelectedPreview?.id ? (
+                    <div
+                      key={visibleSelectedPreview.id}
+                      className="space-y-3 rounded border border-blue-200 bg-blue-50/60 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600">
+                            Live DOM element
+                          </p>
+                          <p className="mt-0.5 text-xs font-medium text-slate-700">
+                            {visibleSelectedPreview.tagName ?? "element"}
+                          </p>
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          {visibleSelectedPreview.id}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-400">{selectedPreview.id}</span>
-                    </div>
-                    {selectedPreview.text ? (
-                      <label className="block text-[10px] text-slate-600">
-                        Content
-                        <textarea
-                          defaultValue={selectedPreview.text}
-                          className="mt-1 min-h-16 w-full resize-y rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500"
-                          disabled={disabled}
-                          onChange={(event) => sendDomMutation("textContent", event.target.value)}
-                          onBlur={(event) => sendDomMutation("textContent", event.target.value)}
-                        />
-                      </label>
-                    ) : null}
-                    {selectedPreview.href ? (
-                      <label className="block text-[10px] text-slate-600">
-                        Link URL
-                        <input
-                          defaultValue={selectedPreview.href}
-                          className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-                          disabled={disabled}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              event.currentTarget.blur();
+                      {visibleSelectedPreview.text ? (
+                        <label className="block text-[10px] text-slate-600">
+                          Content
+                          <textarea
+                            defaultValue={visibleSelectedPreview.text}
+                            className="mt-1 min-h-16 w-full resize-y rounded border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-blue-500"
+                            disabled={disabled}
+                            onChange={(event) =>
+                              sendDomMutation("textContent", event.target.value)
                             }
-                          }}
-                          onBlur={(event) => sendDomMutation("href", event.target.value)}
-                        />
-                      </label>
-                    ) : null}
-                    {selectedPreview.src ? (
-                      <label className="block text-[10px] text-slate-600">
-                        Image URL
-                        <input
-                          defaultValue={selectedPreview.src}
-                          className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
-                          disabled={disabled}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              event.currentTarget.blur();
+                            onBlur={(event) =>
+                              sendDomMutation("textContent", event.target.value)
                             }
-                          }}
-                          onBlur={(event) => sendDomMutation("src", event.target.value)}
-                        />
-                      </label>
-                    ) : null}
-                    <div className="grid grid-cols-2 gap-2">
-                      {["width", "height", "min-width", "max-width", "margin", "padding", "gap", "display", "position", "color", "background-color", "background-size", "background-position", "font-family", "font-size", "font-weight", "line-height", "letter-spacing", "border", "border-radius", "box-shadow"].map((property) => (
-                        <label key={property} className="block text-[10px] text-slate-600">
-                          {property}
+                          />
+                        </label>
+                      ) : null}
+                      {visibleSelectedPreview.href ? (
+                        <label className="block text-[10px] text-slate-600">
+                          Link URL
                           <input
-                            defaultValue={selectedPreview.style?.[property] ?? ""}
-                            className="mt-1 h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
+                            defaultValue={visibleSelectedPreview.href}
+                            className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
                             disabled={disabled}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
@@ -4559,99 +5606,184 @@ export function CmsPageBuilder({
                                 event.currentTarget.blur();
                               }
                             }}
-                            onBlur={(event) => sendDomMutation(`style.${property}`, event.target.value)}
+                            onBlur={(event) =>
+                              sendDomMutation("href", event.target.value)
+                            }
                           />
                         </label>
-                      ))}
-                    </div>
-                    <p className="text-[10px] leading-4 text-slate-500">
-                      Changes apply to this live storefront element and are recorded in the page history.
-                    </p>
-                  </div>
-                ) : null}
-                <label className="block text-[11px] text-slate-500">
-                  Element
-                  <input
-                    className="mt-1 h-8 w-full rounded border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700"
-                    value={selectedComponent?.label ?? LABELS[selected.type]}
-                    readOnly
-                  />
-                </label>
-                {selectedInstance ? (
-                  <p className="rounded bg-slate-50 px-2.5 py-2 text-[11px] leading-4 text-slate-500">
-                    Editing an instance inside {LABELS[selected.type]}.
-                    Structure and style remain owned by the main component.
-                  </p>
-                ) : null}
-                {selectedDefinition && builderMode === "canvas" ? (
-                  <div className="space-y-3 rounded border border-slate-200 bg-slate-50 p-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                          Component instance
-                        </p>
-                        <p className="mt-0.5 text-xs font-medium text-slate-700">
-                          {selectedDefinition.name}
-                        </p>
-                      </div>
-                    </div>
-                    <label className="block text-[10px] text-slate-500">
-                      Variant
-                      <select
-                        className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                        value={
-                          selectedEditorBlock?.variantId ??
-                          selectedDefinition.defaultVariantId ??
-                          ""
-                        }
-                        onChange={(event) =>
-                          updateSelectedVariant(event.target.value)
-                        }
-                        disabled={
-                          disabled ||
-                          Boolean(selectedComponent?.fixed && !selectedInstance)
-                        }
-                      >
-                        {selectedDefinition.variants.map((variant) => (
-                          <option key={variant.id} value={variant.id}>
-                            {variant.label}
-                          </option>
+                      ) : null}
+                      {visibleSelectedPreview.src ? (
+                        <label className="block text-[10px] text-slate-600">
+                          Image URL
+                          <input
+                            defaultValue={visibleSelectedPreview.src}
+                            className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none focus:border-blue-500"
+                            disabled={disabled}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.currentTarget.blur();
+                              }
+                            }}
+                            onBlur={(event) =>
+                              sendDomMutation("src", event.target.value)
+                            }
+                          />
+                        </label>
+                      ) : null}
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          "width",
+                          "height",
+                          "min-width",
+                          "max-width",
+                          "margin",
+                          "padding",
+                          "gap",
+                          "display",
+                          "position",
+                          "color",
+                          "background-color",
+                          "background-size",
+                          "background-position",
+                          "font-family",
+                          "font-size",
+                          "font-weight",
+                          "line-height",
+                          "letter-spacing",
+                          "border",
+                          "border-radius",
+                          "box-shadow",
+                        ].map((property) => (
+                          <label
+                            key={property}
+                            className="block text-[10px] text-slate-600"
+                          >
+                            {property}
+                            <input
+                              defaultValue={
+                                visibleSelectedPreview.style?.[property] ?? ""
+                              }
+                              className="mt-1 h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
+                              disabled={disabled}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                              onBlur={(event) =>
+                                sendDomMutation(
+                                  `style.${property}`,
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </label>
                         ))}
-                      </select>
-                    </label>
-                    <div>
-                      <p className="text-[10px] text-slate-500">Slots</p>
-                      <div className="mt-1 space-y-2">
-                        {selectedDefinition.slots.length ? (
-                          selectedDefinition.slots.map((slot) => (
-                            <div
-                              key={slot.name}
-                              data-testid={`cms-slot-${selected.id}-${slot.name}`}
-                              className="rounded border border-dashed border-slate-300 bg-white p-2 transition-colors hover:border-blue-400 hover:bg-blue-50/30"
-                              onDragOver={(event) => event.preventDefault()}
-                                          onDrop={(event) => onDropSlot(event, slot.name)}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-medium text-slate-600">
-                                  {slot.label}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  {selectedEditorBlock?.slots?.[slot.name]?.length ?? 0}
-                                </span>
-                              </div>
-                              <div className="mt-1 space-y-1">
-                                {(selectedEditorBlock?.slots?.[slot.name] ?? []).map(
-                                  (child, index) => {
-                                    const childDefinition = componentDefinitions.find(
-                                      (definition) => definition.id === child.componentId,
-                                    );
-                                    const childLabel = childDefinition?.name ?? child.componentId;
-                                    const itemCount = selectedEditorBlock?.slots?.[slot.name]?.length ?? 0;
+                      </div>
+                      <p className="text-[10px] leading-4 text-slate-500">
+                        Changes apply to this live storefront element and are
+                        recorded in the page history.
+                      </p>
+                    </div>
+                  ) : null}
+                  <label className="block text-[11px] text-slate-500">
+                    Element
+                    <input
+                      className="mt-1 h-8 w-full rounded border border-slate-200 bg-slate-50 px-2 text-xs text-slate-700"
+                      value={selectedComponent?.label ?? LABELS[selected.type]}
+                      readOnly
+                    />
+                  </label>
+                  {selectedInstance ? (
+                    <p className="rounded bg-slate-50 px-2.5 py-2 text-[11px] leading-4 text-slate-500">
+                      Editing an instance inside {LABELS[selected.type]}.
+                      Structure and style remain owned by the main component.
+                    </p>
+                  ) : null}
+                  {selectedDefinition ? (
+                    <div className="space-y-3 rounded border border-slate-200 bg-slate-50 p-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            Component instance
+                          </p>
+                          <p className="mt-0.5 text-xs font-medium text-slate-700">
+                            {selectedDefinition.name}
+                          </p>
+                        </div>
+                      </div>
+                      <label className="block text-[10px] text-slate-500">
+                        Variant
+                        <select
+                          className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                          value={
+                            selectedEditorBlock?.variantId ??
+                            selectedDefinition.defaultVariantId ??
+                            ""
+                          }
+                          onChange={(event) =>
+                            updateSelectedVariant(event.target.value)
+                          }
+                          disabled={
+                            disabled ||
+                            Boolean(
+                              selectedComponent?.fixed && !selectedInstance,
+                            )
+                          }
+                        >
+                          {selectedDefinition.variants.map((variant) => (
+                            <option key={variant.id} value={variant.id}>
+                              {variant.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div>
+                        <p className="text-[10px] text-slate-500">Slots</p>
+                        <div className="mt-1 space-y-2">
+                          {selectedDefinition.slots.length ? (
+                            selectedDefinition.slots.map((slot) => (
+                              <div
+                                key={slot.name}
+                                data-testid={`cms-slot-${selected.id}-${slot.name}`}
+                                className="rounded border border-dashed border-slate-300 bg-white p-2 transition-colors hover:border-blue-400 hover:bg-blue-50/30"
+                                onDragOver={(event) => event.preventDefault()}
+                                onDrop={(event) => onDropSlot(event, slot.name)}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-medium text-slate-600">
+                                    {slot.label}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    {selectedEditorBlock?.slots?.[slot.name]
+                                      ?.length ?? 0}
+                                  </span>
+                                </div>
+                                <div className="mt-1 space-y-1">
+                                  {(
+                                    selectedEditorBlock?.slots?.[slot.name] ??
+                                    []
+                                  ).map((child, index) => {
+                                    const childDefinition =
+                                      componentDefinitions.find(
+                                        (definition) =>
+                                          definition.id === child.componentId,
+                                      );
+                                    const childLabel =
+                                      childDefinition?.name ??
+                                      child.componentId;
+                                    const itemCount =
+                                      selectedEditorBlock?.slots?.[slot.name]
+                                        ?.length ?? 0;
                                     return (
                                       <div
                                         key={child.id}
                                         draggable={!disabled}
-                                        onDragOver={(event) => event.preventDefault()}
+                                        onDragOver={(event) =>
+                                          event.preventDefault()
+                                        }
                                         onDrop={(event) => {
                                           event.stopPropagation();
                                           onDropSlot(event, slot.name, index);
@@ -4659,7 +5791,11 @@ export function CmsPageBuilder({
                                         onDragStart={(event) =>
                                           event.dataTransfer.setData(
                                             "application/x-cms-component-instance",
-                                            JSON.stringify({ id: child.id, blockId: selected.id, componentId: child.componentId }),
+                                            JSON.stringify({
+                                              id: child.id,
+                                              blockId: selected.id,
+                                              componentId: child.componentId,
+                                            }),
                                           )
                                         }
                                         className="flex items-center gap-1 rounded bg-slate-50 px-2 py-1"
@@ -4678,7 +5814,13 @@ export function CmsPageBuilder({
                                         <button
                                           type="button"
                                           className="grid size-5 place-items-center rounded text-slate-500 hover:bg-white disabled:opacity-30"
-                                          onClick={() => moveInstanceInSlot(slot.name, index, -1)}
+                                          onClick={() =>
+                                            moveInstanceInSlot(
+                                              slot.name,
+                                              index,
+                                              -1,
+                                            )
+                                          }
                                           disabled={disabled || index === 0}
                                           aria-label={`Move ${childLabel} up`}
                                         >
@@ -4687,8 +5829,16 @@ export function CmsPageBuilder({
                                         <button
                                           type="button"
                                           className="grid size-5 place-items-center rounded text-slate-500 hover:bg-white disabled:opacity-30"
-                                          onClick={() => moveInstanceInSlot(slot.name, index, 1)}
-                                          disabled={disabled || index === itemCount - 1}
+                                          onClick={() =>
+                                            moveInstanceInSlot(
+                                              slot.name,
+                                              index,
+                                              1,
+                                            )
+                                          }
+                                          disabled={
+                                            disabled || index === itemCount - 1
+                                          }
                                           aria-label={`Move ${childLabel} down`}
                                         >
                                           <ChevronRight className="size-3 rotate-90" />
@@ -4696,7 +5846,12 @@ export function CmsPageBuilder({
                                         <button
                                           type="button"
                                           className="grid size-5 place-items-center rounded text-red-500 hover:bg-red-50"
-                                          onClick={() => removeInstanceFromSlot(slot.name, index)}
+                                          onClick={() =>
+                                            removeInstanceFromSlot(
+                                              slot.name,
+                                              index,
+                                            )
+                                          }
                                           disabled={disabled}
                                           aria-label={`Remove ${childLabel}`}
                                         >
@@ -4704,221 +5859,242 @@ export function CmsPageBuilder({
                                         </button>
                                       </div>
                                     );
-                                  },
-                                )}
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-[10px] text-slate-400">
-                            No slots defined
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-[10px] leading-4 text-slate-400">
-                      Structure and style tokens are owned by the main
-                      component. This instance can change props, slots, and its
-                      selected variant.
-                    </p>
-                  </div>
-                ) : null}
-                {rightTab === "content" ? (
-                  <>
-                    {selectedVisualDefinition && selectedEditorBlock ? (
-                      <VisualPropertyFields
-                        block={selectedEditorBlock}
-                        definition={selectedVisualDefinition}
-                        disabled={disabled}
-                        onPickMedia={pickMediaForSelected}
-                        onChange={(key, value) => {
-                          const markup = visualMarkupWithProperty(
-                            text(selectedEditorBlock.props.markup, selectedVisualDefinition.markup),
-                            selectedVisualDefinition,
-                            key,
-                            String(value),
-                          );
-                          updateSelected({
-                            ...selectedEditorBlock.props,
-                            [key]: value,
-                            markup,
-                          });
-                          setMessage("Vvveb property updated.");
-                        }}
-                      />
-                    ) : (
-                      <BlockPropertyFields
-                        block={selectedEditorBlock ?? selected}
-                        definition={selectedDefinition}
-                        disabled={disabled}
-                        focus={selectedComponent ?? selectedPreviewFocus}
-                        onPickMedia={pickMediaForSelected}
-                        onChange={(key, value) => {
-                          updateSelected({
-                            ...(selectedEditorBlock?.props ?? {}),
-                            [key]: value,
-                          });
-                          setMessage("Property updated.");
-                        }}
-                      />
-                    )}
-                  </>
-                ) : null}
-                {rightTab === "layout" || rightTab === "style" || rightTab === "responsive" ? (
-                  <>
-                    {rightTab === "style" ? (
-                      <div className="rounded border border-slate-200 p-2.5">
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="text-[10px] text-slate-500">
-                            State
-                            <select
-                              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                              value={styleState}
-                              onChange={(event) => setStyleState(event.target.value)}
-                              disabled={disabled}
-                            >
-                              <option value="">- State -</option>
-                              <option value="hover">hover</option>
-                              <option value="active">active</option>
-                              <option value="nth-of-type(2n)">nth-of-type(2n)</option>
-                            </select>
-                          </label>
-                          <label className="text-[10px] text-slate-500">
-                            Theme
-                            <select
-                              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                              value={styleTheme ?? ""}
-                              onChange={(event) => setStyleTheme((event.target.value || null) as StyleTheme)}
-                              disabled={disabled}
-                            >
-                              <option value="">- Theme Auto -</option>
-                              <option value="light">Light</option>
-                              <option value="dark">Dark</option>
-                            </select>
-                          </label>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-slate-400">
+                              No slots defined
+                            </span>
+                          )}
                         </div>
                       </div>
-                    ) : null}
-                    <LayoutFields
-                      block={selectedEditorBlock ?? selected}
+                      <p className="text-[10px] leading-4 text-slate-400">
+                        Structure and style tokens are owned by the main
+                        component. This instance can change props, slots, and
+                        its selected variant.
+                      </p>
+                    </div>
+                  ) : null}
+                  {rightTab === "content" ? (
+                    <>
+                      {selectedVisualDefinition && selectedEditorBlock ? (
+                        <VisualPropertyFields
+                          block={selectedEditorBlock}
+                          definition={selectedVisualDefinition}
+                          disabled={disabled}
+                          onPickMedia={pickMediaForSelected}
+                          onChange={(key, value) => {
+                            const markup = visualMarkupWithProperty(
+                              text(
+                                selectedEditorBlock.props.markup,
+                                selectedVisualDefinition.markup,
+                              ),
+                              selectedVisualDefinition,
+                              key,
+                              String(value),
+                            );
+                            updateSelected({
+                              ...selectedEditorBlock.props,
+                              [key]: value,
+                              markup,
+                            });
+                            setMessage("Vvveb property updated.");
+                          }}
+                        />
+                      ) : (
+                        <BlockPropertyFields
+                          block={selectedEditorBlock ?? selected}
+                          definition={selectedDefinition}
+                          disabled={disabled}
+                          focus={selectedComponent ?? selectedPreviewFocus}
+                          onPickMedia={pickMediaForSelected}
+                          onChange={(key, value) => {
+                            updateSelected({
+                              ...(selectedEditorBlock?.props ?? {}),
+                              [key]: value,
+                            });
+                            setMessage("Property updated.");
+                          }}
+                        />
+                      )}
+                    </>
+                  ) : null}
+                  {rightTab === "layout" ||
+                  rightTab === "style" ||
+                  rightTab === "responsive" ? (
+                    <>
+                      {rightTab === "style" ? (
+                        <div className="rounded border border-slate-200 p-2.5">
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[10px] text-slate-500">
+                              State
+                              <select
+                                className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                                value={styleState}
+                                onChange={(event) =>
+                                  setStyleState(event.target.value)
+                                }
+                                disabled={disabled}
+                              >
+                                <option value="">- State -</option>
+                                <option value="hover">hover</option>
+                                <option value="active">active</option>
+                                <option value="nth-of-type(2n)">
+                                  nth-of-type(2n)
+                                </option>
+                              </select>
+                            </label>
+                            <label className="text-[10px] text-slate-500">
+                              Theme
+                              <select
+                                className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                                value={styleTheme ?? ""}
+                                onChange={(event) =>
+                                  setStyleTheme(
+                                    (event.target.value || null) as StyleTheme,
+                                  )
+                                }
+                                disabled={disabled}
+                              >
+                                <option value="">- Theme Auto -</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                              </select>
+                            </label>
+                          </div>
+                        </div>
+                      ) : null}
+                      <LayoutFields
+                        block={selectedEditorBlock ?? selected}
+                        disabled={
+                          disabled ||
+                          Boolean(selectedComponent?.fixed && !selectedInstance)
+                        }
+                        onChange={(layout) =>
+                          updateSelected({
+                            ...(selectedEditorBlock?.props ?? {}),
+                            layout: {
+                              ...(selectedEditorBlock?.props.layout &&
+                              typeof selectedEditorBlock.props.layout ===
+                                "object"
+                                ? selectedEditorBlock.props.layout
+                                : {}),
+                              ...layout,
+                            },
+                          })
+                        }
+                        onAccessibilityChange={(accessibility) =>
+                          updateSelected({
+                            ...(selectedEditorBlock?.props ?? {}),
+                            accessibility,
+                          })
+                        }
+                      />
+                    </>
+                  ) : null}
+                  {rightTab === "advanced" ? (
+                    <details open className="rounded border border-slate-200">
+                      <summary className="cursor-pointer px-2.5 py-2 text-[11px] font-medium text-slate-600">
+                        Advanced JSON
+                      </summary>
+                      <textarea
+                        className="min-h-48 w-full border-t border-slate-200 bg-white p-2 font-mono text-[11px] leading-5 text-slate-700 outline-none"
+                        value={propsDraft}
+                        onChange={(e) => setPropsDraft(e.target.value)}
+                        onBlur={() => {
+                          try {
+                            const parsed = JSON.parse(propsDraft) as unknown;
+                            if (
+                              parsed &&
+                              typeof parsed === "object" &&
+                              !Array.isArray(parsed)
+                            ) {
+                              updateSelected(parsed as Record<string, unknown>);
+                              setMessage("Properties updated.");
+                            }
+                          } catch {
+                            setMessage("Properties must be valid JSON.");
+                          }
+                        }}
+                        disabled={disabled}
+                        aria-label="Advanced block properties JSON"
+                      />
+                    </details>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      aria-label="Move selected block left"
+                      className="h-8 rounded border border-slate-200 text-xs hover:bg-slate-50 disabled:opacity-30"
+                      onClick={() => move(-1)}
                       disabled={
                         disabled ||
-                        Boolean(selectedComponent?.fixed && !selectedInstance)
+                        FIXED_COMPONENT_TYPES.has(selected.type) ||
+                        blocks.findIndex((b) => b.id === selected.id) === 0
                       }
-                      onChange={(layout) =>
-                        updateSelected({
-                          ...(selectedEditorBlock?.props ?? {}),
-                          layout: {
-                            ...(selectedEditorBlock?.props.layout && typeof selectedEditorBlock.props.layout === "object"
-                              ? selectedEditorBlock.props.layout
-                              : {}),
-                            ...layout,
-                          },
-                        })
+                    >
+                      <ChevronLeft className="mx-auto size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Move selected block right"
+                      className="h-8 rounded border border-slate-200 text-xs hover:bg-slate-50 disabled:opacity-30"
+                      onClick={() => move(1)}
+                      disabled={
+                        disabled ||
+                        FIXED_COMPONENT_TYPES.has(selected.type) ||
+                        blocks.findIndex((b) => b.id === selected.id) ===
+                          blocks.length - 1
                       }
-                      onAccessibilityChange={(accessibility) =>
-                        updateSelected({
-                          ...(selectedEditorBlock?.props ?? {}),
-                          accessibility,
-                        })
-                      }
-                    />
-                  </>
-                ) : null}
-                {rightTab === "advanced" ? (
-                  <details open className="rounded border border-slate-200">
-                    <summary className="cursor-pointer px-2.5 py-2 text-[11px] font-medium text-slate-600">
-                      Advanced JSON
-                    </summary>
-                    <textarea
-                      className="min-h-48 w-full border-t border-slate-200 bg-white p-2 font-mono text-[11px] leading-5 text-slate-700 outline-none"
-                      value={propsDraft}
-                      onChange={(e) => setPropsDraft(e.target.value)}
-                      onBlur={() => {
-                        try {
-                          const parsed = JSON.parse(propsDraft) as unknown;
-                          if (
-                            parsed &&
-                            typeof parsed === "object" &&
-                            !Array.isArray(parsed)
-                          ) {
-                            updateSelected(parsed as Record<string, unknown>);
-                            setMessage("Properties updated.");
-                          }
-                        } catch {
-                          setMessage("Properties must be valid JSON.");
-                        }
-                      }}
-                      disabled={disabled}
-                      aria-label="Advanced block properties JSON"
-                    />
-                  </details>
-                ) : null}
-                <div className="grid grid-cols-2 gap-2">
+                    >
+                      <ChevronRight className="mx-auto size-3.5" />
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    className="h-8 rounded border border-slate-200 text-xs hover:bg-slate-50 disabled:opacity-30"
-                    onClick={() => move(-1)}
+                    className="h-8 w-full rounded border border-red-200 text-xs text-red-600 hover:bg-red-50"
+                    onClick={removeSelected}
                     disabled={
                       disabled ||
-                      FIXED_COMPONENT_TYPES.has(selected.type) ||
-                      blocks.findIndex((b) => b.id === selected.id) === 0
+                      Boolean(selectedInstance) ||
+                      FIXED_COMPONENT_TYPES.has(selected.type)
                     }
                   >
-                    <ChevronLeft className="mx-auto size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="h-8 rounded border border-slate-200 text-xs hover:bg-slate-50 disabled:opacity-30"
-                    onClick={() => move(1)}
-                    disabled={
-                      disabled ||
-                      FIXED_COMPONENT_TYPES.has(selected.type) ||
-                      blocks.findIndex((b) => b.id === selected.id) ===
-                        blocks.length - 1
-                    }
-                  >
-                    <ChevronRight className="mx-auto size-3.5" />
+                    Remove component
                   </button>
                 </div>
-                <button
-                  type="button"
-                  className="h-8 w-full rounded border border-red-200 text-xs text-red-600 hover:bg-red-50"
-                  onClick={removeSelected}
-                  disabled={
-                    disabled ||
-                    Boolean(selectedInstance) ||
-                    FIXED_COMPONENT_TYPES.has(selected.type)
-                  }
+              ) : (
+                <div
+                  className="m-3 flex items-start gap-2 rounded border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-500"
+                  role="alert"
                 >
-                  Remove component
-                </button>
-              </div>
-            ) : (
-              <div className="m-3 flex items-start gap-2 rounded border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-500" role="alert">
-                <button
-                  type="button"
-                  className="grid size-6 shrink-0 place-items-center rounded hover:bg-white"
-                  aria-label="Close"
-                  title="Close"
-                  onClick={() => setRightOpen(false)}
+                  <button
+                    type="button"
+                    className="grid size-6 shrink-0 place-items-center rounded hover:bg-white"
+                    aria-label="Close"
+                    title="Close"
+                    onClick={() => setRightOpen(false)}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                  <span>
+                    <strong className="font-semibold text-slate-700">
+                      No selected element!
+                    </strong>{" "}
+                    Click on an element to edit.
+                  </span>
+                </div>
+              )}
+              {message ? (
+                <p
+                  className="mx-4 rounded bg-slate-100 px-2.5 py-2 text-[11px] text-slate-500"
+                  role="status"
                 >
-                  <X className="size-3.5" />
-                </button>
-                <span>
-                  <strong className="font-semibold text-slate-700">No selected element!</strong>{" "}
-                  Click on an element to edit.
-                </span>
-              </div>
-            )}
-            {message ? (
-              <p
-                className="mx-4 rounded bg-slate-100 px-2.5 py-2 text-[11px] text-slate-500"
-                role="status"
-              >
-                {message}
-              </p>
-            ) : null}
+                  {message}
+                </p>
+              ) : null}
             </div>
           </aside>
         ) : null}

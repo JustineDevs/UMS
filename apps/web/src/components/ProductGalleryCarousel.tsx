@@ -236,9 +236,9 @@ export function ProductGalleryCarousel({
               role="tablist"
               aria-label="Gallery position"
             >
-              {slides.map((_, i) => (
+              {slides.map((slide, i) => (
                 <button
-                  key={i}
+                  key={`${slide.kind}-${slide.url}`}
                   type="button"
                   role="tab"
                   aria-selected={i === safe}
@@ -261,7 +261,7 @@ export function ProductGalleryCarousel({
         >
           {slides.map((s, idx) => (
             <button
-              key={`${s.kind}-${idx}-${s.url.slice(0, 40)}`}
+              key={`${s.kind}-${s.url}`}
               type="button"
               role="tab"
               aria-selected={idx === safe}

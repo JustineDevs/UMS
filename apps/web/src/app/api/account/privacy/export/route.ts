@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getStorefrontSession } from "@/lib/auth";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { readResponseJson } from "@/lib/read-response-json";
+import { accountPrivacyExportResponseSchema } from "@/lib/admin-api-contracts";
 
 export const runtime = "nodejs";
 
@@ -36,8 +38,10 @@ export async function GET(req: Request): Promise<Response> {
         { status: response.status === 404 ? 404 : 503, headers: { "Cache-Control": "no-store" } },
       );
     }
-    const data = await response.json();
-    return NextResponse.json(data, {
+    const data = await readResponseJson(response, { error: "invalid_worker_response" });
+    const parsed = accountPrivacyExportResponseSchema.safeParse(data);
+    if (!parsed.success) return NextResponse.json({ error: "Your data export returned an invalid response." }, { status: 502, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json(parsed.data, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate",
         "Content-Disposition": 'attachment; filename="my-account-data.json"',

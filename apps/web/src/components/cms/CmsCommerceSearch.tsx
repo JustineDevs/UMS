@@ -41,10 +41,10 @@ export function CmsCommerceSearch() {
   const loadCategories = useCallback(() => {
     void fetch("/api/admin/catalog/categories")
       .then(async (r) => {
+        if (!r.ok) return;
         const j = (await r.json()) as {
           categories?: { id: string; name: string; handle: string }[];
         };
-        if (!r.ok) return;
         setCategories(j.categories ?? []);
       })
       .catch(() => setCategories([]));
@@ -87,7 +87,7 @@ export function CmsCommerceSearch() {
   return (
     <div className="max-w-5xl space-y-4">
       <p className="text-sm text-slate-600">
-        Table uses the live Medusa catalog. Links open the staff product editor
+        Table uses the live commerce catalog. Links open the staff product editor
         and storefront PDP.
       </p>
       <div className="flex flex-wrap items-end gap-2">

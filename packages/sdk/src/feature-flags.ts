@@ -1,4 +1,4 @@
-export type FeatureFlagDef = {
+type FeatureFlagDef = {
   key: string;
   envVar: string;
   defaultEnabled: boolean;
@@ -35,22 +35,6 @@ export function isFeatureEnabled(key: string): boolean {
   return readEnvFlag(def.envVar, def.defaultEnabled);
 }
 
-export function getFeatureFlags(): Record<string, boolean> {
-  const result: Record<string, boolean> = {};
-  for (const def of FLAG_REGISTRY) {
-    result[def.key] = readEnvFlag(def.envVar, def.defaultEnabled);
-  }
-  return result;
-}
-
-export function getKillSwitchFlags(): FeatureFlagDef[] {
-  return FLAG_REGISTRY.filter((f) => f.killSwitch);
-}
-
 export function getAllFlagDefs(): FeatureFlagDef[] {
   return [...FLAG_REGISTRY];
-}
-
-export function getDisabledFeatures(): string[] {
-  return FLAG_REGISTRY.filter((f) => !readEnvFlag(f.envVar, f.defaultEnabled)).map((f) => f.key);
 }

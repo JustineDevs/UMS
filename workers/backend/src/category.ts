@@ -1,6 +1,7 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 
 type CategoryRow = { id: string; collection_id: string | null; collection_handle: string; locale: string; intro_html: string; banner_url: string | null; banner_alt: string | null; blocks: unknown; updated_at: string };
+const MAX_PUBLIC_CATEGORY_CONTENT = 500;
 
 export async function getCategoryContent(database: WorkerDatabaseClient, handle: string, locale: string, organizationId: string): Promise<CategoryRow | null> {
   const result = await database.query<CategoryRow>(`SELECT id, collection_id, collection_handle, locale, intro_html, banner_url, banner_alt, blocks, updated_at FROM public.cms_category_content WHERE organization_id = $1 AND collection_handle = $2 AND locale = $3 LIMIT 1`, [organizationId, handle, locale]);
@@ -8,7 +9,7 @@ export async function getCategoryContent(database: WorkerDatabaseClient, handle:
 }
 
 export async function listCategoryContent(database: WorkerDatabaseClient, locale: string, organizationId: string): Promise<CategoryRow[]> {
-  const result = await database.query<CategoryRow>(`SELECT id, collection_id, collection_handle, locale, intro_html, banner_url, banner_alt, blocks, updated_at FROM public.cms_category_content WHERE organization_id = $1 AND locale = $2 ORDER BY collection_handle`, [organizationId, locale]);
+  const result = await database.query<CategoryRow>(`SELECT id, collection_id, collection_handle, locale, intro_html, banner_url, banner_alt, blocks, updated_at FROM public.cms_category_content WHERE organization_id = $1 AND locale = $2 ORDER BY collection_handle, id LIMIT ${MAX_PUBLIC_CATEGORY_CONTENT}`, [organizationId, locale]);
   return result.rows;
 }
 

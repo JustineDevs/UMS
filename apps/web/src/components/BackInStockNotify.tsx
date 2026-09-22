@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type Props = {
   productId: string;
@@ -12,10 +12,12 @@ export function BackInStockNotify({ productId, productSlug, variantId }: Props) 
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [message, setMessage] = useState("");
+  const submittingRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || status === "loading" || submittingRef.current) return;
+    submittingRef.current = true;
     setStatus("loading");
     try {
       const res = await fetch("/api/back-in-stock", {
@@ -33,6 +35,8 @@ export function BackInStockNotify({ productId, productSlug, variantId }: Props) 
     } catch {
       setStatus("error");
       setMessage("Could not submit. Check your connection and try again.");
+    } finally {
+      submittingRef.current = false;
     }
   }
 
@@ -50,7 +54,9 @@ export function BackInStockNotify({ productId, productSlug, variantId }: Props) 
         This item is currently out of stock. Enter your email to be notified when it is available.
       </p>
       <form onSubmit={handleSubmit} className="flex gap-2">
+        <label htmlFor="back-in-stock-email" className="sr-only">Email address</label>
         <input
+          id="back-in-stock-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}

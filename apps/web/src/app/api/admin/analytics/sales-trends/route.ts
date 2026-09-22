@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
-import { fetchCanonicalSalesTrends } from "@/lib/analytics-bridge";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
+import { correlatedError } from "@/lib/staff-api-response";
+import { adminAnalyticsSalesTrendsResponseSchema } from "@/lib/admin-api-contracts";
+import { proxyWorkerAdminRoute } from "@/lib/worker-admin-route-proxy";
 
 export async function GET(req: NextRequest) {
   const cid = getCorrelationId(req);
@@ -12,7 +13,12 @@ export async function GET(req: NextRequest) {
   if (!staffSessionAllows(session, "analytics:read")) {
     return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
   }
-  const months = Number(req.nextUrl.searchParams.get("months") ?? "6");
-  const data = await fetchCanonicalSalesTrends(months);
-  return correlatedJson(cid, { data });
+  try {
+    const response = await proxyWorkerAdminRoute(req, "/api/admin/analytics/sales-trends", adminAnalyticsSalesTrendsResponseSchema);
+    const headers = new Headers(response.headers);
+    headers.set("x-request-id", cid);
+    return new Response(response.body, { status: response.status, headers });
+  } catch {
+    return correlatedError(cid, 503, "Analytics service is unavailable", "SERVICE_UNAVAILABLE");
+  }
 }

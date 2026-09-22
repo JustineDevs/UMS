@@ -23,6 +23,12 @@ if (command.length === 0) {
 
 const intervalMs = clampInteger(process.env.UVS_MEMORY_PROBE_INTERVAL_MS, 5000, 1000, 60000);
 const durationMs = clampInteger(process.env.UVS_MEMORY_PROBE_DURATION_MS, 15 * 60 * 1000, 60000, 60 * 60 * 1000);
+const maxTotalRssMiB = clampInteger(
+  process.env.UVS_MEMORY_PROBE_MAX_TOTAL_RSS_MIB,
+  6000,
+  512,
+  32 * 1024,
+);
 const startedAt = Date.now();
 const samples = [];
 const counters = { fastRefresh: 0, fullReload: 0, errors: 0 };
@@ -125,6 +131,9 @@ async function sample() {
   };
   samples.push(record);
   log({ type: "sample", ...record });
+  if (record.totalRssMiB >= maxTotalRssMiB) {
+    stop("rss-threshold", 1);
+  }
 }
 
 const timer = setInterval(() => void sample(), intervalMs);
@@ -151,6 +160,7 @@ function stop(reason, code = 0) {
     peakRssMiB: Math.round((peak / 1024 / 1024) * 10) / 10,
     samples: samples.length,
     counters,
+    maxTotalRssMiB,
   });
   process.exitCode = code;
 }

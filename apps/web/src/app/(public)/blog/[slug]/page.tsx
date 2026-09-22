@@ -8,6 +8,7 @@ import {
   buildJsonLdArticle,
   buildJsonLdBreadcrumb,
   buildPageMetadata,
+  serializeJsonLd,
   SEO_KEYWORDS,
 } from "@/lib/seo";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
@@ -58,11 +59,11 @@ export default async function BlogPostPage({ params }: Props) {
     <article className="storefront-page-shell max-w-3xl">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1 text-xs text-on-surface-variant">
         <Link href="/" className="hover:text-primary">Home</Link>

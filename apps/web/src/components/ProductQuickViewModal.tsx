@@ -36,30 +36,29 @@ export function ProductQuickViewModal({
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       try {
         const res = await fetch(
           `/api/shop/product?slug=${encodeURIComponent(slug)}`,
+          { signal: controller.signal },
         );
         const data = (await res.json()) as {
           product?: Product;
           error?: string;
         };
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         if (!res.ok) {
           setError(data.error ?? "Unable to load");
           return;
         }
         if (data.product) setProduct(data.product);
       } catch {
-        if (!cancelled) setError("Network error");
+        if (!controller.signal.aborted) setError("Network error");
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [slug, open]);
 
   useEffect(() => {

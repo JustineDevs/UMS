@@ -2,9 +2,11 @@ import { type NextFetchEvent, NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { tryCmsRedirect } from "@/lib/cms-redirect";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
+import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
+  if (process.env.NODE_ENV === "development" && process.env.UVS_E2E_REAL_SESSION === "1" && process.env.VERCEL !== "1" && request.cookies.has(E2E_SESSION_COOKIE)) return response;
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return response;
@@ -31,6 +33,7 @@ async function updateSupabaseSession(request: NextRequest): Promise<NextResponse
 }
 
 function isAuthDisabledForQa(): boolean {
+  if (process.env.UVS_E2E_LOCAL === "1" && process.env.VERCEL !== "1") return true;
   if (process.env.NODE_ENV === "production") return false;
   return [
     process.env.AUTH_DISABLED,
@@ -102,6 +105,14 @@ export default async function middleware(
       console.warn("[tracking] view_rate_limited", { status: 429 });
       return response;
     }
+  }
+
+  // API route handlers perform their own session and authorization checks. Do
+  // not spend a second Supabase lookup or CMS redirect query in middleware.
+  if (requestWithId.nextUrl.pathname.startsWith("/api/")) {
+    const apiResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    apiResponse.headers.set("x-request-id", requestId);
+    return apiResponse;
   }
 
   const redirect = await tryCmsRedirect(requestWithId);

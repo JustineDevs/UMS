@@ -103,7 +103,7 @@ function shipmentProgress(status: ShipmentStatus) {
 
 function formatDate(value: string | null) {
   if (!value) return "Pending update";
-  return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(value).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" });
 }
 
 function toWorkspaceShipment(row: DeliveryLogisticsShipmentRow, eventCount: number): WorkspaceShipment {

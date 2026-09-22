@@ -3,7 +3,7 @@ import Link from "next/link";
 import { loadCmsPagePublic } from "@universal-music-store/platform-data";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import { Faq4 } from "@universal-music-store/ui";
-import { buildJsonLdFaq, buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import { buildJsonLdFaq, buildPageMetadata, serializeJsonLd, SEO_KEYWORDS } from "@/lib/seo";
 
 export const revalidate = 120;
 
@@ -48,7 +48,7 @@ export default async function FaqPage() {
       {faqJsonLd ? (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
         />
       ) : null}
       <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">

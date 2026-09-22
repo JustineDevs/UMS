@@ -1,4 +1,5 @@
 import { fetchWorkerInventoryPage } from "@/lib/worker-admin-bridge";
+import { adminInventoryStreamResponseSchema } from "@/lib/admin-api-contracts";
 
 const TICK_MS = 10_000;
 type InventoryPage = Awaited<ReturnType<typeof fetchWorkerInventoryPage>>;
@@ -48,17 +49,17 @@ export function createInventoryStream(
         try {
           const result = await fetchPage({ limit: pageSize, offset, signal: req.signal });
           if (closed) return;
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ rows: result.rows, page, pageSize, total: result.total })}\n\n`,
-            ),
-          );
-        } catch (error) {
+          const payload = adminInventoryStreamResponseSchema.safeParse({ rows: result.rows, page, pageSize, total: result.total });
+          if (!payload.success) {
+            controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ code: "INVENTORY_STREAM_FAILED", retryable: true })}\n\n`));
+            return;
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload.data)}\n\n`));
+        } catch {
           if (closed) return;
-          const message = error instanceof Error ? error.message : String(error);
           try {
             controller.enqueue(
-              encoder.encode(`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`),
+              encoder.encode(`event: error\ndata: ${JSON.stringify(adminInventoryStreamResponseSchema.parse({ code: "INVENTORY_STREAM_FAILED", retryable: true }))}\n\n`),
             );
           } catch {
             close();

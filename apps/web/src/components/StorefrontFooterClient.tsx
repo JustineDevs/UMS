@@ -10,10 +10,12 @@ export function StorefrontFooterClient({
   columns,
   bottomLinks,
   socialLinks,
+  copyright,
 }: {
   columns: FooterColumn[];
   bottomLinks: FooterLink[];
   socialLinks: FooterLink[];
+  copyright: string;
 }) {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
@@ -37,7 +39,7 @@ export function StorefrontFooterClient({
       <Footer12
         brandName="Universal Music Store"
         brandImageSrc="/brand/universal-music-store-logo-landscape.png"
-        copyright={`© ${new Date().getFullYear()} Universal Music Store. All rights reserved.`}
+        copyright={copyright}
         columns={columns}
         socialLinks={socialLinks.map((link) => ({
           ...link,

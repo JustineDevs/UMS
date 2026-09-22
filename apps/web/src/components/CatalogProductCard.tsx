@@ -130,7 +130,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
             </div>
           )}
 
-          <div className="pointer-events-none absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <div className="pointer-events-none absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 transition-[transform,opacity] duration-300 group-hover:translate-y-0 group-hover:opacity-100">
             <span className="block w-full bg-primary py-3 text-center text-xs font-bold uppercase tracking-widest text-on-primary">
               View product
             </span>

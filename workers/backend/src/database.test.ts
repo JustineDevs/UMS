@@ -5,38 +5,19 @@ import {
   withWorkerTransaction,
 } from "./database.ts";
 
-test("uses the Hyperdrive connection string when configured", async () => {
-  const calls: string[] = [];
-  class FakeClient {
-    async connect(): Promise<void> {
-      calls.push("connect");
-    }
-    async query<T>(): Promise<{ rows: T[]; rowCount: number }> {
-      calls.push("query");
-      return { rows: [], rowCount: 0 };
-    }
-    async end(): Promise<void> {
-      calls.push("end");
-    }
-  }
-  const client = createWorkerDatabaseClient(
-    {
-      HYPERDRIVE: { connectionString: "postgres://hyperdrive" },
-      MEDUSA_DB_URL: "postgres://fallback",
-    },
-    (options) => {
-      calls.push(`construct:${options.connectionString}`);
-      return new FakeClient();
-    },
+test("rejects a generic Hyperdrive binding even when the removed compatibility flag is set", () => {
+  const genericEnv = {
+    HYPERDRIVE: { connectionString: "postgres://generic" },
+    UVS_ALLOW_LEGACY_HYPERDRIVE: "1",
+  };
+  assert.throws(
+    () => createWorkerDatabaseClient(genericEnv),
+    /database_not_configured/,
   );
-  await client.query("select 1");
-  await client.end();
-  assert.deepEqual(calls, [
-    "construct:postgres://hyperdrive",
-    "connect",
-    "query",
-    "end",
-  ]);
+  assert.throws(
+    () => createWorkerDatabaseClient(genericEnv, "app"),
+    /app_database_not_configured/,
+  );
 });
 
 test("keeps APP and Medusa database roles on their own bindings", async () => {

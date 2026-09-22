@@ -40,8 +40,10 @@ const diagnostics = (report.diagnostics || []).filter((item) => {
 });
 const summary = report.summary || {};
 const errorCount = diagnostics.filter((item) => item.severity === "error").length;
+const warningCount = diagnostics.filter((item) => item.severity === "warning").length;
+const warningBudget = Number.parseInt(process.env.REACT_DOCTOR_WARNING_BUDGET || "286", 10);
 console.log(
-  `[react-doctor] ${diagnostics.length} diagnostics: ${errorCount} errors, ${diagnostics.filter((item) => item.severity === "warning").length} warnings`,
+  `[react-doctor] ${diagnostics.length} diagnostics: ${errorCount} errors, ${warningCount} warnings (budget ${warningBudget})`,
 );
 
 for (const diagnostic of diagnostics.filter(
@@ -53,6 +55,10 @@ for (const diagnostic of diagnostics.filter(
 }
 
 // React Doctor returns a non-zero status when its configured blocking mode
-// sees diagnostics, including warnings. This wrapper intentionally blocks only
-// on source-level errors; warnings remain visible in CI output for triage.
-process.exit(errorCount > 0 ? 1 : 0);
+// sees diagnostics, including warnings. The wrapper keeps the source-level
+// error gate and adds a ratchet: warning growth fails CI, while reducing the
+// backlog lowers the effective baseline for future runs.
+if (warningCount > warningBudget) {
+  console.error(`[react-doctor] warning budget exceeded: ${warningCount} > ${warningBudget}`);
+}
+process.exit(errorCount > 0 || warningCount > warningBudget ? 1 : 0);

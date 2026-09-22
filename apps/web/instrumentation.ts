@@ -1,22 +1,16 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-import { getAuthSecret } from "./src/lib/auth-secret";
-
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;
   }
-  const { ensureStorefrontRuntimeEnvLoaded } = await import(
-    "./src/lib/storefront-runtime-env"
-  );
-  const storefrontDir = path.dirname(fileURLToPath(import.meta.url));
-  ensureStorefrontRuntimeEnvLoaded({ cwd: storefrontDir });
+  const [{ getAuthSecret }, { ensureStorefrontRuntimeEnvLoaded, assertWorkerBackendEnvProduction }] = await Promise.all([
+    import("./src/lib/auth-secret"),
+    import("./src/lib/storefront-runtime-env"),
+  ]);
+  // Keep path discovery inside the Node-only runtime module so the Edge
+  // instrumentation graph contains no Node APIs.
+  ensureStorefrontRuntimeEnvLoaded();
 
-  const { assertMedusaStorefrontEnvProduction } = await import(
-    "@universal-music-store/sdk"
-  );
-  assertMedusaStorefrontEnvProduction();
+  assertWorkerBackendEnvProduction();
 
   if (process.env.NODE_ENV === "production") {
     if (!getAuthSecret()) {

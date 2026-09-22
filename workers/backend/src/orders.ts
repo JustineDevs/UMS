@@ -2,6 +2,7 @@ import type { WorkerDatabaseClient } from "./database.ts";
 import { verifyWorkerBearerToken } from "./auth.ts";
 
 export type OrderReadEnv = { JWT_SECRET?: string; SUPABASE_URL?: string };
+const MAX_ORDER_OFFSET = 100_000;
 type OrderRow = {
   id: string;
   display_id: string | number;
@@ -78,17 +79,18 @@ export async function handleCustomerOrdersRequest(
     Number.parseInt(url.searchParams.get("offset") ?? "0", 10) || 0,
   );
   const result = await database.query<OrderRow>(
-    `SELECT o.id, o.display_id, o.status, o.total, o.currency_code, o.created_at,
+    `SELECT o.id, o.display_id, o.status,
+            COALESCE(SUM(oi.unit_price * oi.quantity), 0) AS total,
+            o.currency_code, o.created_at,
             COALESCE(SUM(oi.quantity), 0) AS item_count
      FROM public."order" o
-     LEFT JOIN public.order_line_item oli ON oli.order_id = o.id AND oli.deleted_at IS NULL
-     LEFT JOIN public.order_item oi ON oi.order_id = o.id AND oi.item_id = oli.id AND oi.deleted_at IS NULL
+     LEFT JOIN public.order_item oi ON oi.order_id = o.id AND oi.deleted_at IS NULL
      WHERE o.deleted_at IS NULL
        AND (o.customer_id = $1 OR ($2::text IS NOT NULL AND lower(o.email) = $2::text))
      GROUP BY o.id ORDER BY o.created_at DESC LIMIT $3 OFFSET $4`,
-    [claims.sub, email, limit, offset],
+    [claims.sub, email, limit, Math.min(MAX_ORDER_OFFSET, offset)],
   );
-  return json({ orders: result.rows, limit, offset });
+  return json({ orders: result.rows, limit, offset: Math.min(MAX_ORDER_OFFSET, offset) });
 }
 
 export async function handleCustomerOrderDetailRequest(
@@ -108,9 +110,24 @@ export async function handleCustomerOrderDetailRequest(
   if (!/^order_[A-Za-z0-9_-]+$/.test(orderId))
     return json({ error: "not_found" }, 404);
   const result = await database.query<CustomerOrderDetailRow>(
-    `SELECT o.id, o.display_id, o.status, o.total, o.subtotal, o.tax_total,
-            o.shipping_total, o.discount_total, o.currency_code, o.created_at,
-            o.updated_at, o.payment_status, o.fulfillment_status, o.customer_id,
+    `SELECT o.id, o.display_id, o.status,
+            COALESCE((SELECT SUM(oi.unit_price * oi.quantity)
+              FROM public.order_item oi
+             WHERE oi.order_id = o.id AND oi.deleted_at IS NULL), 0) AS total,
+            COALESCE((SELECT SUM(oi.unit_price * oi.quantity)
+              FROM public.order_item oi
+             WHERE oi.order_id = o.id AND oi.deleted_at IS NULL), 0) AS subtotal,
+            0::numeric AS tax_total,
+            0::numeric AS shipping_total,
+            0::numeric AS discount_total,
+            o.currency_code, o.created_at,
+            o.updated_at,
+            COALESCE((SELECT pc.status
+                FROM public.order_payment_collection opc
+                JOIN public.payment_collection pc ON pc.id = opc.payment_collection_id
+               WHERE opc.order_id = o.id AND opc.deleted_at IS NULL AND pc.deleted_at IS NULL
+               ORDER BY pc.created_at DESC LIMIT 1), 'pending') AS payment_status,
+            NULL::text AS fulfillment_status, o.customer_id,
             o.email, o.metadata,
             CASE WHEN oa.id IS NULL THEN NULL ELSE jsonb_build_object(
               'first_name', oa.first_name, 'last_name', oa.last_name,
@@ -118,25 +135,26 @@ export async function handleCustomerOrderDetailRequest(
               'city', oa.city, 'province', oa.province, 'postal_code', oa.postal_code,
               'country_code', oa.country_code
             ) END AS shipping_address,
-            COALESCE(SUM(oi.quantity), 0) AS item_count
+            COALESCE((SELECT SUM(oi.quantity)
+                FROM public.order_item oi
+               WHERE oi.order_id = o.id AND oi.deleted_at IS NULL), 0) AS item_count
      FROM public."order" o
      LEFT JOIN public.order_address oa ON oa.id = o.shipping_address_id
-     LEFT JOIN public.order_line_item oli ON oli.order_id = o.id AND oli.deleted_at IS NULL
-     LEFT JOIN public.order_item oi ON oi.order_id = o.id AND oi.item_id = oli.id AND oi.deleted_at IS NULL
      WHERE o.id = $1 AND o.deleted_at IS NULL
        AND (o.customer_id = $2 OR ($3::text IS NOT NULL AND lower(o.email) = $3::text))
-     GROUP BY o.id, oa.id`,
+     LIMIT 1`,
     [orderId, claims.sub, email],
   );
   const row = result.rows[0];
   if (!row) return json({ error: "not_found" }, 404);
 
   const items = await database.query<CustomerOrderItemRow>(
-    `SELECT oli.id, oli.title, oli.quantity, oli.unit_price,
+    `SELECT oli.id, oli.title, oi.quantity, oi.unit_price,
             oli.variant_sku, oli.thumbnail
-       FROM public.order_line_item oli
-       JOIN public."order" o ON o.id = oli.order_id
-      WHERE oli.order_id = $1 AND oli.deleted_at IS NULL AND o.deleted_at IS NULL
+       FROM public.order_item oi
+       JOIN public.order_line_item oli ON oli.id = oi.item_id AND oli.deleted_at IS NULL
+       JOIN public."order" o ON o.id = oi.order_id
+      WHERE oi.order_id = $1 AND oi.deleted_at IS NULL AND o.deleted_at IS NULL
       ORDER BY oli.created_at, oli.id`,
     [orderId],
   );

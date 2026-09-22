@@ -23,7 +23,7 @@ function filesUnder(root: string): string[] {
   });
 }
 
-test("every CMS mutation export uses the shared idempotent admin boundary", () => {
+test("every CMS mutation export uses a durable authenticated idempotent boundary", () => {
   const root = resolve(repoRoot(), "apps/web/src/app/api/admin/cms");
   const mutationFiles = filesUnder(root).filter((path) =>
     /export const (POST|PUT|PATCH|DELETE)\s*=/.test(readFileSync(path, "utf8")),
@@ -32,10 +32,12 @@ test("every CMS mutation export uses the shared idempotent admin boundary", () =
   assert.ok(mutationFiles.length > 0);
   for (const path of mutationFiles) {
     const source = readFileSync(path, "utf8");
-    assert.match(
-      source,
-      /withAdminMutationIdempotency/,
-      `${path} is a CMS mutation without the shared auth/tenant/idempotency boundary`,
+    const localBoundary = /withAdminMutationIdempotency/.test(source);
+    const workerBoundary = /proxyWorkerAdminRoute/.test(source) && /Idempotency-Key/.test(source);
+    assert.equal(
+      localBoundary || workerBoundary,
+      true,
+      `${path} is a CMS mutation without a durable authenticated idempotency boundary`,
     );
   }
 });
@@ -44,15 +46,26 @@ test("internal and cron storefront routes require service authentication and red
   const root = resolve(repoRoot(), "apps/web/src/app/api");
   const protectedRoots = [join(root, "internal"), join(root, "cron")];
   const routes = protectedRoots.flatMap(filesUnder);
+  const workerCronProxy = readFileSync(
+    resolve(repoRoot(), "apps/web/src/lib/worker-cron-proxy.ts"),
+    "utf8",
+  );
 
   assert.ok(routes.length > 0);
   for (const path of routes) {
     const source = readFileSync(path, "utf8");
-    assert.match(
-      source,
-      /CRON_SECRET|_CRON_SECRET|x-cron-secret|x-internal-secret/,
+    const hasLocalServiceBoundary = /CRON_SECRET|_CRON_SECRET|x-cron-secret|x-internal-secret/.test(source);
+    const delegatesToWorkerCronBoundary = /proxyCronToWorker\(request,/.test(source);
+    assert.equal(
+      hasLocalServiceBoundary || delegatesToWorkerCronBoundary,
+      true,
       `${path} has no service-secret authentication contract`,
     );
+    if (delegatesToWorkerCronBoundary) {
+      assert.match(workerCronProxy, /authorization\s*=\s*request\.headers\.get\("authorization"\)/);
+      assert.match(workerCronProxy, /cronSecret\s*=\s*request\.headers\.get\("x-cron-secret"\)/);
+      assert.match(workerCronProxy, /if \(!authorization && !cronSecret\) return Response\.json\(\{ error: "Unauthorized" \}, \{ status: 401 \}\)/);
+    }
     assert.doesNotMatch(
       source,
       /NextResponse\.json\(\{\s*error:\s*message\s*\}/,

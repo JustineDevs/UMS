@@ -36,3 +36,13 @@ test("bounded JSON parser preserves a JSON null body for route-level validation"
     { value: null, tooLarge: false, valid: true },
   );
 });
+
+test("bounded JSON parser rejects prototype-pollution keys", async () => {
+  assert.deepEqual(
+    await parseBoundedJson(
+      new Request("https://storefront.test", { body: JSON.stringify({ constructor: { prototype: { polluted: true } } }), method: "POST" }),
+      256,
+    ),
+    { value: null, tooLarge: false, valid: false },
+  );
+});

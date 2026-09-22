@@ -33,6 +33,6 @@ export async function handlePayPalConfirmationRequest(request: Request, database
     await database.query(`UPDATE public.payment_attempts SET provider_payment_id = $2, provider_payload = $3::jsonb, status = 'paid', checkout_state = 'provider_verified', updated_at = now() WHERE correlation_id = $1::uuid AND status NOT IN ('paid', 'completed')`, [correlationId, confirmed.captureId, JSON.stringify(confirmed.payload)]);
     return json({ ok: true, correlationId, captureId: confirmed.captureId });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "paypal_confirmation_failed" }, 502);
+    return json({ error: "paypal_confirmation_failed", code: "PAYPAL_CONFIRMATION_FAILED" }, 502);
   }
 }

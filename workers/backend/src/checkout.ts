@@ -9,6 +9,7 @@ import {
   createXenditSession,
   type HostedCheckoutResult,
 } from "./providers.ts";
+import { formatMajorAmount, minorToMajor } from "./money.ts";
 
 type CheckoutRow = {
   cart_id: string;
@@ -112,17 +113,17 @@ export async function handleCheckoutPreviewRequest(
     const amount = Number(row.amount);
     if (!Number.isSafeInteger(amount) || amount < 0) return new Response(JSON.stringify({ error: "price_unavailable" }), { status: 503, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
     const lineTotal = amount * line.quantity;
-    lineSubtotalsByVariantId[line.variantId] = lineTotal / 100;
+    lineSubtotalsByVariantId[line.variantId] = minorToMajor(lineTotal, first.currency_code);
     subtotal += lineTotal;
   }
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify({ validLines, subtotal, currency: first.currency_code })));
   const quoteFingerprint = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
   return new Response(JSON.stringify({
-    subtotal: subtotal / 100,
+    subtotal: minorToMajor(subtotal, first.currency_code),
     taxTotal: 0,
     shippingTotal: 0,
     discountTotal: 0,
-    total: subtotal / 100,
+    total: minorToMajor(subtotal, first.currency_code),
     currencyCode: first.currency_code.toUpperCase(),
     lineSubtotalsByVariantId,
     quoteFingerprint,
@@ -169,7 +170,7 @@ export async function createHostedCheckout(
       clientId: env.PAYPAL_CLIENT_ID ?? "",
       clientSecret: env.PAYPAL_CLIENT_SECRET ?? "",
       sandbox: (env.PAYPAL_ENVIRONMENT ?? "sandbox") !== "production",
-      amountMajor: (totals.amountMinor / 100).toFixed(2),
+      amountMajor: formatMajorAmount(totals.amountMinor, totals.currency),
       currency: totals.currency,
       returnUrl: input.successUrl,
       cancelUrl: input.cancelUrl,
@@ -317,8 +318,7 @@ export async function handleCheckoutSessionRequest(
           },
         );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "checkout_provider_failed";
+        const message = error instanceof Error ? error.message : "checkout_provider_failed";
         if (attemptCreated) {
           await appDatabase.query(
             `UPDATE public.payment_attempts
@@ -327,7 +327,7 @@ export async function handleCheckoutSessionRequest(
             [message, correlationId],
           );
         }
-        return new Response(JSON.stringify({ error: message }), {
+        return new Response(JSON.stringify({ error: "checkout_provider_failed", code: "CHECKOUT_PROVIDER_FAILED" }), {
           status: 502,
           headers: {
             "Content-Type": "application/json",

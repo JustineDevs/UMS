@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   AdminBreadcrumbs,
   AdminErrorState,
@@ -41,6 +41,7 @@ type FormData = {
 const EMPTY_FORM: FormData = { full_name: "", email: "", phone: "", role: "staff", hired_at: "" };
 
 export function UsersPageClient() {
+  const pinMutationRef = useRef(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -115,7 +116,8 @@ export function UsersPageClient() {
 
   async function toggleActive(emp: Employee) {
     const key = `active:${emp.id}`;
-    if (actionKey) return;
+    if (actionKey || pinMutationRef.current) return;
+    pinMutationRef.current = true;
     setActionKey(key);
     try {
       const response = await fetch(`/api/admin/employees/${emp.id}`, {
@@ -128,6 +130,7 @@ export function UsersPageClient() {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "User status could not be updated.");
     } finally {
+      pinMutationRef.current = false;
       setActionKey(null);
     }
   }
@@ -135,7 +138,8 @@ export function UsersPageClient() {
   async function handleSetPin(e: React.FormEvent) {
     e.preventDefault();
     if (!pinModal) return;
-    if (actionKey) return;
+    if (actionKey || pinMutationRef.current) return;
+    pinMutationRef.current = true;
     setActionKey(`pin:${pinModal.id}`);
     try {
       const response = await fetch(`/api/admin/employees/${pinModal.id}/pin`, {
@@ -149,12 +153,14 @@ export function UsersPageClient() {
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "PIN could not be updated.");
     } finally {
+      pinMutationRef.current = false;
       setActionKey(null);
     }
   }
 
   async function confirmDeleteEmployee() {
     if (!deleteModal) return;
+    if (deleting) return;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -273,23 +279,23 @@ export function UsersPageClient() {
           <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 space-y-5">
             <h2 className="text-lg font-bold font-headline">{editId ? "Edit User" : "Add User"}</h2>
             <div>
-              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Full Name</label>
-              <input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+              <label htmlFor="employee-full-name" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Full Name</label>
+              <input id="employee-full-name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Email</label>
-                <input type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+                <label htmlFor="employee-email" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Email</label>
+                <input id="employee-email" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Phone</label>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+                <label htmlFor="employee-phone" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Phone</label>
+                <input id="employee-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Role</label>
-                <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+                <label htmlFor="employee-role" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Role</label>
+                <select id="employee-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
                   <option value="staff">Staff</option>
                   <option value="cashier">Cashier</option>
                   <option value="manager">Manager</option>
@@ -297,8 +303,8 @@ export function UsersPageClient() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Hired Date</label>
-                <input type="date" value={form.hired_at} onChange={(e) => setForm({ ...form, hired_at: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+                <label htmlFor="employee-hired-date" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Hired Date</label>
+                <input id="employee-hired-date" type="date" value={form.hired_at} onChange={(e) => setForm({ ...form, hired_at: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-2">
@@ -357,6 +363,7 @@ export function UsersPageClient() {
             <h2 className="text-lg font-bold font-headline">Set PIN for {pinModal.name}</h2>
             <p className="text-sm text-on-surface-variant">Enter a 4-8 digit PIN for POS operations.</p>
             <input
+              aria-label="POS PIN"
               required
               type="password"
               minLength={4}

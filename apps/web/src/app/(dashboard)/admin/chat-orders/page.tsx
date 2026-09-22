@@ -2,7 +2,6 @@ import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/ad
 import { ChatIntakeForm } from "@/components/ChatIntakeForm";
 import { ChatOrdersWorkspace } from "@/components/ChatOrdersWorkspace";
 import { fetchRecentChatIntake } from "@/lib/chat-intake-bridge";
-import { getAdminDraftOrderEditUrl } from "@/lib/catalog-admin-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -10,12 +9,13 @@ export const dynamic = "force-dynamic";
 
 export default async function ChatOrdersPage() {
   await requirePagePermission("chat_orders:manage");
-  const rows = await fetchRecentChatIntake(80);
+  const loadedRows = await fetchRecentChatIntake(80);
+  const rows = loadedRows ?? [];
 
   return (
     <AdminPageShell
       title="Chat orders"
-      subtitle="Capture orders from chat or phone, attach real catalog lines, and open draft orders in your store when the system is connected."
+      subtitle="Capture chat or phone requests as tenant-scoped tickets with real catalog-backed commerce carts."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Chat orders" }]}
@@ -32,6 +32,7 @@ export default async function ChatOrdersPage() {
           internal key. Each line must reference a real product variant from your catalog.
         </p>
       </details>
+      {!loadedRows ? <p role="alert" className="mb-6 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">Chat-order data is unavailable from the commerce Worker. No ticket data was loaded.</p> : null}
       <section className="mb-10 max-w-xl">
         <ChatIntakeForm />
       </section>
@@ -46,10 +47,10 @@ export default async function ChatOrdersPage() {
       </section>
       <ChatOrdersWorkspace rows={rows.map((r) => ({
         ...r,
-        draftHref: r.medusa_draft_order_id ? getAdminDraftOrderEditUrl(r.medusa_draft_order_id) : null,
-        medusaOrderId: r.medusa_order_id,
-        medusaOrderDisplayId: r.medusa_order_display_id,
-        medusaOrderPaymentStatus: r.medusa_order_payment_status,
+        commerceCartId: r.commerce_cart_id,
+        commerceOrderId: r.commerce_order_id,
+        commerceOrderDisplayId: r.commerce_order_display_id,
+        commercePaymentStatus: r.commerce_payment_status,
         paymentProvider: r.payment_provider,
         paymentExternalId: r.payment_external_id,
         paymentStatus: r.payment_status,

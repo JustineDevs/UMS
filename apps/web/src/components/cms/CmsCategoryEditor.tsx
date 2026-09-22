@@ -61,10 +61,10 @@ export function CmsCategoryEditor() {
   }, []);
 
   const loadCategories = useCallback(() => {
-    void fetch("/api/admin/cms/category-content/medusa-categories")
+    void fetch("/api/admin/cms/category-content/catalog-categories")
       .then(async (r) => {
-        const j = (await r.json()) as { categories?: CatOpt[] };
         if (!r.ok) return;
+        const j = (await r.json()) as { categories?: CatOpt[] };
         setCategories(j.categories ?? []);
       })
       .catch(() => setCategories([]));
@@ -75,8 +75,8 @@ export function CmsCategoryEditor() {
       `/api/admin/cms/category-content/catalog-gaps?locale=${encodeURIComponent(gapLocale)}`,
     )
       .then(async (r) => {
-        const j = (await r.json()) as { data?: { missing?: CatOpt[] } };
         if (!r.ok) return;
+        const j = (await r.json()) as { data?: { missing?: CatOpt[] } };
         setGaps(j.data?.missing ?? []);
       })
       .catch(() => setGaps([]));

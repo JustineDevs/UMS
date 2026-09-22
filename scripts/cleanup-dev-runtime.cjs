@@ -78,11 +78,13 @@ function readProcessInfo(pid) {
     const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
     const marker = stat.lastIndexOf(") ");
     const fields = stat.slice(marker + 2).split(" ");
+    const cwd = fs.realpathSync(`/proc/${pid}/cwd`);
     return {
       pid,
       ppid: Number(fields[1]),
       pgid: Number(fields[2]),
       command,
+      cwd,
     };
   } catch {
     return null;
@@ -107,6 +109,7 @@ function stopWorkspaceDevProcesses() {
     "dev-worker-first.mjs",
     "run-next-dev.cjs",
     "next dev --port",
+    "wrangler dev",
     "tsx watch",
     "tsx/dist/cli.mjs watch",
   ];
@@ -120,7 +123,7 @@ function stopWorkspaceDevProcesses() {
       (info) =>
         info.pid !== process.pid &&
         !ancestorPids.has(info.pid) &&
-        info.command.includes(projectRoot) &&
+        (info.command.includes(projectRoot) || info.cwd === projectRoot) &&
         knownCommands.some((pattern) => info.command.includes(pattern)),
     );
   const byParent = new Map();

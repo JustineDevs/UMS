@@ -373,3 +373,52 @@ test("keeps webhook lifecycle transitions monotonic and preserves cancellation",
   assert.match(update ?? "", /'cancelled'/);
   assert.match(update ?? "", /status IN \('paid', 'completed', 'refunded'\)/);
 });
+
+test("reconciles Xendit refund callbacks into APP audit on first and duplicate delivery", async () => {
+  const commerceStatements: Array<{ sql: string; values?: readonly unknown[] }> = [];
+  const appStatements: Array<{ sql: string; values?: readonly unknown[] }> = [];
+  let deliveryCount = 0;
+  const commerce = {
+    query: async <T extends Record<string, unknown>>(sql: string, values?: readonly unknown[]) => {
+      commerceStatements.push({ sql, values });
+      if (sql.startsWith("INSERT INTO public.payment_webhook_events")) {
+        deliveryCount += 1;
+        return { rows: (deliveryCount === 1 ? [{ inserted: true }] : []) as T[], rowCount: deliveryCount === 1 ? 1 : 0 };
+      }
+      if (sql.startsWith("INSERT INTO public.worker_webhook_events")) return { rows: [] as T[], rowCount: 0 };
+      throw new Error(`unexpected commerce query: ${sql}`);
+    },
+    end: async () => undefined,
+  };
+  const app = {
+    query: async <T extends Record<string, unknown>>(sql: string, values?: readonly unknown[]) => {
+      appStatements.push({ sql, values });
+      return { rows: [] as T[], rowCount: 1 };
+    },
+    end: async () => undefined,
+  };
+  const payload = JSON.stringify({
+    event: "refund.succeeded",
+    created: "2026-09-21T08:00:00.000Z",
+    data: { id: "rfd_test", status: "SUCCEEDED", updated: "2026-09-21T08:00:01.000Z" },
+  });
+  const request = () => new Request("https://api.test/webhooks/xendit", {
+    method: "POST",
+    body: payload,
+    headers: { "x-callback-token": "x-token" },
+  });
+  const first = await handleWorkerWebhookRequest(request(), commerce, "xendit", { XENDIT_WEBHOOK_TOKEN: "x-token" }, app);
+  const duplicate = await handleWorkerWebhookRequest(request(), commerce, "xendit", { XENDIT_WEBHOOK_TOKEN: "x-token" }, app);
+  assert.equal(first.status, 202);
+  assert.equal(duplicate.status, 202);
+  assert.equal((await duplicate.json() as { duplicate: boolean }).duplicate, true);
+  assert.deepEqual(commerceStatements[0]?.values?.slice(0, 3), [
+    "xendit",
+    "xendit:refund.succeeded:rfd_test:2026-09-21T08:00:01.000Z",
+    "refund.succeeded",
+  ]);
+  assert.equal(appStatements.length, 2);
+  assert.match(appStatements[0]?.sql ?? "", /provider_refund_id = \$2/);
+  assert.deepEqual(appStatements[0]?.values?.slice(0, 4), ["xendit", "rfd_test", "completed", "SUCCEEDED"]);
+  assert.equal(commerceStatements.some(({ sql }) => sql.startsWith("UPDATE public.payment_attempts")), false);
+});

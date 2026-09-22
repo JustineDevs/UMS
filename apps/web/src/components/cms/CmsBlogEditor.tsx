@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CatalogMediaPickerDialog } from "@/components/catalog/CatalogMediaPickerDialog";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
@@ -40,6 +40,8 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
   const [row, setRow] = useState<Post | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
   const [tagsInput, setTagsInput] = useState("");
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
 
@@ -73,21 +75,26 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
       .split(/[,]+/)
       .map((t) => t.trim())
       .filter(Boolean);
-    const r = await fetch(`/api/admin/cms/blog/${postId}`, {
-      method: "PUT",
-      headers: cmsMutationHeaders(),
-      body: JSON.stringify({
-        ...row,
-        tags,
-      }),
-    });
-    const j = (await r.json()) as { error?: string; data?: Post };
-    setSaving(false);
-    if (!r.ok) {
-      setError(j.error ?? "Save failed");
-      return;
+    try {
+      const r = await fetch(`/api/admin/cms/blog/${postId}`, {
+        method: "PUT",
+        headers: cmsMutationHeaders(),
+        body: JSON.stringify({
+          ...row,
+          tags,
+        }),
+      });
+      const j = (await r.json()) as { error?: string; data?: Post };
+      if (!r.ok) {
+        setError(j.error ?? "Save failed");
+        return;
+      }
+      if (j.data) setRow(j.data);
+    } catch {
+      setError("Save failed");
+    } finally {
+      setSaving(false);
     }
-    if (j.data) setRow(j.data);
   };
 
   const genPreviewToken = () => {
@@ -182,6 +189,7 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         <p className="font-medium text-slate-800">Preview token</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
+            aria-label="Preview token"
             readOnly
             className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1 font-mono text-[11px]"
             value={row.preview_token ?? ""}
@@ -342,16 +350,24 @@ export function CmsBlogEditor({ postId }: { postId: string }) {
         </button>
         <button
           type="button"
-          disabled={!canWrite}
+          disabled={!canWrite || deleting}
           className="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-800"
           onClick={async () => {
+            if (deleting || deletingRef.current) return;
             if (!confirm("Delete this post?")) return;
-            const r = await fetch(`/api/admin/cms/blog/${postId}`, {
-              method: "DELETE",
-              headers: cmsMutationHeaders(),
-            });
-            if (r.ok) router.push("/admin/cms/blog");
-            else setError("Delete failed");
+            deletingRef.current = true;
+            setDeleting(true);
+            try {
+              const r = await fetch(`/api/admin/cms/blog/${postId}`, {
+                method: "DELETE",
+                headers: cmsMutationHeaders(),
+              });
+              if (r.ok) router.push("/admin/cms/blog");
+              else setError("Delete failed");
+            } finally {
+              deletingRef.current = false;
+              setDeleting(false);
+            }
           }}
         >
           Delete

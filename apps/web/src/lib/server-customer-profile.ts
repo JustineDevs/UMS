@@ -1,4 +1,5 @@
 import type { StorefrontShippingAddress } from "@universal-music-store/validation";
+import { readResponseJson } from "@/lib/read-response-json";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type ServerCustomerProfile = {
@@ -9,6 +10,27 @@ export type ServerCustomerProfile = {
   updatedAt?: string | null;
 };
 export type CustomerProfileLoadResult = { profile: ServerCustomerProfile | null; unavailable: boolean };
+
+const localE2eProfile: ServerCustomerProfile = {
+  displayName: "E2E Tester",
+  phone: "+639171234567",
+  avatarUrl: null,
+  shippingAddresses: [{
+    fullName: "E2E Tester",
+    line1: "123 Test Street",
+    city: "Manila",
+    postalCode: "1000",
+    barangay: "Barangay Test",
+    province: "Metro Manila",
+    country: "PH",
+    phone: "+639171234567",
+  }],
+  updatedAt: "2099-01-01T00:00:00.000Z",
+};
+
+function isLocalE2eProfileEnabled(): boolean {
+  return process.env.UVS_E2E_LOCAL === "1" && process.env.VERCEL !== "1";
+}
 
 function workerBaseUrl() { return process.env.API_URL?.trim().replace(/\/$/, "") || null; }
 function mapProfile(value: unknown): ServerCustomerProfile | null {
@@ -29,6 +51,12 @@ function mapProfile(value: unknown): ServerCustomerProfile | null {
 
 export async function loadCustomerProfileResult(email: string): Promise<CustomerProfileLoadResult> {
   if (!email.trim()) return { profile: null, unavailable: false };
+  if (
+    isLocalE2eProfileEnabled() &&
+    ["e2e-test@example.com", "local-admin@example.com"].includes(email.trim().toLowerCase())
+  ) {
+    return { profile: localE2eProfile, unavailable: false };
+  }
   const baseUrl = workerBaseUrl();
   if (!baseUrl) return { profile: null, unavailable: true };
   try {
@@ -41,7 +69,7 @@ export async function loadCustomerProfileResult(email: string): Promise<Customer
       cache: "no-store",
     });
     if (!response.ok) return { profile: null, unavailable: response.status >= 500 };
-    const payload = await response.json().catch(() => null) as { profile?: unknown } | null;
+    const payload = await readResponseJson<{ profile?: unknown } | null>(response, null);
     return { profile: mapProfile(payload?.profile), unavailable: false };
   } catch { return { profile: null, unavailable: true }; }
 }

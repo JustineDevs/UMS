@@ -18,7 +18,7 @@ test.describe("Admin access control", () => {
   });
 
   test("POS API returns 401 when no session", async ({ request }) => {
-    const res = await request.post(`${adminBase}/api/pos/medusa/lookup`, {
+    const res = await request.post(`${adminBase}/api/pos/commerce/lookup`, {
       data: { barcode: "test" },
       failOnStatusCode: false,
     });
@@ -27,9 +27,9 @@ test.describe("Admin access control", () => {
     expect(body).toMatchObject({ code: "NO_SESSION" });
   });
 
-  test("Medusa BFF API returns 401 when no session", async ({ request }) => {
+  test("Worker-backed order status API returns 401 when no session", async ({ request }) => {
     const res = await request.patch(
-      `${adminBase}/api/medusa/orders/order_test123`,
+      `${adminBase}/api/admin/orders/order_test123/status`,
       {
         data: { status: "pending" },
         failOnStatusCode: false,

@@ -3,6 +3,7 @@ import { logAdminApiEvent } from "@/lib/admin-api-log";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { requireStaffSession } from "@/lib/requireStaffSession";
 import { correlatedJson, tagResponse } from "@/lib/staff-api-response";
+import { integrationsCouriersResponseSchema } from "@/lib/admin-api-contracts";
 
 export async function GET(req: Request) {
   const correlationId = getCorrelationId(req);
@@ -16,5 +17,7 @@ export async function GET(req: Request) {
     phase: "ok",
     detail: { count: COURIER_REGISTRY.length },
   });
-  return correlatedJson(correlationId, { couriers: COURIER_REGISTRY });
+  const parsed = integrationsCouriersResponseSchema.safeParse({ couriers: COURIER_REGISTRY });
+  if (!parsed.success) return correlatedJson(correlationId, { error: "Courier registry is invalid", code: "COURIER_REGISTRY_INVALID" }, { status: 503 });
+  return correlatedJson(correlationId, parsed.data);
 }

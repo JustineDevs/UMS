@@ -124,6 +124,18 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+const SAFE_CART_ERRORS = new Set([
+  "insufficient_stock",
+  "cart_not_found",
+  "cart_line_not_found",
+  "variant_not_found",
+]);
+
+function safeCartError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  return SAFE_CART_ERRORS.has(message) ? message : fallback;
+}
+
 export async function handleCreateCartRequest(
   request: Request,
   database: WorkerDatabaseClient,
@@ -323,10 +335,7 @@ export async function handleCartUpdateRequest(
         const cart = await getCartById(cartId, database);
         return cart ? jsonResponse({ cart }) : jsonResponse({ error: "cart_not_found" }, 404);
       } catch (error) {
-        return jsonResponse(
-          { error: error instanceof Error ? error.message : "cart_update_failed" },
-          422,
-        );
+        return jsonResponse({ error: safeCartError(error, "cart_update_failed") }, 422);
       }
     },
   );
@@ -440,8 +449,7 @@ export async function handleCartLineQuantityRequest(
           quantity,
         });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "cart_line_update_failed";
+        const message = safeCartError(error, "cart_line_update_failed");
         return jsonResponse(
           { error: message },
           message === "insufficient_stock" ? 409 : 422,
@@ -494,7 +502,7 @@ export async function addCartLine(
       `INSERT INTO public.cart_line_item
        (id, cart_id, title, subtitle, thumbnail, quantity, variant_id, product_id, product_title,
         product_description, product_handle, variant_sku, variant_title, unit_price, raw_unit_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $3, $9, $10, $11, $12, $13, jsonb_build_object('value', $13::text))`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $3, $9, $10, $11, $12, $13, jsonb_build_object('value', $13::numeric))`,
       [
         lineId,
         cartId,
@@ -555,8 +563,7 @@ export async function handleAddCartLineRequest(
         const line = await addCartLine(cartId, variantId, quantity, database);
         return jsonResponse({ cart: { id: cartId }, line_item: line });
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "cart_line_add_failed";
+        const message = safeCartError(error, "cart_line_add_failed");
         const status =
           message === "insufficient_stock"
             ? 409

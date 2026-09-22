@@ -4,6 +4,8 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
+import { checkoutAvailablePaymentMethodsResponseSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +44,8 @@ function unavailable(code: string, error: string, status = 503) {
     error,
     message: PUBLIC_UNAVAILABLE,
   };
-  return NextResponse.json(body, { status });
+  const parsed = checkoutAvailablePaymentMethodsResponseSchema.parse(body);
+  return NextResponse.json(parsed, { status });
 }
 
 /** Lists payment methods exposed by the Worker capability route. */
@@ -64,11 +67,11 @@ export async function GET(req: Request) {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
-    const payload = (await response.json().catch(() => ({}))) as {
+    const payload = await readResponseJson(response, {} as {
       ok?: boolean;
       keys?: unknown[];
       code?: string;
-    };
+    });
     const keys = (payload.keys ?? []).filter(
       (key): key is PaymentProviderKey =>
         typeof key === "string" && VALID_KEYS.has(key as PaymentProviderKey),
@@ -81,7 +84,8 @@ export async function GET(req: Request) {
         error: null,
         message: null,
       };
-      return NextResponse.json(body, {
+      const parsed = checkoutAvailablePaymentMethodsResponseSchema.parse(body);
+      return NextResponse.json(parsed, {
         headers: { "Cache-Control": "no-store" },
       });
     }

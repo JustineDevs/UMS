@@ -10,7 +10,7 @@ import {
   strictCatalog,
 } from "../fixtures/env";
 import {
-  assertExpectAllPspsMatchMedusa,
+  assertExpectAllPspsMatchWorker,
   clickPayButton,
   extractOrderIdFromUrl,
   fillCheckoutShippingInfo,
@@ -59,12 +59,11 @@ test.describe.configure({ mode: stressDescribeMode() });
  * Env:
  * - PLAYWRIGHT_STOREFRONT_STORAGE_STATE: path to storageState JSON (customer signed in with Google); required for real add-to-bag.
  * - E2E_STRICT_PAYMENTS=1 | E2E_STRICT_E2E=1: fail if PSP env missing (skipUnlessPspConfigured throws).
- * - E2E_EXPECT_ALL_PSPS=1: Medusa payment-health providers must all have E2E_* credentials.
+ * - E2E_EXPECT_ALL_PSPS=1: every Worker-exposed provider must have E2E_* credentials.
  * - E2E_STRESS_ITERATIONS=N (default 1, max 50)
  * - E2E_STRESS_PARALLEL=1: parallel describe (higher cart collision risk)
  * - E2E_STRESS_EXCLUDE_COD=1: omit COD from the matrix
- * - E2E_VERIFY_MEDUSA_ORDER=1 + MEDUSA_SECRET_API_KEY (or E2E_MEDUSA_ADMIN_SECRET): assert admin order after redirect
- * - E2E_VERIFY_ADMIN_ORDER=1: assert admin API can see order (requires same secret)
+ * - E2E_VERIFY_WORKER_ORDER=1 + E2E_WORKER_ADMIN_TOKEN: assert Worker admin order after redirect
  * - E2E_VERIFY_TRACKING=1: navigate to /track/:orderId and verify content renders
  * - E2E_TRACE=all: full Playwright traces (see root playwright.config.ts)
  */
@@ -74,7 +73,7 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
   let providers: PaymentProvider[] = [];
 
   test.beforeAll(async ({ request }) => {
-    await assertExpectAllPspsMatchMedusa(request);
+    await assertExpectAllPspsMatchWorker(request);
     providers = await getStressRunProviders(request);
   });
 
@@ -189,7 +188,7 @@ test.describe("@workflow @checkout @stress end-to-end stress journey", () => {
 
             await test.step("admin order visibility", async () => {
               const vis = await verifyAdminOrderVisibility(request, orderId);
-              if (isE2eStrictPayments() && process.env.E2E_VERIFY_ADMIN_ORDER === "1") {
+              if (isE2eStrictPayments() && process.env.E2E_VERIFY_WORKER_ORDER === "1") {
                 expect(vis.apiVisible, `Admin API should see order ${orderId}`).toBe(true);
               }
             });

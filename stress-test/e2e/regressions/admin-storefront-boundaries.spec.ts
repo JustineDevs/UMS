@@ -10,7 +10,13 @@ test.describe("admin and storefront boundary regressions", () => {
 
     const callback = new URL(page.url()).searchParams.get("callbackUrl");
     expect(callback).toBe("/admin");
-    expect(page.url()).toMatch(/^http:\/\/127\.0\.0\.1:3000\/sign-in\?/);
+    // The unified app may canonicalize 127.0.0.1 to the configured public
+    // origin (localhost locally, the deployed host in production). The
+    // security invariant is that auth stays on that configured origin.
+    const expectedOrigin = new URL(
+      process.env.NEXT_PUBLIC_SITE_URL ?? adminBase,
+    ).origin;
+    expect(new URL(page.url()).origin).toBe(expectedOrigin);
   });
 
   test("product specifications fill the service-information space", async ({ page }) => {

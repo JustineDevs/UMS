@@ -1,40 +1,28 @@
 import { NextResponse } from "next/server";
-import { registerPaymentAttempt } from "@universal-music-store/platform-data";
 
 import { getStorefrontSession } from "@/lib/auth";
-import { applyRateLimit, readCartIdFromCookie } from "@/lib/cart-api-helpers";
+import { applyRateLimit, readCartIdFromCookie, writeCartCookie } from "@/lib/cart-api-helpers";
+import { createWorkerCheckoutCart } from "@/lib/worker-checkout-cart";
 import { loadCustomerProfile } from "@/lib/server-customer-profile";
 import { isStorefrontProfileComplete } from "@/lib/storefront-profile-complete";
 import { readVerifiedCheckoutCartTotalsPreview } from "@/lib/checkout-worker";
-import { minorUnitDivisor } from "@/lib/medusa-money";
 import {
   reconcileCheckoutIntentQuote,
   registerCheckoutIntentRouteLogic,
 } from "@/lib/payment-attempt-route-logic";
-import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 import { capturePostHogEvent } from "@universal-music-store/sdk";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
+import { paymentCheckoutIntentSchema } from "@/lib/admin-api-contracts";
 import {
   isIsolatedCodE2E,
   registerIsolatedCodAttempt,
 } from "@/lib/isolated-cod-e2e-ledger";
+import { checkoutIntentRegistrationResponseSchema } from "@/lib/admin-api-contracts";
+import { readResponseJson } from "@/lib/read-response-json";
 
 export const dynamic = "force-dynamic";
-
-type Body = {
-  provider?: string;
-  amountMinor?: number;
-  currencyCode?: string;
-  quoteFingerprint?: string;
-  variantIds?: string[];
-  productIds?: string[];
-  medusaPaymentSessionId?: string;
-  providerSessionId?: string;
-  providerPaymentId?: string;
-  idempotencyKey?: string;
-};
 
 /**
  * Registers a durable payment/checkout attempt (ledger row) before redirecting to a hosted PSP.
@@ -60,11 +48,6 @@ export async function POST(req: Request) {
     return rl.response;
   }
 
-  const cartId = await readCartIdFromCookie();
-  if (!cartId) {
-    return NextResponse.json({ error: "No active cart" }, { status: 400 });
-  }
-
   const bounded = await parseBoundedJson(req, 16 * 1024);
   if (bounded.tooLarge) {
     return NextResponse.json(
@@ -72,15 +55,40 @@ export async function POST(req: Request) {
       { status: 413 },
     );
   }
-  const body: Body = bounded.valid ? (bounded.value as Body) : {};
-
-  const provider =
-    typeof body.provider === "string" ? body.provider.trim().toLowerCase() : "";
-  if (!provider || !["cod", "stripe", "paypal", "xendit"].includes(provider)) {
+  const parsed = paymentCheckoutIntentSchema.safeParse(
+    bounded.valid ? bounded.value : undefined,
+  );
+  if (!parsed.success) {
     return NextResponse.json(
       { error: "provider is required" },
       { status: 400 },
     );
+  }
+  const body = parsed.data;
+  const provider = body.provider;
+
+  let cartId = await readCartIdFromCookie();
+  if (!cartId && body.lines?.length) {
+    const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!apiUrl) {
+      return NextResponse.json(
+        { error: "Checkout service is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    try {
+      const createdCartId = await createWorkerCheckoutCart(apiUrl, body.lines);
+      cartId = createdCartId;
+      await writeCartCookie(createdCartId);
+    } catch {
+      return NextResponse.json(
+        { error: "The checkout cart could not be prepared." },
+        { status: 502 },
+      );
+    }
+  }
+  if (!cartId) {
+    return NextResponse.json({ error: "No active cart" }, { status: 400 });
   }
 
   const profile = await loadCustomerProfile(sessionEmail);
@@ -91,24 +99,20 @@ export async function POST(req: Request) {
     );
   }
 
-  const amountMinor =
-    typeof body.amountMinor === "number" && Number.isFinite(body.amountMinor)
-      ? Math.max(0, Math.floor(body.amountMinor))
-      : 0;
-  const currencyCode =
-    typeof body.currencyCode === "string" && body.currencyCode.trim()
-      ? body.currencyCode.trim()
-      : "PHP";
   let authoritative;
   try {
     authoritative = await readVerifiedCheckoutCartTotalsPreview(cartId);
   } catch (error) {
+    const correlationId = crypto.randomUUID();
+    console.error("[checkout-intents] cart reconciliation failed", {
+      correlationId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not reconcile checkout cart",
+        error: "Could not reconcile checkout cart",
+        code: "CHECKOUT_CART_RECONCILIATION_FAILED",
+        requestId: correlationId,
       },
       { status: 409 },
     );
@@ -127,42 +131,66 @@ export async function POST(req: Request) {
       status: quoteMismatch.status,
     });
   }
-  const authoritativeAmountMinor = Math.max(
-    0,
-    Math.round(
-      authoritative.total * minorUnitDivisor(authoritative.currencyCode),
-    ),
-  );
-
-  const sb = createStorefrontServiceSupabase();
   const isolatedCodE2E = isIsolatedCodE2E() && provider === "cod";
-  const result = await registerCheckoutIntentRouteLogic({
-    organizationId: process.env.DEFAULT_ORGANIZATION_ID?.trim() || undefined,
-    cartId,
-    provider,
-    amountMinor: authoritativeAmountMinor || amountMinor,
-    currencyCode: authoritative.currencyCode || currencyCode,
-    quoteFingerprint: authoritative.quoteFingerprint,
-    variantIds: authoritative.variantIds,
-    productIds: authoritative.productIds,
-    medusaPaymentSessionId: body.medusaPaymentSessionId,
-    providerSessionId: body.providerSessionId,
-    providerPaymentId: body.providerPaymentId,
-    idempotencyKey: body.idempotencyKey,
-    supabaseAvailable: Boolean(sb) || isolatedCodE2E,
-    registerPaymentAttempt: async (input) => {
-      if (sb) {
-        return registerPaymentAttempt(sb, input);
-      }
-      if (isolatedCodE2E) {
-        return registerIsolatedCodAttempt({
+  let result: { status: number; body: unknown };
+  let workerSetCookie: string | null = null;
+  if (isolatedCodE2E) {
+    result = await registerCheckoutIntentRouteLogic({
+      cartId,
+      provider,
+      amountMinor: 0,
+      currencyCode: authoritative.currencyCode,
+      quoteFingerprint: authoritative.quoteFingerprint,
+      variantIds: authoritative.variantIds,
+      productIds: authoritative.productIds,
+      supabaseAvailable: true,
+      registerPaymentAttempt: async (input) =>
+        registerIsolatedCodAttempt({
           cartId: input.cartId,
           quoteFingerprint: input.quoteFingerprint ?? "",
-        });
-      }
-      throw new Error("Payment ledger is not configured");
-    },
-  });
+        }),
+    });
+  } else {
+    const apiUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+    if (!apiUrl) {
+      return NextResponse.json(
+        { error: "Checkout service is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    try {
+      const workerResponse = await fetch(`${apiUrl}/store/checkout-intents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Cookie: `mcart_id=${encodeURIComponent(cartId)}`,
+        },
+        body: JSON.stringify({
+          cartId,
+          provider,
+          quoteFingerprint: authoritative.quoteFingerprint,
+          medusaPaymentSessionId: body.medusaPaymentSessionId,
+          providerSessionId: body.providerSessionId,
+          providerPaymentId: body.providerPaymentId,
+          idempotencyKey: body.idempotencyKey,
+        }),
+        cache: "no-store",
+      });
+      result = {
+        status: workerResponse.status,
+        body: await readResponseJson<unknown>(workerResponse, {
+          error: "Checkout service returned an invalid response",
+        }),
+      };
+      workerSetCookie = workerResponse.headers.get("set-cookie");
+    } catch {
+      return NextResponse.json(
+        { error: "Checkout service is temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+  }
 
   if (result.status === 200 && result.body && typeof result.body === "object") {
     const b = result.body as { correlationId?: string; reused?: boolean };
@@ -204,5 +232,20 @@ export async function POST(req: Request) {
     });
   }
 
+  if (result.status === 200) {
+    const parsedResponse = checkoutIntentRegistrationResponseSchema.safeParse(
+      result.body,
+    );
+    if (!parsedResponse.success)
+      return NextResponse.json(
+        { error: "Checkout intent returned an invalid response" },
+        { status: 502 },
+      );
+    const response = NextResponse.json(parsedResponse.data, {
+      status: result.status,
+    });
+    if (workerSetCookie) response.headers.set("Set-Cookie", workerSetCookie);
+    return response;
+  }
   return NextResponse.json(result.body, { status: result.status });
 }

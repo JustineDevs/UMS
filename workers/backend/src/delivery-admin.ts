@@ -8,21 +8,21 @@ function organization(claims: WorkerAuthClaims): string | null { const value = c
 function allowed(claims: WorkerAuthClaims, permission: string): boolean { const permissions = Array.isArray(claims.permissions) ? claims.permissions : []; return claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === permission); }
 function limit(value: string | null): number { const parsed = Number(value); return Number.isSafeInteger(parsed) && parsed > 0 ? Math.min(parsed, 100) : 50; }
 
-export async function handleDeliveryShipmentsRequest(request: Request, database: WorkerDatabaseClient, env: DeliveryAdminEnv): Promise<Response> {
+export async function handleDeliveryShipmentsRequest(request: Request, database: WorkerDatabaseClient, env: DeliveryAdminEnv, commerce?: WorkerDatabaseClient): Promise<Response> {
   if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL });
   if (!claims) return json({ error: "unauthorized" }, 401);
   if (!allowed(claims, request.method === "POST" ? "orders:write" : "dashboard:read")) return json({ error: "forbidden" }, 403);
   const org = organization(claims);
   if (!org) return json({ error: "organization_claim_required" }, 403);
-  if (request.method === "POST") return handleMutation(request, database, org, claims);
+  if (request.method === "POST") return handleMutation(request, database, org, claims, commerce);
   const params = new URL(request.url).searchParams;
   const values: unknown[] = [org];
   const clauses = ["organization_id = $1"];
   if (params.get("status")) { const status = params.get("status")!.trim(); if (!/^[a-z_]{1,32}$/.test(status)) return json({ error: "invalid_status" }, 400); values.push(status); clauses.push(`status = $${values.length}`); }
   values.push(limit(params.get("limit")));
-  const shipments = await database.query(`SELECT * FROM public.delivery_logistics_shipments WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC LIMIT $${values.length}`, values);
-  const events = await database.query(`SELECT * FROM public.delivery_logistics_events WHERE organization_id = $1 ORDER BY occurred_at DESC LIMIT $2`, [org, Math.min(limit(params.get("limit")), 100)]);
+  const shipments = await database.query(`SELECT id, organization_id, order_id, order_display_id, customer_email, branch_id, courier_slug, courier_label, status, origin_address, destination_address, geocoded_destination, sla_code, sla_label, package_dimensions, hazard_flags, route_metadata, tracking_url, tracking_status, proof_of_delivery, cod_amount, driver_cash_balance, settlement_status, pricing, metadata, last_event_at, created_by_email, updated_by_email, created_at, updated_at, medusa_fulfillment_id, provider_shipment_id, eta_at, idempotency_key FROM public.delivery_logistics_shipments WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC LIMIT $${values.length}`, values);
+  const events = await database.query(`SELECT id, organization_id, shipment_id, event_type, event_status, event_payload, occurred_at, created_by_email, created_at, idempotency_key FROM public.delivery_logistics_events WHERE organization_id = $1 ORDER BY occurred_at DESC LIMIT $2`, [org, Math.min(limit(params.get("limit")), 100)]);
   return json({ data: { shipments: shipments.rows, events: events.rows } });
 }
 
@@ -30,7 +30,7 @@ function object(value: unknown): Record<string, unknown> { return value && typeo
 function text(value: unknown): string | null { return typeof value === "string" && value.trim() ? value.trim() : null; }
 function safeStatus(value: unknown): string { return value === "assigned" || value === "in_transit" || value === "delivered" || value === "returned" || value === "cancelled" ? value : "planned"; }
 
-async function handleMutation(request: Request, database: WorkerDatabaseClient, org: string, claims: WorkerAuthClaims): Promise<Response> {
+async function handleMutation(request: Request, database: WorkerDatabaseClient, org: string, claims: WorkerAuthClaims, commerce?: WorkerDatabaseClient): Promise<Response> {
   const key = request.headers.get("Idempotency-Key")?.trim();
   if (!key || key.length > 255) return json({ error: "idempotency_key_required" }, 400);
   let input: Record<string, unknown>;
@@ -42,8 +42,17 @@ async function handleMutation(request: Request, database: WorkerDatabaseClient, 
     const actor = text(claims.email);
     if (kind === "shipment") {
       const orderId = text(input.order_id);
-      const customerEmail = text(input.customer_email);
-      if (!orderId || !customerEmail) return json({ error: "order_id_and_customer_email_required" }, 400);
+      if (!orderId) return json({ error: "order_id_required" }, 400);
+      if (!commerce) return json({ error: "commerce_database_unavailable" }, 503);
+      const orderResult = await commerce.query<{ display_id: string | number | null; email: string | null }>(
+        `SELECT display_id, email FROM public."order"
+         WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2 LIMIT 1`,
+        [orderId, org],
+      );
+      const order = orderResult.rows[0];
+      if (!order) return json({ error: "order_not_found" }, 404);
+      const customerEmail = text(order.email);
+      if (!customerEmail) return json({ error: "order_customer_email_missing" }, 409);
       const result = await database.query(
         `INSERT INTO public.delivery_logistics_shipments
           (organization_id,order_id,order_display_id,customer_email,branch_id,courier_slug,courier_label,status,
@@ -61,7 +70,7 @@ async function handleMutation(request: Request, database: WorkerDatabaseClient, 
            provider_shipment_id=EXCLUDED.provider_shipment_id, eta_at=EXCLUDED.eta_at, idempotency_key=EXCLUDED.idempotency_key, updated_at=now()
          WHERE delivery_logistics_shipments.organization_id = $1
          RETURNING *`,
-        [org, orderId, text(input.order_display_id), customerEmail.toLowerCase(), text(input.branch_id), text(input.courier_slug), text(input.courier_label), safeStatus(input.status), JSON.stringify(object(input.origin_address)), JSON.stringify(object(input.destination_address)), JSON.stringify(object(input.geocoded_destination)), JSON.stringify(object(input.package_dimensions)), JSON.stringify(Array.isArray(input.hazard_flags) ? input.hazard_flags.map(String) : []), JSON.stringify(object(input.route_metadata)), text(input.tracking_url), text(input.tracking_status), JSON.stringify(object(input.proof_of_delivery)), typeof input.cod_amount === "number" ? input.cod_amount : null, typeof input.driver_cash_balance === "number" ? input.driver_cash_balance : null, ["held", "reconciled", "remitted", "none"].includes(input.settlement_status as string) ? input.settlement_status : "pending", JSON.stringify(object(input.pricing)), JSON.stringify(object(input.metadata)), actor, text(input.medusa_fulfillment_id), text(input.provider_shipment_id), text(input.eta_at), key],
+        [org, orderId, String(order.display_id ?? orderId), customerEmail.toLowerCase(), text(input.branch_id), text(input.courier_slug), text(input.courier_label), safeStatus(input.status), JSON.stringify(object(input.origin_address)), JSON.stringify(object(input.destination_address)), JSON.stringify(object(input.geocoded_destination)), JSON.stringify(object(input.package_dimensions)), JSON.stringify(Array.isArray(input.hazard_flags) ? input.hazard_flags.map(String) : []), JSON.stringify(object(input.route_metadata)), text(input.tracking_url), text(input.tracking_status), JSON.stringify(object(input.proof_of_delivery)), typeof input.cod_amount === "number" ? input.cod_amount : null, typeof input.driver_cash_balance === "number" ? input.driver_cash_balance : null, ["held", "reconciled", "remitted", "none"].includes(input.settlement_status as string) ? input.settlement_status : "pending", JSON.stringify(object(input.pricing)), JSON.stringify(object(input.metadata)), actor, text(input.medusa_fulfillment_id), text(input.provider_shipment_id), text(input.eta_at), key],
       );
       return json({ data: result.rows[0] }, 201);
     }

@@ -161,8 +161,8 @@ export function CmsMediaManager() {
   const loadRefs = (id: string) => {
     void fetch(`/api/admin/cms/media/${id}?refs=1`)
       .then(async (r) => {
-        const j = (await r.json()) as { data?: { refs?: unknown } };
         if (!r.ok) return;
+        const j = (await r.json()) as { data?: { refs?: unknown } };
         setRefsText(JSON.stringify(j.data?.refs ?? [], null, 2));
       })
       .catch(() => setRefsText("Unable to load references"));

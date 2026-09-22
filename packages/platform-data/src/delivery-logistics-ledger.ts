@@ -77,7 +77,7 @@ export type DeliveryLogisticsEventRow = {
   created_at: string;
 };
 
-function rowToShipment(row: Record<string, unknown>): DeliveryLogisticsShipmentRow {
+export function normalizeDeliveryLogisticsShipmentRow(row: Record<string, unknown>): DeliveryLogisticsShipmentRow {
   const status =
     row.status === "assigned" ||
     row.status === "in_transit" ||
@@ -166,7 +166,7 @@ function rowToShipment(row: Record<string, unknown>): DeliveryLogisticsShipmentR
   };
 }
 
-function rowToEvent(row: Record<string, unknown>): DeliveryLogisticsEventRow {
+export function normalizeDeliveryLogisticsEventRow(row: Record<string, unknown>): DeliveryLogisticsEventRow {
   return {
     id: String(row.id ?? ""),
     shipment_id: String(row.shipment_id ?? ""),
@@ -200,7 +200,7 @@ export async function listDeliveryLogisticsShipments(
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;
   }
-  return (data ?? []).map((row) => rowToShipment(row as Record<string, unknown>));
+  return (data ?? []).map((row) => normalizeDeliveryLogisticsShipmentRow(row as Record<string, unknown>));
 }
 
 export async function upsertDeliveryLogisticsShipment(
@@ -278,7 +278,7 @@ export async function upsertDeliveryLogisticsShipment(
     .select("*")
     .single();
   if (error) throw error;
-  return rowToShipment(data as Record<string, unknown>);
+  return normalizeDeliveryLogisticsShipmentRow(data as Record<string, unknown>);
 }
 
 export async function listDeliveryLogisticsEvents(
@@ -300,7 +300,7 @@ export async function listDeliveryLogisticsEvents(
     if (isMissingTableOrSchemaError(error)) return [];
     throw error;
   }
-  return (data ?? []).map((row) => rowToEvent(row as Record<string, unknown>));
+  return (data ?? []).map((row) => normalizeDeliveryLogisticsEventRow(row as Record<string, unknown>));
 }
 
 export async function appendDeliveryLogisticsEvent(
@@ -332,5 +332,5 @@ export async function appendDeliveryLogisticsEvent(
   if (!row || typeof row !== "object") {
     throw new Error("Delivery event transaction returned no event");
   }
-  return rowToEvent(row as Record<string, unknown>);
+  return normalizeDeliveryLogisticsEventRow(row as Record<string, unknown>);
 }

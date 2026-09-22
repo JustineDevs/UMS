@@ -7,6 +7,7 @@ import {
 } from "@/lib/storefront-api-rate-limit";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { isSameOriginMutation } from "@/lib/request-origin";
+import { cmsExperimentImpressionSchema, simpleOkResponseSchema } from "@/lib/admin-api-contracts";
 
 export async function POST(req: NextRequest) {
   if (!isSameOriginMutation(req)) {
@@ -28,17 +29,14 @@ export async function POST(req: NextRequest) {
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
     return Response.json({ error: "Invalid payload" }, { status: 400 });
   }
-  const rec = body as Record<string, unknown>;
-  const experimentKey =
-    typeof rec.experiment_key === "string" ? rec.experiment_key.trim() : "";
-  const variantId =
-    typeof rec.variant_id === "string" ? rec.variant_id.trim() : "";
-  if (!experimentKey || !variantId) {
+  const parsed = cmsExperimentImpressionSchema.safeParse(body);
+  if (!parsed.success) {
     return Response.json(
       { error: "experiment_key and variant_id required" },
       { status: 400 },
     );
   }
+  const { experiment_key: experimentKey } = parsed.data;
 
   const svc = createStorefrontServiceSupabase();
   if (!svc) {
@@ -50,5 +48,5 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Not recorded" }, { status: 404 });
   }
 
-  return Response.json({ ok: true });
+  return Response.json(simpleOkResponseSchema.parse({ ok: true }));
 }

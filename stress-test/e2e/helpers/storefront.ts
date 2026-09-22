@@ -14,9 +14,19 @@ export async function expectCheckoutShellVisible(page: Page): Promise<void> {
   const onboard = page.getByTestId("checkout-onboarding-continue");
   const retry = page.getByTestId("checkout-profile-retry");
   const signIn = page.getByRole("heading", { name: "Sign in", exact: true });
+  const welcomeBack = page.getByRole("heading", { name: "Welcome back", exact: true });
+  const googleSignIn = page.getByRole("button", { name: "Continue with Google", exact: true });
   const onboardingGuard = page.getByRole("button", { name: "Continue", exact: true });
   await expect(
-    pay.or(guest).or(onboard).or(retry).or(signIn).or(onboardingGuard),
+    pay
+      .or(guest)
+      .or(onboard)
+      .or(retry)
+      .or(signIn)
+      .or(welcomeBack)
+      .or(googleSignIn)
+      .or(onboardingGuard)
+      .first(),
   ).toBeVisible({ timeout: 20_000 });
 }
 

@@ -1,5 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { createCommerceJob, enqueueCommerceJob, type WorkerQueue } from "./queue.ts";
+import { applyProviderRefundUpdate, providerRefundUpdate } from "./refund-reconciliation.ts";
 
 const encoder = new TextEncoder();
 
@@ -133,13 +134,17 @@ function json(body: Record<string, unknown>, status: number): Response {
 function eventId(provider: WebhookProvider, value: unknown): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  const candidate =
-    provider === "stripe"
-      ? record.id
-      : (record.id ?? record.event_id ?? record.eventId);
-  return typeof candidate === "string" && candidate.trim()
-    ? candidate.trim()
-    : null;
+  const candidate = provider === "stripe"
+    ? record.id
+    : (record.id ?? record.event_id ?? record.eventId);
+  if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
+  if (provider !== "xendit") return null;
+  const resource = recordAt(record.data);
+  const resourceId = stringField(resource, "id");
+  const type = stringField(record, "event", "event_type", "type");
+  if (!resourceId || !type) return null;
+  const version = stringField(resource, "updated") ?? stringField(record, "created");
+  return `xendit:${type}:${resourceId}${version ? `:${version}` : ""}`.slice(0, 255);
 }
 
 function recordAt(value: unknown): Record<string, unknown> | null {
@@ -235,6 +240,7 @@ function eventType(body: unknown): string | null {
       recordAt(body),
       "type",
       "event_type",
+      "event",
       "status",
     )?.toLowerCase() ?? null
   );
@@ -376,6 +382,7 @@ export async function handleWorkerWebhookRequest(
   database: WorkerDatabaseClient,
   provider: WebhookProvider,
   env: WorkerWebhookEnv,
+  refundAuditDatabase?: WorkerDatabaseClient,
 ): Promise<Response> {
   if (request.method !== "POST")
     return json({ error: "method_not_allowed" }, 405);
@@ -391,6 +398,9 @@ export async function handleWorkerWebhookRequest(
   const id = eventId(provider, body);
   if (!id) return json({ error: "webhook_event_id_required" }, 400);
   const type = eventType(body);
+  const refundUpdate = provider === "pancake"
+    ? null
+    : providerRefundUpdate(provider, type, body);
   const status = paymentStatus(provider, type);
   const correlationId = providerCorrelation(body);
   const providerIds = providerObjectId(body);
@@ -406,6 +416,7 @@ export async function handleWorkerWebhookRequest(
   const duplicate = paymentEvent.rows.length === 0;
   if (
     !duplicate &&
+    !refundUpdate &&
     (correlationId || providerIds.sessionId || providerIds.paymentId) &&
     status
   ) {
@@ -467,6 +478,10 @@ export async function handleWorkerWebhookRequest(
      RETURNING true AS inserted`,
     [provider, id, rawBody],
   );
+  if (refundUpdate) {
+    if (!refundAuditDatabase) return json({ error: "refund_audit_unavailable" }, 503);
+    await applyProviderRefundUpdate(refundAuditDatabase, provider as "stripe" | "paypal" | "xendit", refundUpdate);
+  }
   return json(
     {
       accepted: true,

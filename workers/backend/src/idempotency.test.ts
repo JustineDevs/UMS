@@ -10,6 +10,7 @@ import {
 
 class MemoryStore implements IdempotencyStore {
   records = new Map<string, IdempotencyRecord>();
+  released: string[] = [];
 
   async get(key: string): Promise<IdempotencyRecord | null> {
     return this.records.get(key) ?? null;
@@ -18,6 +19,11 @@ class MemoryStore implements IdempotencyStore {
   async put(record: IdempotencyRecord): Promise<void> {
     if (this.records.has(record.key)) throw new Error("atomic_claim_lost");
     this.records.set(record.key, record);
+  }
+
+  async release(key: string, _requestHash: string): Promise<void> {
+    this.released.push(key);
+    this.records.delete(key);
   }
 }
 
@@ -86,6 +92,25 @@ test("does not store a failed operation", async () => {
     /provider_failed/,
   );
   assert.equal(store.records.size, 0);
+});
+
+test("releases transient responses so the same request can retry", async () => {
+  const store = new MemoryStore();
+  let calls = 0;
+  const first = await executeIdempotently(store, "retry-1", "hash-a", async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ error: "upstream_unavailable" }), { status: 503 });
+  });
+  const second = await executeIdempotently(store, "retry-1", "hash-a", async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  });
+
+  assert.equal(first.kind, "executed");
+  assert.equal(second.kind, "executed");
+  assert.equal(calls, 2);
+  assert.equal(store.records.get("retry-1")?.status, 200);
+  assert.deepEqual(await second.response.json(), { ok: true });
 });
 
 test("rejects empty and oversized keys before running the operation", async () => {

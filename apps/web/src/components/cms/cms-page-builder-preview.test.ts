@@ -52,3 +52,18 @@ test("canvas document reflects draft props while unchanged inputs stay determini
   assert.match(draft, /Draft title/);
   assert.notEqual(first, draft);
 });
+
+test("canvas document keeps untrusted props out of executable HTML contexts", () => {
+  const document = componentCanvasDocument(
+    {
+      ...createComponentCanvasPreviewBlock(definition, "sale"),
+      id: "canvas-</script><script>alert(1)</script>",
+      props: { title: "</script><script>alert(2)</script>" },
+    },
+    { ...definition, slots: [{ name: "content", label: "</strong><script>alert(3)</script>" }] },
+  );
+  assert.ok(!document.includes("<script>alert(1)</script>"));
+  assert.ok(!document.includes("<script>alert(2)</script>"));
+  assert.ok(document.includes("textContent=String(slot.label||slot.name)"));
+  assert.ok(!document.includes("drop.innerHTML='<strong>'"));
+});

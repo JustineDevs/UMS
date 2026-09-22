@@ -15,8 +15,7 @@ This repository is a monorepo ecommerce platform with:
 
 - `apps/web`: customer-facing shop, account, checkout, content, wishlist, reviews
 - `apps/web`: staff dashboard, catalog, inventory, orders, CMS, POS, settings
-- `apps/api`: support API and health endpoints
-- `apps/medusa`: commerce backend
+- `workers/backend`: Worker-native commerce, platform, admin, webhook, and compliance API
 - `packages/*`: shared UI, SDK, validation, database, and business-domain packages
 
 ## Core UX Stack
@@ -24,7 +23,7 @@ This repository is a monorepo ecommerce platform with:
 - Frontend: Next.js App Router, React, TypeScript
 - UI system: `packages/ui` primitives plus app-specific chrome and shells
 - Auth: Supabase Auth SSR with Google OAuth
-- Commerce data: Medusa + shared platform-data helpers
+- Commerce data: Supabase PostgreSQL through Cloudflare Hyperdrive; Redis-compatible persistence and queues use Worker-compatible services
 - Analytics/guardrails: PostHog, Vercel Analytics, BotId protection, consent banner
 
 ## High-Level Data Flow
@@ -33,9 +32,8 @@ This repository is a monorepo ecommerce platform with:
 flowchart LR
   Browser[Browser] --> Storefront[apps/web]
   Browser --> Admin[apps/web]
-  Storefront --> API[apps/api]
-  Storefront --> Medusa[apps/medusa]
-  Admin --> Medusa
+  Storefront --> Worker[workers/backend]
+  Admin --> Worker
   Admin --> PlatformData[packages/platform-data]
   Storefront --> PlatformData
   Admin --> UI[packages/ui]
@@ -50,7 +48,7 @@ flowchart LR
 
 - `apps/web/src/app/layout.tsx`
   - Global metadata, fonts, theme color, canonical base, robots, icons, manifest
-  - Installs `SupabaseSessionProvider`, `MedusaCartProvider`, analytics, BotId client protection
+  - Installs `SupabaseSessionProvider`, Worker-backed `CartProvider`, analytics, BotId client protection
   - Adds cart sync, wishlist sync, onboarding guard, smooth scrolling, cookie consent
 - `apps/web/src/app/(public)/layout.tsx`
   - Wraps public routes in `StorefrontPublicChrome`
@@ -137,7 +135,7 @@ flowchart LR
 - `/accessibility`
 - `/maintenance`
 - `/errors/[code]`
-- `/sitemap`
+- `/site-map` (human-readable route; `/sitemap.xml` is the machine-readable metadata sitemap)
 
 ### Storefront API Routes
 
@@ -145,7 +143,7 @@ Primary domains:
 
 - Auth: `/api/auth/[...nextauth]`
 - Account: `/api/account/profile`, `/api/account/profile/status`, `/api/account/orders/[orderId]/cancel`
-- Cart: `/api/cart/resume`, `/api/cart/merge`, `/api/cart/attach-customer`, `/api/cart/medusa-bind`, `/api/cart/abandonment`
+- Cart: `/api/cart/resume`, `/api/cart/merge`, `/api/cart/attach-customer`, `/api/cart/bind`, `/api/cart/abandonment`
 - Checkout: `/api/checkout/*` including promo, available payment methods, COD payload/place-order, totals preview, stock verification, receipt upload, telemetry, completion
 - Orders and returns: `/api/orders/return`
 - Wishlist: `/api/wishlist`, `/api/wishlist/sync`
@@ -283,10 +281,10 @@ Primary domains:
 - CMS: `/api/admin/cms/*`
 - CRM: `/api/admin/crm/*`
 - Inventory: `/api/admin/inventory`, `/api/admin/inventory/stream`
-- Devices and POS: `/api/admin/devices/*`, `/api/admin/pos/*`, `/api/pos/medusa/*`
+- Devices and POS: `/api/admin/devices/*`, `/api/admin/pos/*`, `/api/pos/commerce/*` (Worker-backed web gateway)
 - Employees and shifts: `/api/admin/employees/*`, `/api/admin/shifts/*`, `/api/admin/pin-approval`
 - Workflow and monitoring: `/api/admin/workflow/*`, `/api/admin/audit-logs`, `/api/admin/tasks/today`, `/api/admin/sse`
-- Integrations: `/api/admin/medusa/payment-providers`, `/api/integrations/*`
+- Integrations: `/api/admin/payments/provider-operation`, `/api/integrations/*`
 - Commerce metrics and analytics: `/api/admin/analytics/*`, `/api/admin/commerce-recovery-metrics`, `/api/admin/cost-visibility`
 
 ### Admin UX Component Inventory

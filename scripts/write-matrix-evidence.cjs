@@ -4,9 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
 
-const [matrixId, command, runtime, runner, exitCodeRaw, observedJson, artifactsJson, callbackUrl, callbackStatus] = process.argv.slice(2);
+const [matrixId, command, runtime, runner, exitCodeRaw, observedJson, artifactsJson, callbackUrl, callbackStatus, result = "pass", blockedBy, recoveryCondition] = process.argv.slice(2);
 if (!matrixId || !command || !runtime || !runner || exitCodeRaw === undefined || !observedJson || !artifactsJson) {
-  console.error("usage: write-matrix-evidence <matrixId> <command> <runtime> <runner> <exit-code> <observed-json> <artifacts-json> [callback-url] [callback-status]");
+  console.error("usage: write-matrix-evidence <matrixId> <command> <runtime> <runner> <exit-code> <observed-json> <artifacts-json> [callback-url] [callback-status] [pass|blocked] [blocked-by] [recovery-condition]");
   process.exit(2);
 }
 const exitCode = Number(exitCodeRaw);
@@ -23,11 +23,19 @@ const record = {
   runner,
   exitCode,
   prerequisites: ["fresh targeted run completed without skip"],
-  result: "pass",
+  result,
   observed: parseArray(observedJson, "observed"),
   artifacts: parseArray(artifactsJson, "artifacts"),
   verifiedAt: new Date().toISOString(),
 };
+if (!["pass", "blocked"].includes(result)) throw new Error(`result must be pass or blocked, got ${result}`);
+if (result === "blocked") {
+  if (!blockedBy?.trim() || !recoveryCondition?.trim()) {
+    throw new Error("blocked evidence requires blockedBy and recoveryCondition");
+  }
+  record.blockedBy = blockedBy.trim();
+  record.recoveryCondition = recoveryCondition.trim();
+}
 if (callbackUrl) record.callbackUrl = callbackUrl;
 if (callbackStatus) record.callbackStatus = Number(callbackStatus);
 record.artifactSha256 = Object.fromEntries(record.artifacts.map((artifact) => {

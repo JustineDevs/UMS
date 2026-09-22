@@ -12,7 +12,7 @@ import {
 } from "@/lib/cart";
 
 /**
- * Merges guest session lines into the Medusa customer cart, then links any cookie cart.
+ * Merges guest session lines into the Worker customer cart, then links the cookie cart.
  */
 export function CartSyncOnSignIn() {
   const { data: session, status } = useSession();

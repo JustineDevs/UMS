@@ -30,9 +30,11 @@ export type AdminApiErrorCode =
   | "SUPABASE_NOT_CONFIGURED"
   | "MEDUSA_UNAVAILABLE"
   | "VALIDATION_ERROR"
+  | "RESOURCE_LIMIT"
   | "INSUFFICIENT_STOCK"
   | "INVENTORY_CHECK_FAILED"
-  | "POS_POLICY_DENIED";
+  | "POS_POLICY_DENIED"
+  | "FEATURE_RETIRED";
 
 /**
  * Standard error response for admin API routes.

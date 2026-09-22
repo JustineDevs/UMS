@@ -7,7 +7,7 @@ import { sanitizeCmsHtml } from "@universal-music-store/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { fetchCategorySummaries, fetchProductsPage } from "@/lib/catalog-fetch";
-import { buildPageMetadata, canonicalUrl, SITE_DESCRIPTION } from "@/lib/seo";
+import { buildPageMetadata, canonicalUrl, serializeJsonLd, SITE_DESCRIPTION } from "@/lib/seo";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { decodeCollectionHandle } from "@/lib/collection-route";
 
@@ -34,9 +34,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CollectionByHandlePage({ params, searchParams }: Props) {
   const { handle } = await params;
-  const { locale = "en", page: pageRaw } = await searchParams;
   const h = decodeCollectionHandle(handle);
   if (!h) notFound();
+  const { locale = "en", page: pageRaw } = await searchParams;
   const parsedPage = Number.parseInt(pageRaw ?? "1", 10);
   const currentPage = Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const pageSize = 24;
@@ -55,8 +55,8 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
     : null;
   if (categories.kind === "ok" && !category) notFound();
   const categoryLabel = category?.category ?? h;
-  const cms = await loadCmsCategoryContentPublic(h, locale.trim() || "en", category?.id);
   if (page.kind !== "ok") return <main className="storefront-page-shell"><StorefrontCommerceAlert failure={page} /></main>;
+  const cms = await loadCmsCategoryContentPublic(h, locale.trim() || "en", category?.id);
 
   const collectionUrl = canonicalUrl(`/collections/${encodeURIComponent(h)}`);
   const structuredData = {
@@ -85,7 +85,7 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
 
   return (
     <main className="storefront-page-shell max-w-[1600px] pb-16">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
       {cms?.banner_url ? <div className="relative mb-10 aspect-[21/9] overflow-hidden rounded-2xl bg-surface-container-low"><Image src={cms.banner_url} alt={cms.banner_alt ?? `${categoryLabel} collection banner`} fill priority className="object-cover" sizes="100vw" unoptimized={shouldUnoptimizeImage(cms.banner_url)} /></div> : null}
       <header className="mb-10 max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-5 text-sm text-on-surface-variant">

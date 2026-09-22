@@ -78,7 +78,7 @@ export function NangoPaymentConnect() {
           try {
             const response = await fetch("/api/admin/payments/connections", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
               credentials: "include",
               body: JSON.stringify({ connection_id: connectionId, provider_config_key: providerConfigKey }),
             });
@@ -104,7 +104,7 @@ export function NangoPaymentConnect() {
     setBusy(integration);
     setStatus(null);
     try {
-      const response = await fetch("/api/admin/payments/connect-session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ integration_id: integration }) });
+      const response = await fetch("/api/admin/payments/connect-session", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ integration_id: integration }) });
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Unable to start secure connection");
@@ -122,7 +122,7 @@ export function NangoPaymentConnect() {
     setBusy(connection.provider_config_key);
     setStatus(null);
     try {
-      const response = await fetch("/api/admin/payments/connections/reconnect", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider_config_key: connection.provider_config_key, nango_connection_id: connection.nango_connection_id }) });
+      const response = await fetch("/api/admin/payments/connections/reconnect", { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ provider_config_key: connection.provider_config_key, nango_connection_id: connection.nango_connection_id }) });
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Unable to start reconnect");
@@ -141,7 +141,7 @@ export function NangoPaymentConnect() {
     setBusy(connection.provider_config_key);
     setStatus(null);
     try {
-      const response = await fetch("/api/admin/payments/connections", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider_config_key: connection.provider_config_key, nango_connection_id: connection.nango_connection_id }) });
+      const response = await fetch("/api/admin/payments/connections", { method: "DELETE", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ provider_config_key: connection.provider_config_key, nango_connection_id: connection.nango_connection_id }) });
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error ?? "Unable to disconnect payment provider");

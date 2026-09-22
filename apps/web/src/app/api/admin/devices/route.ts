@@ -1,47 +1,6 @@
-import { withAdminMutationIdempotency } from "@/lib/admin-mutation-idempotency";
-import { NextRequest } from "next/server";
-import { listDevices, upsertDevice } from "@universal-music-store/platform-data";
-import { requireStaffApiSession } from "@/lib/requireStaffSession";
 import { getCorrelationId } from "@/lib/request-correlation";
-import { correlatedJson } from "@/lib/staff-api-response";
-import { adminSupabaseOr503 } from "@/lib/require-admin-supabase";
-import { parseAdminJson } from "@/lib/admin-api-security";
-import { z } from "zod";
-import { resolveStaffOrganization } from "@/lib/staff-organization";
-
-const deviceSchema = z.object({
-  id: z.string().uuid().optional(),
-  name: z.string().trim().min(1).max(120),
-  type: z.enum(["terminal", "printer", "kds", "scanner"]).default("terminal"),
-  ip_address: z.string().trim().max(64).optional(),
-  is_active: z.boolean().optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-}).strict();
-
-export async function GET(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("devices:manage");
-  if (!auth.ok) return auth.response;
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const data = await listDevices(sup.client, organization.id);
-  return correlatedJson(cid, { data });
-}
-
-async function post(req: NextRequest) {
-  const cid = getCorrelationId(req);
-  const auth = await requireStaffApiSession("devices:manage");
-  if (!auth.ok) return auth.response;
-  const parsed = await parseAdminJson(req, deviceSchema);
-  if (!parsed.ok) return correlatedJson(cid, { error: parsed.error }, { status: parsed.status });
-  const sup = adminSupabaseOr503(cid);
-  if ("response" in sup) return sup.response;
-  const organization = await resolveStaffOrganization(sup.client, auth.session.user?.email);
-  if (!organization) return correlatedJson(cid, { error: "Organization membership is not configured" }, { status: 403 });
-  const device = await upsertDevice(sup.client, { ...parsed.data, organization_id: organization.id });
-  return correlatedJson(cid, { data: device }, { status: 201 });
-}
-
-export const POST = withAdminMutationIdempotency("/admin/devices:POST", post);
+import { fetchWorkerDevicesForAdmin, saveWorkerDeviceForAdmin } from "@/lib/worker-admin-bridge";
+export const dynamic = "force-dynamic";
+export async function GET(request: Request) { const correlationId = getCorrelationId(request); const response = await fetchWorkerDevicesForAdmin(); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); }
+export async function POST(request: Request) { const correlationId = getCorrelationId(request); return mutate(request, correlationId, "POST", "/api/admin/devices"); }
+async function mutate(request: Request, correlationId: string, method: "POST" | "PATCH", path: string) { const key = request.headers.get("Idempotency-Key")?.trim(); if (!key) return new Response(JSON.stringify({ error: "Idempotency-Key is required", requestId: correlationId }), { status: 400, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); const length = Number(request.headers.get("content-length") ?? 0); if (length > 128 * 1024) return new Response(JSON.stringify({ error: "Payload too large", requestId: correlationId }), { status: 413, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); let body: Record<string, unknown>; try { const text = await request.text(); if (text.length > 128 * 1024) throw new Error("payload_too_large"); body = JSON.parse(text) as Record<string, unknown>; if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid_payload"); } catch (error) { const status = error instanceof Error && error.message === "payload_too_large" ? 413 : 400; return new Response(JSON.stringify({ error: status === 413 ? "Payload too large" : "Invalid JSON body", requestId: correlationId }), { status, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); } const response = await saveWorkerDeviceForAdmin(path, method, body, key); return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } }); }

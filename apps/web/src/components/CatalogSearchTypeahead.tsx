@@ -50,16 +50,6 @@ export function CatalogSearchTypeahead({
   const requestRef = useRef<AbortController | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Next navigation can preserve this client component while the server page
-  // changes its query string. Keep the visible input aligned with the
-  // canonical URL after actions such as “Clear search”.
-  useEffect(() => {
-    setQ(initialQ ?? "");
-    setOpen(false);
-    setItems([]);
-    setActiveIndex(-1);
-  }, [initialQ]);
-
   const runSuggest = useCallback(async (term: string) => {
     const t = term.trim();
     if (t.length < 2) {
@@ -90,11 +80,13 @@ export function CatalogSearchTypeahead({
       setItems(nextItems);
       setActiveIndex(-1);
     } catch {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        return;
+      }
       setItems([]);
       setSuggestionError(true);
     } finally {
-      if (!controller.signal.aborted) setLoading(false);
+      if (requestRef.current === controller) setLoading(false);
     }
   }, []);
 

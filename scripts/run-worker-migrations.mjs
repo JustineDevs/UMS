@@ -14,6 +14,28 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: join(root, ".env.local"), override: false });
 
+if (process.argv.includes("--target=medusa")) {
+  const databaseUrl = process.env.MEDUSA_DB_URL;
+  if (!databaseUrl?.trim()) throw new Error("MEDUSA_DB_URL is required for the commerce idempotency ledger");
+  const sql = await readFile(join(root, "workers", "backend", "migrations", "002_medusa_worker_idempotency.sql"), "utf8");
+  const client = new pg.Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(sql);
+    await client.query("COMMIT");
+    const check = await client.query(`SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='worker_idempotency_records'`);
+    if (check.rowCount !== 1) throw new Error("Commerce idempotency ledger verification failed");
+    console.log("Applied and verified the commerce idempotency ledger");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    await client.end();
+  }
+  process.exit(0);
+}
+
 const databaseUrl = process.env.APP_DB_URL;
 if (!databaseUrl?.trim()) {
   console.error("APP_DB_URL is required; refusing to apply the Worker ledger to the commerce database implicitly.");

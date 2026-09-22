@@ -5,26 +5,12 @@ export function storefrontHttpBase(): string {
   return process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 }
 
-export function medusaHttpBase(): string {
+function workerHttpBase(): string {
   return (
-    process.env.PLAYWRIGHT_MEDUSA_URL?.replace(/\/health\/?$/, "") ??
-    process.env.NEXT_PUBLIC_MEDUSA_URL?.trim().replace(/\/$/, "") ??
-    process.env.MEDUSA_BACKEND_URL?.trim().replace(/\/$/, "") ??
-    "http://localhost:9000"
-  );
-}
-
-export function internalApiKey(): string | undefined {
-  return process.env.INTERNAL_API_KEY?.trim() || undefined;
-}
-
-export function medusaPublishableKey(): string | undefined {
-  return (
-    process.env.PLAYWRIGHT_MEDUSA_PUBLISHABLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY?.trim() ||
-    process.env.MEDUSA_PUBLISHABLE_API_KEY?.trim() ||
-    undefined
-  );
+    process.env.PLAYWRIGHT_WORKER_URL ??
+    process.env.API_URL ??
+    "http://127.0.0.1:8787"
+  ).replace(/\/$/, "");
 }
 
 export async function skipUnlessStorefrontReachable(
@@ -39,14 +25,14 @@ export async function skipUnlessStorefrontReachable(
   }
 }
 
-export async function skipUnlessMedusaReachable(
+async function skipUnlessWorkerReachable(
   request: APIRequestContext,
 ): Promise<void> {
-  const base = medusaHttpBase();
+  const base = workerHttpBase();
   const res = await request
-    .get(`${base}/health`, { failOnStatusCode: false })
+    .get(`${base}/healthz`, { failOnStatusCode: false })
     .catch(() => null);
   if (!res?.ok()) {
-    test.skip(true, `Medusa not reachable at ${base}`);
+    test.skip(true, `Cloudflare Worker not reachable at ${base}`);
   }
 }

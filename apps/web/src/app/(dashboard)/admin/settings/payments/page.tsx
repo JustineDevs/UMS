@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import Link from "next/link";
 import { Download, RotateCw, Settings2 } from "lucide-react";
 import { listRecentPaymentAttempts } from "@universal-music-store/platform-data";
 
@@ -77,7 +78,7 @@ export default async function PaymentSettingsPage({
     <div className="flex flex-col gap-4">
       <AdminPageHeader title="Personal Finances" subtitle={formattedDate} actions={<div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs"><RotateCw className="size-4" /><span>Updated {attempts[0]?.updated_at ? format(new Date(attempts[0].updated_at), "MMM d, h:mm a") : "not available"}</span></div>
-        <Button asChild size="sm" variant="outline"><a href="/admin/settings"><Settings2 />Settings</a></Button>
+        <Button asChild size="sm" variant="outline"><Link href="/admin/settings"><Settings2 />Settings</Link></Button>
         <Button asChild size="sm" variant="outline"><a href="/api/admin/payment-attempts/export"><Download data-icon="inline-start" />Export CSV</a></Button>
       </div>} />
       <Tabs defaultValue={activeTab === "accounts" ? "12-months" : activeTab === "transactions" ? "custom" : "30-days"} className="flex flex-col gap-4">
@@ -113,7 +114,7 @@ export default async function PaymentSettingsPage({
           <div className="flex flex-col gap-3 rounded-xl border border-border border-dashed p-6">
             <h2 className="font-medium">Transactions</h2>
             <p className="text-sm text-muted-foreground">Payment attempts and retry actions are managed in the operational ledger.</p>
-            <Button asChild size="sm" variant="outline" className="w-fit"><a href="/admin/payments">Open payment attempts</a></Button>
+            <Button asChild size="sm" variant="outline" className="w-fit"><Link href="/admin/payments">Open payment attempts</Link></Button>
           </div>
         </TabsContent>
       </Tabs>

@@ -289,6 +289,7 @@ export function ProductReviewsFeedClient({
                       year: "numeric",
                       month: "short",
                       day: "numeric",
+                      timeZone: "Asia/Manila",
                     })}
                   </time>
                 </div>
@@ -303,6 +304,7 @@ export function ProductReviewsFeedClient({
                   if (media.kind === "image") {
                     return (
                       <a
+                        aria-label="Open review proof media"
                         href={media.url}
                         target="_blank"
                         rel="noreferrer"

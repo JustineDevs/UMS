@@ -35,7 +35,8 @@ export async function listCmsBlogPosts(supabase: SupabaseClient, organizationId?
   let query = supabase
     .from("cms_blog_posts")
     .select("*")
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(500);
   if (organizationId) query = query.eq("organization_id", organizationId);
   const { data, error } = await query;
   if (error) {

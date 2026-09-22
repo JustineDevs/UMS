@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.tracking_capability_revocations (
   expires_at timestamptz,
   revoked_by text,
   reason text,
+  organization_id uuid,
   CONSTRAINT tracking_capability_revocations_resource_check
     CHECK (resource_id ~ '^(order|cart)_[A-Za-z0-9_-]+$')
 );
@@ -16,3 +17,8 @@ CREATE INDEX IF NOT EXISTS tracking_capability_revocations_expires_idx
 ALTER TABLE public.tracking_capability_revocations ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.tracking_capability_revocations FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.tracking_capability_revocations TO service_role;
+
+ALTER TABLE public.tracking_capability_revocations
+  ADD COLUMN IF NOT EXISTS organization_id uuid;
+CREATE INDEX IF NOT EXISTS tracking_capability_revocations_org_idx
+  ON public.tracking_capability_revocations (organization_id, revoked_at DESC);

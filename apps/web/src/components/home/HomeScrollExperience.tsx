@@ -843,31 +843,39 @@ export function HomeScrollExperience({
               aria-label="Partners logo marquee"
             >
               <div
-                className="flex min-w-max items-center gap-6 will-change-transform motion-safe:animate-[partner-marquee_24s_linear_infinite] motion-reduce:animate-none group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused]"
+                className="flex min-w-max items-center gap-6 motion-safe:animate-[partner-marquee_24s_linear_infinite] motion-reduce:animate-none group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused]"
+                role="list"
+                aria-label="Official brand and logistics partners"
               >
-                {marqueePartners.map((partner, index) => (
-                  <a
-                    key={`${partner.name}-${index}`}
-                    href={partner.href}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="group/logo flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center rounded-lg bg-transparent px-3 opacity-80 transition-[transform,opacity,filter] duration-300 hover:-translate-y-0.5 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                    aria-label={`Visit ${partner.name} official site`}
-                  >
-                    <span className="sr-only">{partner.name}</span>
-                    <div className="relative h-full w-full">
-                      <Image
-                        src={encodeURI(partner.logo)}
-                        alt={partner.name}
-                        fill
-                        sizes="(max-width: 768px) 42vw, 180px"
-                        className={`object-contain object-center transition-transform duration-300 group-hover/logo:scale-[1.03] ${
-                          partner.imageClassName ?? ""
-                        }`}
-                      />
-                    </div>
-                  </a>
-                ))}
+                {marqueePartners.map((partner, index) => {
+                  const isDecorativeClone = index >= PARTNERS.length;
+                  return (
+                    <a
+                      key={`${partner.name}-${partner.href}-${index}`}
+                      href={partner.href}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="group/logo flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center rounded-lg bg-transparent px-3 opacity-80 transition-[transform,opacity,filter] duration-300 hover:-translate-y-0.5 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                      aria-label={`Visit ${partner.name} official site`}
+                      aria-hidden={isDecorativeClone || undefined}
+                      role="listitem"
+                      tabIndex={isDecorativeClone ? -1 : undefined}
+                    >
+                      <span className="sr-only">{partner.name}</span>
+                      <div className="relative h-full w-full">
+                        <Image
+                          src={encodeURI(partner.logo)}
+                          alt={partner.name}
+                          fill
+                          sizes="(max-width: 768px) 42vw, 180px"
+                          className={`object-contain object-center transition-transform duration-300 group-hover/logo:scale-[1.03] ${
+                            partner.imageClassName ?? ""
+                          }`}
+                        />
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -920,7 +928,7 @@ export function HomeScrollExperience({
             const wide = tile.variant === "wide" || index >= 2;
             return (
               <Link
-                key={`${tile.href}-${index}`}
+                key={tile.href}
                 data-home-collection-panel
                 data-cms-id={`home-tile-${index}`}
                 data-cms-label={`Category tile ${index + 1}`}
@@ -941,7 +949,7 @@ export function HomeScrollExperience({
                     </p>
                   ) : null}
                   {tile.linkLabel ? (
-                    <span className="mt-2 inline-block font-medium text-primary transition-all hover:underline hover:underline-offset-8">
+                    <span className="mt-2 inline-block font-medium text-primary transition-[text-decoration-color] hover:underline hover:underline-offset-8">
                       {tile.linkLabel}
                     </span>
                   ) : null}
@@ -971,7 +979,7 @@ export function HomeScrollExperience({
             <div className="mx-8 hidden h-0.5 flex-grow bg-outline-variant opacity-20 md:block" />
             <Link
               href={home.latestSection.viewAllHref || "/shop"}
-              className="font-medium text-primary transition-all hover:underline"
+              className="font-medium text-primary transition-[text-decoration-color] hover:underline"
             >
               {home.latestSection.viewAllLabel}
             </Link>
@@ -1038,7 +1046,7 @@ export function HomeScrollExperience({
           : {};
         const content = typeof overrides[block.id]?.innerHTML === "string"
           ? sanitizeCmsHtml(String(overrides[block.id].innerHTML))
-          : markup;
+          : sanitizeCmsHtml(markup);
         return (
           <section
             key={block.id}
