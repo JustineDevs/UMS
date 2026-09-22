@@ -30,12 +30,22 @@ const getCachedPublicHomeContent = unstable_cache(
 );
 
 const HOME_CONTENT_DEADLINE_MS = 1_500;
+const HOME_AUXILIARY_READ_DEADLINE_MS = 1_500;
 
 function loadHomeContentWithinDeadline() {
   return Promise.race([
     getCachedPublicHomeContent(),
     new Promise<typeof DEFAULT_STOREFRONT_HOME_PAYLOAD>((resolve) =>
       setTimeout(() => resolve(DEFAULT_STOREFRONT_HOME_PAYLOAD), HOME_CONTENT_DEADLINE_MS),
+    ),
+  ]);
+}
+
+function loadHomepageAuxiliaryReadWithinDeadline<T>(read: Promise<T>, fallback: T) {
+  return Promise.race([
+    read,
+    new Promise<T>((resolve) =>
+      setTimeout(() => resolve(fallback), HOME_AUXILIARY_READ_DEADLINE_MS),
     ),
   ]);
 }
@@ -104,8 +114,8 @@ export default async function HomePage({
   }
 
   const [customerCount, reviewSummary, publicMeta] = await Promise.all([
-    fetchHomepageCustomerCount(),
-    fetchHomepageSocialProof(),
+    loadHomepageAuxiliaryReadWithinDeadline(fetchHomepageCustomerCount(), 0),
+    loadHomepageAuxiliaryReadWithinDeadline(fetchHomepageSocialProof(), { average: 0, count: 0 }),
     getCachedPublicSiteMetadata().catch(() => null),
   ]);
   const orgJsonLd = buildJsonLdOrganization({
