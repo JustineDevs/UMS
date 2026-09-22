@@ -235,3 +235,10 @@ reconciliation. The storefront UX suite passed 22/23; the only skipped case is i
 the deployed catalog has no seeded image fixture. The HTTP matrix reached the Worker cases (4/4)
 but the storefront cases were redirected to Vercel SSO when run outside the authenticated browser
 session, so the product-header assertion still requires an authenticated preview request.
+
+The focused Worker provider/queue/webhook contract pass completed with 53/53 tests passing.
+It covered Stripe checkout/refund/signature replay and deduplication, PayPal order/capture/refund
+and transmission verification, Xendit/Pancake callback tokens and refund reconciliation, provider
+failure handling, queue retry/redelivery/dead-letter behavior, and idempotency replay semantics.
+These are contract-level proofs; they do not replace live provider delivery or authenticated
+preview browser evidence.
