@@ -293,17 +293,32 @@ function jsonError(error: string, id: string, status: number): Response {
   });
 }
 
+function nativeRouteFailureCode(error: unknown): string {
+  const candidate =
+    error && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
+  return typeof candidate === "string" ? candidate : "UNKNOWN";
+}
+
+export function nativeRouteFailureResponse(error: unknown, id: string): Response {
+  // PostgreSQL's undefined-table error means the deployed Worker schema is
+  // behind the database it is connected to. Reporting that as a catalog outage
+  // sends operators toward the wrong recovery path and hides the real defect.
+  if (nativeRouteFailureCode(error) === "42P01") {
+    return jsonError("database_schema_unavailable", id, 503);
+  }
+  return jsonError("catalog_unavailable", id, 503);
+}
+
 function logNativeRouteFailure(
   error: unknown,
   requestId: string,
   matches: Record<string, unknown>,
 ): void {
-  const candidate =
-    error && typeof error === "object" && "code" in error
-      ? error.code
-      : undefined;
+  const candidate = nativeRouteFailureCode(error);
   const errorCode =
-    typeof candidate === "string" && /^[0-9A-Z]{5}$/.test(candidate)
+    /^[0-9A-Z]{5}$/.test(candidate)
       ? candidate
       : "UNKNOWN";
   const route =
@@ -4358,7 +4373,7 @@ export async function handleBackendRequest(
       });
     } catch (error) {
       logNativeRouteFailure(error, id, nativeRouteMatches);
-      return jsonError("catalog_unavailable", id, 503);
+      return nativeRouteFailureResponse(error, id);
     }
   }
 
