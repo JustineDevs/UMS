@@ -226,3 +226,12 @@ COD validation, and cron-secret rejection. The route-header repair is not yet pr
 production alias; Vercel deployment `8DgD98NffjZz1KnZdK4FkdWZCrFo` remains in progress while
 the JavaScript/TypeScript security check has completed successfully. The HTTP matrix remains
 pending until that deployment is ready.
+
+The ready preview for `b1ee6b4f` is
+`https://universalmusic-rclz121zg-justinedevs-projects.vercel.app`. The deployed cart
+quantity/reconciliation suite passed 13/13, covering over-limit edits, rapid-edit serialization,
+stale-price correction, unavailable variants, outage recovery, mobile controls, and cross-tab
+reconciliation. The storefront UX suite passed 22/23; the only skipped case is image zoom because
+the deployed catalog has no seeded image fixture. The HTTP matrix reached the Worker cases (4/4)
+but the storefront cases were redirected to Vercel SSO when run outside the authenticated browser
+session, so the product-header assertion still requires an authenticated preview request.
