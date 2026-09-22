@@ -15,6 +15,7 @@ import {
   isInventoryReservationExpiryJob,
   isNotificationDeliveryJob,
 } from "./jobs.ts";
+import { handleWorkerWebhookRequest, type QueuedWebhookPayload } from "./webhooks.ts";
 
 export { handleBackendRequest } from "./router.ts";
 export * from "./idempotency.ts";
@@ -56,6 +57,43 @@ async function handleNativeCommerceJob(
   job: CommerceJob,
   env: WorkerEnv,
 ): Promise<void> {
+  if (job.name === "webhook-persistence") {
+    const payload = job.payload as Partial<QueuedWebhookPayload>;
+    if (
+      (payload.provider !== "stripe" &&
+        payload.provider !== "paypal" &&
+        payload.provider !== "xendit" &&
+        payload.provider !== "pancake") ||
+      typeof payload.rawBody !== "string" ||
+      !payload.headers ||
+      typeof payload.headers !== "object"
+    ) {
+      throw new Error("invalid_webhook_persistence_payload");
+    }
+    const provider = payload.provider;
+    const response = await withWorkerDatabase(
+      env,
+      (database) =>
+        handleWorkerWebhookRequest(
+          new Request(`https://worker.internal/webhooks/${provider}`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              ...payload.headers,
+            },
+            body: payload.rawBody,
+          }),
+          database,
+          provider,
+          env,
+          database,
+        ),
+      "app",
+    );
+    if (response.status >= 400)
+      throw new Error(`webhook_persistence_failed:${response.status}`);
+    return;
+  }
   if (isInventoryReservationExpiryJob(job)) {
     await handleInventoryReservationExpiryJob(env, job);
     return;

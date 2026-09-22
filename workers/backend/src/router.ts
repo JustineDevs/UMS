@@ -30,7 +30,7 @@ import {
   type CheckoutEnv,
 } from "./checkout.ts";
 import {
-  handleWorkerWebhookRequest,
+  enqueueWorkerWebhookRequest,
   type WorkerWebhookEnv,
 } from "./webhooks.ts";
 import {
@@ -1347,6 +1347,24 @@ export async function handleBackendRequest(
           !hasConfiguredDatabaseForRole(env, "medusa"))));
   if (splitDatabaseMisconfiguration) {
     return jsonError("database_not_configured", id, 503);
+  }
+  if (webhookMatch) {
+    try {
+      const queuedResponse = await enqueueWorkerWebhookRequest(
+        request,
+        webhookMatch[1] as "stripe" | "paypal" | "xendit" | "pancake",
+        env,
+      );
+      const headers = responseHeaders(queuedResponse.headers, origin);
+      headers.set("X-Request-ID", id);
+      return new Response(queuedResponse.body, {
+        status: queuedResponse.status,
+        headers,
+      });
+    } catch (error) {
+      logNativeRouteFailure(error, id, nativeRouteMatches);
+      return jsonError("webhook_unavailable", id, 503);
+    }
   }
   if (
     adminPaymentRetryMatch &&
@@ -4164,27 +4182,7 @@ export async function handleBackendRequest(
                                                                                                               database,
                                                                                                               env,
                                                                                                             )
-                                                                                                          : webhookMatch
-                                                                                                            ? await withWorkerDatabase(
-                                                                                                                env as BackendEnv &
-                                                                                                                  WorkerDatabaseEnv,
-                                                                                                                (
-                                                                                                                  appDatabase,
-                                                                                                                ) =>
-                                                                                                                  handleWorkerWebhookRequest(
-                                                                                                                    request,
-                                                                                                                    database,
-                                                                                                                    webhookMatch[1] as
-                                                                                                                      | "stripe"
-                                                                                                                      | "paypal"
-                                                                                                                      | "xendit"
-                                                                                                                      | "pancake",
-                                                                                                                    env,
-                                                                                                                    appDatabase,
-                                                                                                                  ),
-                                                                                                                "app",
-                                                                                                              )
-                                                                                                            : customerOrdersMatch
+                                                                                                          : customerOrdersMatch
                                                                                                               ? handleCustomerOrdersRequest(
                                                                                                                   request,
                                                                                                                   database,

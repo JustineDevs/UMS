@@ -1,4 +1,5 @@
 export type CommerceJobName =
+  | "webhook-persistence"
   | "webhook-finalization"
   | "inventory-reservation-expiry"
   | "notification-delivery";
@@ -30,6 +31,7 @@ export type WorkerQueue = {
 const MAX_PAYLOAD_BYTES = 128 * 1024;
 const MAX_ATTEMPTS = 8;
 const JOB_NAMES = new Set<CommerceJobName>([
+  "webhook-persistence",
   "webhook-finalization",
   "inventory-reservation-expiry",
   "notification-delivery",
@@ -112,11 +114,22 @@ export function handleCommerceJobMessage(
   deadLetter?: DeadLetterSink,
 ): Promise<void> {
   if (!isCommerceJob(message.body)) {
+    console.error("commerce_job_invalid", {
+      messageId: message.id,
+      attempts: message.attempts,
+    });
     return deadLetterOrRetry(message, new Error("invalid_commerce_job"), deadLetter);
   }
+  const job = message.body;
   return handler(message.body).then(
     () => message.ack(),
     (error) => {
+      console.error("commerce_job_failed", {
+        messageId: message.id,
+        jobName: job.name,
+        attempts: message.attempts,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
       if (message.attempts >= MAX_ATTEMPTS) {
         return deadLetterOrRetry(message, error, deadLetter);
       }
