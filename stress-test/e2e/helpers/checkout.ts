@@ -207,6 +207,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     // Public tunnels can finish hydration after the first click. Re-acquire the
     // control after each reload instead of clicking a detached/stale locator.
     for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
+      // Consent can mount again after the PDP finishes client hydration. Keep
+      // the real CTA unobstructed immediately before every click attempt.
+      await dismissCookieConsent(page);
       const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
       await addButton.evaluate((element) => {
