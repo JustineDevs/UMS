@@ -249,3 +249,10 @@ startup credentials `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `STRIPE_SECR
 configured on the production Worker. This is why the PayPal sandbox browser handoff is skipped
 and why Stripe/PayPal are absent from `/store/payment-methods`; no secret values are included in
 this report.
+
+The existing authenticated Vercel project was inspected without revealing values: Production
+contains `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `STRIPE_API_KEY`, and
+`STRIPE_WEBHOOK_SECRET`. The Worker expects the first two names and `STRIPE_SECRET_KEY`; therefore
+the provider startup gap is a deployment-scope mismatch, not an absent provider account. The
+remaining configuration action is to copy the PayPal sandbox credentials and map
+`STRIPE_API_KEY` to the Worker secret name `STRIPE_SECRET_KEY`.
