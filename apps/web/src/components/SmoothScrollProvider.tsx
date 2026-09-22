@@ -49,28 +49,32 @@ export function SmoothScrollProvider({
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
-    const instance = new Lenis({
-      duration: 1.2,
-      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-      orientation: "vertical",
-      gestureOrientation: "vertical",
+    let instance: Lenis | null = null;
+    let unsubScroll: (() => void) | undefined;
+    let onTick: ((_time: number) => void) | undefined;
+    const frame = window.requestAnimationFrame(() => {
+      instance = new Lenis({
+        duration: 1.2,
+        easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+        orientation: "vertical",
+        gestureOrientation: "vertical",
+      });
+
+      setLenis(instance);
+      unsubScroll = instance.on("scroll", ScrollTrigger.update);
+      onTick = (time: number) => {
+        instance?.raf(time * 1000);
+      };
+      gsap.ticker.add(onTick);
+      gsap.ticker.lagSmoothing(0);
     });
 
-    setLenis(instance);
-
-    const unsubScroll = instance.on("scroll", ScrollTrigger.update);
-
-    const onTick = (time: number) => {
-      instance.raf(time * 1000);
-    };
-    gsap.ticker.add(onTick);
-    gsap.ticker.lagSmoothing(0);
-
     return () => {
-      unsubScroll();
-      gsap.ticker.remove(onTick);
-      instance.destroy();
+      window.cancelAnimationFrame(frame);
+      if (unsubScroll) unsubScroll();
+      if (onTick) gsap.ticker.remove(onTick);
+      instance?.destroy();
       setLenis(null);
     };
   }, []);
