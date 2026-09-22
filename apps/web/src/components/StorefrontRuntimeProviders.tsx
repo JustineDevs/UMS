@@ -47,7 +47,6 @@ export function StorefrontRuntimeProviders({
               { path: "/api/account/profile", method: "PATCH" },
               { path: "/api/account/orders/*/cancel", method: "POST" },
               { path: "/api/reviews", method: "POST" },
-              { path: "/api/cart/bind", method: "POST" },
               { path: "/api/cart/abandonment", method: "POST" },
               { path: "/api/newsletter", method: "POST" },
               { path: "/api/back-in-stock", method: "POST" },

@@ -10643,7 +10643,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 503]
-      x-source-sha256: 3ad4d1752332be5f1dd138eb289a8cdc4b71015633db0f617af16b2706b3b803
+      x-source-sha256: ffa3adab422d67d50a944d209c487892c39195a7607a3e3b42c98fe72f8b5664
       security:
         - CartCapability: []
       responses:
@@ -17530,7 +17530,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /cart/bind. Runtime source: apps/web/src/app/api/cart/bind/route.ts."
-      x-source-sha256: 3ad4d1752332be5f1dd138eb289a8cdc4b71015633db0f617af16b2706b3b803
+      x-source-sha256: ffa3adab422d67d50a944d209c487892c39195a7607a3e3b42c98fe72f8b5664
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
