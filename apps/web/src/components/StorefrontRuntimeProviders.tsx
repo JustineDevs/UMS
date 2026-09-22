@@ -62,7 +62,10 @@ export function StorefrontRuntimeProviders({
           <SmoothScrollProvider>{children}</SmoothScrollProvider>
         </OnboardingGuard>
         <CookieConsentBanner />
-        {process.env.VERCEL === "1" ? <Analytics /> : null}
+        {/* Analytics is a client component. Keep its tree identical in SSR and
+            hydration; gating it with the server-only VERCEL variable causes a
+            production-only mismatch because the browser bundle cannot see it. */}
+        <Analytics />
       </CartProvider>
     </SupabaseSessionProvider>
   );
