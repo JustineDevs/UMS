@@ -2,10 +2,10 @@
 
 This document is the **live** counterpart to archived notes under `output/full-application-audit/`. It encodes what the repo enforces in CI and at boot.
 
-## 1. Payment credentials (Medusa environment)
+## 1. Payment credentials (Cloudflare Worker environment)
 
-- **Medusa** registers payment modules from **`process.env`** at startup (`apps/medusa/medusa-config.ts`). Set `STRIPE_API_KEY`, `PAYPAL_*`, `XENDIT_*`, and webhook secrets in the Medusa deployment environment; restart Medusa after rotation.
-- **Observability:** `GET /admin/payment-health` on Medusa returns which providers have env keys present (no secret values).
+- **Cloudflare Worker** reads payment credentials from its secret store at request time. Set `STRIPE_API_KEY`, `PAYPAL_*`, `XENDIT_*`, and webhook secrets on the Worker; deploy after rotation.
+- **Observability:** `GET /api/admin/payment-health` on the Worker returns which providers have credentials present (no secret values).
 - **Storefront** must not bundle server-only PSP secrets (`stress-test/scripts/check-storefront-client-boundary.mjs`).
 - **Payment-state reconciliation** is part of production readiness, not only credential hygiene: Supabase `payment_attempts`, server finalize routes, optional `GET /api/cron/finalize-payment-attempts` on the storefront, and staff **Payment attempts** in admin together reduce stuck orders when webhooks or browser returns fail. Treat missing cron or misconfigured `STOREFRONT_*` recovery env vars as an operational gap, not only a security gap.
 
@@ -15,9 +15,9 @@ This document is the **live** counterpart to archived notes under `output/full-a
 | --- | --- |
 | Dependency audit triage | `stress-test/scripts/check-audit-triage.js` (document highs in the active security runbook) |
 | Storefront client bundle (no server secrets) | `stress-test/scripts/check-storefront-client-boundary.mjs` |
-| Legacy DB migrations vs Medusa commerce tables | `stress-test/scripts/check-commerce-migration-boundary.mjs` |
+| Legacy DB migrations vs commerce tables | `stress-test/scripts/check-commerce-migration-boundary.mjs` |
 | Admin API routes must show staff or internal guard patterns | `stress-test/scripts/check-admin-api-staff-guard.mjs` |
-| Unit tests (incl. Medusa env validation, admin webhook policy) | `pnpm test`, `pnpm release-gate` |
+| Unit tests (incl. Worker env validation, admin webhook policy) | `pnpm test`, `pnpm release-gate` |
 
 GitHub Actions workflow: `.github/workflows/security-audit.yml`.
 
@@ -38,5 +38,5 @@ Staff admin sign-in is **Google-only** on `/sign-in`. E2E credentials exist only
 
 ## 5. References
 
-- `docs/data-ownership.md` and `packages/database/src/data-boundaries.ts` for Medusa vs Supabase ownership.
-- `apps/medusa/src/loaders/validate-process-env.ts` for production env rules.
+- `docs/data-ownership.md` and `packages/database/src/data-boundaries.ts` for APP/MEDUSA database ownership during the migration.
+- `workers/backend/wrangler.toml` and the Worker environment validation for production secret rules.
