@@ -242,3 +242,10 @@ and transmission verification, Xendit/Pancake callback tokens and refund reconci
 failure handling, queue retry/redelivery/dead-letter behavior, and idempotency replay semantics.
 These are contract-level proofs; they do not replace live provider delivery or authenticated
 preview browser evidence.
+
+The live payment-method probe returned only `XENDIT` and `COD`. A read-only production Worker
+secret-name audit confirmed the cause: webhook verification secrets exist, but the provider
+startup credentials `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `STRIPE_SECRET_KEY` are not
+configured on the production Worker. This is why the PayPal sandbox browser handoff is skipped
+and why Stripe/PayPal are absent from `/store/payment-methods`; no secret values are included in
+this report.
