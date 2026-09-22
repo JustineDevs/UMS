@@ -49,6 +49,7 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
   const sort = collectionSorts.some((option) => option.value === sortRaw)
     ? sortRaw as (typeof collectionSorts)[number]["value"]
     : "newest";
+  const sortLabel = collectionSorts.find((option) => option.value === sort)?.label ?? "Newest";
   const pageSize = 24;
 
   const [categories, page] = await Promise.all([
@@ -110,6 +111,7 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
         </p>
         <nav aria-label="Collection sort" className="mt-4 flex flex-wrap items-center gap-2 text-sm">
           <span className="text-on-surface-variant">Sort:</span>
+          <span className="text-on-surface-variant" aria-live="polite">Sorted by {sortLabel.toLowerCase()}</span>
           {collectionSorts.map((option) => (
             <Link
               key={option.value}
