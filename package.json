@@ -17,7 +17,6 @@
     "lint": "pnpm exec turbo lint --filter=@universal-music-store/web... --concurrency=2",
     "typecheck": "pnpm --filter web typecheck && pnpm exec tsc --noEmit --pretty false -p workers/backend/tsconfig.json && pnpm --filter @universal-music-store/sdk typecheck && pnpm --filter @universal-music-store/resend-mail typecheck",
     "ci:preflight": "node scripts/ci-preflight.cjs",
-    "ci:local": "act -W .github/workflows/release-gate.yml --job gate --container-architecture linux/amd64",
     "backend:worker:dev": "pnpm exec wrangler dev --show-interactive-dev-session=false",
     "typecheck:backend:worker": "pnpm exec tsc --noEmit --pretty false -p workers/backend/tsconfig.json",
     "backend:worker:config-preflight": "node scripts/cloudflare-worker-config-preflight.mjs",

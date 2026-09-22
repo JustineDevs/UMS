@@ -59,7 +59,7 @@ These defaults are optimized for AI coding agents (and humans) working on apps t
 - Fix every review or CI finding on `dev`, rerun the required checks, and merge only when the PR is verified clean.
 - Vercel Cron is not part of this topology. Keep scheduled storefront recovery in `.github/workflows/storefront-cron.yml`; do not add a Vercel `crons` block or treat Vercel Hobby Cron limits as a payment-webhook solution.
 - Deploy the backend only with `pnpm backend:worker:deploy` after `wrangler login` and configured Hyperdrive/Queue bindings. Docker is not part of the backend deployment path.
-- Before pushing any branch, run the local Act gate with `pnpm ci:local`; a failed or skipped local gate must not be pushed.
+- Before pushing any branch, run the bounded local contract checks; the full release gate runs in CI or only by deliberate explicit invocation.
 - Local Act validates the non-secret release workflow. Provider sandbox, security, and production-only checks still require their documented credentials or infrastructure and must not be simulated with empty secrets.
 
 <!-- CONTINUAL LEARNING -->

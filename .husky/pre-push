@@ -2,7 +2,7 @@
 set -eu
 
 # Keep pushes responsive and leave the heavyweight release gate to CI or an
-# explicit `pnpm ci:local` invocation. Contract checks catch route/config drift
+# explicit `pnpm release-gate` invocation. Contract checks catch route/config drift
 # without starting Docker, a second dependency install, or the full browser
 # and integration test graph on every push.
 pnpm quality:contracts
