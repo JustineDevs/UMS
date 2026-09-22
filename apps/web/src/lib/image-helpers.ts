@@ -32,6 +32,9 @@ export function isKnownUnavailableExternalImage(
     const hostname = url.hostname.toLowerCase();
     return (
       hostname === "medusa-public-images.s3.eu-west-1.amazonaws.com" ||
+      // This Supabase project was decommissioned; catalog rows from the old
+      // dataset can still reference its public storage URLs.
+      hostname === "gvsyfyaqxfrunoghgqiq.supabase.co" ||
       hostname === "fbcdn.net" || hostname.endsWith(".fbcdn.net")
     );
   } catch {
