@@ -350,9 +350,41 @@ const emptyFacets = {
 };
 
 export async function fetchCategorySummaries(): Promise<CategorySummariesResult> {
-  if (!workerBaseUrl())
-    return misconfigured("Set API_URL to the deployed Worker address.");
-  return { kind: "ok", summaries: [], fetchedAt: new Date().toISOString() };
+  const base = workerUrl("/store/catalog/categories");
+  if (!base) return misconfigured("Set API_URL to the deployed Worker address.");
+  try {
+    const response = await fetch(base, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 60, tags: ["storefront:catalog-categories"] },
+    });
+    if (!response.ok)
+      return {
+        kind: "service_error",
+        message: `Worker catalog categories returned ${response.status}`,
+      };
+    const payload = await readResponseJson(response, {} as {
+      categories?: Array<{
+        id?: string;
+        handle?: string;
+        category?: string;
+        count?: number;
+        parentId?: string | null;
+      }>;
+    });
+    const summaries = (payload.categories ?? []).flatMap((category) => {
+      if (!category.id || !category.handle || !category.category) return [];
+      return [{
+        id: category.id,
+        handle: category.handle,
+        category: category.category,
+        count: Number(category.count ?? 0),
+        parentId: category.parentId ?? null,
+      }];
+    });
+    return { kind: "ok", summaries, fetchedAt: new Date().toISOString() };
+  } catch (error) {
+    return catalogServiceError(error);
+  }
 }
 
 export async function fetchVariantFacets(

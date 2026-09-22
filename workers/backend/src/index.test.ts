@@ -81,6 +81,10 @@ test("keeps customer orders on the commerce database role", () => {
   assert.equal(nativeDatabaseRole({ customerOrdersMatch: true }), "medusa");
 });
 
+test("keeps catalog taxonomy reads on the commerce database role", () => {
+  assert.equal(nativeDatabaseRole({ catalogCategoriesMatch: true }), "medusa");
+});
+
 test("bulk fulfillment is APP-owned and requires both database roles", async () => {
   assert.equal(nativeDatabaseRole({ bulkFulfillmentMatch: true }), "app");
   for (const bindings of [

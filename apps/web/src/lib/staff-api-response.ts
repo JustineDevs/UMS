@@ -13,7 +13,11 @@ export function correlatedJson(
   body: unknown,
   init?: Parameters<typeof NextResponse.json>[1],
 ): NextResponse {
-  const res = NextResponse.json(body, init);
+  const responseBody =
+    body && typeof body === "object" && !Array.isArray(body) && "error" in body && !("requestId" in body) && !("correlationId" in body)
+      ? { ...(body as Record<string, unknown>), correlationId }
+      : body;
+  const res = NextResponse.json(responseBody, init);
   return tagResponse(res, correlationId);
 }
 

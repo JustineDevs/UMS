@@ -8,13 +8,8 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 
 const projectRoot = path.resolve(__dirname, "..");
-const portCleaner = path.join(
-  projectRoot,
-  "stress-test/scripts/kill-project-ports.js",
-);
 const runtimeLockPath = path.join(
   projectRoot,
   ".uvs-dev-runtime",
@@ -179,11 +174,6 @@ if (stoppedWorkspaceProcesses > 0) {
     `[cleanup-dev] Stopped ${stoppedWorkspaceProcesses} stale workspace dev process(es).`,
   );
 }
-
-spawnSync(process.execPath, [portCleaner], {
-  cwd: projectRoot,
-  stdio: "inherit",
-});
 
 const selfPid = String(process.pid);
 if (process.platform !== "linux") {

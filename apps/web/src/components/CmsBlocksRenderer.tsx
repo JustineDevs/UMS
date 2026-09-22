@@ -3,6 +3,9 @@ import Link from "next/link";
 import {
   createSupabaseClient,
   blockFromComponentInstance,
+  cmsBlockTypeForComponentId,
+  getCmsBlockDefinition,
+  isSafeCmsStyleKey,
   getCmsPaymentLinkById,
   resolveCmsInstanceProps,
   type CmsBlock,
@@ -57,6 +60,9 @@ function cmsLayoutStyle(layout: unknown): CSSProperties {
 
 type FaqItem = { q: string; a: string };
 
+type FeatureItem = { title: string; body: string };
+type TestimonialItem = { quote: string; name: string; role: string };
+
 function parseFaqItems(raw: unknown): FaqItem[] {
   if (!Array.isArray(raw)) return [];
   const out: FaqItem[] = [];
@@ -72,6 +78,47 @@ function parseFaqItems(raw: unknown): FaqItem[] {
   return out.filter((i) => i.q.trim() || i.a.trim());
 }
 
+function parseFeatureItems(raw: unknown): FeatureItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 12).flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const item = value as Record<string, unknown>;
+    const title = String(item.title ?? "").trim();
+    const body = String(item.body ?? "").trim();
+    return title || body ? [{ title, body }] : [];
+  });
+}
+
+function parseTestimonialItems(raw: unknown): TestimonialItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 12).flatMap((value) => {
+    if (!value || typeof value !== "object") return [];
+    const item = value as Record<string, unknown>;
+    const quote = String(item.quote ?? "").trim();
+    const name = String(item.name ?? "").trim();
+    const role = String(item.role ?? "").trim();
+    return quote || name ? [{ quote, name, role }] : [];
+  });
+}
+
+function isInternalHref(value: string): boolean {
+  return value.startsWith("/") && !value.startsWith("//");
+}
+
+function renderCmsAction(href: string, label: string, className: string) {
+  if (!href || !label) return null;
+  if (isInternalHref(href)) {
+    return <Link href={href} className={className}>{label}</Link>;
+  }
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return <a href={url.toString()} target="_blank" rel="noreferrer" className={className}>{label}</a>;
+  } catch {
+    return null;
+  }
+}
+
 async function loadPaymentLinkById(id: string): Promise<CmsPaymentLinkRow | null> {
   const key = id.trim();
   const organizationId = process.env.DEFAULT_ORGANIZATION_ID?.trim();
@@ -85,8 +132,16 @@ async function loadPaymentLinkById(id: string): Promise<CmsPaymentLinkRow | null
   }
 }
 
-async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) {
-  if (!blocks.length) return null;
+const MAX_RENDERED_CMS_BLOCKS = 200;
+const MAX_RENDERED_CMS_DEPTH = 4;
+
+async function renderCmsBlocks(
+  blocks: CmsBlock[],
+  withSectionSpacing: boolean,
+  depth = 0,
+) {
+  if (!blocks.length || depth > MAX_RENDERED_CMS_DEPTH) return null;
+  const boundedBlocks = blocks.slice(0, MAX_RENDERED_CMS_BLOCKS);
   const nodes: React.ReactNode[] = [];
   const paymentLinkCache = new Map<string, Promise<CmsPaymentLinkRow | null>>();
 
@@ -102,14 +157,22 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
 
   const renderSlot = async (instances: CmsComponentInstance[] | undefined) => {
     if (!instances?.length) return null;
-    return renderCmsBlocks(instances.map(blockFromComponentInstance), false);
+    return renderCmsBlocks(instances.map(blockFromComponentInstance), false, depth + 1);
   };
 
-  for (const rawBlock of blocks) {
+  for (const rawBlock of boundedBlocks) {
+    const canonicalDefinition = getCmsBlockDefinition(rawBlock.componentId ?? rawBlock.type);
+    const canonicalComponentId = canonicalDefinition?.id
+      ?? rawBlock.componentId
+      ?? rawBlock.type.replaceAll("_", "-");
     const b: CmsBlock = {
       ...rawBlock,
+      type: canonicalDefinition
+        ? cmsBlockTypeForComponentId(canonicalDefinition.id) ?? rawBlock.type
+        : rawBlock.type,
+      componentId: canonicalComponentId,
       props: resolveCmsInstanceProps({
-        componentId: rawBlock.componentId ?? rawBlock.type,
+        componentId: canonicalComponentId,
         variantId: rawBlock.variantId,
         props: rawBlock.props,
       }),
@@ -510,6 +573,107 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
         );
         break;
       }
+      case "announcement_bar": {
+        const message = String(b.props.message ?? "").trim();
+        if (!message) break;
+        const href = String(b.props.href ?? "").trim();
+        const linkLabel = String(b.props.linkLabel ?? "Learn more").trim();
+        nodes.push(
+          <aside
+            key={b.id}
+            data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id}
+            data-cms-block-type="announcement_bar"
+            className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-primary px-4 py-2 text-center text-sm text-white"
+          >
+            <span data-cms-id={`${b.id}::message`} data-cms-label="Announcement" data-cms-prop="message">{message}</span>
+            {href ? renderCmsAction(href, linkLabel, "font-semibold underline underline-offset-2") : null}
+          </aside>,
+        );
+        break;
+      }
+      case "promo_banner": {
+        const eyebrow = String(b.props.eyebrow ?? "").trim();
+        const title = String(b.props.title ?? "").trim();
+        const body = String(b.props.body ?? "").trim();
+        const href = String(b.props.href ?? "").trim();
+        const ctaLabel = String(b.props.ctaLabel ?? "Shop now").trim();
+        if (!title && !body) break;
+        nodes.push(
+          <section
+            key={b.id}
+            data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id}
+            data-cms-block-type="promo_banner"
+            className="flex flex-col gap-5 rounded-2xl bg-primary p-8 text-white sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div className="max-w-2xl">
+              {eyebrow ? <p data-cms-id={`${b.id}::eyebrow`} data-cms-label="Eyebrow" data-cms-prop="eyebrow" className="text-xs font-bold uppercase tracking-[0.2em] text-white/75">{eyebrow}</p> : null}
+              {title ? <h2 data-cms-id={`${b.id}::title`} data-cms-label="Title" data-cms-prop="title" className="mt-1 font-headline text-2xl font-bold">{title}</h2> : null}
+              {body ? <p data-cms-id={`${b.id}::body`} data-cms-label="Supporting text" data-cms-prop="body" className="mt-2 text-sm leading-relaxed text-white/80">{body}</p> : null}
+            </div>
+            {href ? renderCmsAction(href, ctaLabel, "inline-flex shrink-0 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-primary hover:bg-white/90") : null}
+          </section>,
+        );
+        break;
+      }
+      case "feature_grid": {
+        const heading = String(b.props.heading ?? "").trim();
+        const items = parseFeatureItems(b.props.items);
+        if (!items.length) break;
+        nodes.push(
+          <section key={b.id} data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id} data-cms-block-type="feature_grid" className="space-y-5">
+            {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((item, index) => (
+                <article key={`${item.title}-${index}`} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
+                  {item.title ? <h3 data-cms-id={`${b.id}::item-${index}-title`} data-cms-label={`Feature ${index + 1} title`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="title" className="font-semibold text-primary">{item.title}</h3> : null}
+                  {item.body ? <p data-cms-id={`${b.id}::item-${index}-body`} data-cms-label={`Feature ${index + 1} body`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="body" className="mt-2 text-sm leading-relaxed text-on-surface-variant">{item.body}</p> : null}
+                </article>
+              ))}
+            </div>
+          </section>,
+        );
+        break;
+      }
+      case "testimonial_grid": {
+        const heading = String(b.props.heading ?? "").trim();
+        const items = parseTestimonialItems(b.props.items);
+        if (!items.length) break;
+        nodes.push(
+          <section key={b.id} data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id} data-cms-block-type="testimonial_grid" className="space-y-5">
+            {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {items.map((item, index) => (
+                <figure key={`${item.name}-${index}`} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
+                  {item.quote ? <blockquote data-cms-id={`${b.id}::item-${index}-quote`} data-cms-label={`Testimonial ${index + 1}`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="quote" className="text-sm leading-relaxed text-on-surface-variant">“{item.quote}”</blockquote> : null}
+                  {item.name ? <figcaption data-cms-id={`${b.id}::item-${index}-name`} data-cms-label={`Testimonial ${index + 1} name`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="name" className="mt-4 font-semibold text-primary">{item.name}{item.role ? <span className="ml-2 font-normal text-on-surface-variant">{item.role}</span> : null}</figcaption> : null}
+                </figure>
+              ))}
+            </div>
+          </section>,
+        );
+        break;
+      }
+      case "product_grid": {
+        const heading = String(b.props.heading ?? "").trim();
+        const slugs = String(b.props.slugs ?? "").split(/[\s,]+/).map((slug) => slug.trim()).filter(Boolean).slice(0, 8);
+        const columns = Math.min(4, Math.max(2, Number(b.props.columns) || 4));
+        const products = [];
+        for (const slug of slugs) {
+          const res = await getCachedProductBySlug(slug);
+          if (res.kind === "ok") products.push(res.product);
+        }
+        if (!products.length) break;
+        const gridClass = columns === 2 ? "sm:grid-cols-2" : columns === 3 ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4";
+        nodes.push(
+          <section key={b.id} data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id} data-cms-block-type="product_grid" className="space-y-5">
+            {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
+            <div data-cms-id={`${b.id}::grid`} data-cms-label="Product grid" data-cms-prop="slugs" className={`grid gap-8 ${gridClass}`}>
+              {products.map((product) => <CatalogProductCard key={product.id} product={product} />)}
+            </div>
+          </section>,
+        );
+        break;
+      }
       case "featured_products": {
         const raw = String(b.props.slugs ?? "");
         const slugs = raw
@@ -607,11 +771,22 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
     <>
       {nodes.map((node, index) => {
         if (!isValidElement(node)) return node;
-        const rawBlock = blocks.find((block) => String(node.key) === block.id) ?? blocks[index];
+        const rawBlock = boundedBlocks.find((block) => String(node.key) === block.id) ?? boundedBlocks[index];
         const styleOverrides = Object.fromEntries(
           Object.entries(rawBlock.styleOverrides ?? {}).filter(
-            ([key, value]) => /^--cms-[a-z0-9-]+$/.test(key) && typeof value === "string" && value.length <= 200,
+            ([key, value]) => isSafeCmsStyleKey(key) && typeof value === "string" && value.length <= 200,
           ),
+        );
+        const visualStyles = Object.fromEntries(
+          Object.entries(styleOverrides)
+            .filter(([key]) => key.startsWith("style."))
+            .map(([key, value]) => [
+              key.slice(6).replace(/-([a-z])/g, (_, character: string) => character.toUpperCase()),
+              value,
+            ]),
+        );
+        const themeStyles = Object.fromEntries(
+          Object.entries(styleOverrides).filter(([key]) => key.startsWith("--cms-")),
         );
         const existingStyle = typeof node.props.style === "object" && node.props.style ? node.props.style : {};
         const layoutStyle = cmsLayoutStyle(rawBlock.props.layout);
@@ -619,7 +794,7 @@ async function renderCmsBlocks(blocks: CmsBlock[], withSectionSpacing: boolean) 
           "data-cms-instance-id": rawBlock.id,
           "data-cms-component-id": rawBlock.componentId ?? rawBlock.type.replaceAll("_", "-"),
           "data-cms-variant": rawBlock.variantId ?? "default",
-          style: { ...existingStyle, ...layoutStyle, ...styleOverrides },
+          style: { ...existingStyle, ...layoutStyle, ...visualStyles, ...themeStyles },
         });
       })}
     </>

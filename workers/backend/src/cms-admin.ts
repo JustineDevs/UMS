@@ -65,7 +65,7 @@ function boundedString(value: unknown, max: number): string | null {
   return typeof value === "string" && value.length <= max ? value : null;
 }
 
-function parseNode(value: unknown, index: number): CmsNode | null {
+function parseNode(value: unknown): CmsNode | null {
   if (!isRecord(value)) return null;
   const id = boundedString(value.id, 160);
   const componentId = boundedString(value.componentId, 160);
@@ -98,7 +98,7 @@ function parseNode(value: unknown, index: number): CmsNode | null {
 
 function validateTree(value: unknown): { tree: CmsNode[]; errors: string[] } {
   if (!Array.isArray(value)) return { tree: [], errors: [] };
-  if (value.length > 2000) return { tree: [], errors: ["tree_too_large"] };
+  if (value.length > 200) return { tree: [], errors: ["tree_too_large"] };
   const tree = value.map(parseNode).filter((node): node is CmsNode => Boolean(node));
   if (tree.length !== value.length) return { tree: [], errors: ["invalid_tree_node"] };
   const byId = new Map(tree.map((node) => [node.id, node]));
@@ -113,9 +113,59 @@ function validateTree(value: unknown): { tree: CmsNode[]; errors: string[] } {
       const child = byId.get(childId);
       if (!child) errors.push(`missing_child:${node.id}/${childId}`);
       else if (child.parentId !== node.id) errors.push(`parent_mismatch:${childId}`);
+      else if (!child.slot) errors.push(`child_slot_required:${childId}`);
     }
   }
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const walk = (node: CmsNode, depth: number) => {
+    if (depth > 4) {
+      errors.push(`tree_depth_exceeded:${node.id}`);
+      return;
+    }
+    if (visiting.has(node.id)) {
+      errors.push(`child_cycle:${node.id}`);
+      return;
+    }
+    if (visited.has(node.id)) return;
+    visiting.add(node.id);
+    for (const childId of node.children) {
+      const child = byId.get(childId);
+      if (child) walk(child, depth + 1);
+    }
+    visiting.delete(node.id);
+    visited.add(node.id);
+  };
+  for (const node of tree.filter((candidate) => candidate.parentId === null)) walk(node, 1);
+  for (const node of tree) if (!visited.has(node.id)) walk(node, 1);
   return { tree, errors: [...new Set(errors)] };
+}
+
+function treeToBlocks(tree: CmsNode[]): unknown[] {
+  const byId = new Map(tree.map((node) => [node.id, node]));
+  const instance = (node: CmsNode): Record<string, unknown> => {
+    const slots: Record<string, unknown[]> = {};
+    for (const childId of node.children) {
+      const child = byId.get(childId);
+      if (!child?.slot) continue;
+      (slots[child.slot] ??= []).push(instance(child));
+    }
+    return {
+      id: node.id,
+      componentId: node.componentId,
+      variantId: node.variantId,
+      props: node.props,
+      slots,
+      styleOverrides: node.styles,
+      lockedStructure: node.lockedStructure,
+    };
+  };
+  return tree
+    .filter((node) => node.parentId === null)
+    .map((node) => ({
+      ...instance(node),
+      type: node.blockType ?? node.componentId.replaceAll("-", "_"),
+    }));
 }
 
 function claimOrganization(claims: WorkerAuthClaims): string | null {
@@ -196,8 +246,8 @@ async function readBody(request: Request): Promise<{ body: CmsPageInput | null; 
     const expectedVersion = parsed.expectedVersion;
     if (expectedVersion !== undefined && (typeof expectedVersion !== "number" || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1)) return { body: null, raw };
     if (parsed.status !== undefined && !["draft", "published", "scheduled"].includes(String(parsed.status))) return { body: null, raw };
-    if (parsed.tree !== undefined && !Array.isArray(parsed.tree)) return { body: null, raw };
-    if (parsed.blocks !== undefined && !Array.isArray(parsed.blocks)) return { body: null, raw };
+    if (parsed.tree !== undefined && (!Array.isArray(parsed.tree) || parsed.tree.length > 200)) return { body: null, raw };
+    if (parsed.blocks !== undefined && (!Array.isArray(parsed.blocks) || parsed.blocks.length > 200)) return { body: null, raw };
     if (parsed.mutations !== undefined && (!Array.isArray(parsed.mutations) || parsed.mutations.some((item) => !isRecord(item)))) return { body: null, raw };
     return { body: parsed as unknown as CmsPageInput, raw };
   } catch {
@@ -236,6 +286,9 @@ async function savePage(
     const checked = validateTree(sourceTree);
     if (input.status === "published" && checked.errors.length) return json({ error: "invalid_publish_tree", details: checked.errors }, 422);
     const tree = checked.tree;
+    const canonicalBlocks = tree.length
+      ? treeToBlocks(tree)
+      : input.blocks ?? existing?.blocks ?? [];
     const values = [
       organizationId,
       input.slug,
@@ -243,7 +296,7 @@ async function savePage(
       input.page_type ?? String(existing?.page_type ?? "static"),
       input.title ?? String(existing?.title ?? ""),
       input.body ?? String(existing?.body ?? ""),
-      JSON.stringify(input.blocks ?? existing?.blocks ?? []),
+      JSON.stringify(canonicalBlocks),
       JSON.stringify(tree),
       input.status ?? String(existing?.status ?? "draft"),
       input.published_at !== undefined ? input.published_at : existing?.published_at ?? null,

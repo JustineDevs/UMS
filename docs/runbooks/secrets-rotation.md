@@ -1,25 +1,25 @@
 # Secrets rotation (payments and integrations)
 
-Payment provider credentials for Medusa live in the **Medusa server environment** (for example the root `.env.local` loaded by `apps/medusa`, or your host’s secret manager). There is no admin UI in this repo that stores PSP keys.
+Payment provider credentials live in the **Cloudflare Worker environment**. Do not place production PSP secrets in the storefront, Vercel client bundle, or committed `.env` files.
 
 ## Stripe
 
 1. Create a new restricted API key or roll the existing secret key in the Stripe Dashboard.
-2. Update `STRIPE_API_KEY` (and `STRIPE_WEBHOOK_SECRET` if the webhook endpoint secret changed).
-3. Restart Medusa.
+2. Update the Worker secret `STRIPE_WEBHOOK_SECRET` if the endpoint secret changed.
+3. Deploy the Worker after the secret rotation.
 4. Verify webhooks still reach `${API_URL}/webhooks/stripe` and the Worker records the event.
 
 ## PayPal
 
 1. Rotate client secret in the PayPal Developer portal when required.
 2. Update `PAYPAL_CLIENT_SECRET` (and `PAYPAL_CLIENT_ID` / `PAYPAL_WEBHOOK_ID` if those changed).
-3. Restart Medusa.
+3. Deploy the Worker after the secret rotation.
 
 ## Xendit
 
 1. Rotate keys in the provider dashboard.
 2. Update `XENDIT_SECRET_KEY` and `XENDIT_WEBHOOK_TOKEN`.
-3. Restart Medusa and re-register webhooks if URLs or secrets changed.
+3. Deploy the Worker and re-register `${API_URL}/webhooks/xendit` if the URL or token changed.
 
 ## Shipment tracking provider
 
@@ -27,7 +27,7 @@ Update the tracking webhook signing secret in env; restart services that consume
 
 ## Supabase service role
 
-`SUPABASE_SERVICE_ROLE_KEY` is used by admin and storefront server code for platform data writes (not for Medusa commerce). This key has full table access and must be rotated on a regular schedule (recommended: quarterly or after any suspected leak).
+`SUPABASE_SERVICE_ROLE_KEY` is used by admin and storefront server code for platform data writes (not for Worker commerce requests). This key has full table access and must be rotated on a regular schedule (recommended: quarterly or after any suspected leak).
 
 ### Rotation steps
 

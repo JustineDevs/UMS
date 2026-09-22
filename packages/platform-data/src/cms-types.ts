@@ -112,6 +112,44 @@ export type CmsComponentVariant = {
   styleTokens?: Record<string, string>;
 };
 
+export type CmsDataRequirement = {
+  key: string;
+  source: "catalog" | "collection" | "blog" | "media" | "navigation" | "analytics";
+  limit?: number;
+  required?: boolean;
+};
+
+export type CmsResponsivePolicy = {
+  enabled: boolean;
+  visibility: "tokenized";
+  allowedPresets: string[];
+};
+
+export type CmsAccessibilityPolicy = {
+  requireAltText: boolean;
+  requireAccessibleName: boolean;
+  semanticRoot: string;
+};
+
+export type CmsMigrationDefinition = {
+  fromVersion: number;
+  toVersion: number;
+  description: string;
+};
+
+/** Canonical metadata consumed by palette, inspector, validation, preview, and rendering. */
+export type CmsBlockDefinition = CmsComponentDefinition & {
+  propsSchema: Record<string, unknown>;
+  defaultProps: Record<string, unknown>;
+  dataRequirements: CmsDataRequirement[];
+  permissions: string[];
+  responsivePolicy: CmsResponsivePolicy;
+  accessibilityPolicy: CmsAccessibilityPolicy;
+  renderer: string;
+  previewRenderer: string;
+  migration: CmsMigrationDefinition[];
+};
+
 /** A reusable main component definition shared by every component instance. */
 export type CmsComponentDefinition = {
   id: string;

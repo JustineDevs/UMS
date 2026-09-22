@@ -52,6 +52,28 @@ test("publish validation rejects orphan and inconsistent child links", () => {
   assert.equal(result.ok, false);
 });
 
+test("publish validation bounds nesting and enforces known slot contracts", () => {
+  const tooDeep = Array.from({ length: 6 }, (_, index) => ({
+    id: `node-${index}`,
+    componentId: "two-column",
+    parentId: index === 0 ? null : `node-${index - 1}`,
+    slot: index === 0 ? null : "content",
+    props: {},
+    styles: {},
+    children: index < 5 ? [`node-${index + 1}`] : [],
+  }));
+  const deepResult = validateCmsPublishTree(tooDeep);
+  assert.equal(deepResult.ok, false);
+  assert.ok(deepResult.ok === false && deepResult.errors.some((error) => error.includes("maximum depth")));
+
+  const invalidSlot = validateCmsPublishTree([
+    { id: "hero", componentId: "hero", parentId: null, slot: null, props: {}, styles: {}, children: ["image"] },
+    { id: "image", componentId: "image", parentId: "hero", slot: "actions", props: {}, styles: {}, children: [] },
+  ]);
+  assert.equal(invalidSlot.ok, false);
+  assert.ok(invalidSlot.ok === false && invalidSlot.errors.some((error) => error.includes("not allowed in slot")));
+});
+
 test("normalizes persisted trees without dropping unknown nodes", () => {
   const tree = normalizeCmsTree([
     { id: "root", componentId: "future-layout", parentId: null, slot: null, props: { keep: true }, children: ["child", "missing"] },
@@ -90,6 +112,12 @@ test("canonical CMS tree round-trips nested slots without losing block metadata"
   assert.equal(roundTrip[0].slots?.actions[0].componentId, "cta-row");
   assert.equal(roundTrip[0].slots?.actions[0].slots.icon[0].componentId, "icon");
   assert.equal(tree.find((node) => node.id === "icon_1")?.parentId, "cta_1");
+});
+
+test("legacy flat blocks are canonicalized when converted to the tree", () => {
+  const [node] = cmsBlocksToTree([{ id: "products", type: "featured_products", props: { slugs: "one" } }]);
+  assert.equal(node?.componentId, "featured-products");
+  assert.equal(node?.blockType, "featured_products");
 });
 
 test("unsupported CMS tree nodes stay identifiable instead of becoming rich text", () => {

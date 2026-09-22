@@ -47,8 +47,14 @@ export function verifyE2eSessionValue(value: string | undefined, now = Date.now(
 }
 
 export async function getE2eSessionEmail(): Promise<string | null> {
-  const value = (await cookies()).get(E2E_SESSION_COOKIE)?.value;
-  return verifyE2eSessionValue(value);
+  try {
+    const value = (await cookies()).get(E2E_SESSION_COOKIE)?.value;
+    return verifyE2eSessionValue(value);
+  } catch {
+    // Direct route-unit tests do not have a Next request store. Treat that
+    // context as unauthenticated instead of masking the route's 401 response.
+    return null;
+  }
 }
 
 export function e2eSessionCookieOptions() {

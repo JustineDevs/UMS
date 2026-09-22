@@ -51,6 +51,14 @@ type CollectionProductRow = CollectionRow & {
   total_count: string | number;
 };
 
+type CatalogCategoryRow = {
+  id: string;
+  handle: string;
+  name: string;
+  parent_category_id: string | null;
+  product_count: string | number;
+};
+
 function boundedInteger(
   value: string | null,
   fallback: number,
@@ -342,6 +350,42 @@ export async function handleCollectionsRequest(
     count: Number(result.rows[0]?.total_count ?? 0),
     limit,
     offset,
+  });
+}
+
+export async function handleCatalogCategoriesRequest(
+  request: Request,
+  database: WorkerDatabaseClient,
+): Promise<Response> {
+  if (request.method !== "GET")
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  const result = await database.query<CatalogCategoryRow>(
+    `SELECT pc.id, pc.handle, pc.name, pc.parent_category_id,
+            COUNT(DISTINCT p.id) AS product_count
+       FROM public.product_category pc
+       LEFT JOIN public.product_category_product pcp
+         ON pcp.product_category_id = pc.id
+       LEFT JOIN public.product p
+         ON p.id = pcp.product_id
+        AND p.deleted_at IS NULL
+        AND p.status = 'published'
+      WHERE pc.deleted_at IS NULL
+        AND pc.is_active = true
+      GROUP BY pc.id, pc.handle, pc.name, pc.parent_category_id, pc.rank
+      ORDER BY pc.rank, pc.name, pc.id
+      LIMIT 500`,
+  );
+  return cacheableJson({
+    categories: result.rows.map((row) => ({
+      id: row.id,
+      handle: row.handle,
+      category: row.name,
+      count: Number(row.product_count ?? 0),
+      parentId: row.parent_category_id,
+    })),
   });
 }
 

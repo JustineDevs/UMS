@@ -3,6 +3,8 @@
  * Codes vary by version; match case-insensitively.
  */
 const HINTS: Record<string, string> = {
+  ClientConfiguration:
+    "This deployment is missing the public Supabase Auth configuration. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the deployment, then redeploy.",
   Configuration:
     "The server is missing or misreading Supabase Auth environment variables. Configure SUPABASE_URL and the Supabase publishable/anon key, then add the exact app callback URL in Supabase Auth URL Configuration.",
   AccessDenied:

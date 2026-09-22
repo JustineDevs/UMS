@@ -1,16 +1,16 @@
 # Payment Integration Guide
 
-This document describes the payment providers integrated into the Universal Music Store e-commerce platform (Medusa v2).
+This document describes the payment providers integrated into the Universal Music Store Cloudflare Worker runtime.
 
 ## Storefront checkout lifecycle (runtime truth)
 
-1. **Cart preparation** happens on the storefront server (Medusa store APIs) before a payment session is created.
+1. **Cart preparation** happens through the Worker-native commerce API before a payment session is created.
 2. **Payment attempt** rows in Supabase (`payment_attempts`) record `correlation_id`, cart, provider, and status. Register via `POST /api/payments/checkout-intents` before hosted PSP redirect or COD completion.
-3. **Provider session** is created through Medusa `initiatePaymentSession` (Stripe Elements, PayPal, Xendit, or COD session data).
+3. **Provider session** is created through the Worker provider adapters (Stripe, PayPal, Xendit, or COD session data).
 4. **Completion** is server-owned: hosted flows call `POST /api/payments/checkout-intents/:correlationId/finalize`. **COD** calls `POST /api/checkout/cod-place-order` with the same `correlationId`. The browser does not call `cart.complete` for COD.
 5. **Recovery**: `GET /api/cron/finalize-payment-attempts` (secret header) processes stuck rows. Operators use **Admin → Payment attempts** (`/admin/payments`) for retry and escalation when `STOREFRONT_ORIGIN` and `STOREFRONT_INTERNAL_RECONCILE_SECRET` are set.
 
-Legacy `POST /api/checkout/complete-medusa-cart` remains for backward compatibility; optional strict mode: `STOREFRONT_STRICT_PAYMENT_LEDGER=true` requires a ledger correlation id.
+The Worker owns payment-attempt state, provider callbacks, idempotency, and order finalization. Do not register a Vercel page, storefront root, or legacy Medusa endpoint as a provider webhook target.
 
 ## Overview
 
@@ -21,7 +21,7 @@ Legacy `POST /api/checkout/complete-medusa-cart` remains for backward compatibil
 | **Xendit** | GCash, bank transfer, cards, e-wallets | Philippines |
 | **Cash on delivery** | COD | In-person or configured regions |
 
-Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa process to enable providers per deployment. Restart Medusa after changing keys.
+Configure provider secrets in the Cloudflare Worker environment. Keep provider credentials out of the storefront and out of committed `.env` files.
 
 ---
 
@@ -31,9 +31,9 @@ Use `apps/medusa/medusa-config.ts` and **environment variables** on the Medusa p
 2. Obtain **Secret key** and **Webhook signing secret** from the Stripe Dashboard.
 3. Register the Cloudflare backend webhook URL: `${API_URL}/webhooks/stripe` (the Worker verifies and persists the event directly).
 
-### Environment (Medusa)
+### Worker environment
 
-Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa server environment (see root `.env.local` / `.env.example` section 12).
+Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The Worker endpoint is `${API_URL}/webhooks/stripe`; do not use `/hooks/payment/stripe`.
 
 ---
 
@@ -41,9 +41,9 @@ Set `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, and related keys in the Medusa se
 
 1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
-3. Register PayPal webhooks at `${API_URL}/hooks/payment/paypal`.
+3. Register PayPal webhooks at `${API_URL}/webhooks/paypal`.
 
-### Environment (Medusa)
+### Worker environment
 
 `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_WEBHOOK_ID`, etc. (see root `.env.local` / `.env.example`).
 
@@ -66,7 +66,7 @@ Xendit supports Philippine payment methods:
 3. Get API keys from **Developers → API Keys**.
 4. Create a webhook in **Developers → Webhooks** for payment updates.
 
-### Environment (Medusa)
+### Worker environment
 
 ```env
 XENDIT_SECRET_KEY=xnd_...
@@ -79,11 +79,11 @@ Customers select **"GCash / Xendit"** on checkout when that provider is enabled.
 
 ### Webhooks
 
-Register: `${API_URL}/hooks/payment/xendit`
+Register: `${API_URL}/webhooks/xendit`
 
-The provider suffix is `xendit`, not `xendit_xendit`. The same service exposes
-Stripe at `/hooks/payment/stripe` and PayPal at `/hooks/payment/paypal`. Do not
-register the storefront root or a Vercel page as a payment webhook endpoint.
+The Worker exposes Stripe at `/webhooks/stripe`, PayPal at `/webhooks/paypal`, Xendit at
+`/webhooks/xendit`, and Pancake at `/webhooks/pancake`. Do not register the storefront
+root, a Vercel page, or `/hooks/payment/*` as a payment webhook endpoint.
 
 ---
 
@@ -98,14 +98,14 @@ Cash on delivery remains available for eligible regions and is completed through
 1. Customer adds items to bag and goes to `/checkout`.
 2. Customer selects an available payment method.
 3. Customer clicks **Continue to secure payment**.
-4. Medusa creates a cart, initiates a payment session for the chosen provider.
+4. The Worker creates or reconciles the cart and initiates a payment session for the chosen provider.
 5. Customer completes payment on the provider’s hosted page (or COD flow) as applicable.
-6. After payment, the provider sends a webhook to Medusa where configured.
-7. Medusa completes the order and updates the cart/order status.
+6. After payment, the provider sends a webhook to the Cloudflare Worker where configured.
+7. The Worker completes the order and updates the cart/order status.
 
 ---
 
-## Provider IDs (Medusa)
+## Provider identifiers
 
 | Provider | Example ID |
 |----------|------------|
@@ -114,7 +114,7 @@ Cash on delivery remains available for eligible regions and is completed through
 | Xendit | `pp_xendit_xendit` |
 | COD | `pp_cod_cod` |
 
-These IDs are used when configuring `NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID` for a default provider, or when selecting a provider on the checkout page.
+The checkout Worker uses the provider names `stripe`, `paypal`, `xendit`, and `cod`. The legacy `pp_*` values above are retained only as migration references and must not be used as webhook paths or Worker provider configuration.
 
 ---
 
@@ -132,8 +132,8 @@ When working on payment features in Cursor:
    - **paypal-integration** – PayPal setup and webhooks.
 
 3. **Configuration**:
-   - Root: `.env.example` → `NEXT_PUBLIC_MEDUSA_*`, `MEDUSA_*` (client config), then copy into `.env.local`.
-   - Medusa: `apps/medusa/.env.template` → provider keys, webhook secrets, then copy into `apps/medusa/.env.local`.
+   - Root: `.env.example` → local non-secret defaults and Worker endpoint configuration, then copy into `.env.local`.
+   - Cloudflare Worker: configure provider keys and webhook secrets with the Worker secret store; never commit them or expose them through `NEXT_PUBLIC_*` variables.
 
 ---
 
