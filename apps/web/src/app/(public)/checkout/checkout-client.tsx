@@ -575,7 +575,7 @@ export function CheckoutClient({
               placeholder="you@example.com"
               autoComplete="email"
               disabled={
-                authStatus === "authenticated" ||
+                (!isGuestCheckout && authStatus === "authenticated") ||
                 paymentMethod === "COD" ||
                 foreignCheckoutActive
               }

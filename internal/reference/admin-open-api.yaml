@@ -9673,7 +9673,7 @@ paths:
       x-idempotency-persisted: true
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
-      x-runtime-statuses: [200, 400, 413, 503]
+      x-runtime-statuses: [200, 400, 401, 413, 503]
       x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       security:
         - StaffSession: []
@@ -9716,7 +9716,7 @@ paths:
       x-idempotency-persisted: true
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
-      x-runtime-statuses: [200, 400, 413, 503]
+      x-runtime-statuses: [200, 400, 401, 413, 503]
       x-source-sha256: 4f64bd2aa456807f042cb25ec57e67b641a7cc7477ef31c3d292df85dd636d1c
       security:
         - StaffSession: []
@@ -11483,7 +11483,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 409, 502, 503]
-      x-source-sha256: bc2afbee841d88f996bc029b121de0a3ba2459c6db2d20627bd1ee32a0f8c26c
+      x-source-sha256: 9288dd7a1ab8c99d7bfd12c1bb73233dbd1c366dc08e737bbdf46841395190d0
       security:
         - CustomerSession: []
         - name: Idempotency-Key
@@ -17798,7 +17798,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /checkout/start. Runtime source: apps/web/src/app/api/checkout/start/route.ts."
-      x-source-sha256: bc2afbee841d88f996bc029b121de0a3ba2459c6db2d20627bd1ee32a0f8c26c
+      x-source-sha256: 9288dd7a1ab8c99d7bfd12c1bb73233dbd1c366dc08e737bbdf46841395190d0
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:

@@ -712,6 +712,7 @@ export function useCheckoutClient({
                 quantity: l.quantity,
               })),
               email: em || undefined,
+              guestMode,
               providerId: PAYMENT_PROVIDER_IDS[paymentMethod],
               loyaltyPointsToRedeem:
                 parsedLoyalty !== undefined && parsedLoyalty > 0
