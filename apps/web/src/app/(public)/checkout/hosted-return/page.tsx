@@ -20,6 +20,7 @@ export default async function HostedReturnPage({
   searchParams: Promise<{
     provider?: string;
     status?: string;
+    session_id?: string;
     token?: string;
     stripe_session?: string;
   }>;
@@ -28,7 +29,9 @@ export default async function HostedReturnPage({
   const provider = normalizeHostedReturnProvider(sp.provider);
   const status = normalizeHostedReturnStatus(sp.status);
   const providerOrderId =
-    typeof sp.token === "string"
+    typeof sp.session_id === "string"
+      ? sp.session_id
+      : typeof sp.token === "string"
       ? sp.token
       : typeof sp.stripe_session === "string"
         ? sp.stripe_session
