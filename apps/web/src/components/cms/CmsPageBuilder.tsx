@@ -189,7 +189,7 @@ function replaceWithSanitizedHtml(
   html: string,
   ownerDocument: Document,
 ) {
-  // lgtm[js/xss]: html is sanitized by sanitizeVisualPropertyValue before parsing.
+  // lgtm[js/xss-through-dom]: html is sanitized by sanitizeVisualPropertyValue before parsing.
   const parsed = new DOMParser().parseFromString(html, "text/html");
   target.replaceChildren(
     ...Array.from(parsed.body.childNodes, (node) =>
