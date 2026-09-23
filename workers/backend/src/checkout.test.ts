@@ -143,3 +143,42 @@ test("rejects non-HTTPS checkout callbacks before database or provider work", as
     "invalid_checkout_urls",
   );
 });
+
+test("accepts loopback HTTP callbacks for local checkout runs", async () => {
+  const response = await handleCheckoutSessionRequest(
+    new Request("http://127.0.0.1/store/checkout/session", {
+      method: "POST",
+      headers: { "Idempotency-Key": "checkout-local-loopback" },
+      body: JSON.stringify({
+        cart_id: "cart-1",
+        provider: "stripe",
+        success_url: "http://localhost:3000/checkout/hosted-return?provider=stripe",
+        cancel_url: "http://localhost:3000/checkout/hosted-return?provider=stripe&status=cancel",
+      }),
+    }),
+    {
+      query: async (sql: string) => {
+        if (sql.includes("FROM public.cart c")) {
+          return {
+            rows: [{ cart_id: "cart-1", currency_code: "PHP", quantity: 1, unit_price: 100 }],
+            rowCount: 1,
+          };
+        }
+        if (sql.includes("INSERT INTO public.worker_idempotency_records")) {
+          return { rows: [{ state: "pending", request_hash: "" }], rowCount: 1 };
+        }
+        if (sql.includes("DELETE FROM public.worker_idempotency_records")) {
+          return { rows: [], rowCount: 1 };
+        }
+        throw new Error(`unexpected query: ${sql}`);
+      },
+      end: async () => undefined,
+    },
+    { STRIPE_API_KEY: "" },
+  );
+  assert.equal(response.status, 502);
+  assert.equal(
+    ((await response.json()) as { error: string }).error,
+    "checkout_provider_failed",
+  );
+});

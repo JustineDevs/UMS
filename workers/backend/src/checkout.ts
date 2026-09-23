@@ -228,9 +228,17 @@ export async function handleCheckoutSessionRequest(
     typeof input.success_url === "string" ? input.success_url : "";
   const cancelUrl =
     typeof input.cancel_url === "string" ? input.cancel_url : "";
-  const validHttpsUrl = (value: string): boolean => {
+  const validCheckoutCallbackUrl = (value: string): boolean => {
     try {
-      return new URL(value).protocol === "https:" && value.length <= 2048;
+      const url = new URL(value);
+      const loopback =
+        url.hostname === "localhost" ||
+        url.hostname === "127.0.0.1" ||
+        url.hostname === "[::1]";
+      return (
+        value.length <= 2048 &&
+        (url.protocol === "https:" || (url.protocol === "http:" && loopback))
+      );
     } catch {
       return false;
     }
@@ -238,8 +246,8 @@ export async function handleCheckoutSessionRequest(
   if (
     !cartId ||
     (provider !== "stripe" && provider !== "paypal" && provider !== "xendit") ||
-    !validHttpsUrl(successUrl) ||
-    !validHttpsUrl(cancelUrl)
+    !validCheckoutCallbackUrl(successUrl) ||
+    !validCheckoutCallbackUrl(cancelUrl)
   )
     return new Response(JSON.stringify({ error: "invalid_checkout_urls" }), {
       status: 400,
