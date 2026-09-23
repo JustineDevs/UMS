@@ -52,6 +52,12 @@ function objectPayload(payload, label) {
 
 async function smoke(base) {
   const checks = [
+    ["/health", 200, (payload) => {
+      const value = objectPayload(payload, "/health");
+      if (value.status !== "ok" || value.runtime !== "cloudflare_worker") {
+        throw new Error("/health did not return the Worker liveness contract");
+      }
+    }],
     ["/healthz", 200, (payload) => {
       const value = objectPayload(payload, "/healthz");
       if (value.runtime !== "cloudflare_worker") throw new Error("/healthz is not Worker-native");
