@@ -921,6 +921,7 @@ export const adminDeliveryLogisticsResponseSchema = z.object({
     checklist: z.array(z.record(z.string().max(128), z.unknown())).max(50),
     supportedApps: z.array(z.record(z.string().max(128), z.unknown())).max(50),
     couriers: boundedDeliveryLogisticsRowsSchema,
+    openExceptions: z.array(z.record(z.string().max(128), z.unknown())).max(200),
     shipments: z.array(z.record(z.string().max(128), z.unknown())).max(25),
     events: z.array(z.record(z.string().max(128), z.unknown())).max(25),
     operationalSignals: z.object({ activeOrders: z.number().int().nonnegative(), shipmentDue: z.number().int().nonnegative(), recordedShipments: z.number().int().nonnegative(), recentEvents: z.number().int().nonnegative(), trackingLinksEnabled: z.boolean(), codDeliveredPendingCapture: z.number().int().nonnegative(), pancakePosConfigured: z.boolean(), smsConfigured: z.boolean() }).strict(),
