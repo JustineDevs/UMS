@@ -184,11 +184,12 @@ export function HostedCheckoutReturn({
           staleReason?: string | null;
           lastError?: string | null;
         };
-        if (
-          stJson.status === "completed" &&
-          typeof stJson.trackingPageUrl === "string" &&
-          stJson.trackingPageUrl
-        ) {
+        const paymentSettled =
+          ["paid", "completed", "captured"].includes(stJson.status ?? "") ||
+          ["completed", "provider_verified", "finalizing", "awaiting_completion"].includes(
+            stJson.checkoutState ?? "",
+          );
+        if (paymentSettled && typeof stJson.trackingPageUrl === "string" && stJson.trackingPageUrl) {
           const safeTrackingUrl = sanitizeSameOriginUrl(
             stJson.trackingPageUrl,
             window.location.origin,
@@ -216,12 +217,7 @@ export function HostedCheckoutReturn({
           );
           return;
         }
-        if (
-          ["paid", "completed", "captured"].includes(stJson.status ?? "") ||
-          ["provider_verified", "finalizing", "awaiting_completion"].includes(
-            stJson.checkoutState ?? "",
-          )
-        ) {
+        if (paymentSettled) {
           const retryFinalize = await finalize();
           if (disposed) return;
           if (retryFinalize.ok) {
