@@ -706,6 +706,18 @@ export const cartReconcileErrorResponseSchema = z.object({
   error: z.literal("Catalog reconciliation is temporarily unavailable"),
   lines: z.array(z.object({ variantId: z.string().min(1).max(200), status: z.literal("error") }).strict()).max(50),
 }).strict();
+const cartAbandonmentLineSchema = z.object({
+  variantId: z.string().max(200).optional(),
+  quantity: z.number().int().nonnegative().max(999).optional(),
+  price: z.number().finite().nonnegative().max(1_000_000_000).optional(),
+}).passthrough();
+export const cartAbandonmentRequestSchema = z.object({
+  email: z.string().max(320).nullable().optional(),
+  lines: z.array(cartAbandonmentLineSchema).max(50).optional(),
+  path: z.string().max(2_000).nullable().optional(),
+  referrer: z.string().max(2_000).nullable().optional(),
+  clientTimestamp: z.string().max(200).nullable().optional(),
+}).passthrough();
 export const checkoutStartResponseSchema = z.object({
   checkoutUrl: z.string().url().max(2_000), cartId: z.string().min(1).max(300), providerLabel: z.string().min(1).max(120), confirmedTotal: z.number().finite().nonnegative(), currencyCode: z.string().regex(/^[A-Z]{3,8}$/),
   paymentSessionId: z.string().min(1).max(500), providerPaymentId: z.string().min(1).max(500), quoteFingerprint: z.string().min(1).max(512), variantIds: z.array(z.string().max(200)).max(500), productIds: z.array(z.string().max(200)).max(500), checkoutActionKind: z.literal("redirect"), correlationId: z.string().min(1).max(200), workerCheckout: z.literal(true),
@@ -1719,6 +1731,7 @@ export const adminRequestContracts = {
   "patch /account/marketing-preferences": accountMarketingPreferencesPatchSchema,
   "patch /account/order-preferences": accountOrderPreferencesPatchSchema,
   "post /cart/reconcile": cartReconcileRequestSchema,
+  "post /cart/abandonment": cartAbandonmentRequestSchema,
   "post /wishlist": wishlistRequestSchema,
   "post /wishlist/sync": wishlistSyncRequestSchema,
   "patch /account/profile": storefrontCustomerProfilePatchSchema,

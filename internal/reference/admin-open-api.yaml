@@ -17517,8 +17517,29 @@ components:
       additionalProperties: true
       description: "Validated request payload for POST /cart/abandonment. Runtime source: apps/web/src/app/api/cart/abandonment/route.ts."
       x-source-sha256: 60ea8e077e6aedbb17d053b5fd5948f3889833b1525ed7e1f0cf3bf8907e6131
-      x-contract-inference: unresolved
-      x-contract-status: non-authoritative
+      x-contract-inference: runtime-zod
+      x-contract-status: executable
+      properties:
+        email:
+          anyOf:
+            - type: string
+            - type: null
+        lines:
+          type: array
+          items:
+            type: object
+        path:
+          anyOf:
+            - type: string
+            - type: null
+        referrer:
+          anyOf:
+            - type: string
+            - type: null
+        clientTimestamp:
+          anyOf:
+            - type: string
+            - type: null
     post_cart_abandonmentResponse:
       type: object
       additionalProperties: false
