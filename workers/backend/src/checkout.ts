@@ -29,6 +29,7 @@ type PreviewRow = {
 };
 export type CheckoutProvider = "stripe" | "paypal" | "xendit";
 export type CheckoutEnv = {
+  DEFAULT_ORGANIZATION_ID?: string;
   STRIPE_API_KEY?: string;
   PAYPAL_CLIENT_ID?: string;
   PAYPAL_CLIENT_SECRET?: string;
@@ -310,10 +311,11 @@ export async function handleCheckoutSessionRequest(
       try {
         await appDatabase.query(
           `INSERT INTO public.payment_attempts
-             (correlation_id, cart_id, provider, amount_minor, currency, status, checkout_state, idempotency_key)
-           VALUES ($1::uuid, $2, $3, $4, $5, 'initiated', 'awaiting_provider', $6)`,
+             (correlation_id, organization_id, cart_id, provider, amount_minor, currency, status, checkout_state, idempotency_key)
+           VALUES ($1::uuid, NULLIF($2, ''), $3, $4, $5, $6, 'initiated', 'awaiting_provider', $7)`,
           [
             correlationId,
+            env.DEFAULT_ORGANIZATION_ID?.trim() ?? "",
             cartId,
             provider,
             totals.amountMinor,
