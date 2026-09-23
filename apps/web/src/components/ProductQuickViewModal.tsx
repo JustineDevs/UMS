@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@universal-music-store/ui";
 import { AddToCartSection } from "@/components/AddToCartSection";
+import { ProductVariantProvider } from "@/components/ProductVariantProvider";
 import { minVariantPrice } from "@/lib/medusa-catalog-mapper";
 import {
   isKnownUnavailableExternalImage,
@@ -147,7 +148,9 @@ export function ProductQuickViewModal({
                   </p>
                 </div>
 
-                <AddToCartSection product={product} testId="quick-view-add-to-bag" />
+                <ProductVariantProvider product={product}>
+                  <AddToCartSection product={product} testId="quick-view-add-to-bag" />
+                </ProductVariantProvider>
 
                 <div className="flex justify-end">
                   <Button
