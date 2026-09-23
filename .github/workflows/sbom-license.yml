@@ -9,6 +9,10 @@ on:
       - 'pnpm-lock.yaml'
       - '**/package.json'
 
+concurrency:
+  group: sbom-license-${{ github.event.pull_request.number || github.ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   sbom:
     runs-on: ubuntu-latest
