@@ -83,15 +83,20 @@ export function HostedCheckoutReturn({
         return;
       }
 
-      if (isUnresolvedHostedReturnToken(provider, providerOrderId)) {
-        setMessage(
-          "Stripe did not return a checkout session. Your bag is unchanged; return to checkout and try again.",
-        );
-        setFailed(true);
-        return;
-      }
-
-      const correlationId = await resolveCorrelationId(provider, providerOrderId);
+      // Stripe can occasionally return the documented placeholder literally.
+      // Do not trust that value as a provider identifier; recover only through
+      // the same-site cart/attempt capability and let the Worker reconcile the
+      // provider state before finalizing.
+      const effectiveProviderOrderId = isUnresolvedHostedReturnToken(
+        provider,
+        providerOrderId,
+      )
+        ? undefined
+        : providerOrderId;
+      const correlationId = await resolveCorrelationId(
+        provider,
+        effectiveProviderOrderId,
+      );
       if (disposed) return;
       if (!correlationId) {
         setMessage(buildHostedReturnMissingCorrelationMessage(provider));
