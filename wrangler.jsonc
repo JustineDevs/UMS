@@ -6,7 +6,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "vars": {
-    "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+    "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
+    "PUBLIC_SITE_URL": "https://universalmusic.vercel.app"
   },
   "env": {
     "dev": {
@@ -26,7 +27,8 @@
         { "binding": "APP_HYPERDRIVE", "id": "670f984853514e0ea8f61aa4956d2155" }
       ],
       "vars": {
-        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
+        "PUBLIC_SITE_URL": "https://universalmusic.vercel.app"
       },
     },
     "production": {
@@ -53,7 +55,10 @@
         }
       },
       "vars": {
-        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
+        "PUBLIC_SITE_URL": "https://universalmusic.vercel.app",
+        "CMS_ORGANIZATION_ID": "local-admin@example.com",
+        "DEFAULT_ORGANIZATION_ID": "local-admin@example.com"
       },
     }
   }

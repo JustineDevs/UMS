@@ -10643,7 +10643,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 503]
-      x-source-sha256: 3ad4d1752332be5f1dd138eb289a8cdc4b71015633db0f617af16b2706b3b803
+      x-source-sha256: ffa3adab422d67d50a944d209c487892c39195a7607a3e3b42c98fe72f8b5664
       security:
         - CartCapability: []
       responses:
@@ -11578,7 +11578,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 413, 429]
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       security: []
       requestBody:
         required: true
@@ -13393,7 +13393,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 5ee47969bb9cd8b63f6f42c576d8e9bdcc948aa44a5393d1b75c513644f865a1
+      x-source-sha256: f5fb10cf7934882ea466f502bedb2287345429829889755ab354a454b4043f16
       security: []
       responses:
         "200":
@@ -15808,7 +15808,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /shop/product. Runtime source: apps/web/src/app/api/shop/product/route.ts."
-      x-source-sha256: 5ee47969bb9cd8b63f6f42c576d8e9bdcc948aa44a5393d1b75c513644f865a1
+      x-source-sha256: f5fb10cf7934882ea466f502bedb2287345429829889755ab354a454b4043f16
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -17530,7 +17530,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /cart/bind. Runtime source: apps/web/src/app/api/cart/bind/route.ts."
-      x-source-sha256: 3ad4d1752332be5f1dd138eb289a8cdc4b71015633db0f617af16b2706b3b803
+      x-source-sha256: ffa3adab422d67d50a944d209c487892c39195a7607a3e3b42c98fe72f8b5664
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -17875,7 +17875,7 @@ components:
       type: object
       additionalProperties: false
       description: "Validated request payload for POST /checkout/verify-stock. Runtime source: apps/web/src/app/api/checkout/verify-stock/route.ts."
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -17888,7 +17888,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /checkout/verify-stock. Runtime source: apps/web/src/app/api/checkout/verify-stock/route.ts."
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       x-contract-inference: runtime-zod
       x-contract-status: executable
       anyOf:

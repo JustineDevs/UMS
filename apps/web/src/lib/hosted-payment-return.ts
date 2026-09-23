@@ -67,6 +67,15 @@ export function buildHostedReturnMissingCorrelationMessage(
   )} payment to your checkout session. Return to checkout to review your payment status, or check your account in a few minutes.`;
 }
 
+export function isUnresolvedHostedReturnToken(
+  provider: HostedReturnProvider,
+  value: string | undefined,
+): boolean {
+  if (!value?.trim()) return false;
+  const token = value.trim();
+  return provider === "stripe" && /^\{CHECKOUT_SESSION_ID\}$/i.test(token);
+}
+
 export function buildHostedReturnStatusMessage(
   provider: HostedReturnProvider,
   status: Exclude<HostedReturnStatus, "success">,

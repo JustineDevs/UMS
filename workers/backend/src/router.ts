@@ -54,7 +54,7 @@ import { handleNavigationRequest } from "./navigation.ts";
 import { handleAnnouncementRequest } from "./announcement.ts";
 import { handleBlogRequest } from "./blog.ts";
 import { handleCategoryRequest } from "./category.ts";
-import { handleSitemapRequest } from "./sitemap.ts";
+import { handleSitemapRequest, handleSitemapXmlRequest } from "./sitemap.ts";
 import {
   handleCmsAdminPageMutationsRequest,
   handleCmsAdminPageRequest,
@@ -228,6 +228,7 @@ export interface BackendEnv
   ALLOWED_ORIGINS?: string;
   CMS_ORGANIZATION_ID?: string;
   DEFAULT_ORGANIZATION_ID?: string;
+  PUBLIC_SITE_URL?: string;
   JWT_SECRET?: string;
   CMS_ADMIN_JWT_SECRET?: string;
   AUTH_SECRET?: string;
@@ -293,17 +294,32 @@ function jsonError(error: string, id: string, status: number): Response {
   });
 }
 
+function nativeRouteFailureCode(error: unknown): string {
+  const candidate =
+    error && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
+  return typeof candidate === "string" ? candidate : "UNKNOWN";
+}
+
+export function nativeRouteFailureResponse(error: unknown, id: string): Response {
+  // PostgreSQL's undefined-table error means the deployed Worker schema is
+  // behind the database it is connected to. Reporting that as a catalog outage
+  // sends operators toward the wrong recovery path and hides the real defect.
+  if (nativeRouteFailureCode(error) === "42P01") {
+    return jsonError("database_schema_unavailable", id, 503);
+  }
+  return jsonError("catalog_unavailable", id, 503);
+}
+
 function logNativeRouteFailure(
   error: unknown,
   requestId: string,
   matches: Record<string, unknown>,
 ): void {
-  const candidate =
-    error && typeof error === "object" && "code" in error
-      ? error.code
-      : undefined;
+  const candidate = nativeRouteFailureCode(error);
   const errorCode =
-    typeof candidate === "string" && /^[0-9A-Z]{5}$/.test(candidate)
+    /^[0-9A-Z]{5}$/.test(candidate)
       ? candidate
       : "UNKNOWN";
   const route =
@@ -390,6 +406,7 @@ export function nativeDatabaseRole(
     "categoriesMatch",
     "categoryMatch",
     "sitemapMatch",
+    "sitemapXmlMatch",
     "cmsAdminCreateMatch",
     "cmsAdminPageListMatch",
     "cmsAdminPageDetailMatch",
@@ -1129,6 +1146,7 @@ export async function handleBackendRequest(
       ? path.match(/^\/store\/categories\/([^/]+)$/)
       : null;
   const sitemapMatch = request.method === "GET" && path === "/store/sitemap";
+  const sitemapXmlMatch = request.method === "GET" && path === "/sitemap.xml";
   const complianceExportMatch =
     request.method === "GET" && path === "/compliance/export";
   const complianceErasureMatch =
@@ -1153,6 +1171,7 @@ export async function handleBackendRequest(
     searchSuggestionsMatch,
     socialProofMatch,
     sitemapMatch,
+    sitemapXmlMatch,
     cmsAdminCreateMatch,
     cmsAdminPageListMatch,
     cmsAdminPageDetailMatch,
@@ -3800,6 +3819,7 @@ export async function handleBackendRequest(
         categoriesMatch ||
         categoryMatch ||
         sitemapMatch ||
+        sitemapXmlMatch ||
         cartMatch ||
         inventoryMatch ||
         customerOrdersMatch ||
@@ -4268,6 +4288,14 @@ export async function handleBackendRequest(
                                                                                                                                     env.DEFAULT_ORGANIZATION_ID,
                                                                                                                                     env,
                                                                                                                                   )
+                                                                                                                                : sitemapXmlMatch
+                                                                                                                                  ? handleSitemapXmlRequest(
+                                                                                                                                      request,
+                                                                                                                                      database,
+                                                                                                                                      env.CMS_ORGANIZATION_ID ??
+                                                                                                                                        env.DEFAULT_ORGANIZATION_ID,
+                                                                                                                                      env.PUBLIC_SITE_URL,
+                                                                                                                                    )
                                                                                                                                 : sitemapMatch
                                                                                                                                   ? handleSitemapRequest(
                                                                                                                                       request,
@@ -4358,7 +4386,7 @@ export async function handleBackendRequest(
       });
     } catch (error) {
       logNativeRouteFailure(error, id, nativeRouteMatches);
-      return jsonError("catalog_unavailable", id, 503);
+      return nativeRouteFailureResponse(error, id);
     }
   }
 

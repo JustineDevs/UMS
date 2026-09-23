@@ -47,3 +47,30 @@ test("fails closed when a requested variant is not published", async () => {
     lines: [{ variantId: "missing", status: "error" }],
   });
 });
+
+test("does not reintroduce media from the retired catalog storage project", async () => {
+  const response = await handleCartReconcileRequest(
+    new Request("https://api.test/store/cart/reconcile", {
+      method: "POST",
+      body: JSON.stringify({ lines: [{ variantId: "var-legacy", quantity: 1 }] }),
+      headers: { "Content-Type": "application/json" },
+    }),
+    {
+      async query<Row>() {
+        return {
+          rowCount: 1,
+          rows: [{
+            variant_id: "var-legacy", product_handle: "legacy", product_title: "Legacy",
+            product_thumbnail: "https://gvsyfyaqxfrunoghgqiq.supabase.co/storage/v1/object/public/catalog/legacy.jpg",
+            variant_sku: "LEGACY-1", product_metadata: null, currency_code: "php",
+            unit_price: 100, available_quantity: 1, allow_backorder: false,
+          }] as Row[],
+        };
+      },
+      async end() {},
+    },
+  );
+  const payload = (await response.json()) as { lines: Array<Record<string, unknown>> };
+  assert.equal(response.status, 200);
+  assert.equal("thumbnail" in payload.lines[0]!, false);
+});

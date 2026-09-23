@@ -17,6 +17,13 @@ dotenv.config({ path: join(root, ".env.local"), override: false });
 if (process.argv.includes("--target=medusa")) {
   const databaseUrl = process.env.MEDUSA_DB_URL;
   if (!databaseUrl?.trim()) throw new Error("MEDUSA_DB_URL is required for the commerce idempotency ledger");
+  const parsedDatabaseUrl = new URL(databaseUrl);
+  const expectedHost = process.env.WORKER_MEDUSA_DATABASE_HOST ?? "aws-0-ap-southeast-1.pooler.supabase.com";
+  if (parsedDatabaseUrl.hostname !== expectedHost) {
+    throw new Error(
+      `MEDUSA_DB_URL points to ${parsedDatabaseUrl.hostname}; refusing to migrate anything except the current Worker commerce database (${expectedHost}). Set WORKER_MEDUSA_DATABASE_HOST only when the Hyperdrive origin is intentionally rotated.`,
+    );
+  }
   const sql = await readFile(join(root, "workers", "backend", "migrations", "002_medusa_worker_idempotency.sql"), "utf8");
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();

@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { handleBackendRequest, nativeDatabaseRole, probeWorkerDatabaseRoles } from "./router.ts";
+import {
+  handleBackendRequest,
+  nativeDatabaseRole,
+  nativeRouteFailureResponse,
+  probeWorkerDatabaseRoles,
+} from "./router.ts";
 
 const env = {
   ALLOWED_ORIGINS: "https://universalmusic-preview.vercel.app",
@@ -8,6 +13,15 @@ const env = {
 
 test("routes webhook persistence to the APP database role", () => {
   assert.equal(nativeDatabaseRole({ webhookMatch: true }), "app");
+});
+
+test("reports a missing Worker table as a schema outage instead of a catalog outage", async () => {
+  const response = nativeRouteFailureResponse({ code: "42P01" }, "req_schema");
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "database_schema_unavailable",
+    requestId: "req_schema",
+  });
 });
 
 test("routes CMS page reads and mutation history to the APP database role", () => {

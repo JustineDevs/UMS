@@ -197,3 +197,81 @@ The remaining Webpack cache warnings were traced to the generated visual-builder
 ## Architect review
 
 The architect review returned `REJECT` because the source tree remains untracked/migrating and provider-backed E2E/SQL/long-duration evidence is unavailable. One reported typecheck failure was stale relative to the final checkout: a fresh web typecheck passed after the review. The substantive lifecycle concern—propagating client abort into the inventory upstream fetch—was repaired afterward and covered by the stream tests.
+
+## Addendum: deployed verification pass (2026-09-23)
+
+The following checks were run against the deployed storefront at
+`https://universalmusic.vercel.app` with the production Worker at
+`https://ums-backend-production.pcg0255.workers.dev`, using one Chromium worker:
+
+- PayPal cancellation and declined-return safety: 2/2 passed; neither return exposed an order.
+- Collection catalog browser proof: 2/2 passed; collection status and native collection navigation rendered.
+- Storefront API security plus axe accessibility suite: 18/18 passed.
+- Desktop and mobile performance budgets for `/`, `/shop`, and `/collections`: 6/6 passed; TTFB, LCP, and CLS stayed within configured limits.
+- Tracking capability, hosted cancel/failure recovery, and unavailable intent-service recovery: 3/3 passed.
+- Webhook negative-signature boundary: Stripe, PayPal, and Xendit each returned 401 with `invalid_webhook_signature`.
+- Worker `/healthz` and `/readyz`: both returned 200 with `databaseRoles.app=true` and `databaseRoles.medusa=true`.
+
+The deployed HTTP matrix found one contract defect in `GET /api/shop/product`: the route returned
+`Referrer-Policy: no-referrer` while the checked-in contract requires
+`strict-origin-when-cross-origin`. Error and success responses were aligned, the OpenAPI source
+hash reference was regenerated, and the repair was committed as `737e7249` and pushed to the
+verified-hosted-checkout preview branch. The Vercel preview was still building at the time of this
+addendum; the HTTP matrix must be rerun after that deployment is ready.
+
+The follow-up deployed health pass completed with 14/14 checks passing against the same
+storefront and Worker: Worker and storefront health, admin authentication boundary, payment
+method availability, shop/CMS/review public APIs, unauthenticated account/order/cart behavior,
+COD validation, and cron-secret rejection. The route-header repair is not yet promoted to the
+production alias; Vercel deployment `8DgD98NffjZz1KnZdK4FkdWZCrFo` remains in progress while
+the JavaScript/TypeScript security check has completed successfully. The HTTP matrix remains
+pending until that deployment is ready.
+
+The ready preview for `b1ee6b4f` is
+`https://universalmusic-rclz121zg-justinedevs-projects.vercel.app`. The deployed cart
+quantity/reconciliation suite passed 13/13, covering over-limit edits, rapid-edit serialization,
+stale-price correction, unavailable variants, outage recovery, mobile controls, and cross-tab
+reconciliation. The storefront UX suite passed 22/23; the only skipped case is image zoom because
+the deployed catalog has no seeded image fixture. The HTTP matrix reached the Worker cases (4/4)
+but the storefront cases were redirected to Vercel SSO when run outside the authenticated browser
+session, so the product-header assertion still requires an authenticated preview request.
+
+The focused Worker provider/queue/webhook contract pass completed with 53/53 tests passing.
+It covered Stripe checkout/refund/signature replay and deduplication, PayPal order/capture/refund
+and transmission verification, Xendit/Pancake callback tokens and refund reconciliation, provider
+failure handling, queue retry/redelivery/dead-letter behavior, and idempotency replay semantics.
+These are contract-level proofs; they do not replace live provider delivery or authenticated
+preview browser evidence.
+
+The live payment-method probe returned only `XENDIT` and `COD`. A read-only production Worker
+secret-name audit confirmed the cause: webhook verification secrets exist, but the provider
+startup credentials `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, and `STRIPE_SECRET_KEY` are not
+configured on the production Worker. This is why the PayPal sandbox browser handoff is skipped
+and why Stripe/PayPal are absent from `/store/payment-methods`; no secret values are included in
+this report.
+
+The existing authenticated Vercel project was inspected without revealing values: Production
+contains `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `STRIPE_API_KEY`, and
+`STRIPE_WEBHOOK_SECRET`. The Worker expects the first two names and `STRIPE_SECRET_KEY`; therefore
+the provider startup gap is a deployment-scope mismatch, not an absent provider account. The
+remaining configuration action is to copy the PayPal sandbox credentials and map
+`STRIPE_API_KEY` to the Worker secret name `STRIPE_SECRET_KEY`.
+
+That transfer was tested and immediately rolled back safely: the copied PayPal credentials
+returned HTTP 401 from PayPal Sandbox OAuth, and the copied Stripe key returned HTTP 401 from
+Stripe `/v1/account`. The invalid Worker secrets were removed, and production was redeployed as
+Worker version `3410ad27-04f2-4b1f-a433-4a55f5864579`. The live capability contract now correctly
+returns only `XENDIT` and `COD` until valid provider credentials are supplied; no broken provider
+is advertised to customers.
+### 2026-09-23 — Checkout stock-verification browser compatibility
+
+- Root cause: the read-only `POST /api/checkout/verify-stock` endpoint was wrapped
+  in BotID. Legitimate hosted-browser checkout runs were rejected with HTTP 403
+  `Access denied` before Xendit checkout initialization.
+- Fix: the endpoint now keeps same-origin validation, bounded input, and the
+  existing fixed-window rate limit, but no longer uses BotID for this public
+  inventory read. This lets real browsers and privacy-hardened clients reach the
+  provider handoff without weakening checkout or payment authorization.
+- Evidence: the configured Xendit sandbox key returned HTTP 200 from the
+  read-only `/balance` probe; the previous Xendit browser failure therefore was
+  not a provider-credential failure.

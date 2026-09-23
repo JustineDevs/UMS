@@ -1,4 +1,6 @@
 import type { WorkerDatabaseClient } from "./database.ts";
+import { normalizeCatalogMediaUrl } from "./catalog-media.ts";
+export { normalizeCatalogMediaUrl } from "./catalog-media.ts";
 
 type CatalogRow = {
   id: string;

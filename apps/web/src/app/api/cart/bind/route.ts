@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { withBotIdProtection } from "@/lib/botid-protection";
 import {
   applyRateLimit,
   parseJsonBody,
@@ -91,5 +90,10 @@ export async function POST(req: Request) {
     );
   }
 
-  return withBotIdProtection(handlePOST)(req);
+  // Ownership proof, same-origin enforcement, Worker cart verification, and
+  // rate limiting are the security boundary for this endpoint. Applying the
+  // optional Bot ID gate here rejects legitimate hosted-checkout handoffs in
+  // automated and privacy-hardened browsers after checkout has already been
+  // authorized. Keep Bot ID on high-value mutations instead.
+  return handlePOST(req);
 }

@@ -12,6 +12,7 @@ import {
   importWishlistJSON,
   onWishlistChange,
   persistWishlistMutation,
+  syncWishlistFromServer,
 } from "@/lib/wishlist";
 import { addCartLine } from "@/lib/cart";
 import { mapWithConcurrency } from "@/lib/async-batching";
@@ -34,6 +35,21 @@ export function WishlistPageClient() {
     const unsub = onWishlistChange(refresh);
     return unsub;
   }, [refresh]);
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    let active = true;
+    void syncWishlistFromServer()
+      .then((serverItems) => {
+        if (active) setItems(serverItems);
+      })
+      .catch(() => {
+        // Keep the browser copy visible when the remote list is temporarily unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [status]);
 
   async function remove(slug: string, name: string, medusaProductId?: string) {
     const entry = {
