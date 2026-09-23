@@ -123,7 +123,10 @@ async function startWorkerCheckout(input: {
     origin,
   );
   if (input.provider === "stripe") {
-    successUrl.searchParams.set("token", "{CHECKOUT_SESSION_ID}");
+    // Stripe substitutes its reserved placeholder in the documented
+    // `session_id` callback parameter. Keep the provider session ID in the
+    // URL so the return page can safely recover the payment attempt.
+    successUrl.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
   }
   const response = await fetch(`${input.baseUrl}/store/checkout/session`, {
     method: "POST",
