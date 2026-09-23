@@ -27,7 +27,7 @@ Configure provider secrets in the Cloudflare Worker environment. Keep provider c
 
 ## 1. Stripe
 
-1. Open the Stripe **UVS** project in the correct Stripe account. Stripe may display the account namespace as `maharlika-apparel-custom`; that is the account/business namespace, not the project name, and must not be used as a webhook path or application identifier.
+1. Open the Stripe **UVS** project in the correct Stripe account. Stripe may display a separate account/business namespace beside the project name; that namespace is not the project name and must not be used as a webhook path or application identifier.
 2. Obtain **Secret key** and **Webhook signing secret** from the UVS project’s selected mode (Test or Live).
 3. Register the Cloudflare backend webhook URL: `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe` in the matching Stripe mode (local development uses `http://localhost:8787/webhooks/stripe`). The Worker verifies and persists the event directly.
 
