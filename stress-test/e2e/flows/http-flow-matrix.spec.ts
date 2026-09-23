@@ -216,7 +216,9 @@ test.describe.serial("Storefront HTTP matrix", () => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/abandonment`, {
       headers: { ...sameOriginHeaders(), "Content-Type": "application/json" },
-      data: "{",
+      // Playwright serializes string data as a JSON string. Send raw bytes so
+      // this assertion exercises the malformed JSON path rather than BotID.
+      data: Buffer.from("{"),
       failOnStatusCode: false,
     });
     expect(res.status()).toBe(400);
