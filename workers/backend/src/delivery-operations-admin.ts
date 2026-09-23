@@ -1,8 +1,9 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { verifyWorkerBearerToken, type WorkerAuthClaims } from "./auth.ts";
 import { executeIdempotently, HyperdriveIdempotencyStore } from "./idempotency.ts";
+import { buildDeliveryLogisticsCoverageMetadata } from "../../../packages/platform-data/src/delivery-logistics-checklist.ts";
 
-type Env = { CMS_ADMIN_JWT_SECRET?: string; SUPABASE_URL?: string; GEOCODING_BASE_URL?: string; OSRM_BASE_URL?: string };
+type Env = { CMS_ADMIN_JWT_SECRET?: string; SUPABASE_URL?: string; GEOCODING_BASE_URL?: string; OSRM_BASE_URL?: string; PANCAKE_POS_API_KEY?: string; RESEND_API_KEY?: string };
 function json(body: Record<string, unknown>, status = 200): Response { return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }); }
 function org(claims: WorkerAuthClaims): string | null { const value = claims.organization_id ?? claims.org_id; return typeof value === "string" && value.trim() ? value.trim() : null; }
 function allowed(claims: WorkerAuthClaims, write: boolean): boolean { const permissions = Array.isArray(claims.permissions) ? claims.permissions : []; const needed = write ? "orders:write" : "dashboard:read"; return claims.role === "owner" || claims.role === "admin" || permissions.some((value) => value === "*" || value === needed); }
@@ -17,7 +18,37 @@ export async function handleAdminDeliveryOperationsRequest(request: Request, dat
   if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const claims = await verifyWorkerBearerToken(request.headers.get("Authorization"), { secret: env.CMS_ADMIN_JWT_SECRET, supabaseUrl: env.SUPABASE_URL }); if (!claims) return json({ error: "unauthorized" }, 401);
   const tenant = org(claims); if (!tenant) return json({ error: "organization_claim_required" }, 403); const pathname = new URL(request.url).pathname.replace(/^\/api/, ""); const write = request.method === "POST"; if (!allowed(claims, write)) return json({ error: "forbidden" }, 403);
-  if (request.method === "GET") { const couriers = await database.query(`SELECT id, tenant_key, slug, label, phone, status, latitude, longitude, rating, max_weight_kg, max_volume_cm3, cash_balance, cash_limit, metadata, created_at, updated_at FROM public.delivery_logistics_couriers WHERE tenant_key = $1 ORDER BY updated_at DESC LIMIT $2`, [tenant, 200]); const exceptions = await database.query(`SELECT id, tenant_key, shipment_id, exception_type, severity, details, resolved_at, resolved_by_email, created_by_email, created_at FROM public.delivery_logistics_exceptions WHERE tenant_key = $1 AND resolved_at IS NULL ORDER BY created_at DESC LIMIT $2`, [tenant, 200]); if (pathname.endsWith("/operations")) return json({ data: { couriers: couriers.rows, openExceptions: exceptions.rows } }); const shipments = await database.query(`SELECT id, organization_id, order_id, order_display_id, customer_email, courier_slug, courier_label, status, destination_address, tracking_url, tracking_status, last_event_at, created_at, updated_at FROM public.delivery_logistics_shipments WHERE organization_id = $1 ORDER BY updated_at DESC LIMIT $2`, [tenant, 25]); const events = await database.query(`SELECT id, organization_id, shipment_id, event_type, event_status, event_payload, occurred_at, created_at FROM public.delivery_logistics_events WHERE organization_id = $1 ORDER BY occurred_at DESC LIMIT $2`, [tenant, 25]); return json({ ok: true, overview: { coverage: { total: 0, covered: 0, partial: 0, planned: 0 }, checklist: [], supportedApps: [], couriers: couriers.rows, shipments: shipments.rows, events: events.rows, operationalSignals: { activeOrders: 0, shipmentDue: 0, recordedShipments: shipments.rows.length, recentEvents: events.rows.length, trackingLinksEnabled: false, codDeliveredPendingCapture: 0, pancakePosConfigured: false, smsConfigured: false } } }); }
+  if (request.method === "GET") {
+    const [couriers, exceptions, shipments, events, signals] = await Promise.all([
+      database.query(`SELECT id, tenant_key, slug, label, phone, status, latitude, longitude, rating, max_weight_kg, max_volume_cm3, cash_balance, cash_limit, metadata, created_at, updated_at FROM public.delivery_logistics_couriers WHERE tenant_key = $1 ORDER BY updated_at DESC LIMIT $2`, [tenant, 200]),
+      database.query(`SELECT id, tenant_key, shipment_id, exception_type, severity, details, resolved_at, resolved_by_email, created_by_email, created_at FROM public.delivery_logistics_exceptions WHERE tenant_key = $1 AND resolved_at IS NULL ORDER BY created_at DESC LIMIT $2`, [tenant, 200]),
+      database.query(`SELECT id, organization_id, order_id, order_display_id, customer_email, courier_slug, courier_label, status, destination_address, tracking_url, tracking_status, proof_of_delivery, cod_amount, settlement_status, eta_at, last_event_at, created_at, updated_at FROM public.delivery_logistics_shipments WHERE organization_id = $1 ORDER BY updated_at DESC LIMIT $2`, [tenant, 25]),
+      database.query(`SELECT id, organization_id, shipment_id, event_type, event_status, event_payload, occurred_at, created_at FROM public.delivery_logistics_events WHERE organization_id = $1 ORDER BY occurred_at DESC LIMIT $2`, [tenant, 25]),
+      database.query<{ active_orders: number | string; shipment_due: number | string; recorded_shipments: number | string; tracking_links: number | string; cod_delivered_pending_capture: number | string }>(`SELECT (SELECT count(*) FROM public.payment_attempts WHERE organization_id = $1 AND status IN ('paid', 'paid_awaiting_order', 'finalizing_order')) AS active_orders, (SELECT count(*) FROM public.delivery_logistics_shipments WHERE organization_id = $1 AND status IN ('planned', 'assigned', 'in_transit') AND (eta_at IS NULL OR eta_at <= now())) AS shipment_due, (SELECT count(*) FROM public.delivery_logistics_shipments WHERE organization_id = $1) AS recorded_shipments, (SELECT count(*) FROM public.delivery_logistics_shipments WHERE organization_id = $1 AND tracking_url IS NOT NULL AND trim(tracking_url) <> '') AS tracking_links, (SELECT count(*) FROM public.payment_attempts WHERE organization_id = $1 AND provider = 'cod' AND (provider_payload->>'delivered_at') IS NOT NULL AND (provider_payload->>'cod_capture_complete') IS DISTINCT FROM 'true') AS cod_delivered_pending_capture`, [tenant]),
+    ]);
+    const coverage = buildDeliveryLogisticsCoverageMetadata();
+    const row = signals.rows[0] ?? {};
+    const count = (value: unknown): number => Math.max(0, Number(value) || 0);
+    return json({ ok: true, overview: {
+      coverage: coverage.coverage,
+      checklist: coverage.checklist,
+      supportedApps: coverage.supportedApps,
+      couriers: couriers.rows,
+      openExceptions: exceptions.rows,
+      shipments: shipments.rows,
+      events: events.rows,
+      operationalSignals: {
+        activeOrders: count(row.active_orders),
+        shipmentDue: count(row.shipment_due),
+        recordedShipments: count(row.recorded_shipments),
+        recentEvents: events.rows.length,
+        trackingLinksEnabled: count(row.tracking_links) > 0,
+        codDeliveredPendingCapture: count(row.cod_delivered_pending_capture),
+        pancakePosConfigured: Boolean(env.PANCAKE_POS_API_KEY?.trim()),
+        smsConfigured: Boolean(env.RESEND_API_KEY?.trim()),
+      },
+    } });
+  }
   const key = request.headers.get("Idempotency-Key")?.trim(); if (!key || key.length > 255) return json({ error: "idempotency_key_required" }, 400);
   let body: Record<string, unknown>; try { const raw = await request.text(); if (raw.length > 256 * 1024) return json({ error: "payload_too_large" }, 413); const parsed = JSON.parse(raw) as unknown; if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return json({ error: "invalid_json" }, 400); body = parsed as Record<string, unknown>; } catch { return json({ error: "invalid_json" }, 400); }
   const kind = text(body.kind, 32); if (!kind || !["courier", "telemetry", "proof", "exception", "settlement", "geocode", "route"].includes(kind)) return json({ error: "invalid_operation_kind" }, 400);

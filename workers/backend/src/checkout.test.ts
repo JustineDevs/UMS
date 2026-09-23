@@ -182,3 +182,33 @@ test("accepts loopback HTTP callbacks for local checkout runs", async () => {
     "checkout_provider_failed",
   );
 });
+
+test("explains Xendit's HTTPS callback requirement before provider work", async () => {
+  const response = await handleCheckoutSessionRequest(
+    new Request("http://127.0.0.1/store/checkout/session", {
+      method: "POST",
+      headers: { "Idempotency-Key": "checkout-xendit-local-callback" },
+      body: JSON.stringify({
+        cart_id: "cart-1",
+        provider: "xendit",
+        success_url:
+          "http://localhost:3000/checkout/hosted-return?provider=xendit&status=success",
+        cancel_url:
+          "http://localhost:3000/checkout/hosted-return?provider=xendit&status=cancel",
+      }),
+    }),
+    {
+      query: async () => {
+        throw new Error("database must not be queried");
+      },
+      end: async () => undefined,
+    },
+    { XENDIT_SECRET_KEY: "sandbox-key" },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error:
+      "Xendit requires an authenticated HTTPS callback URL for hosted checkout.",
+    code: "XENDIT_HTTPS_CALLBACK_REQUIRED",
+  });
+});

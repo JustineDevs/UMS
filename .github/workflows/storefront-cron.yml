@@ -7,6 +7,12 @@ on:
 
 permissions: {}
 
+# A previous invocation must finish before the next scheduled run starts; these
+# jobs reconcile durable state and must not be cancelled halfway through.
+concurrency:
+  group: storefront-operations-cron
+  cancel-in-progress: false
+
 jobs:
   invoke:
     runs-on: ubuntu-latest

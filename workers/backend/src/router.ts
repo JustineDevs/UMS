@@ -50,6 +50,10 @@ import {
   type PaymentAttemptEnv,
 } from "./payment-attempts.ts";
 import { handleCmsPageRequest } from "./cms.ts";
+import {
+  handleStorefrontHomeRequest,
+  handleStorefrontMetadataRequest,
+} from "./storefront-public.ts";
 import { handleNavigationRequest } from "./navigation.ts";
 import { handleAnnouncementRequest } from "./announcement.ts";
 import { handleBlogRequest } from "./blog.ts";
@@ -400,6 +404,8 @@ export function nativeDatabaseRole(
   const appRouteKeys = [
     "cmsPageMatch",
     "navigationMatch",
+    "storefrontHomeMatch",
+    "storefrontMetadataMatch",
     "announcementMatch",
     "blogListMatch",
     "blogPostMatch",
@@ -1134,6 +1140,10 @@ export async function handleBackendRequest(
     : null;
   const navigationMatch =
     request.method === "GET" && path === "/store/navigation";
+  const storefrontHomeMatch =
+    request.method === "GET" && path === "/storefront/home";
+  const storefrontMetadataMatch =
+    request.method === "GET" && path === "/storefront/public-metadata";
   const announcementMatch =
     request.method === "GET" && path === "/store/announcements";
   const blogListMatch = request.method === "GET" && path === "/store/blog";
@@ -1162,6 +1172,8 @@ export async function handleBackendRequest(
   const nativeRouteMatches = {
     cmsPageMatch,
     navigationMatch,
+    storefrontHomeMatch,
+    storefrontMetadataMatch,
     announcementMatch,
     blogListMatch,
     blogPostMatch,
@@ -3813,6 +3825,8 @@ export async function handleBackendRequest(
         productMatch ||
         cmsPageMatch ||
         navigationMatch ||
+        storefrontHomeMatch ||
+        storefrontMetadataMatch ||
         announcementMatch ||
         blogListMatch ||
         blogPostMatch ||
@@ -4342,7 +4356,19 @@ export async function handleBackendRequest(
                                                                                                                                                 blogPostMatch[1],
                                                                                                                                               ),
                                                                                                                                             )
-                                                                                                                                          : announcementMatch
+                                                                                                                                            : storefrontMetadataMatch
+                                                                                                                                              ? handleStorefrontMetadataRequest(
+                                                                                                                                                  request,
+                                                                                                                                                  database,
+                                                                                                                                                )
+                                                                                                                                            : storefrontHomeMatch
+                                                                                                                                              ? handleStorefrontHomeRequest(
+                                                                                                                                                  request,
+                                                                                                                                                  database,
+                                                                                                                                                  env.CMS_ORGANIZATION_ID ??
+                                                                                                                                                    env.DEFAULT_ORGANIZATION_ID,
+                                                                                                                                                )
+                                                                                                                                            : announcementMatch
                                                                                                                                             ? handleAnnouncementRequest(
                                                                                                                                                 request,
                                                                                                                                                 database,

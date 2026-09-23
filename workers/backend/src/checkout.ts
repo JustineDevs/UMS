@@ -243,6 +243,13 @@ export async function handleCheckoutSessionRequest(
       return false;
     }
   };
+  const requiresHttpsCallback = (value: string): boolean => {
+    try {
+      return new URL(value).protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
   if (
     !cartId ||
     (provider !== "stripe" && provider !== "paypal" && provider !== "xendit") ||
@@ -253,6 +260,25 @@ export async function handleCheckoutSessionRequest(
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  if (
+    provider === "xendit" &&
+    (!requiresHttpsCallback(successUrl) || !requiresHttpsCallback(cancelUrl))
+  ) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Xendit requires an authenticated HTTPS callback URL for hosted checkout.",
+        code: "XENDIT_HTTPS_CALLBACK_REQUIRED",
+      }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
   const digest = await crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(

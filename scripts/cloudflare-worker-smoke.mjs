@@ -52,6 +52,12 @@ function objectPayload(payload, label) {
 
 async function smoke(base) {
   const checks = [
+    ["/health", 200, (payload) => {
+      const value = objectPayload(payload, "/health");
+      if (value.status !== "ok" || value.runtime !== "cloudflare_worker") {
+        throw new Error("/health did not return the Worker liveness contract");
+      }
+    }],
     ["/healthz", 200, (payload) => {
       const value = objectPayload(payload, "/healthz");
       if (value.runtime !== "cloudflare_worker") throw new Error("/healthz is not Worker-native");
@@ -65,6 +71,16 @@ async function smoke(base) {
     ["/store/products?limit=1", 200, (payload) => {
       const value = objectPayload(payload, "/store/products");
       if (!Array.isArray(value.products)) throw new Error("/store/products did not return products[]");
+    }],
+    ["/storefront/public-metadata", 200, (payload) => {
+      const value = objectPayload(payload, "/storefront/public-metadata");
+      if (!value.metadata || typeof value.metadata !== "object" || Array.isArray(value.metadata)) {
+        throw new Error("/storefront/public-metadata did not return metadata{}");
+      }
+    }],
+    ["/storefront/home", 200, (payload) => {
+      const value = objectPayload(payload, "/storefront/home");
+      if (!value.page && !value.home) throw new Error("/storefront/home did not return page or home content");
     }],
     ["/api/admin/orders", 401, (payload) => {
       const value = objectPayload(payload, "/api/admin/orders");
