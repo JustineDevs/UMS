@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it, beforeEach, afterEach } from "node:test";
 import {
   EMPTY_STOREFRONT_PUBLIC_METADATA,
+  loadStorefrontPublicMetadataForPublic,
   mergeStorefrontPublicMetadataPayload,
   resolveStorefrontPublicMetadataWithEnv,
   storefrontSocialLinks,
@@ -37,6 +38,23 @@ describe("mergeStorefrontPublicMetadataPayload", () => {
       { label: "WhatsApp", href: "https://wa.me/639171234567" },
     ]);
   });
+});
+
+it("uses the Worker public metadata contract when API_URL is configured", async () => {
+  const previousUrl = process.env.API_URL;
+  const previousFetch = globalThis.fetch;
+  process.env.API_URL = "https://worker.example.test";
+  globalThis.fetch = async (input) => {
+    assert.equal(String(input), "https://worker.example.test/storefront/public-metadata");
+    return new Response(JSON.stringify({ metadata: { storeName: "UVS" } }), { status: 200 });
+  };
+  try {
+    assert.equal((await loadStorefrontPublicMetadataForPublic()).storeName, "UVS");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = previousUrl;
+  }
 });
 
 const ENV_KEYS = [

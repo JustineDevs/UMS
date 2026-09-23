@@ -181,6 +181,20 @@ export function storefrontSocialLinks(
 }
 
 export async function loadStorefrontPublicMetadataForPublic(): Promise<StorefrontPublicMetadataPayload> {
+  const workerUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerUrl) {
+    try {
+      const response = await fetch(`${workerUrl}/storefront/public-metadata`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`worker_metadata_${response.status}`);
+      const body = (await response.json()) as { metadata?: unknown };
+      return mergeStorefrontPublicMetadataPayload(body.metadata);
+    } catch (e) {
+      console.warn("[storefront-public-metadata] Worker read failed", e);
+      return mergeStorefrontPublicMetadataPayload(null);
+    }
+  }
   const url = process.env.SUPABASE_URL?.trim();
   const anonKey = process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) {

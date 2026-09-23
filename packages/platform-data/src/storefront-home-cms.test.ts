@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   DEFAULT_STOREFRONT_HOME_PAYLOAD,
+  loadStorefrontHomeContentForPublic,
   mergeStorefrontHomePayload,
 } from "./storefront-home-cms.js";
 
@@ -69,4 +70,21 @@ describe("mergeStorefrontHomePayload", () => {
     assert.equal(m.sectionLayout?.newsletter?.maxWidth, "48rem");
     assert.equal("background" in (m.sectionLayout?.newsletter ?? {}), false);
   });
+});
+
+it("uses the Worker public home contract when API_URL is configured", async () => {
+  const previousUrl = process.env.API_URL;
+  const previousFetch = globalThis.fetch;
+  process.env.API_URL = "https://worker.example.test";
+  globalThis.fetch = async (input) => {
+    assert.equal(String(input), "https://worker.example.test/storefront/home");
+    return new Response(JSON.stringify({ home: { hero: { line1: "Worker" } } }), { status: 200 });
+  };
+  try {
+    assert.equal((await loadStorefrontHomeContentForPublic()).hero.line1, "Worker");
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = previousUrl;
+  }
 });

@@ -45,6 +45,7 @@ export * from "./wishlist.ts";
 export * from "./jobs.ts";
 export * from "./reviews.ts";
 export * from "./public-marketing.ts";
+export * from "./storefront-public.ts";
 export * from "./order-preferences.ts";
 export * from "./loyalty.ts";
 
