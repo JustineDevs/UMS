@@ -35,7 +35,7 @@ test("routes public storefront CMS configuration reads to the APP database role"
   assert.equal(nativeDatabaseRole({ storefrontMetadataMatch: true }), "app");
 });
 
-test("public storefront CMS routes fail closed through the native route gate", async () => {
+ test("public storefront CMS routes fail closed through the native route gate", async () => {
   for (const path of ["/storefront/home", "/storefront/public-metadata"]) {
     const response = await handleBackendRequest(
       new Request(`https://worker.test${path}`),
@@ -50,7 +50,7 @@ test("public storefront CMS routes fail closed through the native route gate", a
   }
 });
 
-test("CMS page endpoints fail closed when APP Hyperdrive is missing", async () => {
+ test("CMS page endpoints fail closed when APP Hyperdrive is missing", async () => {
   const paths = [
     "/api/admin/cms/pages",
     "/api/admin/cms/pages/00000000-0000-4000-8000-000000000001",
