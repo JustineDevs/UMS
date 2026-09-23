@@ -70,7 +70,7 @@
     "test:e2e:stress": "node stress-test/scripts/run-e2e.js stress-test/e2e/flows/end-to-end-stress-journey.spec.ts",
     "test:e2e:ui": "node stress-test/scripts/run-e2e.js --ui",
     "dogfood:screenshots": "node stress-test/scripts/run-e2e.js dogfood --project=chromium",
-    "predeploy": "pnpm install --frozen-lockfile && pnpm run build",
+    "predeploy": "pnpm install --frozen-lockfile && node scripts/run-bounded-build.cjs",
     "prepare": "husky",
     "changeset": "changeset",
     "version-packages": "changeset version"

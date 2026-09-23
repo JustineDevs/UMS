@@ -6,12 +6,17 @@ on:
   pull_request:
     branches: [main, dev]
 
+concurrency:
+  group: release-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,6 +26,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
       - name: Install
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
       - name: Release gate
         run: pnpm release-gate
