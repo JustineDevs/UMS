@@ -28,10 +28,13 @@ export type SignInResult = "ok" | "skip_no_env" | "skip_no_ui";
  * Returns "ok" on success, "skip_no_env" when credentials are missing,
  * or "skip_no_ui" when the e2e route is not accessible.
  */
-export async function signInAsAdmin(page: Page): Promise<SignInResult> {
+export async function signInAsAdmin(
+  page: Page,
+  origin = adminBase,
+): Promise<SignInResult> {
   if (process.env.AUTH_DISABLED === "true") {
     try {
-      await page.goto(`${adminBase}/admin`, { timeout: 45_000 });
+      await page.goto(`${origin}/admin`, { timeout: 45_000 });
       return /\/admin(?:[/?#]|$)/i.test(page.url()) ? "ok" : "skip_no_ui";
     } catch {
       return "skip_no_ui";
@@ -45,7 +48,7 @@ export async function signInAsAdmin(page: Page): Promise<SignInResult> {
   }
 
   try {
-    await page.goto(`${adminBase}/sign-in/e2e`, { timeout: 15_000 });
+    await page.goto(`${origin}/sign-in/e2e`, { timeout: 15_000 });
   } catch {
     return "skip_no_ui";
   }
