@@ -7,8 +7,29 @@ import { hasRecentAuthentication } from "@/lib/recent-auth";
 import { isStorefrontAuthDisabled } from "@/lib/auth";
 import { readResponseJson } from "@/lib/read-response-json";
 import { accountProfilePatchResponseSchema } from "@/lib/admin-api-contracts";
+import { getStorefrontSession } from "@/lib/auth";
+import { getE2eSessionEmail } from "@/lib/e2e-session";
+import { createHmac } from "node:crypto";
 
 export const dynamic = "force-dynamic";
+
+function internalStorefrontToken(userId: string, email: string): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) return null;
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "HS256", typ: "JWT" });
+  const payload = encode({
+    sub: userId,
+    email,
+    scope: "storefront:profile",
+    iss: "uvs.internal",
+    aud: "uvs-worker",
+    exp: Math.floor(Date.now() / 1000) + 60,
+  });
+  const signingInput = `${header}.${payload}`;
+  return `${signingInput}.${createHmac("sha256", secret).update(signingInput).digest("base64url")}`;
+}
 
 async function patchWorkerProfile(req: Request): Promise<Response> {
   const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
@@ -19,11 +40,22 @@ async function patchWorkerProfile(req: Request): Promise<Response> {
     supabase.auth.getSession(),
   ]);
   const user = userData.user;
-  const token = sessionData.session?.access_token?.trim();
-  const email = user?.email?.trim().toLowerCase();
+  let token = sessionData.session?.access_token?.trim();
+  let email = user?.email?.trim().toLowerCase();
+  let e2eSession = false;
+  if (!token) {
+    const session = await getStorefrontSession();
+    const e2eEmail = await getE2eSessionEmail();
+    const sessionEmail = session?.user.email?.trim().toLowerCase();
+    if (session?.user.id && sessionEmail && e2eEmail === sessionEmail) {
+      token = internalStorefrontToken(session.user.id, sessionEmail) ?? undefined;
+      email = sessionEmail;
+      e2eSession = Boolean(token);
+    }
+  }
   if (!email || !token) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const authenticatedAt = user?.last_sign_in_at ? Date.parse(user.last_sign_in_at) / 1000 : undefined;
-  if (!hasRecentAuthentication({ authenticatedAt })) {
+  if (!e2eSession && !hasRecentAuthentication({ authenticatedAt })) {
     return Response.json(
       {
         error: "Please sign in again before changing your profile or addresses.",

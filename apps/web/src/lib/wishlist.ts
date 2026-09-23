@@ -69,6 +69,33 @@ export async function persistWishlistMutation(
   }
 }
 
+export async function syncWishlistFromServer(): Promise<WishlistEntry[]> {
+  const response = await fetch("/api/wishlist", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("Saved items could not be loaded.");
+  const payload = (await response.json()) as { items?: unknown };
+  if (!Array.isArray(payload.items)) throw new Error("Invalid saved items response.");
+  const entries: WishlistEntry[] = [];
+  for (const item of payload.items) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.product_slug !== "string" || typeof row.product_name !== "string") continue;
+    entries.push({
+      slug: row.product_slug,
+      name: row.product_name,
+      ...(typeof row.medusa_product_id === "string" && row.medusa_product_id.trim()
+        ? { medusaProductId: row.medusa_product_id.trim() }
+        : {}),
+      addedAt: typeof row.added_at === "string" ? row.added_at : new Date().toISOString(),
+    });
+  }
+  write(entries);
+  return entries;
+}
+
 export function wishlistContains(slug: string, medusaProductId?: string): boolean {
   const mid = medusaProductId?.trim();
   return getWishlist().some((e) => {

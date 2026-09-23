@@ -2,8 +2,11 @@ import { applyRateLimit } from "@/lib/cart-api-helpers";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getStorefrontSession } from "@/lib/auth";
+import { getE2eSessionEmail } from "@/lib/e2e-session";
 import { readResponseJson } from "@/lib/read-response-json";
 import { wishlistCreateResponseSchema, wishlistDeleteResponseSchema, wishlistRequestSchema, wishlistResponseSchema } from "@/lib/admin-api-contracts";
+import { createHmac } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 const MAX_WISHLIST_BODY_BYTES = 16 * 1024;
@@ -12,10 +15,32 @@ function json(value: unknown, status = 200) {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 }
 function workerBaseUrl() { return process.env.API_URL?.trim().replace(/\/$/, "") || null; }
+function internalStorefrontToken(userId: string, email: string): string | null {
+  if (process.env.NODE_ENV === "production") return null;
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret) return null;
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "HS256", typ: "JWT" });
+  const payload = encode({ sub: userId, email, scope: "storefront:wishlist", iss: "uvs.internal", aud: "uvs-worker", exp: Math.floor(Date.now() / 1000) + 60 });
+  const signingInput = `${header}.${payload}`;
+  return `${signingInput}.${createHmac("sha256", secret).update(signingInput).digest("base64url")}`;
+}
 async function workerAuthHeaders() {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token?.trim();
+  let token: string | undefined;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token?.trim();
+  } catch {
+    // Local E2E sessions do not create a Supabase browser session.
+  }
+  if (!token) {
+    const session = await getStorefrontSession();
+    const userId = session?.user.id?.trim();
+    const email = session?.user.email?.trim().toLowerCase();
+    const e2eEmail = await getE2eSessionEmail();
+    if (userId && email && e2eEmail === email) token = internalStorefrontToken(userId, email) ?? undefined;
+  }
   return token ? new Headers({ Authorization: `Bearer ${token}`, Accept: "application/json" }) : null;
 }
 async function proxyWorkerWishlist(request: Request, body?: string): Promise<Response> {
