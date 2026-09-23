@@ -47,8 +47,11 @@ async function resolveCorrelationId(
   return storedId || undefined;
 }
 
-const POLL_MS = 2000;
-const POLL_MAX = 20;
+// Provider webhooks can arrive after the hosted-return redirect. Keep the
+// browser on the return page long enough to observe reconciliation without
+// making the user restart a payment that is already settling.
+const POLL_MS = 1000;
+const POLL_MAX = 45;
 
 export function HostedCheckoutReturn({
   provider,
