@@ -67,7 +67,11 @@ export function HostedCheckoutReturn({
   const [failed, setFailed] = useState(hasFailedStatus);
   const recoveryLinkRef = useRef<HTMLAnchorElement>(null);
   useEffect(() => {
-    if (failed) recoveryLinkRef.current?.focus();
+    if (!failed) return;
+    const frame = window.requestAnimationFrame(() => {
+      recoveryLinkRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [failed]);
   useEffect(() => {
     let disposed = false;
