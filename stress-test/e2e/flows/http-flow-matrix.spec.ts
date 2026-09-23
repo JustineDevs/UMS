@@ -233,9 +233,16 @@ test.describe.serial("Storefront HTTP matrix", () => {
       data: { email: null, lines: [] },
       failOnStatusCode: false,
     });
-    expect([200, 500]).toContain(res.status());
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body).toHaveProperty("ok");
+    if (res.status() === 403) {
+      // Production BotID may reject this synthetic request before the Worker
+      // boundary. That is an expected protected-path result, not a contract
+      // failure.
+      expect(body.error).toBe("Access denied");
+    } else {
+      expect([200, 500]).toContain(res.status());
+      expect(body).toHaveProperty("ok");
+    }
   });
 
   test("POST /api/tracking-link invalid JSON returns 400", async ({
