@@ -9,6 +9,7 @@ import {
   type CmsNode,
   type CmsMutationRecord,
   type StorefrontHomePayload,
+  mergeStorefrontHomePayload,
 } from "@universal-music-store/platform-data";
 import { useSession } from "@/lib/auth-client";
 import dynamic from "next/dynamic";
@@ -145,15 +146,16 @@ export function StorefrontHomeVisualEditor({
         const canonicalJson = canonicalResponse.ok
           ? ((await canonicalResponse.json()) as { data?: Array<{ tree?: CmsNode[] }> })
           : { data: [] };
-        if (!cancelled && legacyJson.data) {
+        if (!cancelled) {
+          const normalizedPayload = mergeStorefrontHomePayload(legacyJson.data);
           setDevMode(Boolean(legacyJson.devMode));
-          setPayload(legacyJson.data);
+          setPayload(normalizedPayload);
           const canonicalTree = canonicalJson.data?.[0]?.tree;
           if (canonicalTree?.length) {
             setBlocks(cmsTreeToBlocks(canonicalTree));
           } else {
             // Legacy content is read only for first-run migration.
-            const legacyBlocks = toBlocks(legacyJson.data);
+            const legacyBlocks = toBlocks(normalizedPayload);
             setBlocks(legacyBlocks);
           }
         }
@@ -173,7 +175,13 @@ export function StorefrontHomeVisualEditor({
   }, []);
 
   const previewUrl = useMemo(
-    () => `${getStorefrontPublicOrigin()}/?adminPreview=1`,
+    () => {
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : getStorefrontPublicOrigin();
+      return `${origin}/?adminPreview=1`;
+    },
     [],
   );
   const save = async (currentBlocks = blocks) => {

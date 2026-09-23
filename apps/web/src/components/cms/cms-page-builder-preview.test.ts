@@ -4,7 +4,9 @@ import type { CmsComponentDefinition } from "@universal-music-store/platform-dat
 import {
   componentCanvasDocument,
   createComponentCanvasPreviewBlock,
+  sanitizeVisualPropertyValue,
 } from "./CmsPageBuilder";
+import type { VisualBuilderProperty } from "@/lib/visual-builder/component-definitions";
 
 const definition: CmsComponentDefinition = {
   id: "promo-banner",
@@ -66,4 +68,38 @@ test("canvas document keeps untrusted props out of executable HTML contexts", ()
   assert.ok(!document.includes("<script>alert(2)</script>"));
   assert.ok(document.includes("textContent=String(slot.label||slot.name)"));
   assert.ok(!document.includes("drop.innerHTML='<strong>'"));
+});
+
+test("visual property edits use the published CMS HTML policy", () => {
+  const property: VisualBuilderProperty = {
+    name: "Title",
+    key: "title",
+    htmlAttr: "innerHTML",
+    inputtype: "textarea",
+    source: "test",
+  };
+  assert.equal(
+    sanitizeVisualPropertyValue(
+      property,
+      '<p>Keep</p><img src="x" onerror="alert(1)"><script>alert(2)</script>',
+    ),
+    "<p>Keep</p>",
+  );
+  assert.equal(
+    sanitizeVisualPropertyValue(
+      property,
+      "<strong>Safe formatting</strong>",
+    ),
+    "<strong>Safe formatting</strong>",
+  );
+  const urlProperty: VisualBuilderProperty = {
+    name: "URL",
+    key: "href",
+    htmlAttr: "href",
+    inputtype: "url",
+    source: "test",
+  };
+  assert.equal(sanitizeVisualPropertyValue(urlProperty, "/shop#new"), "/shop#new");
+  assert.equal(sanitizeVisualPropertyValue(urlProperty, "javascript:alert(1)"), "");
+  assert.equal(sanitizeVisualPropertyValue(urlProperty, "data:text/html,payload"), "");
 });

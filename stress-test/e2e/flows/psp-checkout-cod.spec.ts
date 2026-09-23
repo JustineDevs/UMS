@@ -36,7 +36,7 @@ async function completeOnboardingIfProfileGateRedirected(page: import("@playwrig
   await page.getByLabel("Mobile number", { exact: true }).fill("+639171234567");
   await page.getByLabel("Street address", { exact: true }).fill("123 Test Street");
   const region = page.getByRole("combobox", { name: "Region", exact: true });
-  await region.selectOption({ label: "National Capital Region (NCR)" });
+  await region.selectOption({ index: 1 });
 
   for (const label of ["Province", "City or municipality", "Barangay"]) {
     const select = page.getByRole("combobox", { name: label, exact: true });
@@ -59,9 +59,17 @@ function shouldFailOnMissingPrereq(): boolean {
 
 function isAuthDisabled(): boolean {
   return (
-    process.env.UVS_E2E_LOCAL === "1" ||
+    (process.env.UVS_E2E_LOCAL === "1" &&
+      process.env.UVS_E2E_REAL_SESSION !== "1") ||
     process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true"
   );
+}
+
+async function establishRealSessionIfRequested(
+  page: import("@playwright/test").Page,
+): Promise<boolean> {
+  if (process.env.UVS_E2E_REAL_SESSION !== "1") return true;
+  return (await signInAsAdmin(page)) === "ok";
 }
 
 test.describe("@checkout @cod COD checkout flow", () => {
@@ -91,22 +99,6 @@ test.describe("@checkout @cod COD checkout flow", () => {
     });
 
     await navigateToShopAndAddFirstProduct(page);
-    const cartLines = await page.evaluate(() => {
-      const raw = window.localStorage.getItem("ums-commerce-cart-v5");
-      const envelope = raw ? (JSON.parse(raw) as { lines?: unknown }) : {};
-      return Array.isArray(envelope.lines)
-        ? envelope.lines.filter(
-            (
-              line,
-            ): line is { variantId: string; quantity: number; price: number } =>
-              Boolean(line) &&
-              typeof line === "object" &&
-              typeof (line as { variantId?: unknown }).variantId === "string" &&
-              typeof (line as { quantity?: unknown }).quantity === "number" &&
-              typeof (line as { price?: unknown }).price === "number",
-          )
-        : [];
-    });
     await navigateToCheckout(page);
     await fillCheckoutShippingInfo(page);
     expect(await selectPaymentProvider(page, "cod")).toBe(true);
@@ -129,11 +121,15 @@ test.describe("@checkout @cod COD checkout flow", () => {
   test("complete checkout with Cash on Delivery reaches /track/:orderId", async ({
     page,
   }) => {
-    if (!isAuthDisabled()) {
+    if (!isAuthDisabled() && process.env.UVS_E2E_REAL_SESSION !== "1") {
       test.skip(
         true,
         "COD browser proof requires a storefront customer session with a complete delivery profile.",
       );
+      return;
+    }
+    if (!(await establishRealSessionIfRequested(page))) {
+      test.skip(true, "Real local E2E session is not configured for COD checkout.");
       return;
     }
     await navigateToShopAndAddFirstProduct(page);
@@ -145,6 +141,17 @@ test.describe("@checkout @cod COD checkout flow", () => {
     await page.goto(`${storefrontBase}/checkout`, {
       waitUntil: "domcontentloaded",
     });
+  await page.waitForFunction(
+    () =>
+      window.location.pathname === "/onboarding" ||
+      Boolean(
+        document.querySelector(
+          '[data-testid="checkout-onboarding-continue"], [data-testid="checkout-submit-pay"]',
+        ),
+      ),
+    undefined,
+    { timeout: 30_000 },
+  );
     await completeOnboardingIfProfileGateRedirected(page);
     await navigateToCheckout(page, { guest: false });
     await fillCheckoutShippingInfo(page);

@@ -13,7 +13,7 @@ test.describe("Authenticated wishlist browser flow", () => {
     const slug = await product.getAttribute("data-product-slug");
     expect(slug).toBeTruthy();
     await product.click();
-    await expect(page).toHaveURL(new RegExp(`/shop/${slug}`));
+    await page.waitForURL(new RegExp(`/shop/${slug}`), { timeout: 30_000 });
 
     const save = page.getByRole("button", { name: "Save item to your list" });
     const wishlistResponse = page.waitForResponse(

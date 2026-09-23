@@ -77,7 +77,8 @@ export async function POST(req: Request) {
       );
     }
     try {
-      const createdCartId = await createWorkerCheckoutCart(apiUrl, body.lines);
+      const retryKey = req.headers.get("Idempotency-Key")?.trim();
+      const createdCartId = await createWorkerCheckoutCart(apiUrl, body.lines, retryKey);
       cartId = createdCartId;
       await writeCartCookie(createdCartId);
     } catch {

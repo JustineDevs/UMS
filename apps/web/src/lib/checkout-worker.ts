@@ -203,6 +203,7 @@ export async function startCheckout(input: {
   codCartPayload?: CodCartPayload;
   shippingOptionId?: string;
   attribution?: CommerceAttribution;
+  checkoutAttemptKey?: string;
 }): Promise<CheckoutResult> {
   if (typeof window === "undefined")
     throw new Error("Checkout must run in the browser.");
@@ -232,7 +233,12 @@ export async function startCheckout(input: {
     const cartPreparation = await fetch("/api/checkout/start", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(input.checkoutAttemptKey
+          ? { "Idempotency-Key": input.checkoutAttemptKey }
+          : {}),
+      },
       body: JSON.stringify({
         lines: input.lines,
         email: input.email,
@@ -314,7 +320,12 @@ export async function startCheckout(input: {
   const response = await fetch("/api/checkout/start", {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(input.checkoutAttemptKey
+        ? { "Idempotency-Key": input.checkoutAttemptKey }
+        : {}),
+    },
     body: JSON.stringify({
       lines: input.lines,
       email: input.email,

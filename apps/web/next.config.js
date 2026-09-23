@@ -14,6 +14,7 @@ const {
 loadMonorepoRootEnv(__dirname);
 
 const allowedDevOrigins = [
+  "localhost",
   "127.0.0.1",
   ...(process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
     .split(",")

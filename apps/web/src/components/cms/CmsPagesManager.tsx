@@ -270,7 +270,7 @@ export function CmsPagesManager({
   };
 
   const newPageDialog = newPageDialogOpen ? (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/35 p-4" role="presentation">
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/35 p-4" role="presentation">
       <div role="dialog" aria-modal="true" aria-labelledby="new-page-dialog-title" className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>

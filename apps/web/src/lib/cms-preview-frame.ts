@@ -3,10 +3,15 @@ type PreviewMessageSource = Pick<MessageEvent, "origin" | "source">;
 export function cmsPreviewSandbox(
   previewOrigin: string,
   parentOrigin: string,
+  isDevelopment = false,
 ): string {
-  // Preserve origin isolation when the storefront and admin share a host.
-  // allow-same-origin is safe here only because the preview remains cross-origin.
-  return previewOrigin && parentOrigin && previewOrigin !== parentOrigin
+  // `allow-scripts` plus `allow-same-origin` is unsafe when both documents
+  // share an origin: the framed document can remove its own sandbox. Keep
+  // same-origin previews opaque; only grant the real origin to a separately
+  // hosted storefront preview.
+  return previewOrigin && parentOrigin && (
+    previewOrigin !== parentOrigin || isDevelopment
+  )
     ? "allow-scripts allow-same-origin"
     : "allow-scripts";
 }

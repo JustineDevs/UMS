@@ -7,7 +7,12 @@ import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
-  if (process.env.NODE_ENV === "development" && process.env.UVS_E2E_REAL_SESSION === "1" && process.env.VERCEL !== "1" && request.cookies.has(E2E_SESSION_COOKIE)) return response;
+  if (
+    process.env.UVS_E2E_LOCAL === "1" &&
+    process.env.UVS_E2E_REAL_SESSION === "1" &&
+    process.env.VERCEL !== "1" &&
+    request.cookies.has(E2E_SESSION_COOKIE)
+  ) return response;
   // Keep the documented local-auth development mode consistent with the page/session layer.
   // Never allow this bypass in production, even if a stale environment value is present.
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") {

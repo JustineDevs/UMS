@@ -112,7 +112,9 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
       if (bodyText.trim()) break;
       await page.reload({ waitUntil: "domcontentloaded" });
     }
-    await expect(page).toHaveURL(/\/track\/order_/i, { timeout: 90_000 });
+    // Native finalization returns a scoped v3 capability; legacy deployments may
+    // still return the older order_ path. Both are valid success destinations.
+    await expect(page).toHaveURL(/\/track\/(?:order_|cap_v3\.)/i, { timeout: 90_000 });
   });
 
   test("Xendit failed payment return does not expose an order", async ({

@@ -1,5 +1,32 @@
 # Operator notes: memory and production hardening
 
+## Fresh verification snapshot — 2026-09-23
+
+The checked-in OpenAPI reference was regenerated after the source-drift gate
+found two stale route hashes. It now contains 193 operations, 320 executable
+schemas, and 598 matching source hashes. Run `pnpm quality:contracts` after any
+route change; do not hand-edit the generated YAML or PDF.
+
+Current local static gates pass. Knip and React Doctor remain non-blocking
+triage signals: 28 candidate files, 2 unused dependencies, 11 dev-dependencies,
+24 unused export groups, 4 unused exported types, 1 duplicate export, and 206
+React warnings with 0 errors. Review each candidate against package entrypoints,
+Worker deployment imports, tests, scripts, and CI before deletion.
+
+The matrix evidence verifier is not currently a passing gate. Its fresh run
+found stale verification timestamps across the stored records, an artifact hash
+mismatch for `stress-test/e2e/flows/psp-checkout-cod.spec.ts`, and a
+`needs-verification` versus `blocked` result mismatch. Do not repair this by
+touching timestamps; rerun the affected scenarios and write evidence only from
+real verification.
+
+The visual CMS editor now sanitizes `innerHTML`, `href`, and `src` property edits
+before invoking component lifecycle handlers or serializing the live canvas.
+This keeps preview behavior aligned with published CMS output and rejects
+script/event-handler and executable URL payloads without weakening the existing
+rich-text allowlist. Verified with `cms-page-builder-preview.test.ts` (4/4),
+web typecheck/lint, contract checks, and the Worker suite (509/509).
+
 ## Safe local development
 
 Use the bounded launcher already configured by the repository:

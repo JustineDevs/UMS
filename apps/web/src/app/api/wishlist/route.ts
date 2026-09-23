@@ -39,7 +39,19 @@ async function workerAuthHeaders() {
     const userId = session?.user.id?.trim();
     const email = session?.user.email?.trim().toLowerCase();
     const e2eEmail = await getE2eSessionEmail();
-    if (userId && email && e2eEmail === email) token = internalStorefrontToken(userId, email) ?? undefined;
+    const localAuthDisabled =
+      process.env.NODE_ENV !== "production" &&
+      (process.env.AUTH_DISABLED === "true" ||
+        process.env.AUTH_DISABLE === "true" ||
+        process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
+        process.env.NEXT_PUBLIC_AUTH_DISABLE === "true");
+    if (
+      userId &&
+      email &&
+      (e2eEmail === email || localAuthDisabled)
+    ) {
+      token = internalStorefrontToken(userId, email) ?? undefined;
+    }
   }
   return token ? new Headers({ Authorization: `Bearer ${token}`, Accept: "application/json" }) : null;
 }

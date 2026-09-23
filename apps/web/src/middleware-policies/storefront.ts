@@ -6,7 +6,12 @@ import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
-  if (process.env.NODE_ENV === "development" && process.env.UVS_E2E_REAL_SESSION === "1" && process.env.VERCEL !== "1" && request.cookies.has(E2E_SESSION_COOKIE)) return response;
+  if (
+    process.env.UVS_E2E_LOCAL === "1" &&
+    process.env.UVS_E2E_REAL_SESSION === "1" &&
+    process.env.VERCEL !== "1" &&
+    request.cookies.has(E2E_SESSION_COOKIE)
+  ) return response;
   const url = process.env.SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !key) return response;

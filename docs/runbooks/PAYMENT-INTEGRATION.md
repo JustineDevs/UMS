@@ -27,7 +27,7 @@ Configure provider secrets in the Cloudflare Worker environment. Keep provider c
 
 ## 1. Stripe
 
-1. Open the Stripe **UVS** project in the correct Stripe account. Stripe may display a separate account/business namespace beside the project name; that namespace is not the project name and must not be used as a webhook path or application identifier.
+1. Open the Stripe **UVS** project in the correct Stripe account. Confirm the Dashboard account/business label is **UVS** before configuring events; the label is separate from the webhook endpoint and must not be used as a webhook path or application identifier.
 2. Obtain **Secret key** and **Webhook signing secret** from the UVS project’s selected mode (Test or Live).
 3. Register the Cloudflare backend webhook URL: `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe` in the matching Stripe mode (local development uses `http://localhost:8787/webhooks/stripe`). The Worker verifies and persists the event directly.
 
@@ -107,14 +107,17 @@ Cash on delivery remains available for eligible regions and is completed through
 
 ## Provider identifiers
 
-| Provider | Example ID |
-|----------|------------|
-| Stripe | `pp_stripe_stripe` (and region-specific Stripe method IDs as registered) |
-| PayPal | `pp_paypal_paypal` |
-| Xendit | `pp_xendit_xendit` |
-| COD | `pp_cod_cod` |
+The checkout Worker and webhook configuration use only these canonical provider names:
 
-The checkout Worker uses the provider names `stripe`, `paypal`, `xendit`, and `cod`. The legacy `pp_*` values above are retained only as migration references and must not be used as webhook paths or Worker provider configuration.
+| Provider | Worker/webhook identifier |
+|----------|---------------------------|
+| Stripe | `stripe` |
+| PayPal | `paypal` |
+| Xendit | `xendit` |
+| COD | `cod` |
+
+Do not copy Medusa-era `pp_*` identifiers into Worker configuration, callback URLs, or
+webhook paths. Stripe always targets `/webhooks/stripe`.
 
 ---
 

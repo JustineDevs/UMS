@@ -6,15 +6,13 @@ import {
   isCmsPreviewMessageFromFrame,
 } from "./cms-preview-frame";
 
-test("storefront preview keeps a real origin only across the admin boundary", () => {
+test("storefront preview keeps a real origin for authenticated canvas sessions", () => {
   assert.equal(
     cmsPreviewSandbox("https://store.test", "https://admin.test"),
     "allow-scripts allow-same-origin",
   );
-  assert.equal(
-    cmsPreviewSandbox("https://admin.test", "https://admin.test"),
-    "allow-scripts",
-  );
+  assert.equal(cmsPreviewSandbox("https://admin.test", "https://admin.test"), "allow-scripts");
+  assert.equal(cmsPreviewSandbox("https://admin.test", "https://admin.test", true), "allow-scripts allow-same-origin");
   assert.equal(cmsPreviewSandbox("", "https://admin.test"), "allow-scripts");
 });
 

@@ -259,6 +259,16 @@ export type XenditSessionInput = {
   fetcher?: ProviderFetch;
 };
 
+export type XenditSession = {
+  id: string;
+  status: string;
+  paymentId: string | null;
+  paymentRequestId: string | null;
+  amountMinor: number | null;
+  currency: string | null;
+  payload: Record<string, unknown>;
+};
+
 export async function createXenditSession(
   input: XenditSessionInput,
 ): Promise<HostedCheckoutResult> {
@@ -300,6 +310,50 @@ export async function createXenditSession(
       : "";
   if (!id || !url) throw new Error("xendit_response_missing_checkout");
   return { id, url };
+}
+
+/**
+ * Reads the authoritative Xendit hosted-session state. The browser return is
+ * only a navigation signal; settlement must come from Xendit's API or webhook.
+ */
+export async function getXenditSession(input: {
+  secretKey: string;
+  sessionId: string;
+  fetcher?: ProviderFetch;
+}): Promise<XenditSession> {
+  const sessionId = requireNonEmpty(input.sessionId, "xendit_session_id");
+  const response = await (input.fetcher ?? fetch)(
+    `https://api.xendit.co/sessions/${encodeURIComponent(sessionId)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: basicAuth(
+          requireNonEmpty(input.secretKey, "xendit_secret_key"),
+          "",
+        ),
+      },
+    },
+  );
+  const body = await readJson(response, "xendit_session");
+  const id = typeof body.id === "string"
+    ? body.id.trim()
+    : typeof body.payment_session_id === "string"
+      ? body.payment_session_id.trim()
+      : "";
+  const status = typeof body.status === "string" ? body.status.trim().toUpperCase() : "";
+  if (!id || !status) throw new Error("xendit_response_missing_session_state");
+  const amount = typeof body.amount === "number" || typeof body.amount === "string"
+    ? Number(body.amount)
+    : NaN;
+  return {
+    id,
+    status,
+    paymentId: typeof body.payment_id === "string" ? body.payment_id.trim() || null : null,
+    paymentRequestId: typeof body.payment_request_id === "string" ? body.payment_request_id.trim() || null : null,
+    amountMinor: Number.isSafeInteger(amount) && amount >= 0 ? amount : null,
+    currency: typeof body.currency === "string" ? body.currency.trim().toUpperCase() || null : null,
+    payload: body,
+  };
 }
 
 export type StripeRefundInput = {

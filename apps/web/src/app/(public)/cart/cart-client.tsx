@@ -59,6 +59,7 @@ export function CartPageClient() {
   const pendingQuantityRef = useRef<
     Record<string, { desired: number; running: boolean }>
   >({});
+  const pendingQuantityValidationRef = useRef<Record<string, number>>({});
 
   const refresh = useCallback(() => {
     const next = readCart();
@@ -210,9 +211,49 @@ export function CartPageClient() {
     };
   }, [isHydrating, reconcile]);
 
-  function commitQuantity(variantId: string, quantity: number): void {
+  function commitQuantity(
+    variantId: string,
+    quantity: number,
+    skipReconcileGuard = false,
+  ): void {
     const line = lines.find((candidate) => candidate.variantId === variantId);
     const availableQuantity = line?.availableQuantity;
+    if (
+      !skipReconcileGuard &&
+      (reconciling || authoritativeTotal === null)
+    ) {
+      pendingQuantityValidationRef.current[variantId] = quantity;
+      setQuantityStatus("Refreshing availability before saving quantity.");
+      void reconcile().then(() => {
+        const requested = pendingQuantityValidationRef.current[variantId];
+        delete pendingQuantityValidationRef.current[variantId];
+        if (requested === undefined) return;
+        const latest = readCart().find(
+          (candidate) => candidate.variantId === variantId,
+        );
+        const latestAvailable = latest?.availableQuantity;
+        if (
+          requested > 0 &&
+          latest &&
+          latestAvailable !== null &&
+          latestAvailable !== undefined &&
+          requested > latestAvailable
+        ) {
+          setQuantityErrors((errors) => ({
+            ...errors,
+            [variantId]: cartAvailabilityMessage(latestAvailable),
+          }));
+          setQuantityDrafts((drafts) => ({
+            ...drafts,
+            [variantId]: String(latest.quantity),
+          }));
+          setQuantityStatus("Quantity was not changed.");
+          return;
+        }
+        commitQuantity(variantId, requested, true);
+      });
+      return;
+    }
     if (
       quantity > 0 &&
       availableQuantity !== null &&

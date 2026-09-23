@@ -6,6 +6,7 @@ import {
   confirmPayPalOrder,
   createStripeCheckoutSession,
   createXenditSession,
+  getXenditSession,
   refundStripePayment,
   refundPayPalCapture,
   refundXenditPayment,
@@ -160,6 +161,55 @@ test("creates Xendit payment link and Pancake order through fetch", async () => 
   });
   assert.deepEqual(xendit, { id: "session-1", url: "https://xendit.test/pay" });
   assert.deepEqual(pancake, { id: "pancake-1" });
+});
+
+test("retrieves the authoritative Xendit hosted-session state", async () => {
+  let request: Request | undefined;
+  const result = await getXenditSession({
+    secretKey: "xnd_secret",
+    sessionId: "session-1",
+    fetcher: async (input, init) => {
+      request = new Request(input, init);
+      return jsonResponse({
+        id: "session-1",
+        status: "COMPLETED",
+        payment_id: "payment-1",
+        payment_request_id: "request-1",
+        amount: 599700,
+        currency: "PHP",
+      });
+    },
+  });
+  assert.equal(request?.method, "GET");
+  assert.equal(request?.url, "https://api.xendit.co/sessions/session-1");
+  assert.match(request?.headers.get("Authorization") ?? "", /^Basic /);
+  assert.deepEqual(result, {
+    id: "session-1",
+    status: "COMPLETED",
+    paymentId: "payment-1",
+    paymentRequestId: "request-1",
+    amountMinor: 599700,
+    currency: "PHP",
+    payload: {
+      id: "session-1",
+      status: "COMPLETED",
+      payment_id: "payment-1",
+      payment_request_id: "request-1",
+      amount: 599700,
+      currency: "PHP",
+    },
+  });
+});
+
+test("keeps Xendit session failures fail-closed", async () => {
+  await assert.rejects(
+    getXenditSession({
+      secretKey: "xnd_secret",
+      sessionId: "session-1",
+      fetcher: async () => jsonResponse({ error: "not_found" }, 404),
+    }),
+    /xendit_session_request_failed:404/,
+  );
 });
 
 test("rejects failed provider responses instead of fabricating a checkout URL", async () => {

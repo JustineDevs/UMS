@@ -22,9 +22,11 @@ const attempts =
     new Map<string, IsolatedCodAttempt>());
 
 export function isIsolatedCodE2E(): boolean {
+  const workerApiConfigured = Boolean(process.env.API_URL?.trim());
   return (
     process.env.NODE_ENV !== "production" &&
     process.env.CI_STRICT_E2E === "1" &&
+    !workerApiConfigured &&
     (process.env.AUTH_DISABLED === "true" ||
       process.env.AUTH_DISABLE === "true" ||
       process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||

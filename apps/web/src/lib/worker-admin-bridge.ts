@@ -255,6 +255,15 @@ export async function fetchWorkerWorkflowEntitiesForAdmin(query = ""): Promise<R
 export async function mutateWorkerWorkflowTransitionForAdmin(body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation("/api/admin/workflow/transition", "POST", body, idempotencyKey); }
 export async function fetchWorkerVoidsForAdmin(query = ""): Promise<Response | null> { return workerAdminRequest(`/api/admin/voids${query}`); }
 export async function mutateWorkerVoidForAdmin(body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation("/api/admin/voids", "POST", body, idempotencyKey); }
+export async function mutateWorkerBulkFulfillmentForAdmin(body: Record<string, unknown>, idempotencyKey: string, requestId?: string): Promise<Response | null> {
+  return workerAdminMutation(
+    "/api/admin/orders/bulk-fulfill",
+    "POST",
+    body,
+    idempotencyKey,
+    requestId ? { "X-Request-ID": requestId } : undefined,
+  );
+}
 export async function fetchWorkerReconciliationForAdmin(query = ""): Promise<Response | null> { return workerAdminRequest(`/api/admin/reconciliation${query}`); }
 export async function mutateWorkerPinApprovalForAdmin(body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation("/api/admin/pin-approval", "POST", body, idempotencyKey); }
 

@@ -213,7 +213,7 @@ export function AddToCartSection({
           type="button"
           data-testid={testId}
           data-client-ready={clientReady ? "true" : "false"}
-          disabled={!variant || isOutOfStock}
+          disabled={!clientReady || !variant || isOutOfStock}
           onClick={handleAddToBag}
           className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-[transform,opacity] duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
