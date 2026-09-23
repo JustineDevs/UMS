@@ -119,12 +119,14 @@ export function HostedCheckoutReturn({
         }
       }
 
-      const finalizeOnce = await fetch(
-        `/api/payments/checkout-intents/${encodeURIComponent(
-          correlationId,
-        )}/finalize`,
-        { method: "POST", credentials: "include" },
-      );
+      const finalize = () =>
+        fetch(
+          `/api/payments/checkout-intents/${encodeURIComponent(
+            correlationId,
+          )}/finalize`,
+          { method: "POST", credentials: "include" },
+        );
+      const finalizeOnce = await finalize();
       if (disposed) return;
       const finalizeJson = finalizeOnce.ok
         ? ((await finalizeOnce.json().catch(() => ({}))) as {
@@ -173,6 +175,7 @@ export function HostedCheckoutReturn({
         if (!st.ok) continue;
         const stJson = (await st.json().catch(() => ({}))) as {
           status?: string;
+          checkoutState?: string;
           medusaOrderId?: string | null;
           trackingPageUrl?: string | null;
           staleReason?: string | null;
@@ -209,6 +212,31 @@ export function HostedCheckoutReturn({
             ).trim(),
           );
           return;
+        }
+        if (
+          ["paid", "completed", "captured"].includes(stJson.status ?? "") ||
+          ["provider_verified", "finalizing", "awaiting_completion"].includes(
+            stJson.checkoutState ?? "",
+          )
+        ) {
+          const retryFinalize = await finalize();
+          if (disposed) return;
+          if (retryFinalize.ok) {
+            const retryJson = (await retryFinalize.json().catch(() => ({}))) as {
+              redirectUrl?: string;
+            };
+            if (typeof retryJson.redirectUrl === "string" && retryJson.redirectUrl) {
+              const safeRedirectUrl = sanitizeTrustedPublicUrl(retryJson.redirectUrl);
+              if (!safeRedirectUrl) {
+                setMessage("Payment was confirmed, but the provider returned an invalid redirect. Check your order history.");
+                setFailed(true);
+                return;
+              }
+              clearCart();
+              window.location.href = safeRedirectUrl;
+              return;
+            }
+          }
         }
       }
 
