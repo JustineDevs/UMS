@@ -6,8 +6,6 @@ import {
   sanitizeTrustedPublicUrl,
   type ResolvedTrackingCapability,
 } from "@universal-music-store/sdk";
-import { isTrackingCapabilityRevoked } from "@universal-music-store/platform-data/tracking-capability-revocation";
-import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import {
   fetchWorkerTrackByToken,
   trackFreshness,
@@ -88,64 +86,6 @@ export default async function TrackPage({
           className="inline-flex min-h-11 items-center bg-primary text-on-primary px-6 py-2.5 rounded font-medium hover:opacity-90"
         >
           Continue shopping
-        </Link>
-      </main>
-    );
-  }
-
-  const localAuthDisabled =
-    process.env.NODE_ENV !== "production" &&
-    (process.env.AUTH_DISABLE === "true" ||
-      process.env.NEXT_PUBLIC_AUTH_DISABLE === "true");
-  const capabilityClient = localAuthDisabled
-    ? null
-    : createStorefrontServiceSupabase();
-  if (!capabilityClient && !localAuthDisabled) {
-    return (
-      <main className="storefront-page-shell max-w-2xl text-center">
-        <h1 className="font-headline text-2xl font-bold text-primary mb-4">
-          Tracking unavailable
-        </h1>
-        <p className="font-body text-on-surface-variant mb-6" role="alert">
-          Order tracking is not available here right now. Please contact
-          support.
-        </p>
-        <Link href="/track" className="text-primary underline">
-          Back to track order
-        </Link>
-      </main>
-    );
-  }
-  const revocation = capabilityClient
-    ? await isTrackingCapabilityRevoked(capabilityClient, encodedId.slice(4))
-    : false;
-  if (revocation === null) {
-    return (
-      <main className="storefront-page-shell max-w-2xl text-center">
-        <h1 className="font-headline text-2xl font-bold text-primary mb-4">
-          Tracking unavailable
-        </h1>
-        <p className="font-body text-on-surface-variant mb-6" role="alert">
-          Order tracking is not available here right now. Please contact
-          support.
-        </p>
-        <Link href="/track" className="text-primary underline">
-          Back to track order
-        </Link>
-      </main>
-    );
-  }
-  if (revocation) {
-    return (
-      <main className="storefront-page-shell max-w-2xl text-center">
-        <h1 className="font-headline text-2xl font-bold text-primary mb-4">
-          Tracking link revoked
-        </h1>
-        <p className="font-body text-on-surface-variant mb-6" role="alert">
-          This tracking link is no longer valid. Contact support for a new link.
-        </p>
-        <Link href="/contact?topic=tracking" className="text-primary underline">
-          Contact support
         </Link>
       </main>
     );

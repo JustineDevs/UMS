@@ -178,6 +178,22 @@ async function sha256Hex(value: string): Promise<string> {
   ).join("");
 }
 
+async function isTrackingCapabilityRevoked(
+  database: WorkerDatabaseClient,
+  token: string,
+): Promise<boolean> {
+  const capabilityHash = await sha256Hex(token);
+  const result = await database.query<{ id: string }>(
+    `SELECT id
+       FROM public.tracking_capability_revocations
+      WHERE capability_hash = $1
+        AND (expires_at IS NULL OR expires_at > now())
+      LIMIT 1`,
+    [capabilityHash],
+  );
+  return result.rows.length > 0;
+}
+
 function status(row: OrderRow): string {
   const metadata = row.metadata ?? {};
   const events = Array.isArray(metadata.pancake_pos_events)
@@ -268,6 +284,13 @@ export async function handleTrackingRequest(
     return json({ error: "method_not_allowed" }, 405);
   const capability = await resolveTrackingCapability(token, env);
   if (!capability) return json({ error: "not_found" }, 404);
+  try {
+    if (await isTrackingCapabilityRevoked(database, token)) {
+      return json({ error: "not_found" }, 404);
+    }
+  } catch {
+    return json({ error: "tracking_unavailable" }, 503);
+  }
   const result = await database.query<OrderRow>(
     `SELECT o.id, o.display_id, o.updated_at,
             COALESCE((SELECT SUM(oi.unit_price * oi.quantity)
