@@ -53,10 +53,42 @@ function ensureRequestId(request: NextRequest): {
   return { id, requestHeaders };
 }
 
+async function hasSupabaseUser(request: NextRequest): Promise<boolean> {
+  if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return true;
+  if (
+    process.env.UVS_E2E_LOCAL === "1" &&
+    process.env.UVS_E2E_REAL_SESSION === "1" &&
+    process.env.VERCEL !== "1" &&
+    request.cookies.has(E2E_SESSION_COOKIE)
+  ) return true;
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) return false;
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => request.cookies.getAll(),
+      setAll: () => undefined,
+    },
+  });
+  const { data } = await supabase.auth.getUser();
+  return Boolean(data.user);
+}
+
 export default async function middleware(req: NextRequest, _event: NextFetchEvent) {
   const { id: requestId, requestHeaders } = ensureRequestId(req);
   const requestWithId = new NextRequest(req, { headers: requestHeaders });
   const p = req.nextUrl.pathname;
+  // Route handlers own the authoritative admin permission check. Do not let
+  // shared middleware validation or the IP limiter turn an unauthenticated
+  // request into 400/429 before the handler can return its 401/403 response.
+  // Authenticated requests continue through the existing protections below.
+  const isAdminApi = p.startsWith("/api/admin");
+  const authenticatedAdminApi = isAdminApi ? await hasSupabaseUser(requestWithId) : true;
+  if (isAdminApi && !authenticatedAdminApi) {
+    const apiResponse = NextResponse.next({ request: { headers: requestHeaders } });
+    apiResponse.headers.set("x-request-id", requestId);
+    return apiResponse;
+  }
   if ((p.startsWith("/api/admin") || p.startsWith("/api/integrations")) &&
       ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     const isSignedWebhook = p.includes("/webhook");
