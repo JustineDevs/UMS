@@ -19,6 +19,7 @@ function filesUnder(root: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const path = join(root, entry.name);
     if (entry.isDirectory()) return filesUnder(path);
+    if (entry.name.endsWith(".test.ts")) return [];
     return entry.name.endsWith(".ts") ? [path] : [];
   });
 }

@@ -1,5 +1,49 @@
 # Production hardening report
 
+## Current authoritative snapshot — 2026-09-23
+
+This section supersedes older numeric snapshots below while preserving them as
+historical evidence. The current checkout is on `dev` and remains intentionally
+uncommitted; no deployment claim is made from these local changes.
+
+Fresh repository gates:
+
+This hardening pass also closed a live-editor trust-boundary gap: visual CMS
+`innerHTML`, `href`, and `src` edits now use the same safe-value policy before
+lifecycle handlers and canvas serialization, so the preview cannot display
+markup or executable URLs that the published renderer would later remove.
+Focused CMS coverage proves script/event-handler and `javascript:`/`data:` URL
+rejection while preserving safe formatting and relative links.
+
+- OpenAPI regenerated successfully with 193 operations, 320 executable schemas,
+  and 598 matching route source hashes. The previous two stale hashes were
+  removed from `internal/reference/admin-open-api.yaml` and its PDF companion.
+- `pnpm quality:contracts` passes: admin guard, OpenAPI parity, source-drift,
+  webhook boundary, route ownership, route-state inventory, storefront client
+  boundary, migration boundary, and audit triage.
+- Route ownership reports 206 route files with no unsafe Worker-origin database
+  imports. Route-state inventory covers 92 pages with 92 loading and 92 error
+  boundaries; runtime browser verification remains separate.
+- Knip reports 28 candidate files, 2 package dependencies, 11 dev dependencies,
+  24 unused export groups, 4 unused exported types, and 1 duplicate export.
+  These are triage candidates, not automatic deletion targets.
+- React Doctor reports 206 warnings and 0 errors under the configured budget of
+  286. Warning cleanup remains a tracked hygiene workstream.
+- `node scripts/verify-matrix-evidence.cjs` is currently red: it inventories
+  403 rows and 403 evidence records but rejects stale `verifiedAt` timestamps,
+  the changed `stress-test/e2e/flows/psp-checkout-cod.spec.ts` artifact hash,
+  and one blocked-row result/status mismatch. These records must be rerun from
+  real evidence; timestamps must not be refreshed mechanically.
+
+The release verdict remains **Not ready** until source/deployment mapping,
+provider-backed authenticated evidence, safe database query evidence, and the
+interactive CMS memory soak are completed.
+
+Verification for this snapshot: `cms-page-builder-preview.test.ts` 4/4,
+`pnpm --filter @universal-music-store/web typecheck`, web lint,
+`pnpm quality:contracts`, `pnpm test:backend:worker:all` (509/509), and
+`git diff --check` all pass on the current dirty `dev` checkout.
+
 Date: 2026-09-17  
 Branch: `dev`  
 Scope: `.omx/plans/dev-memory-hardening.md` and `.omx/plans/full-production-optimization-audit.md`
@@ -24,6 +68,7 @@ The confirmed local memory-retention defects were repaired and covered with focu
 | Duplicate Supabase session work on API requests | Medium | Middleware performed Supabase auth and CMS redirect work before route handlers repeated their own checks | API middleware now preserves request IDs/rate/content guards and returns directly; page routes retain session redirects | Web typecheck + lint + contract gates |
 | Unbounded admin CMS list reads | Medium | Category, blog, and announcement GET handlers had no result limit | Added bounded `limit` query parameter with a maximum of 100 | Worker suite 363/363, typecheck, and contract gates |
 | Development memory attribution | High | Existing heap cap was applied but no process-tree/HMR evidence was captured | Added bounded `diagnose:dev-memory` wrapper with RSS process-tree samples, heap-data proxy, HMR/full-reload counters, duration cap, and safe shutdown | Node syntax check; bounded runtime probe still requires a controlled local stack |
+| Visual CMS preview accepted unsanitized markup and URLs | High | The live visual mutation path passed `innerHTML`, `href`, and `src` directly to lifecycle handlers and the iframe before published rendering sanitized them | Apply the shared CMS HTML and safe-URL policy at the visual mutation boundary before lifecycle handling and serialized canvas output | `cms-page-builder-preview.test.ts` 4/4; web typecheck and lint; Worker and contract gates |
 
 ## Cache and latency classification
 
@@ -53,6 +98,13 @@ The live deployment was checked directly: `https://universalmusic.vercel.app/` r
 4. Run a controlled 15-minute dev probe and CMS repeated-edit reproduction; do not continue if host swap pressure or OOM indicators appear. The idle probe and one-pass CMS browser flow are complete; the repeated stateful soak remains open because its second pass hit a CMS drag/drop assertion after 4/10 tests while peaking at 5,485 MiB.
 5. Run provider-backed security/commerce E2E gates with real sandbox credentials where required.
 6. The matrix evidence verifier now recognizes explicit external blockers: across `.omx/context/full-task(4..8).md`, 403 rows are inventoried, 41 are verified with durable evidence, 355 are explicitly blocked with row-level recovery conditions and hashed blocker records, and 7 remain unresolved local findings. The release gate remains open until those unresolved rows are implemented and proven.
+
+The fresh verifier run on 2026-09-23 reports 47 verified rows, 356 blocked
+rows, and zero unresolved rows, but exits non-zero because the stored evidence
+timestamps are stale, one artifact hash no longer matches the dirty checkout,
+and `C5-53` has `needs-verification` evidence for a row marked `blocked`.
+This supersedes the older matrix counts for diagnosis only; it is not a new
+verification claim.
 
 The static UI boundary inventory now covers all 92 App Router pages with loading and error boundaries (92/92 each). This closes the missing-boundary inventory finding but does not replace direct authenticated browser verification of each state.
 

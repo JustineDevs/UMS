@@ -15,6 +15,7 @@ import { createStorefrontServiceSupabase } from "@/lib/storefront-supabase";
 import { logCommerceObservabilityServer } from "@/lib/commerce-observability";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
 import { commerceInvalidationResponseSchema, internalCommerceInvalidationSchema } from "@/lib/admin-api-contracts";
+import { resolveInternalInvalidationSecret } from "@/lib/internal-invalidation-secret";
 
 export const dynamic = "force-dynamic";
 
@@ -57,9 +58,7 @@ function rowMissingQuoteMetadata(row: {
 
 export async function POST(req: Request) {
   /** Playwright sets `__PLAYWRIGHT_*` when repo dotenv clears `STOREFRONT_INTERNAL_INVALIDATION_SECRET`. */
-  const configuredSecret =
-    process.env.STOREFRONT_INTERNAL_INVALIDATION_SECRET?.trim() ||
-    process.env.__PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET?.trim();
+  const configuredSecret = resolveInternalInvalidationSecret();
   const providedSecret = req.headers.get("x-internal-secret")?.trim();
   if (!configuredSecret || providedSecret !== configuredSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

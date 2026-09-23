@@ -4,6 +4,14 @@ Audit date: 2026-09-20
 Repository: `/home/justine/Downloads/UVS`
 Mode: implementation follow-up and evidence synthesis; findings are updated as fixes land, while externally gated evidence remains explicitly open.
 
+## Current verification snapshot — 2026-09-23
+
+The generated OpenAPI reference was regenerated after the source-drift gate
+identified two stale route hashes. The current reference contains 278
+operations, 320 executable schemas, and 598 matching route source hashes.
+`pnpm quality:contracts` passes all local contract-boundary checks. This does
+not replace deployed authenticated/provider evidence.
+
 ## Scope and method
 
 This audit reads the checked-in OpenAPI references, maps documented operations to the Next.js App Router and Worker code, inspects UI route surfaces and integration boundaries, runs repository diagnostics, and compares the contract behavior with current standards. The route matrix is static triage, not runtime proof.

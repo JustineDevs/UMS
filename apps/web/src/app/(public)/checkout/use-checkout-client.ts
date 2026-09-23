@@ -581,6 +581,7 @@ export function useCheckoutClient({
     }
     payInFlightRef.current = true;
     const payAttemptId = ++payAttemptRef.current;
+    const checkoutAttemptKey = `storefront-checkout-${crypto.randomUUID()}`;
     medusaPreviewAbortRef.current?.abort();
     medusaPreviewAbortRef.current = null;
     setLoading(true);
@@ -692,6 +693,7 @@ export function useCheckoutClient({
           loyaltyPointsToRedeem: parsedLoyalty,
           shippingOptionId: selectedShippingOptionId ?? undefined,
           attribution,
+          checkoutAttemptKey,
         });
       } else {
         const startController = new AbortController();
@@ -704,7 +706,10 @@ export function useCheckoutClient({
             method: "POST",
             credentials: "include",
             cache: "no-store",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": checkoutAttemptKey,
+            },
             signal: startController.signal,
             body: JSON.stringify({
               lines: lines.map((l) => ({

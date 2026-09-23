@@ -279,6 +279,7 @@ export async function handleTrackingRequest(
   database: WorkerDatabaseClient,
   env: TrackingEnv,
   token: string,
+  commerceDatabase: WorkerDatabaseClient = database,
 ): Promise<Response> {
   if (request.method !== "GET")
     return json({ error: "method_not_allowed" }, 405);
@@ -291,7 +292,7 @@ export async function handleTrackingRequest(
   } catch {
     return json({ error: "tracking_unavailable" }, 503);
   }
-  const result = await database.query<OrderRow>(
+  const result = await commerceDatabase.query<OrderRow>(
     `SELECT o.id, o.display_id, o.updated_at,
             COALESCE((SELECT SUM(oi.unit_price * oi.quantity)
                         FROM public.order_item oi

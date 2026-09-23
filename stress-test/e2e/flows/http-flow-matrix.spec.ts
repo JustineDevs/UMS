@@ -80,6 +80,11 @@ test.describe("Cloudflare Worker HTTP matrix", () => {
 
 test.describe.serial("Storefront HTTP matrix", () => {
   const base = () => storefrontHttpBase();
+  const sameOriginHeaders = () => ({ Origin: new URL(base()).origin });
+  const ownedCartHeaders = () => ({
+    ...sameOriginHeaders(),
+    Cookie: "mcart_id=cart_00000000000000000000000000000000",
+  });
 
   test("GET /api/health", async ({ request }) => {
     await skipUnlessStorefrontReachable(request);
@@ -143,12 +148,16 @@ test.describe.serial("Storefront HTTP matrix", () => {
     });
     expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body).toEqual({ error: "Provide productSlug and/or medusaProductId" });
+    expect(body).toEqual({
+      code: "REVIEW_REQUEST_REJECTED",
+      error: "Review request was rejected",
+    });
   });
 
   test("POST /api/reviews without session returns 401", async ({ request }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/reviews`, {
+      headers: sameOriginHeaders(),
       data: {},
       failOnStatusCode: false,
     });
@@ -168,7 +177,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/bind`, {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...ownedCartHeaders(), "Content-Type": "application/json" },
       data: "not-json",
       failOnStatusCode: false,
     });
@@ -180,6 +189,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/bind`, {
+      headers: ownedCartHeaders(),
       data: {},
       failOnStatusCode: false,
     });
@@ -191,6 +201,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/bind`, {
+      headers: sameOriginHeaders(),
       data: { cartId: "cart_00000000000000000000000000000000" },
       failOnStatusCode: false,
     });
@@ -204,7 +215,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/abandonment`, {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...sameOriginHeaders(), "Content-Type": "application/json" },
       data: "{",
       failOnStatusCode: false,
     });
@@ -216,6 +227,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/cart/abandonment`, {
+      headers: sameOriginHeaders(),
       data: { email: null, lines: [] },
       failOnStatusCode: false,
     });
@@ -229,7 +241,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/tracking-link`, {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...sameOriginHeaders(), "Content-Type": "application/json" },
       data: "not-json",
       failOnStatusCode: false,
     });
@@ -241,6 +253,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/tracking-link`, {
+      headers: sameOriginHeaders(),
       data: {},
       failOnStatusCode: false,
     });
@@ -260,6 +273,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   test("POST /api/forms/unknown returns 400", async ({ request }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/forms/not-a-real-form`, {
+      headers: sameOriginHeaders(),
       data: { foo: "bar" },
       failOnStatusCode: false,
     });
@@ -271,7 +285,7 @@ test.describe.serial("Storefront HTTP matrix", () => {
   }) => {
     await skipUnlessStorefrontReachable(request);
     const res = await request.post(`${base()}/api/forms/contact`, {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...sameOriginHeaders(), "Content-Type": "application/json" },
       data: "not-json",
       failOnStatusCode: false,
     });

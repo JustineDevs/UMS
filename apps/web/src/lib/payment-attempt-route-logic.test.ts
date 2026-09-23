@@ -114,12 +114,18 @@ test("isolated COD ledger is limited to strict auth-disabled E2E and is idempote
     nodeEnv: process.env.NODE_ENV,
     strict: process.env.CI_STRICT_E2E,
     authDisabled: process.env.AUTH_DISABLED,
+    apiUrl: process.env.API_URL,
   };
   try {
     setTestEnv("NODE_ENV", "test");
     setTestEnv("CI_STRICT_E2E", "1");
     setTestEnv("AUTH_DISABLED", "true");
+    setTestEnv("API_URL", undefined);
     assert.equal(isIsolatedCodE2E(), true);
+
+    setTestEnv("API_URL", "https://worker.example.test");
+    assert.equal(isIsolatedCodE2E(), false);
+    setTestEnv("API_URL", undefined);
 
     const first = registerIsolatedCodAttempt({
       cartId: "cart_isolated_1",
@@ -155,6 +161,7 @@ test("isolated COD ledger is limited to strict auth-disabled E2E and is idempote
     setTestEnv("NODE_ENV", previous.nodeEnv);
     setTestEnv("CI_STRICT_E2E", previous.strict);
     setTestEnv("AUTH_DISABLED", previous.authDisabled);
+    setTestEnv("API_URL", previous.apiUrl);
   }
 });
 

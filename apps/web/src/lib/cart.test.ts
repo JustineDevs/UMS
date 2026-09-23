@@ -50,6 +50,30 @@ test("cart availability distinguishes unavailable variants from stock conflicts"
   );
 });
 
+test("cart reconciliation rejects an over-limit requested quantity", () => {
+  const original: CartLine = {
+    variantId: "v1",
+    quantity: 1,
+    slug: "canary",
+    name: "Canary",
+    sku: "CANARY",
+    type: "Default",
+    finish: "",
+    price: 100,
+  };
+  const [line] = mergeReconciledCartLines([original], [
+    {
+      variantId: "v1",
+      quantity: 12,
+      availableQuantity: 5,
+      status: "over_limit",
+      price: 100,
+    },
+  ]);
+  assert.equal(line?.quantity, 1);
+  assert.equal(line?.availableQuantity, 5);
+});
+
 test("updateLineQuantity removes malformed quantities instead of persisting them", async () => {
   const { readCart, writeCart, updateLineQuantity, clearCart } = await import("./cart");
   const originalWindow = globalThis.window;

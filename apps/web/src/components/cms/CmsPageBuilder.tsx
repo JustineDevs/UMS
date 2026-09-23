@@ -184,6 +184,32 @@ function visualMarkupTarget(
   return property.child ? (root.querySelector(property.child) ?? root) : root;
 }
 
+/** Keep the live canvas subject to the same HTML policy as published CMS output. */
+export function sanitizeVisualPropertyValue(
+  property: VisualComponentDefinition["properties"][number],
+  value: string,
+): string {
+  if (property.htmlAttr === "innerHTML" || property.key === "innerHTML") {
+    return sanitizeCmsHtml(value);
+  }
+  const attribute = property.htmlAttr ?? property.key;
+  if (property.inputtype !== "url" && attribute !== "href" && attribute !== "src") {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (
+    /[\u0000-\u001f\u007f]/.test(trimmed) ||
+    trimmed.startsWith("//") ||
+    /^(?:javascript|vbscript|data):/i.test(trimmed)
+  ) {
+    return "";
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(trimmed) && !/^(?:https?|mailto|tel):/i.test(trimmed)) {
+    return "";
+  }
+  return trimmed;
+}
+
 function visualMarkupWithProperty(
   markup: string,
   definition: VisualComponentDefinition,
@@ -198,9 +224,10 @@ function visualMarkupWithProperty(
   const root = document.body.firstElementChild;
   const property = definition.properties.find((item) => item.key === key);
   if (!root || !property) return markup;
+  const safeValue = sanitizeVisualPropertyValue(property, value);
   if (
     !property.child &&
-    definition.lifecycle?.onChange(root as HTMLElement, key, value)
+    definition.lifecycle?.onChange(root as HTMLElement, key, safeValue)
   ) {
     return document.body.innerHTML;
   }
@@ -213,7 +240,7 @@ function visualMarkupWithProperty(
   } else {
     const target = visualMarkupTarget(root, property);
     const attribute = property.htmlAttr ?? property.key;
-    if (attribute === "innerHTML") target.innerHTML = value;
+    if (attribute === "innerHTML") target.innerHTML = safeValue;
     else if (attribute === "nodeName") {
       const replacement = document.createElement(value.toLowerCase());
       replacement.innerHTML = target.innerHTML;
@@ -2460,7 +2487,11 @@ export function CmsPageBuilder({
   const previewSandbox =
     typeof window === "undefined"
       ? "allow-scripts"
-      : cmsPreviewSandbox(previewOrigin, window.location.origin);
+      : cmsPreviewSandbox(
+          previewOrigin,
+          window.location.origin,
+          process.env.NODE_ENV !== "production",
+        );
   useEffect(() => {
     previewOriginRef.current = previewOrigin;
   }, [previewOrigin]);

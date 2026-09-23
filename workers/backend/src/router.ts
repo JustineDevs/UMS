@@ -1489,6 +1489,40 @@ export async function handleBackendRequest(
     }
   }
   if (
+    trackingMatch &&
+    hasConfiguredDatabaseForRole(env, "app") &&
+    hasConfiguredDatabaseForRole(env, "medusa")
+  ) {
+    try {
+      const nativeResponse = await withWorkerDatabase(
+        env as BackendEnv & WorkerDatabaseEnv,
+        (appDatabase) =>
+          withWorkerDatabase(
+            env as BackendEnv & WorkerDatabaseEnv,
+            (commerceDatabase) =>
+              handleTrackingRequest(
+                request,
+                appDatabase,
+                env,
+                decodeURIComponent(trackingMatch[1]),
+                commerceDatabase,
+              ),
+            "medusa",
+          ),
+        "app",
+      );
+      const headers = responseHeaders(nativeResponse.headers, origin);
+      headers.set("X-Request-ID", id);
+      return new Response(nativeResponse.body, {
+        status: nativeResponse.status,
+        headers,
+      });
+    } catch (error) {
+      logNativeRouteFailure(error, id, nativeRouteMatches);
+      return jsonError("tracking_unavailable", id, 503);
+    }
+  }
+  if (
     adminTerminalOpenDrawerMatch &&
     hasConfiguredDatabaseForRole(env, "app")
   ) {

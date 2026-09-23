@@ -41,6 +41,11 @@ function workerProvider(
   return null;
 }
 
+function requestCheckoutAttemptKey(request: Request): string | undefined {
+  const value = request.headers.get("Idempotency-Key")?.trim();
+  return value && value.length >= 8 && value.length <= 200 ? value : undefined;
+}
+
 async function stableCheckoutKey(
   cartId: string,
   provider: string,
@@ -272,6 +277,7 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  const checkoutAttemptKey = requestCheckoutAttemptKey(req);
 
   const providerId =
     typeof parsed.data.providerId === "string"
@@ -300,7 +306,7 @@ export async function POST(req: Request) {
     let cartId = await readCartIdFromCookie();
     if (!cartId) {
       try {
-        cartId = await createWorkerCheckoutCart(baseUrl, lines);
+        cartId = await createWorkerCheckoutCart(baseUrl, lines, checkoutAttemptKey);
       } catch (error) {
         console.error("[checkout-start] Worker COD cart creation failed", {
           name: error instanceof Error ? error.name : "unknown",
@@ -366,7 +372,7 @@ export async function POST(req: Request) {
     let cartId = await readCartIdFromCookie();
     if (!cartId) {
       try {
-        cartId = await createWorkerCheckoutCart(nativeBaseUrl, lines);
+        cartId = await createWorkerCheckoutCart(nativeBaseUrl, lines, checkoutAttemptKey);
       } catch (error) {
         console.error("[checkout-start] Worker cart creation failed", {
           name: error instanceof Error ? error.name : "unknown",

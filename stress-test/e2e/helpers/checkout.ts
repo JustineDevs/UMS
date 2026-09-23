@@ -240,7 +240,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
         await page.waitForTimeout(100);
       }
       await addButton.click();
-      await page.waitForTimeout(800);
+      await page
+        .waitForURL(/\/cart(?:\?|$)/, { timeout: 10_000 })
+        .catch(() => undefined);
       if (!/\/cart(?:\?|$)/.test(page.url()) && attempt < 2) {
         // A dev/preview server can leave the document in its loading shell
         // while the route compiler restarts. Commit the navigation promptly,

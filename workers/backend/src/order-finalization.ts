@@ -1,6 +1,7 @@
 import type { WorkerDatabaseClient } from "./database.ts";
 import { withWorkerTransaction } from "./database.ts";
 import { verifyWorkerBearerToken } from "./auth.ts";
+import { getXenditSession } from "./providers.ts";
 
 const SAFE_FINALIZATION_ERRORS = new Set([
   "cart_address_not_found",
@@ -407,7 +408,65 @@ export async function finalizeNativeOrderAcrossDatabases(
   commerceDatabase: WorkerDatabaseClient,
   correlationId: string,
   organizationId?: string,
+  env: { XENDIT_SECRET_KEY?: string } = {},
 ): Promise<{ orderId: string; replayed: boolean }> {
+  if (env.XENDIT_SECRET_KEY) {
+    const xenditAttempt = await appDatabase.query<PaymentAttempt & {
+      provider_session_id: string | null;
+    }>(
+      `SELECT correlation_id, cart_id, provider, provider_session_id,
+              amount_minor, currency, provider_payment_id, provider_payload,
+              status, medusa_order_id
+         FROM public.payment_attempts
+        WHERE correlation_id = $1::uuid
+          AND ($2::text IS NULL OR organization_id = $2::text)
+        LIMIT 1`,
+      [correlationId, organizationId ?? null],
+    );
+    const pendingXendit = xenditAttempt.rows[0];
+    if (!pendingXendit) throw new Error("payment_attempt_not_found");
+    if (
+      pendingXendit.provider.toLowerCase() === "xendit" &&
+      !PAID_STATUSES.has(pendingXendit.status.toLowerCase()) &&
+      !pendingXendit.medusa_order_id
+    ) {
+      if (!pendingXendit.provider_session_id)
+        throw new Error("payment_not_settled");
+      const session = await getXenditSession({
+        secretKey: env.XENDIT_SECRET_KEY,
+        sessionId: pendingXendit.provider_session_id,
+      });
+      if (session.status !== "COMPLETED") throw new Error("payment_not_settled");
+      if (
+        session.amountMinor !== null &&
+        Number(pendingXendit.amount_minor) !== session.amountMinor
+      )
+        throw new Error("payment_not_settled");
+      if (
+        session.currency &&
+        pendingXendit.currency &&
+        session.currency !== pendingXendit.currency.toUpperCase()
+      )
+        throw new Error("payment_not_settled");
+      await appDatabase.query(
+        `UPDATE public.payment_attempts
+            SET status = 'paid',
+                provider_payment_id = COALESCE(provider_payment_id, $2),
+                provider_payload = COALESCE(provider_payload, '{}'::jsonb) || $3::jsonb,
+                checkout_state = 'provider_verified',
+                updated_at = now()
+          WHERE correlation_id = $1::uuid
+            AND ($4::text IS NULL OR organization_id = $4::text)
+            AND medusa_order_id IS NULL`,
+        [
+          correlationId,
+          session.paymentId ?? session.paymentRequestId,
+          JSON.stringify({ xenditSession: session.payload }),
+          organizationId ?? null,
+        ],
+      );
+    }
+  }
   const claim = await appDatabase.query<PaymentAttempt>(
     `UPDATE public.payment_attempts
      SET checkout_state = 'finalizing', finalize_attempts = COALESCE(finalize_attempts, 0) + 1, updated_at = now()
@@ -498,7 +557,7 @@ export async function handleNativeOrderFinalizationRequest(
   correlationId: string,
   appDatabase?: WorkerDatabaseClient,
   organizationId?: string,
-  env: { JWT_SECRET?: string } = {},
+  env: { JWT_SECRET?: string; XENDIT_SECRET_KEY?: string } = {},
 ): Promise<Response> {
   if (request.method !== "POST")
     return json({ error: "method_not_allowed" }, 405);
@@ -575,6 +634,7 @@ export async function handleNativeOrderFinalizationRequest(
           database,
           id,
           organizationId,
+          env,
         )
       : await finalizeNativeOrder(database, id, organizationId);
     return json(result, result.replayed ? 200 : 201);

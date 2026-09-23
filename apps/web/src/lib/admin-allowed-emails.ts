@@ -32,12 +32,14 @@ export function isEmailAllowedForGuideDemos(email: string | null | undefined): b
 }
 
 /**
- * Registers the E2E Credentials provider and enables `/sign-in/e2e` (local dev only).
- * Main `/sign-in` is Google-only; Playwright uses `/sign-in/e2e`.
+ * Registers the E2E Credentials provider for a local E2E process. Production
+ * mode is allowed only with the explicit local marker so stable browser proof
+ * can avoid development hot-reload churn; Vercel is always denied.
  */
 export function isAdminE2eCredentialsConfigured(): boolean {
   return (
-    process.env.NODE_ENV === "development" &&
+    process.env.VERCEL !== "1" &&
+    (process.env.NODE_ENV === "development" || process.env.UVS_E2E_LOCAL === "1") &&
     Boolean(process.env.AUTH_SECRET?.trim()) &&
     parseAdminAllowedEmailList().length > 0
   );

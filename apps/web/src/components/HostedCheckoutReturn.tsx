@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { sanitizeSameOriginUrl, sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { clearCart } from "@/lib/cart";
 import {
   buildHostedReturnMissingCorrelationMessage,
@@ -52,6 +52,8 @@ async function resolveCorrelationId(
 // making the user restart a payment that is already settling.
 const POLL_MS = 1000;
 const POLL_MAX = 45;
+const useIsomorphicLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export function HostedCheckoutReturn({
   provider,
@@ -70,13 +72,22 @@ export function HostedCheckoutReturn({
   );
   const [failed, setFailed] = useState(hasFailedStatus);
   const recoveryLinkRef = useRef<HTMLAnchorElement>(null);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!failed) return;
-    const frame = window.requestAnimationFrame(() => {
+    let frame = 0;
+    let retry = 0;
+    const focusRecoveryLink = () => {
       recoveryLinkRef.current?.focus();
+    };
+    frame = window.requestAnimationFrame(() => {
+      focusRecoveryLink();
+      retry = window.setTimeout(focusRecoveryLink, 0);
     });
-    return () => window.cancelAnimationFrame(frame);
-  }, [failed]);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(retry);
+    };
+  }, [failed, provider, status]);
   useEffect(() => {
     let disposed = false;
     async function run(): Promise<void> {

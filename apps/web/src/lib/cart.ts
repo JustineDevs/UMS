@@ -169,7 +169,13 @@ export function mergeReconciledCartLines(
     return {
       ...original,
       variantId: line.variantId,
-      quantity: line.quantity ?? original.quantity,
+      // An over-limit response is an authoritative rejection of the requested
+      // quantity. Keep the customer's previous valid quantity instead of
+      // persisting the rejected draft back into the bag.
+      quantity:
+        line.status === "over_limit"
+          ? original.quantity
+          : line.quantity ?? original.quantity,
       slug: line.slug ?? original.slug,
       name: line.name ?? original.name,
       sku: line.sku ?? original.sku,

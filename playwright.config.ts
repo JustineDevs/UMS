@@ -70,6 +70,17 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     // identity. This marker is never set by Vercel and is not a production
     // authentication control.
     UVS_E2E_LOCAL: process.env.UVS_E2E_LOCAL,
+    // Explicitly forward local staff-E2E credentials to the spawned Next
+    // process. The config loads `.env.local` in the Playwright process, but
+    // relying on an inherited dotenv merge makes the production artifact
+    // intermittently render the disabled `/sign-in/e2e` state.
+    E2E_ADMIN_AUTH: process.env.E2E_ADMIN_AUTH,
+    E2E_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD,
+    UVS_E2E_REAL_SESSION: process.env.UVS_E2E_REAL_SESSION,
+    ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
+    AUTH_SECRET: process.env.AUTH_SECRET,
+    AUTH_DISABLED: process.env.AUTH_DISABLED,
+    AUTH_DISABLE: process.env.AUTH_DISABLE,
     STOREFRONT_INTERNAL_INVALIDATION_SECRET: inv,
     // Survives if dotenv clears the primary key; route reads this in invalidate-commerce-state
     __PLAYWRIGHT_STOREFRONT_INVALIDATION_SECRET: inv,

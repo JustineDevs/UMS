@@ -6,7 +6,11 @@ export { E2E_SESSION_COOKIE } from "./e2e-session-constants";
 const MAX_AGE_SECONDS = 8 * 60 * 60;
 
 function enabled(): boolean {
-  return process.env.NODE_ENV === "development" && process.env.UVS_E2E_REAL_SESSION === "1" && process.env.VERCEL !== "1";
+  return (
+    (process.env.NODE_ENV === "development" || process.env.UVS_E2E_LOCAL === "1") &&
+    process.env.UVS_E2E_REAL_SESSION === "1" &&
+    process.env.VERCEL !== "1"
+  );
 }
 
 function secret(): string | undefined {

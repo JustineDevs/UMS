@@ -294,6 +294,13 @@ test.describe("@admin CMS canonical editor", () => {
       page.getByRole("button", { name: "Add page", exact: true }),
     ).toBeVisible();
     await page.getByRole("button", { name: "Add page", exact: true }).click();
+    await expect(
+      page.getByRole("dialog", { name: "New page" }),
+    ).toBeVisible({ timeout: 30_000 });
+    await page
+      .getByRole("dialog", { name: "New page" })
+      .getByRole("button", { name: "Create page", exact: true })
+      .click();
 
     const nestedBuilder = page
       .locator('[aria-label="Visual page builder"]')

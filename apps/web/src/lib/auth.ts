@@ -5,10 +5,18 @@ import { getE2eSessionEmail } from "./e2e-session";
 
 export type Session = { user: { id?: string; email?: string; name?: string | null; image?: string | null; role?: string; permissions?: string[] }; expires: string; authenticatedAt?: number };
 const localE2eAuthDisabled =
-  process.env.UVS_E2E_LOCAL === "1" && process.env.VERCEL !== "1";
+  process.env.UVS_E2E_LOCAL === "1" &&
+  process.env.UVS_E2E_REAL_SESSION !== "1" &&
+  process.env.VERCEL !== "1";
 const authDisabled =
   localE2eAuthDisabled ||
-  (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production");
+  (process.env.NODE_ENV !== "production" &&
+    [
+      process.env.AUTH_DISABLED,
+      process.env.AUTH_DISABLE,
+      process.env.NEXT_PUBLIC_AUTH_DISABLED,
+      process.env.NEXT_PUBLIC_AUTH_DISABLE,
+    ].some((value) => value === "true"));
 export function isStorefrontAuthDisabled() {
   if (localE2eAuthDisabled) return true;
   if (process.env.NODE_ENV === "production") return false;

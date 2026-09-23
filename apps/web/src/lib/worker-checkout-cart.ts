@@ -5,13 +5,15 @@ import { readResponseJson } from "./read-response-json";
 export async function createWorkerCheckoutCart(
   baseUrl: string,
   lines: CheckoutLine[],
+  idempotencyKey?: string,
 ): Promise<string> {
+  const operationKey = idempotencyKey?.trim() || `storefront-checkout-${crypto.randomUUID()}`;
   const cartResponse = await fetch(`${baseUrl}/store/carts`, {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "Idempotency-Key": `storefront-checkout-cart-${crypto.randomUUID()}`,
+      "Idempotency-Key": `${operationKey}-cart`,
     },
     body: JSON.stringify({ currency_code: "php" }),
     cache: "no-store",
@@ -32,7 +34,7 @@ export async function createWorkerCheckoutCart(
     );
   }
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const lineResponse = await fetch(
       `${baseUrl}/store/carts/${encodeURIComponent(cartId)}/line-items`,
       {
@@ -40,7 +42,7 @@ export async function createWorkerCheckoutCart(
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          "Idempotency-Key": `storefront-checkout-line-${crypto.randomUUID()}`,
+          "Idempotency-Key": `${operationKey}-line-${index}`,
         },
         body: JSON.stringify({
           variant_id: line.variantId,

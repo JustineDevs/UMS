@@ -3,27 +3,22 @@ import { getStaffSession } from "@/lib/requireStaffSession";
 import { staffSessionAllows } from "@universal-music-store/database";
 import { getCorrelationId } from "@/lib/request-correlation";
 import { correlatedError, correlatedJson } from "@/lib/staff-api-response";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { parseAdminJson } from "@/lib/admin-api-security";
 import { adminBulkFulfillmentResponseSchema, adminBulkFulfillmentSchema } from "@/lib/admin-api-contracts";
 import { readResponseJson } from "@/lib/read-response-json";
+import { mutateWorkerBulkFulfillmentForAdmin } from "@/lib/worker-admin-bridge";
 
 async function post(req: NextRequest) {
   const cid = getCorrelationId(req);
   const session = await getStaffSession();
   if (!session?.user) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
   if (!staffSessionAllows(session, "orders:fulfill")) return correlatedError(cid, 403, "Forbidden", "FORBIDDEN");
-  const base = process.env.API_URL?.trim().replace(/\/$/, "");
-  if (!base) return correlatedError(cid, 503, "Commerce Worker is unavailable", "SERVICE_UNAVAILABLE");
   const parsed = await parseAdminJson(req, adminBulkFulfillmentSchema, 64 * 1024);
   if (!parsed.ok) return correlatedError(cid, parsed.status, parsed.error, "VALIDATION_ERROR");
   const key = req.headers.get("Idempotency-Key")?.trim();
   if (!key) return correlatedError(cid, 400, "Idempotency-Key is required", "BAD_REQUEST");
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token?.trim();
-  if (!token) return correlatedError(cid, 401, "Unauthorized", "UNAUTHORIZED");
-  const response = await fetch(`${base}/api/admin/orders/bulk-fulfill`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "Idempotency-Key": key, "X-Request-ID": cid }, body: JSON.stringify(parsed.data), cache: "no-store" });
+  const response = await mutateWorkerBulkFulfillmentForAdmin(parsed.data, key, cid);
+  if (!response) return correlatedError(cid, 503, "Commerce Worker is unavailable", "SERVICE_UNAVAILABLE");
   const payload = await readResponseJson<unknown>(response, null);
   if (response.ok) {
     const validated = adminBulkFulfillmentResponseSchema.safeParse(payload);

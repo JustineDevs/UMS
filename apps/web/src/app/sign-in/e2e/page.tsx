@@ -24,7 +24,9 @@ export const metadata: Metadata = {
 
 /**
  * Playwright and local automation only. Not linked from the main sign-in page.
- * Disabled unless NODE_ENV=development and E2E env is configured (see admin-allowed-emails).
+ * Disabled unless the process is local and E2E env is configured (see
+ * admin-allowed-emails). Production-mode local builds use UVS_E2E_LOCAL=1 so
+ * browser proof can avoid development hot-reload churn; Vercel is denied.
  */
 export default async function AdminE2eSignInPage({
   searchParams,

@@ -41,6 +41,30 @@ import { ProductSelectedPrice } from "@/components/ProductSelectedPrice";
 /** Product detail reads stay live so variant availability does not inherit catalog ISR. */
 export const dynamic = "force-dynamic";
 
+/**
+ * Optional PDP enrichments must never hold the product route hostage when a
+ * secondary service is slow or unavailable. The catalog product itself is
+ * authoritative; reviews, Q&A, and related products can safely render empty
+ * and recover on a later request.
+ */
+async function withPdpDeadline<T>(
+  operation: Promise<T>,
+  fallback: T,
+  timeoutMs = 4_000,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function generateStaticParams() {
   const { fetchProductSlugsForSitemap } = await import("@/lib/catalog-fetch");
   try {
@@ -105,9 +129,9 @@ export default async function ProductPage({ params }: Props) {
   const { product } = res;
 
   const [relatedRes, reviews, qaEntries] = await Promise.all([
-    fetchRelatedProducts(product, 4),
-    fetchProductReviews(slug, { medusaProductId: product.id }),
-    fetchProductQaEntries(slug, { medusaProductId: product.id }),
+    withPdpDeadline(fetchRelatedProducts(product, 4), { kind: "ok", products: [] }),
+    withPdpDeadline(fetchProductReviews(slug, { medusaProductId: product.id }), []),
+    withPdpDeadline(fetchProductQaEntries(slug, { medusaProductId: product.id }), []),
   ]);
   const reviewSummary = summarizeProductReviews(reviews);
   const relatedProducts =

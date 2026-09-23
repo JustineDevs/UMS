@@ -74,6 +74,39 @@ test("tracking keeps confirmation fields behind a confirmation capability", asyn
   assert.deepEqual(body.confirmationOrder?.items, [{ id: "item_1", title: "Canary", quantity: 1, unit_price: 599700 }]);
 });
 
+test("tracking reads revocations from APP and orders from commerce", async () => {
+  const token = await capability("secret", "order_1");
+  const appQueries: string[] = [];
+  const commerceQueries: string[] = [];
+  const appDatabase: WorkerDatabaseClient = {
+    async query<Row>(sql: string) {
+      appQueries.push(sql);
+      return { rows: [], rowCount: 0 } as { rows: Row[]; rowCount: number };
+    },
+    async end() {},
+  };
+  const commerceDatabase: WorkerDatabaseClient = {
+    async query<Row>(sql: string) {
+      commerceQueries.push(sql);
+      return {
+        rows: [{ id: "order_1", display_id: 42, updated_at: "2026-01-01T00:00:00Z", payment_status: "captured", fulfillment_status: "not_fulfilled", email: "buyer@example.com", metadata: {} }],
+        rowCount: 1,
+      } as { rows: Row[]; rowCount: number };
+    },
+    async end() {},
+  };
+  const response = await handleTrackingRequest(
+    new Request("https://api.example/store/tracking/token"),
+    appDatabase,
+    { TRACKING_HMAC_SECRET: "secret", TRACKING_HMAC_KEY_VERSION: "v1" },
+    token,
+    commerceDatabase,
+  );
+  assert.equal(response.status, 200);
+  assert.ok(appQueries.some((sql) => sql.includes("tracking_capability_revocations")));
+  assert.ok(commerceQueries.some((sql) => sql.includes('FROM public."order"')));
+});
+
 test("tracking rejects an expired capability", async () => {
   const token = await capability("secret", "order_1", Math.floor(Date.now() / 1000) - 1);
   const database: WorkerDatabaseClient = {
