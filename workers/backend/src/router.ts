@@ -3825,6 +3825,8 @@ export async function handleBackendRequest(
         productMatch ||
         cmsPageMatch ||
         navigationMatch ||
+        storefrontHomeMatch ||
+        storefrontMetadataMatch ||
         announcementMatch ||
         blogListMatch ||
         blogPostMatch ||

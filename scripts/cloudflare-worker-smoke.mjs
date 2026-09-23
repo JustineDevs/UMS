@@ -66,6 +66,16 @@ async function smoke(base) {
       const value = objectPayload(payload, "/store/products");
       if (!Array.isArray(value.products)) throw new Error("/store/products did not return products[]");
     }],
+    ["/storefront/public-metadata", 200, (payload) => {
+      const value = objectPayload(payload, "/storefront/public-metadata");
+      if (!value.metadata || typeof value.metadata !== "object" || Array.isArray(value.metadata)) {
+        throw new Error("/storefront/public-metadata did not return metadata{}");
+      }
+    }],
+    ["/storefront/home", 200, (payload) => {
+      const value = objectPayload(payload, "/storefront/home");
+      if (!value.page && !value.home) throw new Error("/storefront/home did not return page or home content");
+    }],
     ["/api/admin/orders", 401, (payload) => {
       const value = objectPayload(payload, "/api/admin/orders");
       if (typeof value.error !== "string") throw new Error("unauthenticated admin response lacked an error");

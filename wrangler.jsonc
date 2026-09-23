@@ -28,7 +28,9 @@
       ],
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
-        "PUBLIC_SITE_URL": "https://universalmusic.vercel.app"
+        "PUBLIC_SITE_URL": "https://universalmusic.vercel.app",
+        "CMS_ORGANIZATION_ID": "local-admin@example.com",
+        "DEFAULT_ORGANIZATION_ID": "local-admin@example.com"
       },
     },
     "production": {
