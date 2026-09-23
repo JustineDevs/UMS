@@ -47,11 +47,8 @@ async function resolveCorrelationId(
   return storedId || undefined;
 }
 
-// Provider webhooks can arrive after the hosted-return redirect. Keep the
-// browser on the return page long enough to observe reconciliation without
-// making the user restart a payment that is already settling.
-const POLL_MS = 1000;
-const POLL_MAX = 45;
+const POLL_MS = 2000;
+const POLL_MAX = 20;
 
 export function HostedCheckoutReturn({
   provider,
@@ -184,12 +181,11 @@ export function HostedCheckoutReturn({
           staleReason?: string | null;
           lastError?: string | null;
         };
-        const paymentSettled =
-          ["paid", "completed", "captured"].includes(stJson.status ?? "") ||
-          ["completed", "provider_verified", "finalizing", "awaiting_completion"].includes(
-            stJson.checkoutState ?? "",
-          );
-        if (paymentSettled && typeof stJson.trackingPageUrl === "string" && stJson.trackingPageUrl) {
+        if (
+          stJson.status === "completed" &&
+          typeof stJson.trackingPageUrl === "string" &&
+          stJson.trackingPageUrl
+        ) {
           const safeTrackingUrl = sanitizeSameOriginUrl(
             stJson.trackingPageUrl,
             window.location.origin,
@@ -217,7 +213,12 @@ export function HostedCheckoutReturn({
           );
           return;
         }
-        if (paymentSettled) {
+        if (
+          ["paid", "completed", "captured"].includes(stJson.status ?? "") ||
+          ["provider_verified", "finalizing", "awaiting_completion"].includes(
+            stJson.checkoutState ?? "",
+          )
+        ) {
           const retryFinalize = await finalize();
           if (disposed) return;
           if (retryFinalize.ok) {
