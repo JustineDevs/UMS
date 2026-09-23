@@ -5,6 +5,7 @@ import {
   buildHostedReturnMissingCorrelationMessage,
   buildHostedReturnStatusMessage,
   checkoutReviewHref,
+  isUnresolvedHostedReturnToken,
   normalizeHostedReturnProvider,
   normalizeHostedReturnStatus,
   providerLabelForHostedReturn,
@@ -51,6 +52,12 @@ test("checkoutReviewHref encodes the review message", () => {
     checkoutReviewHref("Payment failed & retry"),
     "/checkout?review=1&message=Payment%20failed%20%26%20retry",
   );
+});
+
+test("unresolved Stripe callback placeholders are rejected as provider IDs", () => {
+  assert.equal(isUnresolvedHostedReturnToken("stripe", "{CHECKOUT_SESSION_ID}"), true);
+  assert.equal(isUnresolvedHostedReturnToken("stripe", "cs_test_real"), false);
+  assert.equal(isUnresolvedHostedReturnToken("paypal", "{CHECKOUT_SESSION_ID}"), false);
 });
 
 test("sanitizeHostedCheckoutUrl allows each provider's hosted checkout origin", () => {

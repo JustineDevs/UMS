@@ -8,6 +8,7 @@ import {
   buildHostedReturnMissingCorrelationMessage,
   buildHostedReturnStatusMessage,
   checkoutReviewHref,
+  isUnresolvedHostedReturnToken,
   PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY,
   type HostedReturnProvider,
   type HostedReturnStatus,
@@ -78,6 +79,14 @@ export function HostedCheckoutReturn({
     async function run(): Promise<void> {
       if (status === "cancel" || status === "failure") {
         setMessage(buildHostedReturnStatusMessage(provider, status));
+        setFailed(true);
+        return;
+      }
+
+      if (isUnresolvedHostedReturnToken(provider, providerOrderId)) {
+        setMessage(
+          "Stripe did not return a checkout session. Your bag is unchanged; return to checkout and try again.",
+        );
         setFailed(true);
         return;
       }
