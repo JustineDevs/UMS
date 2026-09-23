@@ -8,7 +8,6 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
-import { withBotIdProtection } from "@/lib/botid-protection";
 import { trackingLinkRouteLogic } from "@/lib/tracking-link-route-logic";
 import { readCartIdFromCookie } from "@/lib/cart-api-helpers";
 import { isSameOriginMutation } from "@/lib/request-origin";
@@ -66,4 +65,9 @@ async function handlePOST(req: Request) {
   });
 }
 
-export const POST = withBotIdProtection(handlePOST);
+// The cart cookie and same-origin ownership checks are the security boundary
+// for this handoff. BotID is intentionally not applied here: hosted checkout
+// calls this route immediately after cart binding, and privacy-hardened or
+// automated browsers can be legitimate users whose provider handoff must not
+// be rejected as a bot.
+export const POST = handlePOST;
