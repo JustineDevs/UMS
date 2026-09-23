@@ -34,18 +34,30 @@ export function withBotIdProtection<
     if (isStorefrontAuthDisabled() || isLocalE2EBotIdBypassed()) {
       return handler(..._args);
     }
-    let verification: BotIdVerification;
-    try {
-      verification = await checkBotId();
-    } catch {
-      return NextResponse.json(
-        { error: "Bot protection is temporarily unavailable", code: "BOT_PROTECTION_UNAVAILABLE" },
-        { status: 503 },
-      );
-    }
-    if (verification.isBot) {
-      return NextResponse.json({ error: "Access denied" }, { status: 403 });
-    }
+    const protectionFailure = await verifyBotIdProtection();
+    if (protectionFailure) return protectionFailure;
     return handler(..._args);
   };
+}
+
+/**
+ * Runs Bot ID without imposing an authorization order on the caller.
+ * Authenticated mutations can call this after their session check so an
+ * unauthenticated request receives the contract's 401 before bot policy.
+ */
+export async function verifyBotIdProtection(): Promise<Response | null> {
+  if (isStorefrontAuthDisabled() || isLocalE2EBotIdBypassed()) return null;
+  let verification: BotIdVerification;
+  try {
+    verification = await checkBotId();
+  } catch {
+    return NextResponse.json(
+      { error: "Bot protection is temporarily unavailable", code: "BOT_PROTECTION_UNAVAILABLE" },
+      { status: 503 },
+    );
+  }
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+  return null;
 }
