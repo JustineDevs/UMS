@@ -184,6 +184,19 @@ function visualMarkupTarget(
   return property.child ? (root.querySelector(property.child) ?? root) : root;
 }
 
+function replaceWithSanitizedHtml(
+  target: Element,
+  html: string,
+  ownerDocument: Document,
+) {
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  target.replaceChildren(
+    ...Array.from(parsed.body.childNodes, (node) =>
+      ownerDocument.importNode(node, true),
+    ),
+  );
+}
+
 /** Keep the live canvas subject to the same HTML policy as published CMS output. */
 export function sanitizeVisualPropertyValue(
   property: VisualComponentDefinition["properties"][number],
@@ -240,7 +253,8 @@ function visualMarkupWithProperty(
   } else {
     const target = visualMarkupTarget(root, property);
     const attribute = property.htmlAttr ?? property.key;
-    if (attribute === "innerHTML") target.innerHTML = safeValue;
+    if (attribute === "innerHTML")
+      replaceWithSanitizedHtml(target, safeValue, document);
     else if (attribute === "nodeName") {
       const replacement = document.createElement(value.toLowerCase());
       replacement.innerHTML = target.innerHTML;
