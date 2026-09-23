@@ -30,6 +30,11 @@ test("routes CMS page reads and mutation history to the APP database role", () =
   assert.equal(nativeDatabaseRole({ cmsAdminPageMutationsMatch: true }), "app");
 });
 
+test("routes public storefront CMS configuration reads to the APP database role", () => {
+  assert.equal(nativeDatabaseRole({ storefrontHomeMatch: true }), "app");
+  assert.equal(nativeDatabaseRole({ storefrontMetadataMatch: true }), "app");
+});
+
 test("CMS page endpoints fail closed when APP Hyperdrive is missing", async () => {
   const paths = [
     "/api/admin/cms/pages",

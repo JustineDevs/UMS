@@ -347,6 +347,26 @@ export async function upsertStorefrontHomeContent(
  * Returns built-in defaults when Supabase is not configured or the query fails.
  */
 export async function loadStorefrontHomeContentForPublic(): Promise<StorefrontHomePayload> {
+  const workerUrl = process.env.API_URL?.trim().replace(/\/$/, "");
+  if (workerUrl) {
+    try {
+      const response = await fetch(`${workerUrl}/storefront/home`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`worker_home_${response.status}`);
+      const body = (await response.json()) as {
+        home?: unknown;
+        page?: { tree?: unknown };
+      };
+      if (Array.isArray(body.page?.tree) && body.page.tree.length > 0) {
+        return mergeCanonicalHomeTree(body.page.tree as CmsNode[]);
+      }
+      return mergeStorefrontHomePayload(body.home);
+    } catch (e) {
+      console.warn("[storefront-home-cms] Worker read failed", e);
+      return mergeStorefrontHomePayload(null);
+    }
+  }
   const url = process.env.SUPABASE_URL?.trim();
   const anonKey = process.env.SUPABASE_ANON_KEY?.trim();
   if (!url || !anonKey) {
@@ -365,7 +385,7 @@ export async function loadStorefrontHomeContentForPublic(): Promise<StorefrontHo
 }
 
 /** The published page tree is authoritative; legacy home content is only a migration fallback. */
-function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
+export function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
   const blocks = cmsTreeToBlocks(tree);
   const raw: Record<string, unknown> = {};
   const hero = blocks.find((block) => block.id === "home-hero")?.props;
