@@ -53,7 +53,9 @@
         }
       },
       "vars": {
-        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app"
+        "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
+        "CMS_ORGANIZATION_ID": "local-admin@example.com",
+        "DEFAULT_ORGANIZATION_ID": "local-admin@example.com"
       },
     }
   }
