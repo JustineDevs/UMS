@@ -32,7 +32,19 @@ export function SupabaseSessionProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={contextValue}>{children}</Context.Provider>;
 }
 export function useSession() { return useContext(Context); }
-export async function signIn(provider: "google", options?: { callbackUrl?: string }, oauthOptions?: { prompt?: string }) { const callback = new URL("/api/auth/callback", window.location.origin); if (options?.callbackUrl?.startsWith("/")) callback.searchParams.set("next", options.callbackUrl); const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({ provider, options: { redirectTo: callback.toString(), queryParams: oauthOptions?.prompt ? { prompt: oauthOptions.prompt } : undefined } }); if (error) throw error; }
+export async function signIn(provider: "google", options?: { callbackUrl?: string }, oauthOptions?: { prompt?: string }) {
+  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const callback = new URL("/api/auth/callback", configuredOrigin || window.location.origin);
+  if (options?.callbackUrl?.startsWith("/")) callback.searchParams.set("next", options.callbackUrl);
+  const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: callback.toString(),
+      queryParams: oauthOptions?.prompt ? { prompt: oauthOptions.prompt } : undefined,
+    },
+  });
+  if (error) throw error;
+}
 export async function signOut(options?: { callbackUrl?: string }) { await createSupabaseBrowserClient().auth.signOut(); window.location.assign(options?.callbackUrl ?? "/"); }
 export async function signInWithPassword(email: string, password: string, callbackUrl: string) {
   const { error } = await createSupabaseBrowserClient().auth.signInWithPassword({ email, password });
