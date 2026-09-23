@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { assertStorefrontLinesStock } from "@/lib/storefront-inventory-guard";
-import { withBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseBoundedJson } from "@/lib/bounded-request-body";
@@ -57,4 +56,8 @@ async function handlePOST(req: Request): Promise<Response> {
   return NextResponse.json(checkoutVerifyStockResponseSchema.parse(result));
 }
 
-export const POST = withBotIdProtection(handlePOST);
+// Stock verification is a read-only, same-origin, rate-limited request. It is
+// intentionally not gated by BotID: blocking this preflight with a bot score
+// prevents legitimate checkout browsers and hosted-payment test flows from
+// ever reaching the provider handoff.
+export const POST = handlePOST;

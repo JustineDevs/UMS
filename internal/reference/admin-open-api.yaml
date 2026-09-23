@@ -11578,7 +11578,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 413, 429]
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       security: []
       requestBody:
         required: true
@@ -17875,7 +17875,7 @@ components:
       type: object
       additionalProperties: false
       description: "Validated request payload for POST /checkout/verify-stock. Runtime source: apps/web/src/app/api/checkout/verify-stock/route.ts."
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -17888,7 +17888,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /checkout/verify-stock. Runtime source: apps/web/src/app/api/checkout/verify-stock/route.ts."
-      x-source-sha256: 696fb23d51df2fc4150aad513b1ef6ccd1ec1013ab98bafcc7ab6bf7e9eda578
+      x-source-sha256: aa18964d503fe7d1258fd8444d2e6d1a08bb98771eb006b7af45e2764e463100
       x-contract-inference: runtime-zod
       x-contract-status: executable
       anyOf:

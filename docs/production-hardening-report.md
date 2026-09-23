@@ -263,3 +263,15 @@ Stripe `/v1/account`. The invalid Worker secrets were removed, and production wa
 Worker version `3410ad27-04f2-4b1f-a433-4a55f5864579`. The live capability contract now correctly
 returns only `XENDIT` and `COD` until valid provider credentials are supplied; no broken provider
 is advertised to customers.
+### 2026-09-23 — Checkout stock-verification browser compatibility
+
+- Root cause: the read-only `POST /api/checkout/verify-stock` endpoint was wrapped
+  in BotID. Legitimate hosted-browser checkout runs were rejected with HTTP 403
+  `Access denied` before Xendit checkout initialization.
+- Fix: the endpoint now keeps same-origin validation, bounded input, and the
+  existing fixed-window rate limit, but no longer uses BotID for this public
+  inventory read. This lets real browsers and privacy-hardened clients reach the
+  provider handoff without weakening checkout or payment authorization.
+- Evidence: the configured Xendit sandbox key returned HTTP 200 from the
+  read-only `/balance` probe; the previous Xendit browser failure therefore was
+  not a provider-credential failure.
