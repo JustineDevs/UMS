@@ -35,6 +35,21 @@ test("routes public storefront CMS configuration reads to the APP database role"
   assert.equal(nativeDatabaseRole({ storefrontMetadataMatch: true }), "app");
 });
 
+test("public storefront CMS routes fail closed through the native route gate", async () => {
+  for (const path of ["/storefront/home", "/storefront/public-metadata"]) {
+    const response = await handleBackendRequest(
+      new Request(`https://worker.test${path}`),
+      env,
+    );
+    assert.equal(response.status, 503, path);
+    assert.equal(
+      ((await response.json()) as { error: string }).error,
+      "database_not_configured",
+      path,
+    );
+  }
+});
+
 test("CMS page endpoints fail closed when APP Hyperdrive is missing", async () => {
   const paths = [
     "/api/admin/cms/pages",
