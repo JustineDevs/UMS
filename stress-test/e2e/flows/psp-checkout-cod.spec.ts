@@ -139,9 +139,15 @@ test.describe("@checkout @cod COD checkout flow", () => {
     await navigateToShopAndAddFirstProduct(page);
     // The local E2E profile fixture is server-validated by the COD endpoint;
     // production-mode runs require the authenticated customer profile instead.
+    // The authenticated checkout can redirect to onboarding before the
+    // checkout page exists, so resolve that gate before using the shared
+    // checkout helper (which intentionally requires a checkout heading).
+    await page.goto(`${storefrontBase}/checkout`, {
+      waitUntil: "domcontentloaded",
+    });
+    await completeOnboardingIfProfileGateRedirected(page);
     await navigateToCheckout(page, { guest: false });
     await fillCheckoutShippingInfo(page);
-    await completeOnboardingIfProfileGateRedirected(page);
     if (/\/checkout(?:\?|$)/i.test(page.url())) {
       await page.waitForTimeout(1_000);
     }
