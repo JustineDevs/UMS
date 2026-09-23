@@ -13166,7 +13166,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 10ca52172cfe55e6ea53a0fc2d4b02d283ff7fe69c57353163926d3dbbded466
+      x-source-sha256: 4da3aa22854869ace51ec19fbc8698eb41cf2493665c27a5f338eb5290731e1d
       security:
         - CustomerSession: []
       responses:
@@ -13209,7 +13209,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 10ca52172cfe55e6ea53a0fc2d4b02d283ff7fe69c57353163926d3dbbded466
+      x-source-sha256: 4da3aa22854869ace51ec19fbc8698eb41cf2493665c27a5f338eb5290731e1d
       security:
         - CustomerSession: []
       requestBody:
@@ -15798,7 +15798,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /reviews. Runtime source: apps/web/src/app/api/reviews/route.ts."
-      x-source-sha256: 10ca52172cfe55e6ea53a0fc2d4b02d283ff7fe69c57353163926d3dbbded466
+      x-source-sha256: 4da3aa22854869ace51ec19fbc8698eb41cf2493665c27a5f338eb5290731e1d
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -18430,7 +18430,7 @@ components:
       type: object
       additionalProperties: true
       description: "Validated request payload for POST /reviews. Runtime source: apps/web/src/app/api/reviews/route.ts."
-      x-source-sha256: 10ca52172cfe55e6ea53a0fc2d4b02d283ff7fe69c57353163926d3dbbded466
+      x-source-sha256: 4da3aa22854869ace51ec19fbc8698eb41cf2493665c27a5f338eb5290731e1d
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -18478,7 +18478,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /reviews. Runtime source: apps/web/src/app/api/reviews/route.ts."
-      x-source-sha256: 10ca52172cfe55e6ea53a0fc2d4b02d283ff7fe69c57353163926d3dbbded466
+      x-source-sha256: 4da3aa22854869ace51ec19fbc8698eb41cf2493665c27a5f338eb5290731e1d
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:

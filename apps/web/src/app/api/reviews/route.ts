@@ -3,7 +3,7 @@ import {
   getRequestIp,
   rateLimitFixedWindow,
 } from "@/lib/storefront-api-rate-limit";
-import { withBotIdProtection } from "@/lib/botid-protection";
+import { verifyBotIdProtection } from "@/lib/botid-protection";
 import {
   isRecaptchaConfigured,
   verifyRecaptchaAction,
@@ -133,6 +133,8 @@ async function handlePOST(req: Request) {
       401,
     );
   }
+  const botProtectionFailure = await verifyBotIdProtection();
+  if (botProtectionFailure) return botProtectionFailure;
   const email = emailRaw.toLowerCase();
   const userRl = await rateLimitFixedWindow(
     `reviews-post-user:${email}`,
@@ -258,4 +260,4 @@ async function handlePOST(req: Request) {
   }
 }
 
-export const POST = withBotIdProtection(handlePOST);
+export const POST = handlePOST;
