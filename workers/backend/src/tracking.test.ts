@@ -39,7 +39,8 @@ test("tracking returns a redacted native commerce projection for a valid capabil
   const response = await handleTrackingRequest(
     new Request(`https://api.example/store/tracking/${encodeURIComponent(token)}`),
     {
-      async query<Row>() {
+      async query<Row>(sql: string) {
+        if (sql.includes("tracking_capability_revocations")) return { rows: [], rowCount: 0 } as { rows: Row[]; rowCount: number };
         return { rows: [{ id: "order_1", display_id: 42, updated_at: "2026-01-01T00:00:00Z", payment_status: "captured", fulfillment_status: "not_fulfilled", email: "buyer@example.com", metadata: {} }] as Row[], rowCount: 1 };
       },
       async end() {},
@@ -58,7 +59,8 @@ test("tracking keeps confirmation fields behind a confirmation capability", asyn
   const response = await handleTrackingRequest(
     new Request("https://api.example/store/tracking/token"),
     {
-      async query<Row>() {
+      async query<Row>(sql: string) {
+        if (sql.includes("tracking_capability_revocations")) return { rows: [], rowCount: 0 } as { rows: Row[]; rowCount: number };
         return { rows: [{ id: "order_1", display_id: 42, updated_at: "2026-01-01T00:00:00Z", payment_status: "captured", fulfillment_status: "not_fulfilled", email: "buyer@example.com", total: 599700, subtotal: 599700, items: [{ id: "item_1", title: "Canary", quantity: 1, unit_price: 599700 }] , metadata: {} }] as Row[], rowCount: 1 };
       },
       async end() {},
