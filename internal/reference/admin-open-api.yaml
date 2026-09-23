@@ -10548,9 +10548,15 @@ paths:
       x-idempotency-persisted: true
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
-      x-runtime-statuses: [200, 403, 413]
-      x-source-sha256: c97a7389ef2cd5b5f62f8884047a60049031ce4c67054443df2f5a5497221081
+      x-runtime-statuses: [200, 400, 403, 413]
+      x-source-sha256: 60ea8e077e6aedbb17d053b5fd5948f3889833b1525ed7e1f0cf3bf8907e6131
       security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/post_cart_abandonmentRequest'
       responses:
         "200":
           description: Operation completed successfully.
@@ -17506,11 +17512,18 @@ components:
           type: object
           const: true
       required: ["ok"]
+    post_cart_abandonmentRequest:
+      type: object
+      additionalProperties: true
+      description: "Validated request payload for POST /cart/abandonment. Runtime source: apps/web/src/app/api/cart/abandonment/route.ts."
+      x-source-sha256: 60ea8e077e6aedbb17d053b5fd5948f3889833b1525ed7e1f0cf3bf8907e6131
+      x-contract-inference: unresolved
+      x-contract-status: non-authoritative
     post_cart_abandonmentResponse:
       type: object
       additionalProperties: false
       description: "Response contract for POST /cart/abandonment. Runtime source: apps/web/src/app/api/cart/abandonment/route.ts."
-      x-source-sha256: c97a7389ef2cd5b5f62f8884047a60049031ce4c67054443df2f5a5497221081
+      x-source-sha256: 60ea8e077e6aedbb17d053b5fd5948f3889833b1525ed7e1f0cf3bf8907e6131
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
