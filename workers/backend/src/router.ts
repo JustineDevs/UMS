@@ -54,7 +54,7 @@ import { handleNavigationRequest } from "./navigation.ts";
 import { handleAnnouncementRequest } from "./announcement.ts";
 import { handleBlogRequest } from "./blog.ts";
 import { handleCategoryRequest } from "./category.ts";
-import { handleSitemapRequest } from "./sitemap.ts";
+import { handleSitemapRequest, handleSitemapXmlRequest } from "./sitemap.ts";
 import {
   handleCmsAdminPageMutationsRequest,
   handleCmsAdminPageRequest,
@@ -228,6 +228,7 @@ export interface BackendEnv
   ALLOWED_ORIGINS?: string;
   CMS_ORGANIZATION_ID?: string;
   DEFAULT_ORGANIZATION_ID?: string;
+  PUBLIC_SITE_URL?: string;
   JWT_SECRET?: string;
   CMS_ADMIN_JWT_SECRET?: string;
   AUTH_SECRET?: string;
@@ -405,6 +406,7 @@ export function nativeDatabaseRole(
     "categoriesMatch",
     "categoryMatch",
     "sitemapMatch",
+    "sitemapXmlMatch",
     "cmsAdminCreateMatch",
     "cmsAdminPageListMatch",
     "cmsAdminPageDetailMatch",
@@ -1144,6 +1146,7 @@ export async function handleBackendRequest(
       ? path.match(/^\/store\/categories\/([^/]+)$/)
       : null;
   const sitemapMatch = request.method === "GET" && path === "/store/sitemap";
+  const sitemapXmlMatch = request.method === "GET" && path === "/sitemap.xml";
   const complianceExportMatch =
     request.method === "GET" && path === "/compliance/export";
   const complianceErasureMatch =
@@ -1168,6 +1171,7 @@ export async function handleBackendRequest(
     searchSuggestionsMatch,
     socialProofMatch,
     sitemapMatch,
+    sitemapXmlMatch,
     cmsAdminCreateMatch,
     cmsAdminPageListMatch,
     cmsAdminPageDetailMatch,
@@ -3815,6 +3819,7 @@ export async function handleBackendRequest(
         categoriesMatch ||
         categoryMatch ||
         sitemapMatch ||
+        sitemapXmlMatch ||
         cartMatch ||
         inventoryMatch ||
         customerOrdersMatch ||
@@ -4283,6 +4288,14 @@ export async function handleBackendRequest(
                                                                                                                                     env.DEFAULT_ORGANIZATION_ID,
                                                                                                                                     env,
                                                                                                                                   )
+                                                                                                                                : sitemapXmlMatch
+                                                                                                                                  ? handleSitemapXmlRequest(
+                                                                                                                                      request,
+                                                                                                                                      database,
+                                                                                                                                      env.CMS_ORGANIZATION_ID ??
+                                                                                                                                        env.DEFAULT_ORGANIZATION_ID,
+                                                                                                                                      env.PUBLIC_SITE_URL,
+                                                                                                                                    )
                                                                                                                                 : sitemapMatch
                                                                                                                                   ? handleSitemapRequest(
                                                                                                                                       request,
