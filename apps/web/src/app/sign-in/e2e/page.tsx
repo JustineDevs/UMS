@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// This page is enabled only for an explicitly marked local proof runtime. It
+// must remain request-dynamic so a production-style local build does not
+// freeze the build-time-disabled state into a 404.
+export const dynamic = "force-dynamic";
+
 /**
  * Playwright and local automation only. Not linked from the main sign-in page.
  * Disabled unless the process is local and E2E env is configured (see
