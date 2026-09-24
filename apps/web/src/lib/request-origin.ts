@@ -31,6 +31,39 @@ function isConfiguredDevelopmentOrigin(origin: URL): boolean {
   });
 }
 
+function isConfiguredPublicOrigin(origin: URL): boolean {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+    return false;
+  }
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!configured) return false;
+  try {
+    return new URL(configured).origin === origin.origin;
+  } catch {
+    return false;
+  }
+}
+
+function forwardedRequestOrigin(req: Request): string | null {
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
+    return null;
+  }
+  const proto = req.headers
+    .get("x-forwarded-proto")
+    ?.split(",", 1)[0]
+    ?.trim();
+  const host = req.headers
+    .get("x-forwarded-host")
+    ?.split(",", 1)[0]
+    ?.trim();
+  if ((proto !== "http" && proto !== "https") || !host) return null;
+  try {
+    return new URL(`${proto}://${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function isSameOriginMutation(req: Request): boolean {
   const fetchSite = req.headers.get("sec-fetch-site")?.trim().toLowerCase();
   const origin = req.headers.get("origin")?.trim();
@@ -46,7 +79,9 @@ export function isSameOriginMutation(req: Request): boolean {
     const parsedOrigin = new URL(origin);
     return (
       sameOriginOrLoopbackAlias(parsedOrigin, requestUrl) ||
-      isConfiguredDevelopmentOrigin(parsedOrigin)
+      isConfiguredDevelopmentOrigin(parsedOrigin) ||
+      isConfiguredPublicOrigin(parsedOrigin) ||
+      parsedOrigin.origin === forwardedRequestOrigin(req)
     );
   } catch {
     return false;

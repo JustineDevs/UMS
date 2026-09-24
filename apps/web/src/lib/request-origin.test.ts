@@ -73,6 +73,50 @@ test("same-origin mutation policy accepts an explicitly configured HTTPS dev tun
   }
 });
 
+test("same-origin mutation policy accepts the configured public origin behind a proxy", () => {
+  const previous = process.env.NEXT_PUBLIC_SITE_URL;
+  const previousVercel = process.env.VERCEL;
+  process.env.NEXT_PUBLIC_SITE_URL = "https://universalmusic.vercel.app";
+  process.env.VERCEL = "1";
+  try {
+    assert.equal(
+      isSameOriginMutation(
+        new Request("https://internal-vercel-origin.invalid/api/checkout/cod-place-order", {
+          headers: { origin: "https://universalmusic.vercel.app" },
+        }),
+      ),
+      true,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+    else process.env.NEXT_PUBLIC_SITE_URL = previous;
+    if (previousVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previousVercel;
+  }
+});
+
+test("same-origin mutation policy accepts a matching forwarded public host", () => {
+  const previousVercel = process.env.VERCEL;
+  process.env.VERCEL = "1";
+  try {
+  assert.equal(
+    isSameOriginMutation(
+      new Request("https://internal-vercel-origin.invalid/api/checkout/cod-place-order", {
+        headers: {
+          origin: "https://universalmusic.vercel.app",
+          "x-forwarded-proto": "https",
+          "x-forwarded-host": "universalmusic.vercel.app",
+        },
+      }),
+    ),
+    true,
+  );
+  } finally {
+    if (previousVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previousVercel;
+  }
+});
+
 test("same-origin mutation policy rejects explicit cross-site requests", () => {
   const request = new Request("https://store.example/api/forms/contact", {
     method: "POST",
