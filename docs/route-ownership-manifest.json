@@ -1732,8 +1732,10 @@
         "post"
       ],
       "source": "apps/web/src/app/api/checkout/cod-place-order/route.ts",
-      "owner": "web-runtime",
-      "signals": []
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
     },
     {
       "route": "/checkout/commerce-telemetry",
@@ -1741,6 +1743,13 @@
         "post"
       ],
       "source": "apps/web/src/app/api/checkout/commerce-telemetry/route.ts",
+      "owner": "web-runtime",
+      "signals": []
+    },
+    {
+      "route": "/checkout/complete-medusa-cart",
+      "methods": [],
+      "source": "apps/web/src/app/api/checkout/complete-medusa-cart/route.ts",
       "owner": "web-runtime",
       "signals": []
     },
@@ -2082,10 +2091,9 @@
         "get"
       ],
       "source": "apps/web/src/app/api/payments/checkout-intents/recover/route.ts",
-      "owner": "web-bff-worker-origin",
+      "owner": "worker-origin",
       "signals": [
-        "worker-proxy",
-        "direct-database"
+        "worker-proxy"
       ]
     },
     {
@@ -2094,8 +2102,10 @@
         "post"
       ],
       "source": "apps/web/src/app/api/payments/checkout-intents/route.ts",
-      "owner": "web-runtime",
-      "signals": []
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
     },
     {
       "route": "/pos/commerce/commit-sale",
