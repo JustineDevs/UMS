@@ -42,6 +42,38 @@ test("keeps APP and Medusa database roles on their own bindings", async () => {
   assert.deepEqual(connections, ["postgres://app", "postgres://medusa"]);
 });
 
+test("shares one connection promise across concurrent first queries", async () => {
+  let connectCalls = 0;
+  let releaseConnect!: () => void;
+  const connected = new Promise<void>((resolve) => {
+    releaseConnect = resolve;
+  });
+  const queries: string[] = [];
+  const client = {
+    async connect(): Promise<void> {
+      connectCalls += 1;
+      await connected;
+    },
+    async query<T>(text: string): Promise<{ rows: T[]; rowCount: number }> {
+      queries.push(text);
+      return { rows: [], rowCount: 0 };
+    },
+    async end(): Promise<void> {},
+  };
+  const database = createWorkerDatabaseClient(
+    { APP_DB_URL: "postgres://app" },
+    "app",
+    () => client,
+  );
+  const first = database.query("SELECT 1");
+  const second = database.query("SELECT 2");
+  await new Promise((resolve) => setImmediate(resolve));
+  releaseConnect();
+  await Promise.all([first, second]);
+  assert.equal(connectCalls, 1);
+  assert.deepEqual(queries, ["SELECT 1", "SELECT 2"]);
+});
+
 test("does not let the APP role fall back to the generic Medusa binding", () => {
   assert.throws(
     () =>
