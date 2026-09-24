@@ -33,8 +33,9 @@ export function SupabaseSessionProvider({ children }: { children: ReactNode }) {
 }
 export function useSession() { return useContext(Context); }
 export async function signIn(provider: "google", options?: { callbackUrl?: string }, oauthOptions?: { prompt?: string }) {
-  const configuredOrigin = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  const callback = new URL("/api/auth/callback", configuredOrigin || window.location.origin);
+  // Build the callback from the page origin so production OAuth cannot drift
+  // to a build-time/local NEXT_PUBLIC_SITE_URL value.
+  const callback = new URL("/api/auth/callback", window.location.origin);
   if (options?.callbackUrl?.startsWith("/")) callback.searchParams.set("next", options.callbackUrl);
   const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({
     provider,
@@ -45,7 +46,17 @@ export async function signIn(provider: "google", options?: { callbackUrl?: strin
   });
   if (error) throw error;
 }
-export async function signOut(options?: { callbackUrl?: string }) { await createSupabaseBrowserClient().auth.signOut(); window.location.assign(options?.callbackUrl ?? "/"); }
+export async function signOut(options?: { callbackUrl?: string }) {
+  await Promise.allSettled([
+    createSupabaseBrowserClient().auth.signOut(),
+    fetch("/api/auth/e2e", {
+      method: "DELETE",
+      credentials: "include",
+      cache: "no-store",
+    }),
+  ]);
+  window.location.assign(options?.callbackUrl ?? "/");
+}
 export async function signInWithPassword(email: string, password: string, callbackUrl: string) {
   const { error } = await createSupabaseBrowserClient().auth.signInWithPassword({ email, password });
   if (error) return { ok: false as const, error: error.message };
