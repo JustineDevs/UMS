@@ -36,6 +36,7 @@ export async function signIn(provider: "google", options?: { callbackUrl?: strin
   // Build the callback from the page origin so production OAuth cannot drift
   // to a build-time/local NEXT_PUBLIC_SITE_URL value.
   const callback = new URL("/api/auth/callback", window.location.origin);
+  callback.searchParams.set("origin", window.location.origin);
   if (options?.callbackUrl?.startsWith("/")) callback.searchParams.set("next", options.callbackUrl);
   const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({
     provider,
