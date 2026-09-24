@@ -258,6 +258,7 @@ function providerObjectId(body: unknown): {
       object,
       "payment_intent",
       "payment_id",
+      "payment_request_id",
       "capture_id",
       "id",
     ),
