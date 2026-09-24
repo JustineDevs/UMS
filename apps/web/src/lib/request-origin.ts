@@ -44,7 +44,7 @@ function isConfiguredPublicOrigin(origin: URL): boolean {
   }
 }
 
-function forwardedRequestOrigin(req: Request): string | null {
+export function forwardedRequestOrigin(req: Request): string | null {
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
     return null;
   }
@@ -62,6 +62,11 @@ function forwardedRequestOrigin(req: Request): string | null {
   } catch {
     return null;
   }
+}
+
+/** Resolve the browser-facing origin preserved by a trusted hosting proxy. */
+export function requestFacingOrigin(req: Request): string {
+  return forwardedRequestOrigin(req) ?? new URL(req.url).origin;
 }
 
 export function isSameOriginMutation(req: Request): boolean {

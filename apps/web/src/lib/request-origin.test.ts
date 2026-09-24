@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { isSameOriginMutation } from "./request-origin";
+import { isSameOriginMutation, requestFacingOrigin } from "./request-origin";
 
 test("same-origin mutation policy rejects explicit cross-site metadata", () => {
   assert.equal(
@@ -126,4 +126,25 @@ test("same-origin mutation policy rejects explicit cross-site requests", () => {
     },
   });
   assert.equal(isSameOriginMutation(request), false);
+});
+
+test("request-facing origin follows the trusted Vercel forwarded host", () => {
+  const previousVercel = process.env.VERCEL;
+  process.env.VERCEL = "1";
+  try {
+    assert.equal(
+      requestFacingOrigin(
+        new Request("https://internal-vercel-origin.invalid/api/auth/callback", {
+          headers: {
+            "x-forwarded-proto": "https",
+            "x-forwarded-host": "universalmusic-preview.vercel.app",
+          },
+        }),
+      ),
+      "https://universalmusic-preview.vercel.app",
+    );
+  } finally {
+    if (previousVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previousVercel;
+  }
 });
