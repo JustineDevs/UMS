@@ -374,6 +374,45 @@ test("keeps webhook lifecycle transitions monotonic and preserves cancellation",
   assert.match(update ?? "", /status IN \('paid', 'completed', 'refunded'\)/);
 });
 
+test("matches Xendit payment callbacks by payment_request_id", async () => {
+  const queries: Array<{ sql: string; values?: readonly unknown[] }> = [];
+  const database = {
+    query: async <T extends Record<string, unknown>>(sql: string, values?: readonly unknown[]) => {
+      queries.push({ sql, values });
+      if (sql.startsWith("INSERT INTO public.payment_webhook_events"))
+        return { rows: [{ inserted: true }] as T[], rowCount: 1 };
+      if (sql.startsWith("UPDATE public.payment_attempts"))
+        return { rows: [{ correlation_id: "123e4567-e89b-12d3-a456-426614174000" }] as T[], rowCount: 1 };
+      if (sql.startsWith("UPDATE public.payment_webhook_events"))
+        return { rows: [], rowCount: 1 };
+      throw new Error(`unexpected query: ${sql}`);
+    },
+    end: async () => undefined,
+  };
+  const response = await handleWorkerWebhookRequest(
+    new Request("https://api.test/webhooks/xendit", {
+      method: "POST",
+      body: JSON.stringify({
+        id: "xendit-payment-succeeded",
+        event: "payment.succeeded",
+        data: {
+          id: "payment-event-id",
+          payment_request_id: "payment-request-id",
+          status: "SUCCEEDED",
+        },
+      }),
+      headers: { "x-callback-token": "x-token" },
+    }),
+    database,
+    "xendit",
+    { XENDIT_WEBHOOK_TOKEN: "x-token" },
+  );
+  assert.equal(response.status, 202);
+  const update = queries.find(({ sql }) => sql.startsWith("UPDATE public.payment_attempts"));
+  assert.ok(update);
+  assert.equal(update.values?.[6], "payment-request-id");
+});
+
 test("reconciles Xendit refund callbacks into APP audit on first and duplicate delivery", async () => {
   const commerceStatements: Array<{ sql: string; values?: readonly unknown[] }> = [];
   const appStatements: Array<{ sql: string; values?: readonly unknown[] }> = [];

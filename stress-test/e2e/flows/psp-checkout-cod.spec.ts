@@ -69,7 +69,9 @@ async function establishRealSessionIfRequested(
   page: import("@playwright/test").Page,
 ): Promise<boolean> {
   if (process.env.UVS_E2E_REAL_SESSION !== "1") return true;
-  return (await signInAsAdmin(page)) === "ok";
+  // The E2E cookie is host-scoped. Authenticate on the storefront origin
+  // because this flow leaves the admin origin before opening checkout.
+  return (await signInAsAdmin(page, storefrontBase)) === "ok";
 }
 
 test.describe("@checkout @cod COD checkout flow", () => {

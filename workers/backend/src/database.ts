@@ -78,6 +78,7 @@ export function createWorkerDatabaseClient(
     ...WORKER_DB_CLIENT_OPTIONS,
   });
   let connected = false;
+  let connectionPromise: Promise<void> | null = null;
 
   return {
     async query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -85,8 +86,18 @@ export function createWorkerDatabaseClient(
       values: readonly unknown[] = [],
     ): Promise<{ rows: T[]; rowCount: number | null }> {
       if (!connected) {
-        await client.connect();
-        connected = true;
+        if (!connectionPromise) {
+          connectionPromise = client.connect().then(
+            () => {
+              connected = true;
+            },
+            (error) => {
+              connectionPromise = null;
+              throw error;
+            },
+          );
+        }
+        await connectionPromise;
       }
       const result = await client.query<T>(text, [...values]);
       return { rows: result.rows, rowCount: result.rowCount ?? null };

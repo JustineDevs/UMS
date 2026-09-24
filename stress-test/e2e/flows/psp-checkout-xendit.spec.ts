@@ -127,6 +127,9 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
       },
     );
 
+    await expect(page.locator("#main-content main").first()).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page).not.toHaveURL(/\/track\/order_/i);
     await expect(
       page.getByText(/Xendit did not confirm your payment/i),
@@ -146,6 +149,9 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
       },
     );
 
+    await expect(page.locator("#main-content main").first()).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page).not.toHaveURL(/\/track\/order_/i);
     await expect(
       page.getByText(/Xendit did not confirm your payment/i),

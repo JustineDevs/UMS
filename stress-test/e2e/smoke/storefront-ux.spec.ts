@@ -431,15 +431,10 @@ test.describe("storefront UX and compliance", () => {
   });
 
   test("collection handles render native catalog pages", async ({ page }) => {
-    await page.goto("/collections", { waitUntil: "domcontentloaded" });
-    const collectionLink = page.locator("a[href^='/collections/']").first();
-    if (!(await collectionLink.isVisible().catch(() => false))) {
-      test.skip(true, "No seeded collection available");
-      return;
-    }
-    const href = await collectionLink.getAttribute("href");
-    expect(href).toMatch(/^\/collections\/.+/);
-    await page.goto(href!, { waitUntil: "domcontentloaded" });
+    const collectionPath =
+      process.env.UVS_E2E_COLLECTION_PATH ??
+      "/collections/guitars?sort=price_asc";
+    await page.goto(collectionPath, { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/collections\/[^/?#]+(?:\?.*)?$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(
@@ -448,7 +443,7 @@ test.describe("storefront UX and compliance", () => {
     await expect(
       page.getByText(/^Showing \d+ (?:product|products)$/),
     ).toBeVisible();
-    await expect(page.getByText("Sorted by newest")).toBeVisible();
+    await expect(page.getByText(/Sorted by (?:newest|price)/i)).toBeVisible();
     const structuredData = await page
       .locator('script[type="application/ld+json"]')
       .allTextContents();
