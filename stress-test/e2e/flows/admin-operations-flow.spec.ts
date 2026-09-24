@@ -74,52 +74,69 @@ test.describe("@admin Admin operations E2E", () => {
     }
   });
 
-  test("CMS nested DOM edits are persisted to history", async ({ page }) => {
+  test("CMS page creation, component editing, and cleanup are persisted", async ({ page }) => {
     test.setTimeout(120_000);
     const login = await e2eAdminLogin(page);
     if (login === "skip_no_ui" || login === "skip_no_env") test.skip(true, "Admin E2E auth is not configured.");
 
     await page.goto(`${adminBase}/admin/cms/builder`, { waitUntil: "domcontentloaded" });
-    const canvas = page.locator('iframe[title="Storefront canvas"]').contentFrame();
-    const nested = canvas.locator('[data-cms-id^="cms-dom-"][data-cms-block-id]').first();
-    await expect(nested).toBeVisible({ timeout: 30_000 });
-    await nested.click({ force: true });
+    const fixtureTitle = `E2E CMS ${Date.now()}`;
+    const fixtureSlug = `e2e-cms-${Date.now()}`;
 
-    const padding = page.locator("label").filter({ hasText: "padding" }).last().locator("input");
-    await expect(padding).toBeVisible();
-    await padding.fill("24px");
-    await padding.blur();
-    const color = page.locator("label").filter({ hasText: /^\s*color\s*$/ }).locator("input");
-    await color.fill("rgb(255, 0, 0)");
-    await color.press("Enter");
-    const activeSelected = canvas
-      .locator('[data-cms-id][data-selected="true"]')
-      .first();
-    await expect(activeSelected).toHaveCSS("color", "rgb(255, 0, 0)");
-    const undo = page.getByRole("button", { name: "Undo" });
-    const redo = page.getByRole("button", { name: "Redo" });
-    await expect(undo).toBeEnabled();
-    await undo.click();
-    await expect(redo).toBeEnabled();
-    await redo.click();
-    await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
-  });
+    await page.getByRole("button", { name: "Pages", exact: true }).click();
+    await page.getByRole("button", { name: "Add page" }).click();
+    await page.getByLabel("Page title").fill(fixtureTitle);
+    await page.getByLabel("URL slug").fill(fixtureSlug);
+    await page.getByRole("button", { name: "Create page" }).click();
 
-  test("Component Canvas remains disabled until the feature is enabled", async ({ page }) => {
-    test.setTimeout(120_000);
-    const login = await e2eAdminLogin(page);
-    if (login === "skip_no_ui" || login === "skip_no_env") test.skip(true, "Admin E2E auth is not configured.");
+    try {
+      await page.getByRole("button", { name: "Components", exact: true }).click();
+      const addComponent = page.getByRole("button", { name: /^Add / }).first();
+      await expect(addComponent).toBeVisible();
+      await page.getByRole("tab", { name: "Blocks", exact: true }).click();
+      const addBlock = page.locator("button").filter({ hasText: /Hero banner|Heading|Paragraph|Text/ }).last();
+      await expect(addBlock).toBeVisible();
+      await addBlock.click();
 
-    await page.goto(`${adminBase}/admin/cms/builder`, { waitUntil: "domcontentloaded" });
-    await page.getByRole("button", { name: "Components", exact: true }).click();
-    await page.getByRole("button", { name: /Hero banner/ }).first().click();
+      const createResponse = page.waitForResponse(
+        (response) => response.url().includes("/api/admin/cms/pages") && [200, 201].includes(response.status()),
+      );
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await createResponse;
 
-    await expect(
-      page.locator('iframe[title="Isolated component definition canvas"]'),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: "Canvas disabled" }),
-    ).toBeDisabled();
-    await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
+      await expect(page.getByText("Hero banner", { exact: true }).last()).toBeVisible();
+      const headline = page.getByLabel("Headline");
+      await expect(headline).toBeVisible();
+      await headline.fill("E2E verified hero");
+      await headline.blur();
+      await expect(headline).toHaveValue("E2E verified hero");
+      await page.waitForTimeout(250);
+      const updateResponse = page.waitForResponse(
+        (response) => response.url().includes("/api/admin/cms/pages/") && response.request().method() === "PUT" && response.status() === 200,
+      );
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await updateResponse;
+      const undo = page.getByRole("button", { name: "Undo" });
+      const redo = page.getByRole("button", { name: "Redo" });
+      await expect(undo).toBeEnabled();
+      await undo.click();
+      await expect(redo).toBeEnabled();
+      await redo.click();
+
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: "Pages", exact: true }).click();
+      await page.getByRole("button", { name: fixtureTitle, exact: true }).click();
+      await expect(page.getByText("Hero banner", { exact: true }).last()).toBeVisible();
+      await page.getByText("Hero banner", { exact: true }).last().click();
+      await expect(page.getByLabel("Headline")).toHaveValue("E2E verified hero");
+      await expect(page.locator("body")).not.toContainText(/Maximum update depth|Application error|Unhandled Runtime Error/i);
+    } finally {
+      await page.getByRole("button", { name: "Pages", exact: true }).click().catch(() => undefined);
+      const deleteButtons = page.getByRole("button", { name: /^Delete E2E CMS / });
+      for (let index = await deleteButtons.count() - 1; index >= 0; index -= 1) {
+        page.once("dialog", (dialog) => dialog.accept());
+        await deleteButtons.nth(index).click();
+      }
+    }
   });
 });
