@@ -5,7 +5,6 @@ import {
   listMissingProfileParts,
 } from "@/lib/storefront-profile-complete";
 import { profileToCodCartAddresses } from "@/lib/checkout-address";
-import { verifyBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { checkoutCodCartPayloadResponseSchema } from "@/lib/admin-api-contracts";
@@ -56,13 +55,11 @@ async function handlePOST(req: Request) {
     );
   }
 
-  // Run BotID only after the request has proved it is an authenticated,
-  // profile-complete COD attempt. This keeps the abuse gate in place while
-  // preserving the route's real 401/400 contract for unauthenticated and
-  // incomplete profiles.
-  const botProtectionFailure = await verifyBotIdProtection();
-  if (botProtectionFailure) return botProtectionFailure;
-
+  // This endpoint only returns server-owned profile data for the already
+  // authenticated customer; it does not mutate a cart or create an order.
+  // Keep the fixed-window rate limit above, but do not apply BotID here: its
+  // browser challenge can reject legitimate hosted checkout sessions before
+  // the actual, separately authorized COD order mutation runs.
   return Response.json(checkoutCodCartPayloadResponseSchema.parse(payload));
 }
 

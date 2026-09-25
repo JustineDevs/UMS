@@ -11168,7 +11168,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 401, 403, 429]
-      x-source-sha256: 82a6c7c59dd8ac61e686669a62b9c3819c498c6fac4e80d788294e272947e6ec
+      x-source-sha256: 02695b6c4793e459352b7591d894862cdfb1b35e7a994d3bc29eb245e6e6b243
       security:
         - CustomerSession: []
       responses:
@@ -17691,7 +17691,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /checkout/cod-cart-payload. Runtime source: apps/web/src/app/api/checkout/cod-cart-payload/route.ts."
-      x-source-sha256: 82a6c7c59dd8ac61e686669a62b9c3819c498c6fac4e80d788294e272947e6ec
+      x-source-sha256: 02695b6c4793e459352b7591d894862cdfb1b35e7a994d3bc29eb245e6e6b243
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
