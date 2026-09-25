@@ -38,8 +38,12 @@ export function StorefrontRuntimeProviders({
         {!botIdDisabledForLocalAuthBypass ? (
           <BotIdClient
             protect={[
+              // COD placement is already protected by the server-side session,
+              // same-origin, profile, rate-limit, and idempotency checks. Do
+              // not make the browser's BotID challenge a payment prerequisite:
+              // hosted/in-app browsers can reject a legitimate order before
+              // the server receives it.
               { path: "/api/checkout", method: "POST" },
-              { path: "/api/checkout/cod-place-order", method: "POST" },
               { path: "/api/checkout/apply-promo", method: "POST" },
               { path: "/api/checkout/verify-stock", method: "POST" },
               { path: "/api/checkout/upload-payment-receipt", method: "POST" },
