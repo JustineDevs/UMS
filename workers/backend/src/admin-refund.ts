@@ -252,7 +252,7 @@ export async function handleAdminRefundRequest(
           const major = (amount / (10 ** decimals)).toFixed(decimals);
           providerResult = await refundPayPalCapture({ clientId: env.PAYPAL_CLIENT_ID ?? "", clientSecret: env.PAYPAL_CLIENT_SECRET ?? "", sandbox: (env.PAYPAL_ENVIRONMENT ?? "sandbox") !== "production", captureId: providerPaymentId, amountMajor: major, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
         } else {
-          providerResult = await refundXenditPayment({ secretKey: env.XENDIT_SECRET_KEY ?? "", paymentRequestId: providerPaymentId, amountMinor: amount, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
+          providerResult = await refundXenditPayment({ secretKey: env.XENDIT_SECRET_KEY ?? "", paymentRequestId: providerPaymentId, referenceId: orderId, amountMinor: amount, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "provider_error";

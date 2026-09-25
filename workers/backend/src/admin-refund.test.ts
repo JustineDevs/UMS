@@ -168,8 +168,10 @@ test("admin refund finds Xendit payment request identity in native session paylo
   state.env.providerFetch = async (input, init) => {
     const request = new Request(input, init);
     assert.equal(request.url, "https://api.xendit.co/refunds");
-    const body = await request.json() as { payment_request_id?: string };
+    const body = await request.json() as { payment_request_id?: string; reference_id?: string; reason?: string };
     assert.equal(body.payment_request_id, "pr_test");
+    assert.equal(body.reference_id, "order_1");
+    assert.equal(body.reason, "REQUESTED_BY_CUSTOMER");
     return new Response(JSON.stringify({ refund_id: "refund_xendit", status: "SUCCEEDED" }), { status: 200 });
   };
   state.env.databaseFactory = (role) => {

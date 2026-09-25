@@ -449,6 +449,7 @@ export async function refundPayPalCapture(
 export type XenditRefundInput = {
   secretKey: string;
   paymentRequestId: string;
+  referenceId?: string;
   amountMinor: number;
   currency: string;
   idempotencyKey: string;
@@ -472,9 +473,10 @@ export async function refundXenditPayment(
     },
     body: JSON.stringify({
       payment_request_id: requireNonEmpty(input.paymentRequestId, "xendit_payment_request_id"),
+      ...(input.referenceId?.trim() ? { reference_id: input.referenceId.trim() } : {}),
       currency: input.currency.toUpperCase(),
       amount: input.amountMinor,
-      reason: input.reason ?? "requested_by_customer",
+      reason: (input.reason?.trim() || "REQUESTED_BY_CUSTOMER").toUpperCase(),
     }),
   });
   const body = await readJson(response, "xendit_refund");
