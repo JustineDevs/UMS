@@ -39,7 +39,6 @@ export function StorefrontRuntimeProviders({
           <BotIdClient
             protect={[
               { path: "/api/checkout", method: "POST" },
-              { path: "/api/checkout/cod-cart-payload", method: "POST" },
               { path: "/api/checkout/cod-place-order", method: "POST" },
               { path: "/api/checkout/apply-promo", method: "POST" },
               { path: "/api/checkout/verify-stock", method: "POST" },
