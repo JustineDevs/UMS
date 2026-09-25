@@ -458,6 +458,7 @@ export async function handleWorkerWebhookRequest(
              AND $1 IN ('pending', 'failed', 'cancelled') THEN status
            ELSE $1
          END,
+           provider_payment_id = COALESCE(provider_payment_id, $8),
            checkout_state = CASE
              WHEN status IN ('paid', 'completed', 'refunded')
                AND $1 IN ('pending', 'failed', 'cancelled') THEN checkout_state
@@ -479,6 +480,7 @@ export async function handleWorkerWebhookRequest(
         provider,
         correlationId,
         providerIds.sessionId,
+        providerIds.paymentId,
         providerIds.paymentId,
       ],
     );

@@ -33,8 +33,17 @@ const AUTH_REQUIRED_GET_ROUTES = [
   "/api/admin/crm/bridge",
 ];
 
+const ADMIN_API_ROUTE_GROUPS: Record<string, readonly string[]> = {
+  first: AUTH_REQUIRED_GET_ROUTES.slice(0, 7),
+  operations: AUTH_REQUIRED_GET_ROUTES.slice(7, 12),
+  health: AUTH_REQUIRED_GET_ROUTES.slice(12),
+};
+
+const selectedAdminApiRoutes =
+  ADMIN_API_ROUTE_GROUPS[process.env.UVS_ADMIN_API_ROUTE_GROUP ?? ""] ?? AUTH_REQUIRED_GET_ROUTES;
+
 test.describe("Admin API — unauthenticated requests return 401", () => {
-  for (const route of AUTH_REQUIRED_GET_ROUTES) {
+  for (const route of selectedAdminApiRoutes) {
     test(`GET ${route} returns 401 without session`, async ({ request }) => {
       const res = await request.get(`${base}${route}`, {
         failOnStatusCode: false,
@@ -56,7 +65,7 @@ test.describe("Admin API — authenticated requests return 200", () => {
     "Skipped: set E2E_ADMIN_AUTH=1 with ADMIN_ALLOWED_EMAILS and AUTH_SECRET after e2e:ensure-staff",
   );
 
-  for (const route of AUTH_REQUIRED_GET_ROUTES) {
+  for (const route of selectedAdminApiRoutes) {
     test(`GET ${route} returns 200 with valid session`, async ({ page, request }) => {
       const result = await e2eAdminLogin(page);
       if (result !== "ok") {

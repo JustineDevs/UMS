@@ -13,10 +13,13 @@ export function getPostHogProjectToken(): string | undefined {
 }
 
 export function getPostHogApiKey(): string | undefined {
-  const key =
-    process.env.POSTHOG_API_KEY?.trim() ||
-    getPostHogProjectToken();
-  return key || undefined;
+  // `/capture/` accepts a project token, not a personal PostHog API key
+  // (`phx_...`). Prefer the canonical project token when both are present and
+  // ignore a management key rather than sending it to the capture endpoint.
+  const projectToken = getPostHogProjectToken();
+  if (projectToken) return projectToken;
+  const apiKey = process.env.POSTHOG_API_KEY?.trim();
+  return apiKey?.startsWith("phc_") ? apiKey : undefined;
 }
 
 export function getPostHogHost(): string {

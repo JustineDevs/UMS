@@ -1,24 +1,20 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { parseAdminJson } from "@/lib/admin-api-security";
 import { accountMarketingPreferencesPatchSchema, accountMarketingPreferencesResponseSchema } from "@/lib/admin-api-contracts";
 import { readResponseJson } from "@/lib/read-response-json";
+import { getStorefrontWorkerAuth } from "@/lib/storefront-worker-auth";
 
 export const dynamic = "force-dynamic";
 
 async function workerRequest(request: Request, body?: string): Promise<Response> {
   const baseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
   if (!baseUrl) return Response.json({ error: "Account preferences are unavailable." }, { status: 503 });
-  const supabase = await createSupabaseServerClient();
-  const [{ data: userData }, { data: sessionData }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession(),
-  ]);
-  if (!userData.user || !sessionData.session?.access_token) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await getStorefrontWorkerAuth();
+  if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
   const response = await fetch(`${baseUrl}/store/customers/me/marketing-preferences`, {
     method: request.method,
     headers: {
-      Authorization: `Bearer ${sessionData.session.access_token}`,
+      Authorization: `Bearer ${auth.token}`,
       ...(request.method === "PATCH" ? { "Content-Type": "application/json" } : {}),
     },
     ...(request.method === "PATCH" ? { body: body ?? await request.text() } : {}),

@@ -856,22 +856,25 @@ export function HomeScrollExperience({
                 {marqueePartners.map((partner, index) => {
                   const isDecorativeClone = index >= PARTNERS.length;
                   return (
-                    <a
+                    <li
                       key={`${partner.name}-${partner.href}-${index}`}
+                      role="listitem"
+                      aria-hidden={isDecorativeClone || undefined}
+                      className="flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center"
+                    >
+                    <a
                       href={partner.href}
                       target="_blank"
                       rel="noreferrer noopener"
                       className="group/logo flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center rounded-lg bg-transparent px-3 opacity-80 transition-[transform,opacity,filter] duration-300 hover:-translate-y-0.5 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       aria-label={`Visit ${partner.name} official site`}
-                      aria-hidden={isDecorativeClone || undefined}
-                      role="listitem"
                       tabIndex={isDecorativeClone ? -1 : undefined}
                     >
                       <span className="sr-only">{partner.name}</span>
                       <div className="relative h-full w-full">
                         <Image
                           src={encodeURI(partner.logo)}
-                          alt={partner.name}
+                          alt=""
                           fill
                           sizes="(max-width: 768px) 42vw, 180px"
                           className={`object-contain object-center transition-transform duration-300 group-hover/logo:scale-[1.03] ${
@@ -880,6 +883,7 @@ export function HomeScrollExperience({
                         />
                       </div>
                     </a>
+                    </li>
                   );
                 })}
               </div>
@@ -949,9 +953,9 @@ export function HomeScrollExperience({
                   fallbackClass="bg-surface-container-low"
                 />
                 <div className={`absolute ${wide ? "inset-0 flex flex-col items-center justify-center text-center" : "bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10"}`}>
-                  <h3 className="font-headline text-3xl font-extrabold text-primary sm:text-4xl">
+                  <h2 className="font-headline text-3xl font-extrabold text-primary sm:text-4xl">
                     {tile.title}
-                  </h3>
+                  </h2>
                   {tile.subtitle ? (
                     <p className="mt-3 text-sm font-medium uppercase tracking-widest text-primary/80">
                       {tile.subtitle}

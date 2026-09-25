@@ -13,24 +13,26 @@ export function WatermelonRegister({ callbackUrl }: { callbackUrl: string }) {
   };
 
   return (
-    <Auth04
-      brandName="Universal Music Store"
-      socialOnly
-      showFooter={false}
-      heading="Create your account"
-      subheading="Join Universal Music Store and keep your orders in one place."
-      googleLabel="Continue with Google"
-      footerPrompt="Already have an account?"
-      footerActionLabel="Sign in"
-      onGoogleLogin={() => void handleGoogleLogin()}
-      onFooterAction={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`; }}
-      onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
-      onLogin={() => { window.location.href = "/contact?topic=account"; }}
-      footerLinks={[
-        { label: "Privacy", href: "/privacy" },
-        { label: "Terms", href: "/terms" },
-        { label: "Support", href: "/contact" },
-      ]}
-    />
+    <main id="main-content" aria-labelledby="sign-in-heading">
+      <Auth04
+        brandName="Universal Music Store"
+        heading="Create your account"
+        socialOnly
+        showFooter={false}
+        subheading="Join Universal Music Store and keep your orders in one place."
+        googleLabel="Continue with Google"
+        footerPrompt="Already have an account?"
+        footerActionLabel="Sign in"
+        onGoogleLogin={() => void handleGoogleLogin()}
+        onFooterAction={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`; }}
+        onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
+        onLogin={() => { window.location.href = "/contact?topic=account"; }}
+        footerLinks={[
+          { label: "Privacy", href: "/privacy" },
+          { label: "Terms", href: "/terms" },
+          { label: "Support", href: "/contact" },
+        ]}
+      />
+    </main>
   );
 }

@@ -13,6 +13,10 @@ const {
 // Load the shared root environment for local Worker-backed development.
 loadMonorepoRootEnv(__dirname);
 
+const isNextDevCommand = process.argv.some(
+  (argument) => argument === "dev" || argument.endsWith("/dev"),
+);
+
 const allowedDevOrigins = [
   "localhost",
   "127.0.0.1",
@@ -294,13 +298,19 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Keep supervised dev servers from mutating a production build in `.next`.
+  // Keep supervised dev servers from mutating a production build. Some local
+  // E2E runs intentionally use NODE_ENV=production to match deployed behavior;
+  // the command/phase markers distinguish that dev server from `next start`.
   distDir:
     process.env.VERCEL === "1"
       ? ".next"
-      : process.env.NODE_ENV === "production"
-        ? ".next-production"
-        : ".next",
+      : isNextDevCommand ||
+          process.env.NEXT_PHASE === "phase-development-server" ||
+          process.env.UVS_E2E_LOCAL === "1"
+        ? ".next-dev"
+        : process.env.NODE_ENV === "production"
+          ? ".next-production"
+          : ".next",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@universal-music-store/types",

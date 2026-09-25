@@ -62,9 +62,9 @@ export default function LoginPage({
         <div className="flex w-full flex-1 items-center justify-center px-6 py-12 sm:px-12">
           <div className="w-full max-w-md space-y-8">
             <div className="space-y-1">
-              <h2 className="text-3xl font-bold tracking-tight text-neutral-950 dark:text-neutral-50">
+              <h1 id="sign-in-heading" className="text-3xl font-bold tracking-tight text-neutral-950 dark:text-neutral-50">
                 {heading}
-              </h2>
+              </h1>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 {subheading}
               </p>

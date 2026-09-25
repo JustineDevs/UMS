@@ -9,10 +9,10 @@ import {
   writeCart,
   updateLineQuantity,
   readCartRevision,
-  CART_STORAGE_KEY,
   cartAvailabilityMessage,
   parseCartQuantityInput,
   isCartCheckoutBlocked,
+  subscribeToCartUpdates,
 } from "@/lib/cart";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { useCart } from "@/context/CartContext";
@@ -146,7 +146,11 @@ export function CartPageClient() {
       }
       const next = mergeReconciledCartLines(current, payload.lines ?? []);
       setLineErrors({});
-      writeCart(next);
+      // The current page applies the authoritative response immediately via
+      // replaceLines. Avoid emitting the same-tab update event here: the cart
+      // subscription treats that event as an external change and would start
+      // reconciliation again indefinitely.
+      writeCart(next, { sameTab: false });
       replaceLines(next);
       if (typeof payload.currency === "string" && payload.currency.trim()) {
         setCurrencyCode(payload.currency.trim().toUpperCase());
@@ -192,8 +196,7 @@ export function CartPageClient() {
     setMounted(true);
     if (isHydrating) return;
     void reconcile();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== CART_STORAGE_KEY) return;
+    const onCartUpdate = () => {
       reconcileAbortRef.current?.abort();
       reconcileSequenceRef.current += 1;
       // Adopt the persisted envelope before reconciling so another tab cannot
@@ -201,13 +204,13 @@ export function CartPageClient() {
       refresh();
       void reconcile();
     };
-    window.addEventListener("storage", onStorage);
+    const unsubscribe = subscribeToCartUpdates(onCartUpdate);
     return () => {
       reconcileAbortRef.current?.abort();
       if (reconcileTimerRef.current !== null) {
         window.clearTimeout(reconcileTimerRef.current);
       }
-      window.removeEventListener("storage", onStorage);
+      unsubscribe();
     };
   }, [isHydrating, reconcile]);
 

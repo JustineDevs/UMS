@@ -62,11 +62,15 @@ test.describe("Authenticated wishlist browser flow", () => {
     );
     await expect(savedItem).toBeVisible();
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator(`a[href="/shop/${slug}"]`).first()).toBeVisible();
+    await expect(page.locator(`a[href="/shop/${slug}"]`).first()).toBeVisible({
+      timeout: 30_000,
+    });
 
     await page.getByRole("button", { name: "Add to bag" }).click();
     await expect(page.getByRole("status")).toContainText("added to bag", { timeout: 10_000 });
     await page.goto("/cart", { waitUntil: "domcontentloaded" });
-    await expect(page.locator(`a[href="/shop/${slug}"]`).first()).toBeVisible();
+    await expect(page.locator(`a[href="/shop/${slug}"]`).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 });

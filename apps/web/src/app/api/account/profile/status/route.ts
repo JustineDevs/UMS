@@ -1,12 +1,15 @@
 import { getStorefrontSession } from "@/lib/auth";
-import { loadCustomerProfileResult } from "@/lib/server-customer-profile";
+import {
+  loadCustomerProfileResult,
+  normalizeStorefrontShippingAddress,
+} from "@/lib/server-customer-profile";
 import {
   isStorefrontProfileComplete,
   listMissingProfileParts,
 } from "@/lib/storefront-profile-complete";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { accountProfileStatusResponseSchema } from "@/lib/admin-api-contracts";
 import { readResponseJson } from "@/lib/read-response-json";
+import { getStorefrontWorkerAuth } from "@/lib/storefront-worker-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +17,10 @@ const privateNoStore = {
   "Cache-Control": "private, no-store, max-age=0",
 };
 
-function profileStatusJson(payload: unknown, init?: Parameters<typeof Response.json>[1]) {
+function profileStatusJson(
+  payload: unknown,
+  init?: Parameters<typeof Response.json>[1],
+) {
   return Response.json(accountProfileStatusResponseSchema.parse(payload), init);
 }
 
@@ -27,55 +33,83 @@ export async function GET() {
     const session = await getStorefrontSession();
     const email = session?.user?.email?.trim().toLowerCase();
     if (!email) {
-      return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
+      return profileStatusJson(
+        { authenticated: false, complete: false },
+        { headers: privateNoStore },
+      );
     }
     const { profile, unavailable } = await loadCustomerProfileResult(email);
     if (unavailable) {
       return profileStatusJson(
-        { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
+        {
+          authenticated: true,
+          available: false,
+          error: "Profile status is temporarily unavailable.",
+        },
         { status: 503, headers: privateNoStore },
       );
     }
     const complete = isStorefrontProfileComplete(profile);
-    return profileStatusJson({
-      authenticated: true,
-      available: true,
-      complete,
-      missingFields: complete ? [] : listMissingProfileParts(profile),
-      profile,
-    }, { headers: privateNoStore });
+    return profileStatusJson(
+      {
+        authenticated: true,
+        available: true,
+        complete,
+        missingFields: complete ? [] : listMissingProfileParts(profile),
+        profile,
+      },
+      { headers: privateNoStore },
+    );
   }
   if (workerBaseUrl) {
     try {
-      const supabase = await createSupabaseServerClient();
-      const [{ data: userData }, { data: sessionData }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getSession(),
-      ]);
-      const token = sessionData.session?.access_token?.trim();
-      const email = userData.user?.email?.trim().toLowerCase();
-      if (!email || !token) {
-        return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
+      const workerAuth = await getStorefrontWorkerAuth();
+      if (!workerAuth) {
+        return profileStatusJson(
+          { authenticated: false, complete: false },
+          { headers: privateNoStore },
+        );
       }
       const response = await fetch(`${workerBaseUrl}/store/customers/me`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        headers: {
+          Authorization: `Bearer ${workerAuth.token}`,
+          Accept: "application/json",
+        },
         cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {
         return profileStatusJson(
-          { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
-          { status: response.status >= 500 ? 503 : response.status, headers: privateNoStore },
+          {
+            authenticated: true,
+            available: false,
+            error: "Profile status is temporarily unavailable.",
+          },
+          {
+            status: response.status >= 500 ? 503 : response.status,
+            headers: privateNoStore,
+          },
         );
       }
-      const payload = await readResponseJson<{ profile?: Record<string, unknown> | null }>(response, {});
+      const payload = await readResponseJson<{
+        profile?: Record<string, unknown> | null;
+      }>(response, {});
       const raw = payload.profile;
       const profile = raw
         ? {
-            displayName: typeof raw.display_name === "string" ? raw.display_name : null,
+            displayName:
+              typeof raw.display_name === "string" ? raw.display_name : null,
             phone: typeof raw.phone === "string" ? raw.phone : null,
-            avatarUrl: typeof raw.avatar_url === "string" ? raw.avatar_url : null,
-            shippingAddresses: Array.isArray(raw.shipping_addresses) ? raw.shipping_addresses : [],
-            updatedAt: typeof raw.updated_at === "string" ? raw.updated_at : null,
+            avatarUrl:
+              typeof raw.avatar_url === "string" ? raw.avatar_url : null,
+            shippingAddresses: Array.isArray(raw.shipping_addresses)
+              ? raw.shipping_addresses.flatMap((item) => {
+                  const normalized = normalizeStorefrontShippingAddress(item);
+                  return normalized ? [normalized] : [];
+                })
+              : [],
+            updatedAt:
+              typeof raw.updated_at === "string" ? raw.updated_at : null,
           }
         : null;
       const complete = isStorefrontProfileComplete(profile);
@@ -90,9 +124,16 @@ export async function GET() {
         { headers: privateNoStore },
       );
     } catch (error) {
-      console.error("Worker profile status failed", error instanceof Error ? error.message : "unknown");
+      console.error(
+        "Worker profile status failed",
+        error instanceof Error ? error.message : "unknown",
+      );
       return profileStatusJson(
-        { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
+        {
+          authenticated: true,
+          available: false,
+          error: "Profile status is temporarily unavailable.",
+        },
         { status: 503, headers: privateNoStore },
       );
     }
@@ -100,28 +141,38 @@ export async function GET() {
   const session = await getStorefrontSession();
   const email = session?.user?.email?.trim().toLowerCase();
   if (!email) {
-    return profileStatusJson({ authenticated: false, complete: false }, { headers: privateNoStore });
+    return profileStatusJson(
+      { authenticated: false, complete: false },
+      { headers: privateNoStore },
+    );
   }
   const { profile, unavailable } = await loadCustomerProfileResult(email);
   if (unavailable) {
     return profileStatusJson(
-      { authenticated: true, available: false, error: "Profile status is temporarily unavailable." },
+      {
+        authenticated: true,
+        available: false,
+        error: "Profile status is temporarily unavailable.",
+      },
       { status: 503, headers: privateNoStore },
     );
   }
   const complete = isStorefrontProfileComplete(profile);
-  return profileStatusJson({
-    authenticated: true,
-    available: true,
-    complete,
-    missingFields: complete ? [] : listMissingProfileParts(profile),
-    profile: profile
-      ? {
-          displayName: profile.displayName,
-          phone: profile.phone,
-          avatarUrl: profile.avatarUrl,
-          shippingAddresses: profile.shippingAddresses,
-        }
-      : null,
-  }, { headers: privateNoStore });
+  return profileStatusJson(
+    {
+      authenticated: true,
+      available: true,
+      complete,
+      missingFields: complete ? [] : listMissingProfileParts(profile),
+      profile: profile
+        ? {
+            displayName: profile.displayName,
+            phone: profile.phone,
+            avatarUrl: profile.avatarUrl,
+            shippingAddresses: profile.shippingAddresses,
+          }
+        : null,
+    },
+    { headers: privateNoStore },
+  );
 }

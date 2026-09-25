@@ -672,7 +672,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 503]
-      x-source-sha256: 1d670caa5ab39c72ad007ab263ef756d9bc5e7cf7dad9dea3484cb95f2d9ef15
+      x-source-sha256: ef635fca414b8d164b4a80a635642fd0ea8f7fab3064bdcda9c646b8f076bf50
       security:
         - CustomerSession: []
       responses:
@@ -11489,7 +11489,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 403, 409, 502, 503]
-      x-source-sha256: c6f2a30b0ff9a9eba2e303889c7267c78fc2c2f3f717c445d5c561df2127e25a
+      x-source-sha256: 35591daaa452ea21eb3a85bc899c96afaeebd9eb2fc68fbc1bc529ff2fd269ff
       security:
         - CustomerSession: []
         - name: Idempotency-Key
@@ -13632,7 +13632,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       security:
         - CustomerSession: []
         - name: Idempotency-Key
@@ -13682,7 +13682,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       security:
         - CustomerSession: []
       responses:
@@ -13725,7 +13725,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200]
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       security:
         - CustomerSession: []
         - name: Idempotency-Key
@@ -14080,7 +14080,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for DELETE /wishlist. Runtime source: apps/web/src/app/api/wishlist/route.ts."
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -14160,7 +14160,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /account/profile/status. Runtime source: apps/web/src/app/api/account/profile/status/route.ts."
-      x-source-sha256: 1d670caa5ab39c72ad007ab263ef756d9bc5e7cf7dad9dea3484cb95f2d9ef15
+      x-source-sha256: ef635fca414b8d164b4a80a635642fd0ea8f7fab3064bdcda9c646b8f076bf50
       x-contract-inference: runtime-zod
       x-contract-status: executable
       anyOf:
@@ -15691,7 +15691,7 @@ components:
           maxLength: 200
         provider:
           type: string
-          enum: ["stripe", "paypal", "xendit"]
+          enum: ["stripe", "paypal", "xendit", "cod"]
         providerSessionId:
           anyOf:
             - type: string
@@ -15852,7 +15852,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /wishlist. Runtime source: apps/web/src/app/api/wishlist/route.ts."
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -17839,7 +17839,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /checkout/start. Runtime source: apps/web/src/app/api/checkout/start/route.ts."
-      x-source-sha256: c6f2a30b0ff9a9eba2e303889c7267c78fc2c2f3f717c445d5c561df2127e25a
+      x-source-sha256: 35591daaa452ea21eb3a85bc899c96afaeebd9eb2fc68fbc1bc529ff2fd269ff
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -18616,7 +18616,7 @@ components:
       type: object
       additionalProperties: false
       description: "Validated request payload for POST /wishlist. Runtime source: apps/web/src/app/api/wishlist/route.ts."
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -18629,7 +18629,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for POST /wishlist. Runtime source: apps/web/src/app/api/wishlist/route.ts."
-      x-source-sha256: 136c423c8997d9688b0425cf78884c996e3cdbea76b7589258c95ca153c8b707
+      x-source-sha256: 64511dd32e6da819bf3ff7a9522dea7613a64d9439cbbae7445dc55446ab51a7
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:

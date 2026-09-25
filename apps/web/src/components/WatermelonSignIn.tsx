@@ -13,21 +13,24 @@ export function WatermelonSignIn({ callbackUrl, reauth }: { callbackUrl: string;
   };
 
   return (
-    <Auth04
-      brandName="Universal Music Store"
-      socialOnly
-      showFooter={false}
-      termsHref="/terms"
-      privacyHref="/privacy"
-      onGoogleLogin={() => void handleGoogleLogin()}
-      onCreateAccount={() => { window.location.href = "/register"; }}
-      onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
-      onLogin={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}&error=password_auth_unavailable`; }}
-      footerLinks={[
-        { label: "Privacy", href: "/privacy" },
-        { label: "Terms", href: "/terms" },
-        { label: "Support", href: "/contact" },
-      ]}
-    />
+    <main id="main-content" aria-labelledby="sign-in-heading">
+      <Auth04
+        brandName="Universal Music Store"
+        heading="Welcome back"
+        socialOnly
+        showFooter={false}
+        termsHref="/terms"
+        privacyHref="/privacy"
+        onGoogleLogin={() => void handleGoogleLogin()}
+        onCreateAccount={() => { window.location.href = "/register"; }}
+        onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
+        onLogin={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}&error=password_auth_unavailable`; }}
+        footerLinks={[
+          { label: "Privacy", href: "/privacy" },
+          { label: "Terms", href: "/terms" },
+          { label: "Support", href: "/contact" },
+        ]}
+      />
+    </main>
   );
 }

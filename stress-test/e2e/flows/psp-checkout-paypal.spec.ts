@@ -25,10 +25,19 @@ import {
 } from "../helpers/checkout";
 import { signInAsAdmin } from "../fixtures/admin-auth";
 import { getPayPalSandboxBuyer } from "../fixtures/sandbox-cards";
+import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
 const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+
+async function ensureLocalCheckoutSession(page: Parameters<typeof navigateToCheckout>[0]): Promise<void> {
+  if (process.env.UVS_E2E_LOCAL !== "1") return;
+  const result = await e2eAdminLogin(page);
+  if (result !== "ok") {
+    throw new Error(`Authenticated local checkout session unavailable: ${result}`);
+  }
+}
 
 function isPayPalSandbox(): void {
   const env = process.env.PAYPAL_ENVIRONMENT?.trim().toLowerCase();
@@ -44,7 +53,7 @@ async function startPayPalCheckout(
   page: Parameters<typeof navigateToCheckout>[0],
 ): Promise<void> {
   await navigateToShopAndAddFirstProduct(page);
-  await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+  await navigateToCheckout(page, { guest: true });
   await fillCheckoutShippingInfo(page);
   const selected = await selectPaymentProvider(page, "paypal");
   if (!selected) {
@@ -82,8 +91,9 @@ test.describe("@checkout @paypal PayPal checkout flow", () => {
   test("checkout reaches PayPal redirect or inline approval", async ({
     page,
   }) => {
+    await ensureLocalCheckoutSession(page);
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+    await navigateToCheckout(page, { guest: true });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "paypal");
