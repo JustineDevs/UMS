@@ -5,7 +5,7 @@ import {
   listMissingProfileParts,
 } from "@/lib/storefront-profile-complete";
 import { profileToCodCartAddresses } from "@/lib/checkout-address";
-import { withBotIdProtection } from "@/lib/botid-protection";
+import { verifyBotIdProtection } from "@/lib/botid-protection";
 import { getRequestIp, rateLimitFixedWindow } from "@/lib/storefront-api-rate-limit";
 import { isSameOriginMutation } from "@/lib/request-origin";
 import { checkoutCodCartPayloadResponseSchema } from "@/lib/admin-api-contracts";
@@ -56,7 +56,14 @@ async function handlePOST(req: Request) {
     );
   }
 
+  // Run BotID only after the request has proved it is an authenticated,
+  // profile-complete COD attempt. This keeps the abuse gate in place while
+  // preserving the route's real 401/400 contract for unauthenticated and
+  // incomplete profiles.
+  const botProtectionFailure = await verifyBotIdProtection();
+  if (botProtectionFailure) return botProtectionFailure;
+
   return Response.json(checkoutCodCartPayloadResponseSchema.parse(payload));
 }
 
-export const POST = withBotIdProtection(handlePOST);
+export const POST = handlePOST;
