@@ -81,8 +81,13 @@ function payloadValue(data: Record<string, unknown> | null, keys: string[]): str
     const value = data?.[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }
-  const nested = data?.providerPayload;
-  if (nested && typeof nested === "object" && !Array.isArray(nested)) return payloadValue(nested as Record<string, unknown>, keys);
+  for (const nestedKey of ["providerPayload", "xenditSession"]) {
+    const nested = data?.[nestedKey];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const value = payloadValue(nested as Record<string, unknown>, keys);
+      if (value) return value;
+    }
+  }
   return null;
 }
 
