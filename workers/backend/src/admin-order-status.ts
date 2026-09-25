@@ -47,7 +47,7 @@ export async function handleAdminOrderStatusRequest(
         const selected = await transaction.query<OrderState>(
           `SELECT id, COALESCE(metadata, '{}'::jsonb) AS metadata
            FROM public."order" WHERE id = $1 AND deleted_at IS NULL
-             AND metadata->>'organization_id' = $2 FOR UPDATE`,
+             AND COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2 FOR UPDATE`,
           [orderId, organizationId],
         );
         const order = selected.rows[0];
@@ -55,7 +55,8 @@ export async function handleAdminOrderStatusRequest(
         const updated = await transaction.query(
           `UPDATE public."order"
            SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('oms_status', $3), updated_at = now()
-           WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2`,
+           WHERE id = $1 AND deleted_at IS NULL
+             AND COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2`,
           [orderId, organizationId, status],
         );
         if (updated.rowCount !== 1) throw new Error("order_state_changed");
@@ -74,7 +75,8 @@ export async function handleAdminOrderStatusRequest(
           await withWorkerTransaction(commerce, async (transaction) => {
             await transaction.query(
               `UPDATE public."order" SET metadata = $3::jsonb, updated_at = now()
-               WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2
+               WHERE id = $1 AND deleted_at IS NULL
+                 AND COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2
                  AND metadata->>'oms_status' = $4`,
               [orderId, organizationId, JSON.stringify(previous?.metadata ?? {}), status],
             );

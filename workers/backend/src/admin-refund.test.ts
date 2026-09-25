@@ -136,7 +136,7 @@ test("admin refund uses payment data state, provider idempotency, and APP audit"
   });
   const paymentQuery = state.queries.find((query) => query.text.includes("FROM public.payment p"));
   assert.ok(paymentQuery);
-  assert.match(paymentQuery.text, /o\.metadata->>'organization_id' = \$3/);
+  assert.match(paymentQuery.text, /COALESCE\(o\.metadata->>'organization_id', o\.metadata->>'store_id'\) = \$3/);
   assert.equal(paymentQuery.text.includes("p.captured_amount"), false);
   const audit = state.queries.find((query) => query.role === "app" && query.text.includes("INSERT INTO public.payment_refund_audit"));
   assert.ok(audit);

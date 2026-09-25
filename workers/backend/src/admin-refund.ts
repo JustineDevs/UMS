@@ -158,7 +158,8 @@ export async function handleAdminRefundRequest(
     const result = await executeIdempotently(store, scopedKey, hash, async () => {
       const ownedOrder = await withRole(env, "medusa", (medusa) => medusa.query<{ id: string }>(
         `SELECT id FROM public."order"
-          WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2
+          WHERE id = $1 AND deleted_at IS NULL
+            AND COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2
           LIMIT 1`,
         [orderId, principal.organizationId],
       ));
@@ -169,7 +170,9 @@ export async function handleAdminRefundRequest(
              FROM public.payment p
              JOIN public.order_payment_collection opc ON opc.payment_collection_id = p.payment_collection_id
              JOIN public."order" o ON o.id = opc.order_id AND o.deleted_at IS NULL
-            WHERE opc.order_id = $1 AND o.metadata->>'organization_id' = $3 AND p.deleted_at IS NULL
+            WHERE opc.order_id = $1
+              AND COALESCE(o.metadata->>'organization_id', o.metadata->>'store_id') = $3
+              AND p.deleted_at IS NULL
               AND ($2::text IS NULL OR p.id = $2)
             ORDER BY p.created_at ASC`,
           [orderId, paymentId, principal.organizationId],
