@@ -374,16 +374,6 @@
       "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
     },
     {
-      "matrixId": "C4-38",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "medusa"
-      ],
-      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
       "matrixId": "C4-39",
       "matrix": ".omx/context/full-task(4).md",
       "markers": [
