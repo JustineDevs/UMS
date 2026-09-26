@@ -153,7 +153,7 @@ export const RatingBadge = ({
         <RatingStars
           rating={rating}
           className="gap-0.5"
-          starClassName={cx("size-4", theme === "black" && "text-black")}
+          starClassName={cx("size-4", theme === "black" && "text-amber-400")}
         />
 
         <div className="text-center">
@@ -185,7 +185,11 @@ export const RatingBadge = ({
       </div>
 
       <Wreath
-        className={cx("shrink-0 -scale-x-100", theme === "light" && "text-fg-white")}
+        className={cx(
+          "shrink-0 -scale-x-100",
+          theme === "light" && "text-fg-white",
+          theme === "black" && "text-black",
+        )}
       />
     </div>
   );
