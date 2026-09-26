@@ -121,7 +121,7 @@ export default async function HomePage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(webJsonLd) }}
       />
-      <main id="main-content" className="storefront-page-shell max-w-[1600px] pb-12">
+      <main className="storefront-page-shell max-w-[1600px] pb-12">
         {isAdminPreview ? (
           <StorefrontHomePreviewBridge
             products={featured.kind === "ok" ? featured.products : []}

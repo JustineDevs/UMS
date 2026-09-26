@@ -12,7 +12,7 @@ export function StorefrontNav({
 }) {
   return (
     <nav
-      className="pointer-events-none relative w-full min-w-0 max-w-full font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)] [&_a]:pointer-events-auto [&_button]:pointer-events-auto"
+      className="relative w-full min-w-0 max-w-full font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
       aria-label="Primary navigation"
       data-cms-id="header-navigation"
       data-cms-label="Header navigation"
