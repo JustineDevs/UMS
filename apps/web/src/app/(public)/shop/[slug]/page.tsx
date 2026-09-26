@@ -230,17 +230,7 @@ export default async function ProductPage({ params }: Props) {
           </div>
 
         <div className="min-w-0 flex flex-col justify-start">
-          <div className="space-y-2 mb-8 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6">
-            {product.category && (
-              <span className="text-xs font-label uppercase tracking-widest text-secondary">
-                {product.category}
-              </span>
-            )}
-            {product.brand ? (
-              <p className="text-xs font-label uppercase tracking-widest text-on-surface-variant">
-                {product.brand}
-              </p>
-            ) : null}
+          <div className="mb-8 space-y-2">
             <div className="flex flex-wrap gap-2 pt-1">
               <span className="rounded bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-on-primary">
                 {product.brand || "Universal Music Store"}
