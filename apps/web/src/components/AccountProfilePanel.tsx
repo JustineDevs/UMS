@@ -30,7 +30,13 @@ function emptyAddress(): StorefrontShippingAddress {
   };
 }
 
-export function AccountProfilePanel({ initial }: { initial: Initial }) {
+export function AccountProfilePanel({
+  initial,
+  mode = "profile",
+}: {
+  initial: Initial;
+  mode?: "profile" | "addresses";
+}) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
@@ -184,7 +190,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
+      {mode === "profile" ? <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div>
           <label htmlFor="account-display-name" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             Display name (optional)
@@ -230,7 +236,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
             autoComplete="tel"
           />
         </div>
-      </div>
+      </div> : null}
 
       <div className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">

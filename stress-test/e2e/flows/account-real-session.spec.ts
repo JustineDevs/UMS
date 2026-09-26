@@ -19,13 +19,13 @@ test.describe("Authenticated account browser flow", () => {
 
     await page.goto("/account", { waitUntil: "domcontentloaded" });
     await expect(page).toHaveURL(/\/account(?:$|[?#])/);
-    await expect(page.getByRole("heading", { name: /welcome back|your account, in one place/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /settings/i })).toBeVisible();
     for (const id of ["overview", "orders", "profile", "notifications", "preferences", "loyalty"]) {
       await expect(page.locator(`#${id}`).first()).toBeVisible();
     }
     await expect(page.getByRole("button", { name: /sign out/i })).toBeVisible();
 
-    for (const name of ["Orders", "Profile & addresses", "Notifications", "Preferences", "Loyalty wallet"]) {
+    for (const name of ["Purchase History", "Profile", "Notification Settings", "Order Settings", "My Coins"]) {
       const link = page.getByRole("link", { name, exact: true });
       await expect(link).toBeVisible();
       await expect.poll(
@@ -72,7 +72,7 @@ test.describe("Authenticated account browser flow", () => {
     await search.fill("pending");
     await page.getByRole("button", { name: "Search orders" }).click();
     await expect(page).toHaveURL(/\/account\?q=pending$/);
-    await expect(page.getByRole("heading", { name: /welcome back|your account, in one place/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: /settings/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#account-order-search:visible").first()).toHaveValue("pending", { timeout: 30_000 });
 
     await page.getByRole("link", { name: "Completed", exact: true }).click();
@@ -83,7 +83,7 @@ test.describe("Authenticated account browser flow", () => {
     await expect(page).toHaveURL(/\/account\?status=delivered&q=pending#orders$/);
     // The account page rehydrates profile data after the document reload. Wait
     // for the real page shell before asserting persisted query state.
-    await expect(page.getByRole("heading", { name: /welcome back|your account, in one place/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: /settings/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#account-order-search:visible").first()).toHaveValue("pending", { timeout: 30_000 });
 
     expect(observed.some((entry) => entry.path === "/api/account/profile/status" && entry.status === 200)).toBe(true);
@@ -93,10 +93,10 @@ test.describe("Authenticated account browser flow", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/account", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: /welcome back|your account, in one place/i })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: /settings/i })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("#overview").first()).toBeVisible();
 
-    for (const name of ["Orders", "Profile & addresses", "Notifications", "Preferences", "Loyalty wallet"]) {
+    for (const name of ["Purchase History", "Profile", "Notification Settings", "Order Settings", "My Coins"]) {
       const link = page.getByRole("link", { name, exact: true });
       await expect(link).toBeVisible();
       await expect.poll(
@@ -105,7 +105,7 @@ test.describe("Authenticated account browser flow", () => {
       ).toBeGreaterThanOrEqual(44);
     }
 
-    const mobileOrdersLink = page.getByRole("link", { name: "Orders", exact: true });
+    const mobileOrdersLink = page.getByRole("link", { name: "Purchase History", exact: true });
     await mobileOrdersLink.focus();
     await expect(mobileOrdersLink).toBeFocused();
     const focusStyle = await mobileOrdersLink.evaluate((node) => {

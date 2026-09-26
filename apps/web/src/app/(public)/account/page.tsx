@@ -19,7 +19,7 @@ import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { loadCustomerProfileResult } from "@/lib/server-customer-profile";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
-import { AccountSectionNav } from "@/components/AccountSectionNav";
+import { AccountRouteNav } from "@/components/AccountRouteNav";
 import { AccountPrivacyControls } from "@/components/AccountPrivacyControls";
 import { AccountMarketingPreferencesPanel } from "@/components/AccountMarketingPreferencesPanel";
 import { AccountOrderPreferencesPanel } from "@/components/AccountOrderPreferencesPanel";
@@ -36,15 +36,6 @@ export const metadata: Metadata = buildPageMetadata({
   noindex: true,
   referrer: "no-referrer",
 });
-
-const accountNav = [
-  ["overview", "Profile", "person"],
-  ["orders", "Orders", "receipt_long"],
-  ["profile", "Profile & addresses", "person"],
-  ["notifications", "Notifications", "notifications"],
-  ["preferences", "Preferences", "tune"],
-  ["loyalty", "Loyalty wallet", "stars"],
-] as const;
 
 const orderFilters = [
   ["", "All orders"],
@@ -112,7 +103,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </p>
             </div>
           </div>
-          <AccountSectionNav sections={accountNav} />
+          <AccountRouteNav />
           <div className="mt-8 hidden rounded-2xl bg-surface-container-low p-4 lg:block">
             <p className="text-xs font-semibold uppercase tracking-wider text-primary">
               Need help?

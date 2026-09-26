@@ -102,17 +102,17 @@ test.describe("storefront smoke", () => {
     await expect(page.getByRole("link", { name: "Back to bag" })).toBeVisible();
   });
 
-  test("account section navigation scrolls and exposes the active section", async ({ page }) => {
+  test("account navigation exposes dedicated account routes", async ({ page }) => {
     if (!(await requireAuthenticatedAccount(page))) {
       test.skip(true, "Account navigation requires a real authenticated storefront session.");
       return;
     }
-    const profile = page.getByRole("link", { name: "Profile & addresses" });
-    await expect(profile).toHaveAttribute("href", "#profile");
+    const profile = page.getByRole("link", { name: "Profile", exact: true }).first();
+    await expect(profile).toHaveAttribute("href", "/account/profile");
     await expect(profile).toHaveClass(/min-h-11/);
     await profile.click();
-    await expect(page).toHaveURL(/\/account#profile$/);
-    await expect(profile).toHaveAttribute("aria-current", "location");
+    await expect(page).toHaveURL(/\/account\/profile$/);
+    await expect(profile).toHaveAttribute("aria-current", "page");
   });
 
   test("mobile account navigation and recovery actions keep thumb-sized targets", async ({ page }) => {
@@ -122,10 +122,10 @@ test.describe("storefront smoke", () => {
       return;
     }
     for (const locator of [
-      page.getByRole("link", { name: "Overview" }),
-      page.getByRole("link", { name: "Orders", exact: true }),
-      page.getByRole("link", { name: "Profile & addresses" }),
-      page.getByRole("link", { name: "Preferences", exact: true }),
+      page.getByRole("link", { name: "Profile", exact: true }).first(),
+      page.getByRole("link", { name: "Purchase History", exact: true }),
+      page.getByRole("link", { name: "Addresses", exact: true }),
+      page.getByRole("link", { name: "Order Settings", exact: true }),
       page.getByRole("link", { name: /Open full settings/ }),
       page.getByRole("button", { name: "Track order" }),
     ]) {
