@@ -101,8 +101,8 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <main className="storefront-page-shell storefront-content-wide max-w-[1320px]">
-      <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="self-start lg:sticky lg:top-28">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-w-0 self-start lg:sticky lg:top-28">
           <div className="mb-5 hidden items-center gap-3 lg:flex">
             <span className="grid size-10 place-items-center rounded-2xl bg-primary text-on-primary">
               <span className="material-symbols-outlined text-[20px]">
