@@ -25,6 +25,20 @@ test.describe("storefront smoke", () => {
     await expect(page.getByRole("link", { name: "Collections", exact: true })).toHaveCount(0);
   });
 
+  test("home does not render the retired category or newsletter sections", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-cms-id="home-tiles"]')).toHaveCount(0);
+    await expect(page.locator("#join-club")).toHaveCount(0);
+  });
+
+  test("footer uses the commerce layout without the newsletter block", async ({ page }) => {
+    await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    await expect(page.locator("footer")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Payments", exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Keep up to date with our quarterly newsletter/i)).toHaveCount(0);
+  });
+
   test("about route is a dedicated navigable storefront surface", async ({ page }) => {
     await page.goto("/about");
     await expect(page.getByRole("heading", { name: /music gear that earns its place/i })).toBeVisible();

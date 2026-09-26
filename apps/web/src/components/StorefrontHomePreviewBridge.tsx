@@ -51,12 +51,6 @@ function draftHome(blocks: CmsBlock[], previous: StorefrontHomePayload) {
       style: (hero.style ?? next.hero.style) as StorefrontHomePayload["hero"]["style"],
     };
   }
-  const tilesBlock = blocks.find((block) => block.id === "home-tiles")?.props;
-  const tiles = tilesBlock?.tiles;
-  if (Array.isArray(tiles)) {
-    next.tiles = tiles as StorefrontHomePayload["tiles"];
-  }
-  if (tilesBlock?.layout) next.sectionLayout = { ...next.sectionLayout, tiles: tilesBlock.layout as StorefrontHomeSectionLayout };
   const latest = blocks.find((block) => block.id === "home-latest")?.props;
   if (latest) {
     next.latestSection = {
@@ -65,16 +59,6 @@ function draftHome(blocks: CmsBlock[], previous: StorefrontHomePayload) {
       viewAllHref: String(latest.viewAllHref ?? "/shop"),
     };
     if (latest.layout) next.sectionLayout = { ...next.sectionLayout, latest: latest.layout as StorefrontHomeSectionLayout };
-  }
-  const newsletter = blocks.find((block) => block.id === "home-newsletter")?.props;
-  if (newsletter) {
-    next.newsletter = {
-      title: String(newsletter.heading ?? ""),
-      body: String(newsletter.subtitle ?? ""),
-      placeholder: String(newsletter.placeholder ?? "email@address.com"),
-      buttonLabel: String(newsletter.buttonLabel ?? "Subscribe"),
-    };
-    if (newsletter.layout) next.sectionLayout = { ...next.sectionLayout, newsletter: newsletter.layout as StorefrontHomeSectionLayout };
   }
   return next;
 }

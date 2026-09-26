@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Button, Newsletter3 } from "@universal-music-store/ui";
+import { Button } from "@universal-music-store/ui";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { RatingBadge } from "@/components/foundations/rating-badge";
 import type { Product } from "@universal-music-store/types";
@@ -10,9 +10,8 @@ import type { CmsBlock, StorefrontHomePayload, StorefrontHomeSectionLayout } fro
 import type { HomepageSocialProof } from "@/lib/homepage-social-proof";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useLayoutEffect, useRef, useState, useCallback, useEffect, type CSSProperties } from "react";
+import { useLayoutEffect, useRef, useEffect, type CSSProperties } from "react";
 import { batchScrollRevealChildren } from "@/lib/gsap-scroll-system";
-import { getRecaptchaToken, RecaptchaScript } from "@/components/RecaptchaScript";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
@@ -178,46 +177,6 @@ const PARTNERS: Partner[] = [
 
 const marqueePartners = [...PARTNERS, ...PARTNERS, ...PARTNERS];
 
-function TileMedia({
-  imageUrl,
-  fallbackClass,
-}: {
-  imageUrl: string;
-  fallbackClass: string;
-}) {
-  const trimmed = imageUrl?.trim();
-  if (trimmed) {
-    if (isKnownUnavailableExternalImage(trimmed)) {
-      return (
-        <div
-          className={`flex h-full min-h-[inherit] w-full items-end justify-start bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high p-5 transition-transform duration-700 group-hover:scale-105 ${fallbackClass}`}
-        >
-          <div className="max-w-[16rem] rounded-lg bg-white/85 px-4 py-3 text-sm font-medium text-on-surface shadow-sm">
-            Featured image unavailable
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div className="relative h-full min-h-[inherit] w-full">
-        <Image
-          src={trimmed}
-          alt=""
-          fill
-          sizes="(max-width: 768px) 100vw, 66vw"
-          className="object-cover transition-transform duration-700 group-hover:scale-105"
-          unoptimized={shouldUnoptimizeImage(trimmed)}
-        />
-      </div>
-    );
-  }
-  return (
-    <div
-      className={`h-full min-h-[inherit] w-full transition-transform duration-700 group-hover:scale-105 ${fallbackClass}`}
-    />
-  );
-}
-
 /**
  * Home layout with hero stagger and scroll reveals (GSAP ScrollTrigger).
  * Copy and images come from admin CMS (Supabase).
@@ -236,14 +195,9 @@ export function HomeScrollExperience({
   const ctaRef = useRef<HTMLAnchorElement>(null);
   const partnersRef = useRef<HTMLDivElement>(null);
   const asideRef = useRef<HTMLDivElement>(null);
-  const collectionsRef = useRef<HTMLElement>(null);
   const latestHeaderRef = useRef<HTMLDivElement>(null);
   const productsGridRef = useRef<HTMLDivElement>(null);
-  const clubRef = useRef<HTMLElement>(null);
 
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [newsletterError, setNewsletterError] = useState<string | null>(null);
   const selectedTargetRef = useRef<HTMLElement | null>(null);
   const selectionRefreshFrameRef = useRef<number | null>(null);
 
@@ -268,9 +222,7 @@ export function HomeScrollExperience({
       const rootIds = new Set([
         "storefront-header",
         "home-hero",
-        "home-tiles",
         "home-latest",
-        "home-newsletter",
         "storefront-footer",
         "home-footer",
       ]);
@@ -607,37 +559,6 @@ export function HomeScrollExperience({
     }
   }, [home.domOverrides]);
 
-  const handleNewsletterSubmit = useCallback(
-    async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const trimmed = String(new FormData(e.currentTarget).get("email") ?? newsletterEmail).trim();
-      if (!trimmed || !trimmed.includes("@")) {
-        setNewsletterError("Please enter a valid email address.");
-        return;
-      }
-      setNewsletterStatus("sending");
-      setNewsletterError(null);
-      try {
-        const recaptchaToken = await getRecaptchaToken("signup");
-        const res = await fetch("/api/newsletter", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: trimmed, source: "homepage", recaptchaToken }),
-        });
-        if (!res.ok) {
-          const json = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(json.error ?? `HTTP ${res.status}`);
-        }
-        setNewsletterStatus("sent");
-        setNewsletterEmail("");
-      } catch (err) {
-        setNewsletterStatus("error");
-        setNewsletterError(err instanceof Error ? err.message : "Subscription failed. Try again.");
-      }
-    },
-    [newsletterEmail],
-  );
-
   const heroStyle = home.hero.style;
   const heroTone = heroToneClass(heroStyle.textTone);
   const heroLeadTone = heroLeadToneClass(heroStyle.textTone);
@@ -696,26 +617,6 @@ export function HomeScrollExperience({
         );
       }
 
-      const panels = collectionsRef.current?.querySelectorAll<HTMLElement>(
-        "[data-home-collection-panel]",
-      );
-      if (panels?.length) {
-        panels.forEach((panel, index) => {
-          const fromX = index % 2 === 0 ? -70 : 70;
-          gsap.from(panel, {
-            scrollTrigger: {
-              trigger: panel,
-              start: "top 88%",
-              toggleActions: "play none none none",
-            },
-            x: fromX,
-            opacity: 0,
-            duration: 0.85,
-            ease,
-          });
-        });
-      }
-
       if (latestHeaderRef.current) {
         gsap.from(latestHeaderRef.current.children, {
           scrollTrigger: {
@@ -745,20 +646,6 @@ export function HomeScrollExperience({
         },
       );
 
-      if (clubRef.current) {
-        gsap.from(clubRef.current.children, {
-          scrollTrigger: {
-            trigger: clubRef.current,
-            start: "top 85%",
-            toggleActions: "play none none none",
-          },
-          y: 32,
-          opacity: 0,
-          duration: 0.75,
-          stagger: 0.15,
-          ease,
-        });
-      }
     }, rootRef);
 
     return () => {
@@ -774,7 +661,6 @@ export function HomeScrollExperience({
       ref={rootRef}
       data-cms-visual-block-count={visualBlocks.length}
     >
-      <RecaptchaScript />
       <section
         data-cms-id="home-hero"
         data-uvs-id="home-hero"
@@ -923,57 +809,6 @@ export function HomeScrollExperience({
       </section>
 
       <section
-        ref={collectionsRef}
-        data-cms-id="home-tiles"
-        data-uvs-id="home-tiles"
-        data-cms-label="Homepage category tiles"
-        style={sectionStyle(home.sectionLayout?.tiles)}
-        className="scroll-mt-[5.5rem] bg-surface py-14 sm:py-16 md:py-24 storefront-section-x"
-      >
-        <div
-          data-cms-id="home-tiles-grid"
-          data-uvs-id="home-tiles-grid"
-          data-cms-label="Tile grid"
-          className="mx-auto grid max-w-[1600px] grid-cols-1 gap-6 md:grid-cols-12"
-        >
-          {home.tiles.map((tile, index) => {
-            const wide = tile.variant === "wide" || index >= 2;
-            return (
-              <Link
-                key={tile.href}
-                data-home-collection-panel
-                data-cms-id={`home-tile-${index}`}
-                data-uvs-id={`home-tile-${index}`}
-                data-cms-label={`Category tile ${index + 1}`}
-                href={tile.href}
-                className={`group relative min-h-[14rem] overflow-hidden rounded-lg bg-surface-container-high ${wide ? "md:col-span-12" : index === 0 ? "md:col-span-8" : "md:col-span-4"}`}
-              >
-                <TileMedia
-                  imageUrl={tile.imageUrl}
-                  fallbackClass="bg-surface-container-low"
-                />
-                <div className={`absolute ${wide ? "inset-0 flex flex-col items-center justify-center text-center" : "bottom-6 left-6 sm:bottom-8 sm:left-8 md:bottom-10 md:left-10"}`}>
-                  <h2 className="font-headline text-3xl font-extrabold text-primary sm:text-4xl">
-                    {tile.title}
-                  </h2>
-                  {tile.subtitle ? (
-                    <p className="mt-3 text-sm font-medium uppercase tracking-widest text-primary/80">
-                      {tile.subtitle}
-                    </p>
-                  ) : null}
-                  {tile.linkLabel ? (
-                    <span className="mt-2 inline-block font-medium text-primary transition-[text-decoration-color] hover:underline hover:underline-offset-8">
-                      {tile.linkLabel}
-                    </span>
-                  ) : null}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <section
         data-cms-id="home-latest"
         data-uvs-id="home-latest"
         data-cms-label="Latest products"
@@ -1026,32 +861,6 @@ export function HomeScrollExperience({
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      <section
-        ref={clubRef}
-        data-cms-id="home-newsletter"
-        data-uvs-id="home-newsletter"
-        data-cms-label="Newsletter"
-        style={sectionStyle(home.sectionLayout?.newsletter)}
-        id="join-club"
-        className="flex justify-center bg-surface px-[clamp(0.75rem,4vw,2rem)] py-16 text-center sm:py-24 scroll-mt-[5.5rem]"
-      >
-        <div className="w-full max-w-4xl">
-          {newsletterStatus === "sent" ? (
-            <p className="rounded bg-surface-container-highest px-6 py-4 text-sm font-medium text-primary">
-              You are subscribed. Thank you!
-            </p>
-          ) : (
-            <Newsletter3
-              privacyLinkHref="/privacy"
-              onSubmit={handleNewsletterSubmit}
-            />
-          )}
-          {newsletterError ? (
-            <p className="mt-2 text-xs text-error" role="alert">{newsletterError}</p>
-          ) : null}
         </div>
       </section>
 

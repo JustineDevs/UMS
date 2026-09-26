@@ -31,9 +31,7 @@ const IDS = {
   headerNavigation: "header-navigation",
   headerActions: "header-actions",
   hero: "home-hero",
-  tiles: "home-tiles",
   latest: "home-latest",
-  newsletter: "home-newsletter",
   footer: "storefront-footer",
   footerColumns: "footer-columns",
 } as const;
@@ -82,22 +80,10 @@ function toBlocks(payload: StorefrontHomePayload): CmsBlock[] {
         domOverrides: payload.domOverrides,
       },
     },
-    { id: IDS.tiles, type: "home_tiles", props: { tiles: payload.tiles, layout: payload.sectionLayout?.tiles } },
     {
       id: IDS.latest,
       type: "latest_section",
       props: { ...payload.latestSection, layout: payload.sectionLayout?.latest },
-    },
-    {
-      id: IDS.newsletter,
-      type: "newsletter",
-      props: {
-        heading: payload.newsletter.title,
-        subtitle: payload.newsletter.body,
-        placeholder: payload.newsletter.placeholder,
-        buttonLabel: payload.newsletter.buttonLabel,
-        layout: payload.sectionLayout?.newsletter,
-      },
     },
     {
       id: IDS.footer,

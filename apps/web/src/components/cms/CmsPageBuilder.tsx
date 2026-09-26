@@ -683,9 +683,6 @@ function componentChildId(block: CmsBlock, key: string) {
     if (key === "supportLinks") return "footer-support-links";
     if (key === "socialLinks") return "footer-social-links";
   }
-  if (block.id === "home-tiles" && key.startsWith("tile-")) {
-    return `home-tile-${key.slice("tile-".length)}`;
-  }
   if (block.id.startsWith("home-")) return `${block.id}-${key}`;
   return `${block.id}::${key}`;
 }
