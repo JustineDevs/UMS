@@ -133,6 +133,36 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         </aside>
 
         <div className="min-w-0 space-y-8">
+          <header className="border-b border-outline-variant/15 pb-6">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              // ACCOUNT SETTINGS
+            </p>
+            <h1 className="mt-3 font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">
+              Settings
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant">
+              Manage your account settings and set e-mail preferences.
+            </p>
+            <nav aria-label="Settings categories" className="mt-6 flex gap-2 overflow-x-auto pb-1">
+              {[
+                ["profile", "Profile"],
+                ["overview", "Account"],
+                ["orders", "Billing"],
+                ["preferences", "Appearance"],
+                ["notifications", "Notifications"],
+                ["preferences", "Display"],
+              ].map(([id, label], index) => (
+                <a
+                  key={`${id}-${label}`}
+                  href={`#${id}`}
+                  className={`min-h-11 shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition ${index === 0 ? "bg-surface-container-low text-primary" : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"}`}
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </header>
+
           <section
             id="overview"
             className="scroll-mt-28 overflow-hidden rounded-[2rem] bg-primary p-6 text-on-primary shadow-[0_24px_60px_rgba(49,46,43,0.14)] sm:p-9"
@@ -410,9 +440,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     />
                   ) : (
                     <span className="grid size-16 place-items-center rounded-2xl bg-surface-container-low text-primary">
-                      <span className="material-symbols-outlined text-[28px]">
-                        person
-                      </span>
+                      <UserRound className="size-7" aria-hidden="true" />
                     </span>
                   )}
                   <div>
