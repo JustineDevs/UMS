@@ -3,10 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@universal-music-store/platform-data";
-import {
-  sanitizeCmsHtml,
-  SHOP_PRODUCT_PAGE_SIZE,
-} from "@universal-music-store/validation";
+import { SHOP_PRODUCT_PAGE_SIZE } from "@universal-music-store/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import {
@@ -27,7 +24,6 @@ import {
   normalizeShopPageSearchParams,
   shopPageShouldNoIndex,
 } from "@/lib/shop-page-query";
-import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { ShopFilterDrawer } from "@/components/ShopFilterDrawer";
@@ -271,71 +267,20 @@ export default async function ShopPage({
           />
         </div>
       ) : null}
-      <header className="mb-8 grid grid-cols-1 items-end gap-6 border-b border-outline-variant/15 pb-6 sm:mb-10 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-8">
+      <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+        <div className="min-w-0">
           <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
             // SHOP CATALOG
           </p>
           <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
             {category ?? "All categories"}
           </h1>
-          <p className="mt-2 text-sm text-on-surface-variant">
-            {total.toLocaleString("en-PH")} instruments, studio essentials, and accessories
-          </p>
           {searchQ ? (
             <p className="mt-4 font-body text-base text-on-surface-variant">
               Search results for{" "}
               <strong className="text-primary">{searchQ}</strong>
             </p>
           ) : null}
-          {cmsCategory?.intro_html?.trim() ? (
-            <div
-              className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeCmsHtml(String(cmsCategory.intro_html)),
-              }}
-            />
-          ) : (
-            <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-              Browse the catalog with filters for category, instrument type,
-              finish, pickup layout, body wood, condition, skill level,
-              shipping speed, and price. Product details, stock, and checkout
-              use the live store system.
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col gap-6 justify-start lg:col-span-4 lg:items-end lg:justify-end">
-          <CatalogSearchTypeahead
-            key={searchQ ?? ""}
-            initialQ={searchQ}
-            category={category}
-            type={type}
-            finish={finish}
-            brand={brand}
-            pickupConfig={pickupConfig}
-            bodyWood={bodyWood}
-            condition={condition}
-            skillLevel={skillLevel}
-            shippingSpeed={shippingSpeed}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            sort={sort}
-          />
-          <ShopSortSelect
-            value={sort}
-            category={category}
-            type={type}
-            finish={finish}
-            brand={brand}
-            pickupConfig={pickupConfig}
-            bodyWood={bodyWood}
-            condition={condition}
-            skillLevel={skillLevel}
-            shippingSpeed={shippingSpeed}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            search={searchQ}
-          />
         </div>
       </header>
 
@@ -352,7 +297,22 @@ export default async function ShopPage({
             <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-primary">All categories</h2>
             <p className="mt-2 text-xs leading-5 text-on-surface-variant">Browse the catalog by instrument family.</p>
           </div>
-          <ShopFilterGroup title="Category">
+          <ShopSortSelect
+            value={sort}
+            category={category}
+            type={type}
+            finish={finish}
+            brand={brand}
+            pickupConfig={pickupConfig}
+            bodyWood={bodyWood}
+            condition={condition}
+            skillLevel={skillLevel}
+            shippingSpeed={shippingSpeed}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            search={searchQ}
+          />
+          <ShopFilterGroup title="Category" defaultOpen>
             <ul className="space-y-4">
               <li>
                 <Link
