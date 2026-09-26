@@ -128,7 +128,7 @@ interface RatingBadgeProps extends HTMLAttributes<HTMLDivElement> {
   title?: string;
   subtitle?: string;
   rating?: number;
-  theme?: "light" | "dark";
+  theme?: "light" | "dark" | "black";
 }
 
 export const RatingBadge = ({
@@ -141,16 +141,30 @@ export const RatingBadge = ({
 }: RatingBadgeProps) => {
   return (
     <div {...props} className={cx("flex items-center -space-x-0.5", className)}>
-      <Wreath className={cx("shrink-0", theme === "light" && "text-fg-white")} />
+      <Wreath
+        className={cx(
+          "shrink-0",
+          theme === "light" && "text-fg-white",
+          theme === "black" && "text-black",
+        )}
+      />
 
       <div className="flex flex-col items-center gap-1">
-        <RatingStars rating={rating} className="gap-0.5" starClassName="size-4" />
+        <RatingStars
+          rating={rating}
+          className="gap-0.5"
+          starClassName={cx("size-4", theme === "black" && "text-black")}
+        />
 
         <div className="text-center">
           <p
             className={cx(
               "text-sm font-semibold",
-              theme === "light" ? "text-primary_on-brand" : "text-primary",
+              theme === "light"
+                ? "text-primary_on-brand"
+                : theme === "black"
+                  ? "text-black"
+                  : "text-primary",
             )}
           >
             {title}
@@ -158,7 +172,11 @@ export const RatingBadge = ({
           <p
             className={cx(
               "text-xs font-medium",
-              theme === "light" ? "text-secondary_on-brand" : "text-secondary",
+              theme === "light"
+                ? "text-secondary_on-brand"
+                : theme === "black"
+                  ? "text-black"
+                  : "text-secondary",
             )}
           >
             {subtitle}

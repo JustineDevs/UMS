@@ -637,6 +637,7 @@ export function HomeScrollExperience({
               rating={socialProof.reviewSummary.average}
               title={`${socialProof.customerCount.toLocaleString("en-PH")} customers`}
               subtitle={`${socialProof.reviewSummary.count.toLocaleString("en-PH")} reviews`}
+              theme="black"
               className="shrink-0 sm:ml-2"
             />
           </div>
