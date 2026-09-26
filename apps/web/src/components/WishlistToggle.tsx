@@ -72,7 +72,7 @@ export function WishlistToggle({
       aria-label={
         on ? "Remove from saved items" : "Save item to your list"
       }
-      className={`inline-flex items-center justify-center rounded border border-outline-variant/40 p-3 transition-colors hover:border-primary disabled:cursor-wait disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center justify-center rounded bg-surface-container-low p-3 transition-colors hover:bg-surface-container-high disabled:cursor-wait disabled:opacity-60 ${className}`}
     >
       <Heart
         aria-hidden="true"

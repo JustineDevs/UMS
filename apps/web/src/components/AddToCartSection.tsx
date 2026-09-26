@@ -177,7 +177,7 @@ export function AddToCartSection({
       )}
 
       {variant ? (
-        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-4 text-sm" data-testid="pdp-selected-variant">
+        <div className="rounded-xl bg-surface-container-low/40 p-4 text-sm" data-testid="pdp-selected-variant">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               Selected variant
@@ -250,7 +250,7 @@ export function AddToCartSection({
           type="button"
           disabled={!clientReady || !variant || isOutOfStock}
           onClick={() => handlePurchase("/checkout")}
-          className="min-h-[52px] flex-1 rounded border border-primary px-4 py-4 text-center font-headline font-bold tracking-tight text-primary transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
+          className="min-h-[52px] flex-1 rounded bg-surface-container-low px-4 py-4 text-center font-headline font-bold tracking-tight text-primary transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
         >
           Buy now
         </button>
