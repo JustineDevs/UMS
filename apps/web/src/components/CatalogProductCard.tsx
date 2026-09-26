@@ -65,7 +65,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
   const initialInventorySignature = buildFreshnessSignature(product.variants);
 
   return (
-    <Card className="overflow-hidden border-0 bg-transparent shadow-none transition-shadow duration-300 hover:shadow-md">
+    <Card className="overflow-hidden border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-shadow duration-300 hover:shadow-md">
       <Link
         href={`/shop/${product.slug}`}
         className="group block"
@@ -74,7 +74,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
         onClick={() => trackProductClick({ slug: product.slug, id: product.id })}
       >
         <div
-          className="relative mb-6 aspect-[3/4] overflow-hidden bg-surface-container-low"
+          className="relative aspect-square overflow-hidden bg-surface-container-low"
           onMouseEnter={() => {
             setIdx(0);
             startTimer();
@@ -136,10 +136,10 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
             </span>
           </div>
         </div>
-        <CardContent className="p-0">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="mb-1 font-headline text-lg font-bold text-primary uppercase">
+              <h2 className="mb-1 line-clamp-2 font-headline text-sm font-bold text-primary uppercase">
                 {product.name.toUpperCase()}
               </h2>
               <p className="font-body text-xs uppercase tracking-widest text-on-surface-variant">
@@ -152,7 +152,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
                   PHP {compareAtPrice.toLocaleString("en-PH")}
                 </span>
               ) : null}
-              <span className={`block font-headline text-lg font-medium ${isSale ? "text-error" : "text-primary"}`}>
+              <span className={`block font-headline text-base font-medium ${isSale ? "text-error" : "text-primary"}`}>
                 PHP {minPrice.toLocaleString("en-PH")}
               </span>
               <BrowsePriceFreshnessCue
@@ -165,7 +165,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
           </div>
         </CardContent>
       </Link>
-      <div className="px-1">
+      <div className="px-4 pb-4">
         <QuickViewButton slug={product.slug} />
       </div>
     </Card>

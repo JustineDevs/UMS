@@ -271,15 +271,17 @@ export default async function ShopPage({
           />
         </div>
       ) : null}
-      <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
+      <header className="mb-8 grid grid-cols-1 items-end gap-6 border-b border-outline-variant/15 pb-6 sm:mb-10 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
-          <h1 className="font-headline text-[clamp(2rem,6.5vw,4.5rem)] font-bold leading-[1.05] tracking-tighter text-primary">
-            Shop
-            <br />
-            <span className="text-[clamp(1.2rem,4vw,2.75rem)] font-bold">
-              All instruments
-            </span>
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+            // SHOP CATALOG
+          </p>
+          <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+            {category ?? "All categories"}
           </h1>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            {total.toLocaleString("en-PH")} instruments, studio essentials, and accessories
+          </p>
           {searchQ ? (
             <p className="mt-4 font-body text-base text-on-surface-variant">
               Search results for{" "}
@@ -345,7 +347,11 @@ export default async function ShopPage({
 
       <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
         <ShopFilterDrawer activeFilterCount={activeFilterCount}>
-          <aside className="w-full space-y-12">
+          <aside className="w-full space-y-10">
+          <div className="border-b border-outline-variant/20 pb-5">
+            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-primary">All categories</h2>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">Browse the catalog by instrument family.</p>
+          </div>
           <ShopFilterGroup title="Category">
             <ul className="space-y-4">
               <li>
@@ -723,7 +729,7 @@ export default async function ShopPage({
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
                 <CatalogProductCard
                   key={product.id}
