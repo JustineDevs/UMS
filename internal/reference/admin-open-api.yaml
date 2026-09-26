@@ -10329,7 +10329,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 302]
-      x-source-sha256: 3dec1ade023c3138de1fd53b329c03f62972b65345bf75750c2e3a1aa14b6463
+      x-source-sha256: d800d7052af24d02eb46c0844dda8597df98f52cbbfa8ce4a79ee8a11135f136
       security: []
       responses:
         "302":
