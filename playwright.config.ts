@@ -96,6 +96,7 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     UVS_DEV_WEB_MAX_OLD_SPACE_MB: useProductionWebServer
       ? undefined
       : process.env.UVS_DEV_WEB_MAX_OLD_SPACE_MB ?? "3072",
+    UVS_DEV_WEB_PORT: webPort,
   };
 }
 
@@ -103,7 +104,9 @@ function storefrontServerEnv(): Record<string, string | undefined> {
  * Default `127.0.0.1` avoids `ECONNREFUSED ::1` on Windows when Next binds IPv4 only.
  * Override with PLAYWRIGHT_BASE_URL when needed.
  */
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? "3000";
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${webPort}`;
 const tunnelBypass = process.env.PLAYWRIGHT_TUNNEL_BYPASS?.trim();
 
 /**
@@ -216,7 +219,7 @@ export default defineConfig({
         },
         {
           command: useProductionWebServer
-            ? "pnpm --filter @universal-music-store/web exec next start --hostname 127.0.0.1 --port 3000"
+            ? `pnpm --filter @universal-music-store/web exec next start --hostname 127.0.0.1 --port ${webPort}`
             : "pnpm --filter @universal-music-store/web dev",
           url: storefrontWebServerUrl,
           // Critical release proof serves the already-built artifact. Normal
