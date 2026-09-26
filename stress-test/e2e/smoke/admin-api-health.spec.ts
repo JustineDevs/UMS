@@ -10,7 +10,10 @@ import "../runtime-logs-init";
 import { test, expect } from "@playwright/test";
 import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
-const base = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
+const base =
+  process.env.PLAYWRIGHT_WEB_URL ??
+  process.env.PLAYWRIGHT_BASE_URL ??
+  "http://127.0.0.1:3000";
 
 const PUBLIC_GET_ROUTES: string[] = [];
 
