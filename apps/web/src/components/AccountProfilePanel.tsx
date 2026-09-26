@@ -30,7 +30,13 @@ function emptyAddress(): StorefrontShippingAddress {
   };
 }
 
-export function AccountProfilePanel({ initial }: { initial: Initial }) {
+export function AccountProfilePanel({
+  initial,
+  mode = "profile",
+}: {
+  initial: Initial;
+  mode?: "profile" | "addresses";
+}) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
@@ -149,13 +155,11 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
 
   return (
     <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 md:col-span-2">
-      <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
-        Profile &amp; saved addresses
+      <h2 className="font-headline text-2xl font-bold tracking-tight text-primary">
+        My addresses
       </h2>
       <p className="mt-2 text-sm text-on-surface-variant">
-        We validate Philippine mobile numbers. Saved addresses speed up checkout
-        copy-paste; the payment step may still ask you to confirm details with
-        your provider.
+        Manage your shipping addresses and choose a default for checkout.
       </p>
 
       {err ? (
@@ -186,7 +190,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
+      {mode === "profile" ? <div className="mt-6 grid gap-6 md:grid-cols-2">
         <div>
           <label htmlFor="account-display-name" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
             Display name (optional)
@@ -232,7 +236,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
             autoComplete="tel"
           />
         </div>
-      </div>
+      </div> : null}
 
       <div className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -258,13 +262,23 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         {addresses.map((a, i) => (
               <li
                 key={a.id ?? `${a.line1 ?? "address"}-${a.city ?? "city"}-${a.postalCode ?? "postal"}-${a.country ?? "country"}`}
-                className="rounded-lg border border-outline-variant/15 p-4"
+                className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm"
               >
-                <div className="mb-3 flex justify-end">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/15 pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-outline-variant/25 bg-surface-container-low px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      {a.label?.trim() || "Address"}
+                    </span>
+                    {a.isDefault || (addresses.every((address) => address.isDefault !== true) && i === 0) ? (
+                      <span className="rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-primary">
+                        Default
+                      </span>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeAddress(i)}
-                    className="text-xs text-on-surface-variant underline"
+                    className="text-xs font-semibold text-on-surface-variant underline underline-offset-2"
                   >
                     Remove
                   </button>

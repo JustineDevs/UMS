@@ -37,7 +37,7 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace(`/sign-in?callbackUrl=${encodeURIComponent("/onboarding?next=" + encodeURIComponent(nextPath))}`);
+      router.replace(`/login?callbackUrl=${encodeURIComponent("/onboarding?next=" + encodeURIComponent(nextPath))}`);
     }
   }, [status, router, nextPath]);
 
@@ -132,7 +132,7 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string; code?: string; reauthUrl?: string };
         if (j.code === "RECENT_AUTH_REQUIRED" && j.reauthUrl) {
-          router.replace(`/sign-in?callbackUrl=${encodeURIComponent(`/onboarding?next=${encodeURIComponent(nextPath)}`)}&reauth=1`);
+          router.replace(`/login?callbackUrl=${encodeURIComponent(`/onboarding?next=${encodeURIComponent(nextPath)}`)}&reauth=1`);
           return;
         }
         setErr(j.error ?? "Could not save. Try again.");

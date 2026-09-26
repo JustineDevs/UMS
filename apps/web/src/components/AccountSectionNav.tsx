@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bell, LayoutDashboard, ReceiptText, SlidersHorizontal, Star, UserRound } from "lucide-react";
 
 type AccountSection = readonly [string, string, string];
+const icons = { dashboard: LayoutDashboard, receipt_long: ReceiptText, person: UserRound, notifications: Bell, tune: SlidersHorizontal, stars: Star } as const;
 
 export function AccountSectionNav({ sections }: { sections: readonly AccountSection[] }) {
   const [active, setActive] = useState(sections[0]?.[0] ?? "");
@@ -38,7 +40,7 @@ export function AccountSectionNav({ sections }: { sections: readonly AccountSect
           aria-current={active === id ? "location" : undefined}
           className={`flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition hover:bg-surface-container-low hover:text-primary lg:w-full ${active === id ? "bg-surface-container-low text-primary" : "text-on-surface-variant"}`}
         >
-          <span className="material-symbols-outlined text-[19px]" aria-hidden="true">{icon}</span>
+          {(() => { const Icon = icons[icon as keyof typeof icons] ?? LayoutDashboard; return <Icon className="size-[19px]" aria-hidden="true" />; })()}
           {label}
         </a>
       ))}

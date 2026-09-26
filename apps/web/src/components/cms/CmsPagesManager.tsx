@@ -64,6 +64,13 @@ function idempotencyKey(scope: string): string {
   return globalThis.crypto?.randomUUID?.() ?? `${scope}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function cmsPreviewOrigin(): string {
+  if (typeof window !== "undefined" && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname)) {
+    return window.location.origin;
+  }
+  return getStorefrontPublicOrigin();
+}
+
 function emptyPage(): CmsPageRow {
   return {
     id: "",
@@ -249,7 +256,7 @@ export function CmsPagesManager({
   const previewPage = (id: string) => {
     const page = rows.find((item) => item.id === id);
     if (!page) return;
-    const pageUrl = `${getStorefrontPublicOrigin()}/p/${page.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const pageUrl = `${cmsPreviewOrigin()}/p/${page.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
     const previewUrl = cmsPagePreviewUrl(pageUrl, page.preview_token);
     window.open(previewUrl, "_blank", "noopener,noreferrer");
   };
@@ -465,8 +472,8 @@ export function CmsPagesManager({
   if (editing) {
     const isHomepage = editing.slug.trim().toLowerCase() === "home" || editing.slug.trim() === "/";
     const pageUrl = isHomepage
-      ? `${getStorefrontPublicOrigin()}/?adminPreview=1`
-      : `${getStorefrontPublicOrigin()}/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+      ? `${cmsPreviewOrigin()}/?adminPreview=1`
+      : `${cmsPreviewOrigin()}/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
     const previewUrl = cmsPagePreviewUrl(pageUrl, editing.preview_token);
     const settings = (
       <div className="space-y-4 text-xs">

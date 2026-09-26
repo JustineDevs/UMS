@@ -141,6 +141,7 @@ export async function finalizeCheckoutFromServer(
   }
 
   let orderId: string | undefined;
+  let finalizedOrganizationId: string | undefined;
   let errorMessage = "Order not ready";
   let attempts = 0;
   while (attempts < maxAttempts) {
@@ -155,9 +156,14 @@ export async function finalizeCheckoutFromServer(
     );
     const payload = await readResponseJson(response, {} as {
       orderId?: unknown;
+      organizationId?: unknown;
       error?: unknown;
     });
     orderId = typeof payload.orderId === "string" ? payload.orderId : undefined;
+    finalizedOrganizationId =
+      typeof payload.organizationId === "string" && payload.organizationId.trim()
+        ? payload.organizationId.trim()
+        : undefined;
     errorMessage =
       typeof payload.error === "string" ? payload.error : errorMessage;
     if (response.ok && orderId) break;
@@ -175,7 +181,7 @@ export async function finalizeCheckoutFromServer(
     process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
     DEFAULT_PUBLIC_SITE_ORIGIN;
   const redirectUrl = buildTrackingUrl(base, orderId, {
-    storeId: process.env.DEFAULT_ORGANIZATION_ID?.trim(),
+    storeId: finalizedOrganizationId || process.env.DEFAULT_ORGANIZATION_ID?.trim(),
   });
   if (!redirectUrl) {
     return {

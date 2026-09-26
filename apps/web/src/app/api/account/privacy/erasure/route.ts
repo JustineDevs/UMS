@@ -33,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
       {
         error: "Please sign in again before deleting your account.",
         code: "RECENT_AUTH_REQUIRED",
-        reauthUrl: "/sign-in?callbackUrl=%2Faccount&reauth=1",
+        reauthUrl: "/login?callbackUrl=%2Faccount&reauth=1",
       },
       { status: 401, headers: { "Cache-Control": "no-store" } },
     );

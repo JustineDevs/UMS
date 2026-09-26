@@ -32,6 +32,23 @@ const ADMIN_OPERATION_PATHS: readonly string[] = [
   "/admin/finance/reconciliation",
 ];
 
+const ADMIN_ROUTE_GROUPS: Record<string, readonly string[]> = {
+  core: ADMIN_OPERATION_PATHS.slice(0, 5),
+  cms: ["/admin/cms"],
+  payments: ["/admin/settings/payments"],
+  operations: ADMIN_OPERATION_PATHS.slice(7, 11),
+  people: ADMIN_OPERATION_PATHS.slice(11, 15),
+  crm: ["/admin/crm"],
+  receipts: ["/admin/receipts"],
+  platform: ADMIN_OPERATION_PATHS.slice(15, 18),
+  platform2: ADMIN_OPERATION_PATHS.slice(18),
+  builder: ["/admin/cms/builder"],
+  reconciliation: ["/admin/finance/reconciliation"],
+};
+
+const selectedAdminRoutes =
+  ADMIN_ROUTE_GROUPS[process.env.UVS_ADMIN_ROUTE_GROUP ?? ""] ?? ADMIN_OPERATION_PATHS;
+
 test.describe.configure({ mode: "serial" });
 
 test.describe("@admin Admin operations E2E", () => {
@@ -52,7 +69,7 @@ test.describe("@admin Admin operations E2E", () => {
       );
     }
 
-    for (const path of ADMIN_OPERATION_PATHS) {
+    for (const path of selectedAdminRoutes) {
       await test.step(path, async () => {
         await page.goto(`${adminBase}${path}`, {
           waitUntil: "domcontentloaded",

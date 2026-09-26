@@ -1,6 +1,18 @@
-import { StorefrontPublicChrome } from "../../components/StorefrontPublicChrome";
+import {
+  StorefrontPublicChrome,
+  type StorefrontChromeSections,
+} from "../../components/StorefrontPublicChrome";
 import { CmsPagePreviewBridge } from "../../components/CmsPagePreviewBridge";
 import { StorefrontRuntimeProviders } from "../../components/StorefrontRuntimeProviders";
+
+const STOREFRONT_SECTIONS: StorefrontChromeSections = {
+  header: {
+    announcement: true,
+    utilityBar: true,
+    primaryNav: true,
+  },
+  footer: true,
+};
 
 export default function PublicLayout({
   children,
@@ -9,7 +21,7 @@ export default function PublicLayout({
 }) {
   return (
     <StorefrontRuntimeProviders>
-      <StorefrontPublicChrome>
+      <StorefrontPublicChrome sections={STOREFRONT_SECTIONS}>
         <CmsPagePreviewBridge />
         {children}
       </StorefrontPublicChrome>

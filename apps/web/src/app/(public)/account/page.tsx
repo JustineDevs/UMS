@@ -19,10 +19,11 @@ import { OrderCancelButton } from "@/components/OrderCancelButton";
 import { loadCustomerProfileResult } from "@/lib/server-customer-profile";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
-import { AccountSectionNav } from "@/components/AccountSectionNav";
+import { AccountRouteNav } from "@/components/AccountRouteNav";
 import { AccountPrivacyControls } from "@/components/AccountPrivacyControls";
 import { AccountMarketingPreferencesPanel } from "@/components/AccountMarketingPreferencesPanel";
 import { AccountOrderPreferencesPanel } from "@/components/AccountOrderPreferencesPanel";
+import { MapPin, PackageCheck, Pencil, ShieldCheck, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -35,15 +36,6 @@ export const metadata: Metadata = buildPageMetadata({
   noindex: true,
   referrer: "no-referrer",
 });
-
-const accountNav = [
-  ["overview", "Overview", "dashboard"],
-  ["orders", "Orders", "receipt_long"],
-  ["profile", "Profile & addresses", "person"],
-  ["notifications", "Notifications", "notifications"],
-  ["preferences", "Preferences", "tune"],
-  ["loyalty", "Loyalty wallet", "stars"],
-] as const;
 
 const orderFilters = [
   ["", "All orders"],
@@ -83,9 +75,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     orderCount: orders.length,
   });
   const profileAvatar = profile?.avatarUrl ?? user?.image ?? null;
-  const currency =
-    stats.currency ??
-    (stats.lifetimeSpend === null ? "Multiple currencies" : "PHP");
   const visibleOrders = orders.filter((order) => {
     const matchesStatus = accountOrderMatchesStatusFilter(
       order.status,
@@ -101,14 +90,10 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
 
   return (
     <main className="storefront-page-shell storefront-content-wide max-w-[1320px]">
-      <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="self-start lg:sticky lg:top-28">
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="min-w-0 self-start lg:sticky lg:top-28">
           <div className="mb-5 hidden items-center gap-3 lg:flex">
-            <span className="grid size-10 place-items-center rounded-2xl bg-primary text-on-primary">
-              <span className="material-symbols-outlined text-[20px]">
-                person
-              </span>
-            </span>
+              <span className="grid size-10 place-items-center rounded-2xl bg-primary text-on-primary"><UserRound className="size-5" aria-hidden="true" /></span>
             <div>
               <p className="font-headline text-xs font-bold uppercase tracking-[0.18em] text-primary">
                 My account
@@ -118,7 +103,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </p>
             </div>
           </div>
-          <AccountSectionNav sections={accountNav} />
+          <AccountRouteNav />
           <div className="mt-8 hidden rounded-2xl bg-surface-container-low p-4 lg:block">
             <p className="text-xs font-semibold uppercase tracking-wider text-primary">
               Need help?
@@ -136,60 +121,64 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
         </aside>
 
         <div className="min-w-0 space-y-8">
-          <section
-            id="overview"
-            className="scroll-mt-28 overflow-hidden rounded-[2rem] bg-primary p-6 text-on-primary shadow-[0_24px_60px_rgba(49,46,43,0.14)] sm:p-9"
-          >
-            <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-on-primary/65">
-                  Account overview
-                </p>
-                <h1 className="max-w-xl font-headline text-4xl font-extrabold tracking-[-0.06em] sm:text-5xl">
-                  {user
-                    ? "Welcome back" +
-                      (user.name ? ", " + user.name.split(" ")[0] : "") +
-                      "."
-                    : "Your account, in one place."}
-                </h1>
-                <p className="mt-4 max-w-lg text-sm leading-6 text-on-primary/75">
-                  Manage your profile, saved addresses, orders, and shopping
-                  preferences. Payment cards stay with your checkout provider.
-                </p>
-              </div>
-              {!user ? (
-                <Link
-                  href="/sign-in?callbackUrl=/account"
-                  className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl bg-on-primary px-4 py-2.5 text-sm font-semibold text-primary hover:opacity-90"
+          <header className="border-b border-outline-variant/15 pb-6">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              // ACCOUNT SETTINGS
+            </p>
+            <h1 className="mt-3 font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">
+              Settings
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant">
+              Manage your account settings and set e-mail preferences.
+            </p>
+            <nav aria-label="Settings categories" className="mt-6 flex gap-2 overflow-x-auto pb-1">
+              {[
+                ["profile", "Profile"],
+                ["overview", "Account"],
+                ["orders", "Billing"],
+                ["preferences", "Appearance"],
+                ["notifications", "Notifications"],
+                ["preferences", "Display"],
+              ].map(([id, label], index) => (
+                <a
+                  key={`${id}-${label}`}
+                  href={`#${id}`}
+                  className={`min-h-11 shrink-0 rounded-lg px-4 py-2.5 text-sm font-medium transition ${index === 0 ? "bg-surface-container-low text-primary" : "text-on-surface-variant hover:bg-surface-container-low hover:text-primary"}`}
                 >
-                  Sign in <span aria-hidden="true">↗</span>
-                </Link>
-              ) : null}
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </header>
+
+          <section id="overview" className="scroll-mt-28 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">Profile</h1>
+                <p className="mt-1 text-sm text-on-surface-variant">Manage your account profile and delivery details.</p>
+              </div>
+              <span className="hidden text-sm text-on-surface-variant sm:inline">Home <span aria-hidden="true">›</span> Profile</span>
             </div>
-            <dl className="mt-9 grid grid-cols-2 gap-3 border-t border-on-primary/15 pt-5 sm:grid-cols-3">
-              <div>
-                <dt className="text-xs text-on-primary/60">Orders placed</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.orderCount}
-                </dd>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-4">
+                  {profileAvatar ? <Image src={profileAvatar} alt="" width={64} height={64} className="size-16 rounded-full object-cover" referrerPolicy="no-referrer" unoptimized={shouldUnoptimizeImage(profileAvatar)} /> : <span className="grid size-16 place-items-center rounded-full bg-surface-container-low text-primary"><UserRound className="size-7" aria-hidden="true" /></span>}
+                  <div><h2 className="font-headline text-xl font-bold text-primary">{user?.name || profile?.displayName || "Your profile"}</h2><p className="mt-1 text-sm text-on-surface-variant">{user?.email || "Sign in to manage your profile"}</p></div>
+                </div>
+                <a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Edit</a>
               </div>
-              <div>
-                <dt className="text-xs text-on-primary/60">Lifetime spend</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.lifetimeSpend === null
-                    ? "Unavailable"
-                    : `${currency} ${stats.lifetimeSpend.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}
-                </dd>
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <dt className="text-xs text-on-primary/60">Average order</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.averageOrderValue === null
-                    ? "Unavailable"
-                    : `${currency} ${stats.averageOrderValue.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}
-                </dd>
-              </div>
-            </dl>
+              <dl className="mt-7 grid gap-5 border-t border-outline-variant/15 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div><dt className="text-xs text-on-surface-variant">Name</dt><dd className="mt-1 text-sm font-semibold text-primary">{profile?.displayName || user?.name || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Email address</dt><dd className="mt-1 break-all text-sm font-semibold text-primary">{user?.email || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Phone</dt><dd className="mt-1 text-sm font-semibold text-primary">{profile?.phone || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Orders</dt><dd className="mt-1 text-sm font-semibold text-primary">{stats.orderCount}</dd></div>
+              </dl>
+            </section>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><MapPin className="size-5 text-primary" aria-hidden="true" /><h2 className="font-headline text-lg font-bold text-primary">Address</h2></div><a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Edit</a></div>
+              {profile?.shippingAddresses?.[0] ? <div className="mt-5 grid gap-5 border-t border-outline-variant/15 pt-5 sm:grid-cols-2"><div><p className="text-xs text-on-surface-variant">Default address</p><p className="mt-1 text-sm font-semibold text-primary">{profile.shippingAddresses[0].fullName}</p><p className="mt-1 text-sm leading-6 text-on-surface-variant">{profile.shippingAddresses[0].line1}, {profile.shippingAddresses[0].barangay}, {profile.shippingAddresses[0].city}, {profile.shippingAddresses[0].province}</p></div><div><p className="text-xs text-on-surface-variant">Phone</p><p className="mt-1 text-sm font-semibold text-primary">{profile.shippingAddresses[0].phone}</p></div></div> : <p className="mt-5 border-t border-outline-variant/15 pt-5 text-sm text-on-surface-variant">No saved shipping address yet. Add one to speed up checkout.</p>}
+            </section>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7"><div className="flex items-center justify-between"><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-primary" aria-hidden="true" /><h2 className="font-headline text-lg font-bold text-primary">Security</h2></div><a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Manage</a></div><p className="mt-4 text-sm text-on-surface-variant">Your account uses secure Google sign-in. Payment cards remain with the checkout provider.</p></section>
           </section>
 
           <section
@@ -204,6 +193,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <h2 className="mt-2 font-headline text-2xl font-bold tracking-tight text-primary">
                   Order history
                 </h2>
+                <p className="mt-1 text-sm text-on-surface-variant">View and manage your past orders.</p>
               </div>
               <Link
                 href="/shop"
@@ -282,7 +272,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               <div className="space-y-3 py-8 text-sm text-on-surface-variant">
                 <p>Sign in to view your order history.</p>
                 <Link
-                  href="/sign-in?callbackUrl=/account"
+                  href="/login?callbackUrl=/account"
                   className="font-semibold text-primary underline"
                 >
                   Sign in to your account
@@ -290,18 +280,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </div>
             ) : orderViewState === "ready" ? (
               visibleOrders.length > 0 ? (
-                <ul className="divide-y divide-outline-variant/15">
+                <ul className="space-y-3 pt-5">
                   {visibleOrders.map((order) => (
                     <li
                       key={order.id}
-                      className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-low text-primary">
-                          <span className="material-symbols-outlined text-[20px]">
-                            package_2
-                          </span>
-                        </span>
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-low text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span>
                         <div>
                           <p className="text-sm font-semibold text-primary">
                             Order #{order.displayId}
@@ -321,6 +307,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                                 )
                               : ""}
                           </p>
+                          <span className="mt-2 inline-flex rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">{order.status.replace(/_/g, " ")}</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
@@ -416,9 +403,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                     />
                   ) : (
                     <span className="grid size-16 place-items-center rounded-2xl bg-surface-container-low text-primary">
-                      <span className="material-symbols-outlined text-[28px]">
-                        person
-                      </span>
+                      <UserRound className="size-7" aria-hidden="true" />
                     </span>
                   )}
                   <div>

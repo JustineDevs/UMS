@@ -9,7 +9,7 @@ import { CmsAnnouncementStack } from "./CmsAnnouncementBar";
 import { CmsExperimentAssigner } from "./CmsExperimentAssigner";
 import { GlobalRouteMotion } from "./GlobalRouteMotion";
 import { StorefrontFooter } from "./StorefrontFooter";
-import { StorefrontHeader } from "./StorefrontHeader";
+import { StorefrontHeader, type StorefrontHeaderSections } from "./StorefrontHeader";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
 const PUBLIC_READ_DEADLINE_MS = 1_500;
@@ -29,14 +29,22 @@ const EMPTY_NAVIGATION = {
   socialLinks: [],
 };
 
+export type StorefrontChromeSections = {
+  header?: StorefrontHeaderSections;
+  footer?: boolean;
+};
+
 /**
  * Shared storefront chrome (header, footer, motion, CMS experiments) for public routes
  * and root not-found so global 404s still match the main layout.
  */
 export async function StorefrontPublicChrome({
   children,
+  sections,
 }: {
   children: React.ReactNode;
+  /** Page-context composition options. Omitted sections keep the storefront defaults. */
+  sections?: StorefrontChromeSections;
 }) {
   const [nav, announcements, experiments, publicSite] = await Promise.all([
     withinPublicReadDeadline(loadCmsNavigationPublic(), EMPTY_NAVIGATION),
@@ -68,6 +76,7 @@ export async function StorefrontPublicChrome({
           announcementBars.length > 0 ? <CmsAnnouncementStack bars={announcementBars} /> : undefined
         }
         navigation={nav}
+        sections={sections?.header}
       />
       <CmsExperimentAssigner experiments={experiments} />
       <div
@@ -77,14 +86,16 @@ export async function StorefrontPublicChrome({
       >
         <GlobalRouteMotion>{children}</GlobalRouteMotion>
       </div>
-      <StorefrontFooter
-        cmsFooterColumns={nav.footerColumns.length > 0 ? nav.footerColumns : undefined}
-        cmsFooterBottomLinks={
-          nav.footerBottomLinks.length > 0 ? nav.footerBottomLinks : undefined
-        }
-        cmsSocialLinks={nav.socialLinks.length > 0 ? nav.socialLinks : undefined}
-        publicSocialLinks={storefrontSocialLinks(publicSite)}
-      />
+      {sections?.footer !== false ? (
+        <StorefrontFooter
+          cmsFooterColumns={nav.footerColumns.length > 0 ? nav.footerColumns : undefined}
+          cmsFooterBottomLinks={
+            nav.footerBottomLinks.length > 0 ? nav.footerBottomLinks : undefined
+          }
+          cmsSocialLinks={nav.socialLinks.length > 0 ? nav.socialLinks : undefined}
+          publicSocialLinks={storefrontSocialLinks(publicSite)}
+        />
+      ) : null}
     </>
   );
 }

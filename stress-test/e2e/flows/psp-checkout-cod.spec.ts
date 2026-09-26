@@ -67,11 +67,11 @@ function isAuthDisabled(): boolean {
 
 async function establishRealSessionIfRequested(
   page: import("@playwright/test").Page,
-): Promise<boolean> {
-  if (process.env.UVS_E2E_REAL_SESSION !== "1") return true;
+): Promise<"ok" | "skip_no_env" | "skip_no_ui"> {
+  if (process.env.UVS_E2E_REAL_SESSION !== "1") return "ok";
   // The E2E cookie is host-scoped. Authenticate on the storefront origin
   // because this flow leaves the admin origin before opening checkout.
-  return (await signInAsAdmin(page, storefrontBase)) === "ok";
+  return await signInAsAdmin(page, storefrontBase);
 }
 
 test.describe("@checkout @cod COD checkout flow", () => {
@@ -130,8 +130,12 @@ test.describe("@checkout @cod COD checkout flow", () => {
       );
       return;
     }
-    if (!(await establishRealSessionIfRequested(page))) {
-      test.skip(true, "Real local E2E session is not configured for COD checkout.");
+    const sessionResult = await establishRealSessionIfRequested(page);
+    if (sessionResult !== "ok") {
+      if (shouldFailOnMissingPrereq()) {
+        throw new Error(`Real local E2E session unavailable for COD checkout: ${sessionResult}`);
+      }
+      test.skip(true, `Real local E2E session unavailable for COD checkout: ${sessionResult}`);
       return;
     }
     await navigateToShopAndAddFirstProduct(page);
@@ -172,7 +176,20 @@ test.describe("@checkout @cod COD checkout flow", () => {
       return;
     }
 
+    const checkoutIntentResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes("/api/payments/checkout-intents") &&
+        !response.url().includes("/finalize") &&
+        response.request().method() === "POST",
+      { timeout: 60_000 },
+    );
     await clickPayButton(page);
+    const intentPayload = await checkoutIntentResponse
+      .then(async (response) => {
+        const raw = await response.text();
+        return JSON.parse(raw) as { correlationId?: unknown };
+      })
+      .catch(() => ({}));
     await expectOrderConfirmation(page);
 
     const trackUrl = page.url();
@@ -181,6 +198,31 @@ test.describe("@checkout @cod COD checkout flow", () => {
       "Must redirect to the scoped tracking page after COD order placement",
     ).toMatch(/\/track\/(?:order_|cap_)/i);
     createdCodOrderId = trackUrl.match(/(order_[a-z0-9]+)/i)?.[1] ?? null;
+    if (
+      !createdCodOrderId &&
+      typeof intentPayload.correlationId === "string" &&
+      intentPayload.correlationId.trim()
+    ) {
+      const status = await page.evaluate(async (correlationId) => {
+        const response = await fetch(
+          `/api/payments/checkout-intents/${encodeURIComponent(correlationId)}`,
+          { credentials: "include", cache: "no-store" },
+        );
+        const raw = await response.text();
+        return { status: response.status, raw };
+      }, intentPayload.correlationId);
+      let statusPayload: { medusaOrderId?: unknown } = {};
+      try {
+        statusPayload = JSON.parse(status.raw) as { medusaOrderId?: unknown };
+      } catch {
+        statusPayload = {};
+      }
+      createdCodOrderId =
+        typeof statusPayload.medusaOrderId === "string" &&
+        /^order_[a-z0-9]+$/i.test(statusPayload.medusaOrderId)
+          ? statusPayload.medusaOrderId
+          : null;
+    }
 
     await expect(page.getByRole("heading", { name: /order/i })).toBeVisible({
       timeout: 30_000,

@@ -21,7 +21,10 @@ export type E2eAdminLoginResult = "ok" | "skip_no_ui" | "skip_no_env";
  */
 export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
   if (process.env.E2E_ADMIN_AUTH !== "1") return "skip_no_env";
-  if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
+  if (
+    process.env.AUTH_DISABLED === "true" ||
+    process.env.AUTH_DISABLE === "true"
+  ) {
     try {
       await page.goto(`${adminBase}/admin`, { waitUntil: "domcontentloaded" });
       await expect(page).toHaveURL(/\/admin/, { timeout: 45_000 });
@@ -43,10 +46,25 @@ export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
     });
     if (/\/admin(?:[/?#]|$)/i.test(page.url())) return "ok";
     const form = page.getByTestId("e2e-credentials-form");
-    if (response?.status() === 404) return "skip_no_ui";
-    if ((await form.count()) === 0) return "skip_no_ui";
-    await expect(form).toBeVisible({ timeout: 15_000 });
-    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+    if (response?.status() === 404) {
+      if (attempt < 3) {
+        await page.waitForTimeout(750 * (attempt + 1));
+        continue;
+      }
+      return "skip_no_ui";
+    }
+    try {
+      await form.waitFor({ state: "visible", timeout: 15_000 });
+    } catch {
+      if (attempt < 3) {
+        await page.waitForTimeout(750 * (attempt + 1));
+        continue;
+      }
+      return "skip_no_ui";
+    }
+    await page
+      .waitForLoadState("networkidle", { timeout: 15_000 })
+      .catch(() => undefined);
     const passwordInput = page.getByTestId("e2e-admin-password");
     await page.getByTestId("e2e-admin-email").fill(email);
     await passwordInput.fill(password);
@@ -56,7 +74,10 @@ export async function e2eAdminLogin(page: Page): Promise<E2eAdminLoginResult> {
       await expect(page).toHaveURL(/\/admin/, { timeout: 10_000 });
       return "ok";
     } catch {
-      if (attempt === 3) throw new Error("E2E admin credentials did not authenticate after four attempts");
+      if (attempt === 3)
+        throw new Error(
+          "E2E admin credentials did not authenticate after four attempts",
+        );
       await page.waitForTimeout(500);
     }
   }

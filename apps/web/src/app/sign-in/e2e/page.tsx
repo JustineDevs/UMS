@@ -74,7 +74,7 @@ export default async function AdminE2eSignInPage({
             defaultEmail={e2eDefaultEmail}
           />
           <p className="text-center text-sm text-on-surface-variant">
-            <Link href="/sign-in" className="font-medium text-primary underline">
+            <Link href="/login" className="font-medium text-primary underline">
               Standard staff sign-in (Google)
             </Link>
           </p>

@@ -6,7 +6,7 @@ const { existsSync, readdirSync } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 
 const appRel = process.argv[2];
-const port = process.argv[3];
+const port = process.env.UVS_DEV_WEB_PORT || process.argv[3];
 
 if (!appRel || !port) {
   console.error("Usage: node scripts/run-next-dev.cjs <app-rel-path> <port>");

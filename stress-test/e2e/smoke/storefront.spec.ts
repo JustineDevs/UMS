@@ -20,6 +20,25 @@ test.describe("storefront smoke", () => {
     await expect(page.getByTestId("nav-checkout")).toBeVisible();
   });
 
+  test("primary navigation does not expose collections", async ({ page }) => {
+    await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: "Collections", exact: true })).toHaveCount(0);
+  });
+
+  test("home does not render the retired category or newsletter sections", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-cms-id="home-tiles"]')).toHaveCount(0);
+    await expect(page.locator("#join-club")).toHaveCount(0);
+  });
+
+  test("footer uses the commerce layout without the newsletter block", async ({ page }) => {
+    await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    await expect(page.locator("footer")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "Payments", exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Keep up to date with our quarterly newsletter/i)).toHaveCount(0);
+  });
+
   test("about route is a dedicated navigable storefront surface", async ({ page }) => {
     await page.goto("/about");
     await expect(page.getByRole("heading", { name: /music gear that earns its place/i })).toBeVisible();
@@ -83,17 +102,17 @@ test.describe("storefront smoke", () => {
     await expect(page.getByRole("link", { name: "Back to bag" })).toBeVisible();
   });
 
-  test("account section navigation scrolls and exposes the active section", async ({ page }) => {
+  test("account navigation exposes dedicated account routes", async ({ page }) => {
     if (!(await requireAuthenticatedAccount(page))) {
       test.skip(true, "Account navigation requires a real authenticated storefront session.");
       return;
     }
-    const profile = page.getByRole("link", { name: "Profile & addresses" });
-    await expect(profile).toHaveAttribute("href", "#profile");
+    const profile = page.getByRole("link", { name: "Profile", exact: true }).first();
+    await expect(profile).toHaveAttribute("href", "/account/profile");
     await expect(profile).toHaveClass(/min-h-11/);
     await profile.click();
-    await expect(page).toHaveURL(/\/account#profile$/);
-    await expect(profile).toHaveAttribute("aria-current", "location");
+    await expect(page).toHaveURL(/\/account\/profile$/);
+    await expect(profile).toHaveAttribute("aria-current", "page");
   });
 
   test("mobile account navigation and recovery actions keep thumb-sized targets", async ({ page }) => {
@@ -103,10 +122,10 @@ test.describe("storefront smoke", () => {
       return;
     }
     for (const locator of [
-      page.getByRole("link", { name: "Overview" }),
-      page.getByRole("link", { name: "Orders", exact: true }),
-      page.getByRole("link", { name: "Profile & addresses" }),
-      page.getByRole("link", { name: "Preferences", exact: true }),
+      page.getByRole("link", { name: "Profile", exact: true }).first(),
+      page.getByRole("link", { name: "Purchase History", exact: true }),
+      page.getByRole("link", { name: "Addresses", exact: true }),
+      page.getByRole("link", { name: "Order Settings", exact: true }),
       page.getByRole("link", { name: /Open full settings/ }),
       page.getByRole("button", { name: "Track order" }),
     ]) {

@@ -27,12 +27,30 @@ import {
   STRIPE_SANDBOX_TEST_CARD_DECLINE,
 } from "../helpers/checkout";
 import { signInAsAdmin } from "../fixtures/admin-auth";
-import { STRIPE_SUCCESS_CARD, STRIPE_DECLINE_CARD } from "../fixtures/sandbox-cards";
+import {
+  STRIPE_SUCCESS_CARD,
+  STRIPE_DECLINE_CARD,
+} from "../fixtures/sandbox-cards";
+import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
 const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 
+async function ensureLocalCheckoutSession(
+  page: Parameters<typeof navigateToCheckout>[0],
+): Promise<void> {
+  if (process.env.UVS_E2E_LOCAL !== "1") return;
+  const result = await e2eAdminLogin(page);
+  if (result !== "ok") {
+    throw new Error(
+      `Authenticated local checkout session unavailable: ${result}`,
+    );
+  }
+}
+
 function isStripeTestKey(): void {
-  const key = process.env.E2E_STRIPE_API_KEY?.trim() ?? process.env.STRIPE_API_KEY?.trim();
+  const key =
+    process.env.E2E_STRIPE_API_KEY?.trim() ??
+    process.env.STRIPE_API_KEY?.trim();
   if (key && (key.startsWith("sk_live_") || key.startsWith("rk_live_"))) {
     throw new Error(
       "HALT: STRIPE_API_KEY is a live key. Do not run sandbox flows against the live Stripe account. " +
@@ -52,15 +70,20 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
     skipUnlessPspConfigured("stripe");
   });
 
-  test("complete checkout with Stripe test card reaches /track/:orderId", async ({ page }) => {
+  test("complete checkout with Stripe test card reaches /track/:orderId", async ({
+    page,
+  }) => {
+    await ensureLocalCheckoutSession(page);
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+    await navigateToCheckout(page, { guest: true });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "stripe");
     if (!selected) {
       if (shouldFailOnMissingPrereq()) {
-        throw new Error("Stripe payment option is not visible during strict E2E validation.");
+        throw new Error(
+          "Stripe payment option is not visible during strict E2E validation.",
+        );
       }
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
@@ -69,22 +92,32 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
     // shared form fill after selecting Stripe so the receipt email is populated
     // before the hosted handoff is requested.
     await fillCheckoutShippingInfo(page);
-    await payWithStripeSandboxCard(page, STRIPE_SANDBOX_TEST_CARD_SUCCESS ?? STRIPE_SUCCESS_CARD);
+    await payWithStripeSandboxCard(
+      page,
+      STRIPE_SANDBOX_TEST_CARD_SUCCESS ?? STRIPE_SUCCESS_CARD,
+    );
     await expectOrderConfirmation(page);
 
     const trackUrl = page.url();
-  expect(trackUrl, "Must redirect to signed order tracking after Stripe payment").toMatch(
-    /\/track\/(?:order_|cap_v3\.)/i,
-  );
+    expect(
+      trackUrl,
+      "Must redirect to signed order tracking after Stripe payment",
+    ).toMatch(/\/track\/(?:order_|cap_v3\.)/i);
 
-    await expect(
-      page.getByText(/order/i).first(),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/order/i).first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test("admin sees Stripe order after successful payment", async ({ page }) => {
-    if (process.env.AUTH_DISABLED === "true" || process.env.AUTH_DISABLE === "true") {
-      test.skip(true, "Admin auth disabled; run with staff E2E credentials for admin order proof.");
+    if (
+      process.env.AUTH_DISABLED === "true" ||
+      process.env.AUTH_DISABLE === "true"
+    ) {
+      test.skip(
+        true,
+        "Admin auth disabled; run with staff E2E credentials for admin order proof.",
+      );
       return;
     }
     const availability = await page.request.get(
@@ -110,20 +143,30 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       timeout: 20_000,
     });
 
-    const orderRows = page.locator("table tbody tr:has(a[href*='/admin/orders/'])");
+    const orderRows = page.locator(
+      "table tbody tr:has(a[href*='/admin/orders/'])",
+    );
     const rowCount = await orderRows.count();
-    expect(rowCount, "Admin orders list must show at least one order after Stripe payment").toBeGreaterThan(0);
+    expect(
+      rowCount,
+      "Admin orders list must show at least one order after Stripe payment",
+    ).toBeGreaterThan(0);
   });
 
-  test("Stripe checkout handles declined card and shows error", async ({ page }) => {
+  test("Stripe checkout handles declined card and shows error", async ({
+    page,
+  }) => {
+    await ensureLocalCheckoutSession(page);
     await navigateToShopAndAddFirstProduct(page);
-    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+    await navigateToCheckout(page, { guest: true });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "stripe");
     if (!selected) {
       if (shouldFailOnMissingPrereq()) {
-        throw new Error("Stripe payment option is not visible during strict E2E validation.");
+        throw new Error(
+          "Stripe payment option is not visible during strict E2E validation.",
+        );
       }
       test.skip(true, "Stripe payment option not visible on checkout page");
       return;
@@ -132,7 +175,10 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
 
     await clickPayButton(page);
     await ensureStripeHostedCheckout(page);
-    await fillStripeHostedCheckoutTestCard(page, STRIPE_SANDBOX_TEST_CARD_DECLINE ?? STRIPE_DECLINE_CARD);
+    await fillStripeHostedCheckoutTestCard(
+      page,
+      STRIPE_SANDBOX_TEST_CARD_DECLINE ?? STRIPE_DECLINE_CARD,
+    );
     const pay = page
       .getByTestId("hosted-payment-submit-button")
       .or(page.getByRole("button", { name: /^pay\b/i }))
@@ -143,11 +189,16 @@ test.describe("@checkout @stripe Stripe checkout flow", () => {
       page.getByText(/declined|your card was declined|card.*declined/i).first(),
     ).toBeVisible({ timeout: 45_000 });
 
-    expect(page.url(), "Declined card must NOT redirect to /track page").not.toMatch(/\/track\//i);
+    expect(
+      page.url(),
+      "Declined card must NOT redirect to /track page",
+    ).not.toMatch(/\/track\//i);
   });
 
   test("STRIPE_API_KEY is a test key (guard against live key)", () => {
-    const key = process.env.E2E_STRIPE_API_KEY?.trim() ?? process.env.STRIPE_API_KEY?.trim();
+    const key =
+      process.env.E2E_STRIPE_API_KEY?.trim() ??
+      process.env.STRIPE_API_KEY?.trim();
     if (!key) {
       test.skip(true, "No Stripe API key configured");
       return;

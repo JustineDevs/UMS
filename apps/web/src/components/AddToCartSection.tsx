@@ -22,6 +22,7 @@ export function AddToCartSection({
 }) {
   const router = useRouter();
   const [clientReady, setClientReady] = useState(false);
+  const [quantity, setQuantity] = useState(1);
   useEffect(() => setClientReady(true), []);
   const { types, finishes } = useMemo(() => {
     const typeSet = new Set<string>();
@@ -58,12 +59,12 @@ export function AddToCartSection({
   const isOutOfStock = variant !== undefined && (!isVariantSellable(variant) || !isVariantAvailable(variant.id));
   const allVariantsOos = product.variants.length > 0 && product.variants.every((v) => !isVariantSellable(v) || !isVariantAvailable(v.id));
 
-  function handleAddToBag() {
+  function handlePurchase(destination: "/cart" | "/checkout") {
     if (!variant) return;
     const thumb = product.images?.[0]?.imageUrl ?? undefined;
     const line: CartLine = {
       variantId: variant.id,
-      quantity: 1,
+      quantity,
       slug: product.slug,
       name: product.name,
       sku: variant.sku,
@@ -79,11 +80,11 @@ export function AddToCartSection({
       id: product.id,
       variantId: variant.id,
       price: variant.price,
-      quantity: 1,
+      quantity,
       name: product.name,
       currencyCode: variant.currencyCode,
     });
-    router.push("/cart");
+    router.push(destination);
   }
 
   if (allVariantsOos) {
@@ -176,7 +177,7 @@ export function AddToCartSection({
       )}
 
       {variant ? (
-        <div className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-4 text-sm" data-testid="pdp-selected-variant">
+        <div className="rounded-xl bg-surface-container-low/40 p-4 text-sm" data-testid="pdp-selected-variant">
           <div className="flex items-baseline justify-between gap-4">
             <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               Selected variant
@@ -202,7 +203,31 @@ export function AddToCartSection({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 pt-4 min-[400px]:flex-row min-[400px]:items-stretch">
+      <div className="flex items-center justify-between gap-3 border-y border-outline-variant/20 py-4">
+        <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Quantity</span>
+        <div className="flex items-center rounded border border-outline-variant/30">
+          <button
+            type="button"
+            className="grid size-9 place-items-center text-lg hover:bg-surface-container-low disabled:opacity-40"
+            onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+            disabled={quantity <= 1}
+            aria-label="Decrease quantity"
+          >
+            −
+          </button>
+          <span className="min-w-8 text-center text-sm tabular-nums" aria-live="polite">{quantity}</span>
+          <button
+            type="button"
+            className="grid size-9 place-items-center text-lg hover:bg-surface-container-low"
+            onClick={() => setQuantity((value) => Math.min(99, value + 1))}
+            aria-label="Increase quantity"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 pt-2 min-[400px]:flex-row min-[400px]:items-stretch">
         <WishlistToggle
           slug={product.slug}
           name={product.name}
@@ -214,12 +239,20 @@ export function AddToCartSection({
           data-testid={testId}
           data-client-ready={clientReady ? "true" : "false"}
           disabled={!clientReady || !variant || isOutOfStock}
-          onClick={handleAddToBag}
+          onClick={() => handlePurchase("/cart")}
           className="min-h-[52px] flex-1 py-4 px-4 bg-primary text-on-primary font-headline font-bold tracking-tight rounded text-center hover:opacity-90 active:scale-[0.99] transition-[transform,opacity] duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
         >
           {isOutOfStock
             ? "Out of stock"
             : "Add to bag and checkout"}
+        </button>
+        <button
+          type="button"
+          disabled={!clientReady || !variant || isOutOfStock}
+          onClick={() => handlePurchase("/checkout")}
+          className="min-h-[52px] flex-1 rounded bg-surface-container-low px-4 py-4 text-center font-headline font-bold tracking-tight text-primary transition-colors hover:bg-primary hover:text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Buy now
         </button>
       </div>
     </div>

@@ -57,8 +57,10 @@ async function finalizationAuthorization(
 
 test("finalizes a paid cart using one transaction and links the attempt", async () => {
   const queries: string[] = [];
-  const database = client((text) => {
+  let orderInsertValues: readonly unknown[] | undefined;
+  const database = client((text, values) => {
     queries.push(text);
+    if (text.includes("INSERT INTO public.order\n")) orderInsertValues = values;
     if (text.includes("FROM public.payment_attempts"))
       return {
         rows: [
@@ -136,6 +138,7 @@ test("finalizes a paid cart using one transaction and links the attempt", async 
   const result = await finalizeNativeOrder(
     database,
     "00000000-0000-4000-8000-000000000001",
+    "org_1",
   );
   assert.equal(result.replayed, false);
   assert.match(result.orderId, /^order_/);
@@ -145,6 +148,11 @@ test("finalizes a paid cart using one transaction and links the attempt", async 
     queries.some((query) =>
       query.includes("INSERT INTO public.order_line_item"),
     ),
+  );
+  assert.ok(
+    orderInsertValues &&
+      typeof orderInsertValues[6] === "string" &&
+      JSON.parse(orderInsertValues[6]).organization_id === "org_1",
   );
   assert.ok(
     queries.some((query) => query.includes("UPDATE public.payment_attempts")),
@@ -280,6 +288,7 @@ test("split topology routes payment attempts to APP and commerce writes to Medus
     app,
     commerce,
     "00000000-0000-4000-8000-000000000003",
+    "org_1",
   );
   assert.equal(result.replayed, false);
   assert.ok(
@@ -355,11 +364,18 @@ test("reconciles a committed commerce order before retrying the cart", async () 
     app,
     commerce,
     "00000000-0000-4000-8000-000000000004",
+    "org_1",
   );
   assert.deepEqual(result, { orderId: "order_existing", replayed: true });
   assert.ok(
     commerceQueries.some((query) =>
       query.includes("worker_payment_correlation_id"),
+    ),
+  );
+  assert.ok(
+    commerceQueries.some((query) =>
+      query.includes("jsonb_build_object") &&
+      query.includes("organization_id"),
     ),
   );
   assert.ok(

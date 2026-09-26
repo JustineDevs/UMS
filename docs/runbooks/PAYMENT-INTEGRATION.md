@@ -41,7 +41,10 @@ Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The production Worker en
 
 1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
-3. Register PayPal webhooks at `${API_URL}/webhooks/paypal`.
+3. Register PayPal webhooks at `https://ums-backend-production.pcg0255.workers.dev/webhooks/paypal`.
+   For local development, use `http://localhost:8787/webhooks/paypal`. Never register the
+   Vercel storefront host or the legacy `universalmusic-store.vercel.app` host as the
+   provider callback.
 
 ### Worker environment
 

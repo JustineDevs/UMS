@@ -21,10 +21,19 @@ import {
   enablePublicTunnelBypass,
 } from "../helpers/checkout";
 import { signInAsAdmin } from "../fixtures/admin-auth";
+import { e2eAdminLogin } from "../helpers/admin-e2e-auth";
 
 const adminBase = process.env.PLAYWRIGHT_WEB_URL ?? "http://127.0.0.1:3000";
 const storefrontBase =
   process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+
+async function ensureLocalCheckoutSession(page: Parameters<typeof navigateToCheckout>[0]): Promise<void> {
+  if (process.env.UVS_E2E_LOCAL !== "1") return;
+  const result = await e2eAdminLogin(page);
+  if (result !== "ok") {
+    throw new Error(`Authenticated local checkout session unavailable: ${result}`);
+  }
+}
 
 async function startXenditCheckout(
   page: Parameters<typeof navigateToCheckout>[0],
@@ -33,7 +42,7 @@ async function startXenditCheckout(
     maxCandidates: 20,
     shopPath: "/shop?sort=price_asc",
   });
-  await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+  await navigateToCheckout(page, { guest: true });
   await fillCheckoutShippingInfo(page);
   const selected = await selectPaymentProvider(page, "xendit");
   if (!selected) {
@@ -52,11 +61,12 @@ test.describe("@checkout @xendit Xendit checkout flow", () => {
   });
 
   test("checkout reaches Xendit hosted payment page", async ({ page }) => {
+    await ensureLocalCheckoutSession(page);
     await navigateToShopAndAddPreferredCatalogProduct(page, {
       maxCandidates: 20,
       shopPath: "/shop?sort=price_asc",
     });
-    await navigateToCheckout(page, { guest: process.env.UVS_E2E_LOCAL !== "1" });
+    await navigateToCheckout(page, { guest: true });
     await fillCheckoutShippingInfo(page);
 
     const selected = await selectPaymentProvider(page, "xendit");

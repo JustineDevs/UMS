@@ -11,6 +11,7 @@
     "storage:prune": "node scripts/storage-maintenance.cjs prune",
     "commit:sh": "bash scripts/commit/parallel-commit.sh",
     "security:check": "node scripts/commit/cli/index.js security",
+    "security:scorecard": "node scripts/security/run-scorecard.cjs",
     "verify:matrix-evidence": "node scripts/verify-matrix-evidence.cjs",
     "write:matrix-evidence": "node scripts/write-matrix-evidence.cjs",
     "bruno:generate": "node scripts/generate-bruno-collection.mjs",

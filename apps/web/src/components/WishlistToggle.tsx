@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Heart } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -39,7 +40,7 @@ export function WishlistToggle({
     if (pending) return;
     if (status !== "authenticated") {
       const next = pathname || `/shop/${slug}`;
-      router.push(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+      router.push(`/login?callbackUrl=${encodeURIComponent(next)}`);
       return;
     }
     setPending(true);
@@ -71,14 +72,12 @@ export function WishlistToggle({
       aria-label={
         on ? "Remove from saved items" : "Save item to your list"
       }
-      className={`inline-flex items-center justify-center rounded border border-outline-variant/40 p-3 transition-colors hover:border-primary disabled:cursor-wait disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center justify-center rounded bg-surface-container-low p-3 transition-colors hover:bg-surface-container-high disabled:cursor-wait disabled:opacity-60 ${className}`}
     >
-      <span
-        className={`material-symbols-outlined text-[22px] ${on ? "text-primary" : "text-on-surface-variant"}`}
-        style={on ? { fontVariationSettings: '"FILL" 1' } : undefined}
-      >
-        favorite
-      </span>
+      <Heart
+        aria-hidden="true"
+        className={`size-[22px] ${on ? "fill-current text-primary" : "text-on-surface-variant"}`}
+      />
       {!mounted ? <span className="sr-only">Save</span> : null}
     </button>
   );

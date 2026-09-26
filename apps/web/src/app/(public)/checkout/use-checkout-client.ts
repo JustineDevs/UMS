@@ -64,6 +64,21 @@ export type CheckoutEmbeddedData = {
 };
 
 type ProfileGate = "idle" | "loading" | "complete" | "incomplete" | "error";
+type CheckoutProfileSummary = {
+  displayName: string | null;
+  phone: string | null;
+  shippingAddresses: Array<{
+    fullName: string;
+    phone?: string;
+    line1: string;
+    line2?: string;
+    barangay?: string;
+    city: string;
+    province: string;
+    postalCode?: string;
+    country?: string;
+  }>;
+};
 export type CheckoutPhase =
   | "idle"
   | "starting"
@@ -74,6 +89,7 @@ export type CheckoutPhase =
   | "error";
 const FINALIZE_POLL_MS = 2_000;
 const FINALIZE_POLL_MAX = 20;
+const PROFILE_STATUS_TIMEOUT_MS = 15_000;
 const STRIPE_CANCEL_MESSAGE =
   "You left the card checkout before paying. Your bag is unchanged. Choose a payment method and continue when you are ready.";
 const localAuthBypass =
@@ -101,9 +117,10 @@ export function useCheckoutClient({
   const medusaPreviewAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(() =>
-    initialReviewMessage?.trim() ||
-    (initialStripeCheckoutCancel ? STRIPE_CANCEL_MESSAGE : null),
+  const [error, setError] = useState<string | null>(
+    () =>
+      initialReviewMessage?.trim() ||
+      (initialStripeCheckoutCancel ? STRIPE_CANCEL_MESSAGE : null),
   );
   const [loading, setLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
@@ -128,6 +145,8 @@ export function useCheckoutClient({
   >("idle");
   const [profileGate, setProfileGate] = useState<ProfileGate>("idle");
   const [profileMissing, setProfileMissing] = useState<string[]>([]);
+  const [profileSummary, setProfileSummary] =
+    useState<CheckoutProfileSummary | null>(null);
   const [quoteReviewAcknowledged, setQuoteReviewAcknowledged] = useState(false);
   const [foreignCheckoutActive, setForeignCheckoutActive] = useState(false);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
@@ -148,12 +167,15 @@ export function useCheckoutClient({
     try {
       const res = await fetch("/api/account/profile/status", {
         cache: "no-store",
+        signal: AbortSignal.timeout(PROFILE_STATUS_TIMEOUT_MS),
       });
       if (!res.ok) return "error";
       const data = (await res.json()) as {
         complete?: boolean;
         missingFields?: string[];
+        profile?: CheckoutProfileSummary | null;
       };
+      setProfileSummary(data.profile ?? null);
       setProfileMissing(
         Array.isArray(data.missingFields) ? data.missingFields : [],
       );
@@ -318,6 +340,7 @@ export function useCheckoutClient({
     if (authStatus !== "authenticated" || !session?.user) {
       setProfileGate("idle");
       setProfileMissing([]);
+      setProfileSummary(null);
       return;
     }
     let cancelled = false;
@@ -350,9 +373,9 @@ export function useCheckoutClient({
         }
         return r.json();
       })
-      .then((d: { balance?: number }) =>
-        { if (!cancelled) setLoyaltyBalance(Number(d.balance ?? 0)); },
-      )
+      .then((d: { balance?: number }) => {
+        if (!cancelled) setLoyaltyBalance(Number(d.balance ?? 0));
+      })
       .catch((reason: unknown) => {
         if (cancelled) return;
         setLoyaltyBalance(0);
@@ -362,7 +385,9 @@ export function useCheckoutClient({
             : "Loyalty balance is temporarily unavailable.",
         );
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user?.email]);
 
   const refresh = useCallback(() => {
@@ -1295,6 +1320,7 @@ export function useCheckoutClient({
     profileGate,
     setProfileGate,
     profileMissing,
+    profileSummary,
     fetchProfileStatus,
     providerAvailable,
     refresh,

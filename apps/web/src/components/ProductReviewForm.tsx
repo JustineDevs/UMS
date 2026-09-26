@@ -39,7 +39,7 @@ export function ProductReviewForm({
     return () => controller.abort();
   }, []);
 
-  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/shop")}`;
+  const signInHref = `/login?callbackUrl=${encodeURIComponent(pathname || "/shop")}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

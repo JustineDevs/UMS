@@ -670,7 +670,7 @@ export const checkoutIntentRecoveryResponseSchema = z.union([
   }).strict(),
 ]);
 export const checkoutIntentResponseSchema = z.object({
-  correlationId: z.string().min(1).max(200), cartId: z.string().min(1).max(200), provider: z.enum(["stripe", "paypal", "xendit"]),
+  correlationId: z.string().min(1).max(200), cartId: z.string().min(1).max(200), provider: z.enum(["stripe", "paypal", "xendit", "cod"]),
   providerSessionId: z.string().max(500).nullable().optional(), providerPaymentId: z.string().max(500).nullable().optional(), status: checkoutIntentStateSchema,
   checkoutState: checkoutIntentStateSchema, quoteFingerprint: z.string().max(500).nullable().optional(), staleReason: z.string().max(500).nullable().optional(), medusaOrderId: z.string().max(200).nullable().optional(),
   trackingPageUrl: z.string().url().max(2_000).nullable(), lastError: z.string().max(2_000).nullable(), finalizeAttempts: z.number().int().nonnegative().max(100), updatedAt: z.string().datetime(),

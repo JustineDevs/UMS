@@ -3,10 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@universal-music-store/platform-data";
-import {
-  sanitizeCmsHtml,
-  SHOP_PRODUCT_PAGE_SIZE,
-} from "@universal-music-store/validation";
+import { SHOP_PRODUCT_PAGE_SIZE } from "@universal-music-store/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import {
@@ -27,7 +24,6 @@ import {
   normalizeShopPageSearchParams,
   shopPageShouldNoIndex,
 } from "@/lib/shop-page-query";
-import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { ShopFilterDrawer } from "@/components/ShopFilterDrawer";
@@ -271,14 +267,13 @@ export default async function ShopPage({
           />
         </div>
       ) : null}
-      <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-8">
-          <h1 className="font-headline text-[clamp(2rem,6.5vw,4.5rem)] font-bold leading-[1.05] tracking-tighter text-primary">
-            Shop
-            <br />
-            <span className="text-[clamp(1.2rem,4vw,2.75rem)] font-bold">
-              All instruments
-            </span>
+      <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+            // SHOP CATALOG
+          </p>
+          <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+            {category ?? "All categories"}
           </h1>
           {searchQ ? (
             <p className="mt-4 font-body text-base text-on-surface-variant">
@@ -286,39 +281,22 @@ export default async function ShopPage({
               <strong className="text-primary">{searchQ}</strong>
             </p>
           ) : null}
-          {cmsCategory?.intro_html?.trim() ? (
-            <div
-              className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeCmsHtml(String(cmsCategory.intro_html)),
-              }}
-            />
-          ) : (
-            <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-              Browse the catalog with filters for category, instrument type,
-              finish, pickup layout, body wood, condition, skill level,
-              shipping speed, and price. Product details, stock, and checkout
-              use the live store system.
-            </p>
-          )}
         </div>
-        <div className="flex flex-col gap-6 justify-start lg:col-span-4 lg:items-end lg:justify-end">
-          <CatalogSearchTypeahead
-            key={searchQ ?? ""}
-            initialQ={searchQ}
-            category={category}
-            type={type}
-            finish={finish}
-            brand={brand}
-            pickupConfig={pickupConfig}
-            bodyWood={bodyWood}
-            condition={condition}
-            skillLevel={skillLevel}
-            shippingSpeed={shippingSpeed}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            sort={sort}
-          />
+      </header>
+
+      {cmsCategory?.blocks?.length ? (
+        <div className="mb-10">
+          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
+        </div>
+      ) : null}
+
+      <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
+        <ShopFilterDrawer activeFilterCount={activeFilterCount}>
+          <aside className="w-full space-y-10">
+          <div className="border-b border-outline-variant/20 pb-5">
+            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-primary">All categories</h2>
+            <p className="mt-2 text-xs leading-5 text-on-surface-variant">Browse the catalog by instrument family.</p>
+          </div>
           <ShopSortSelect
             value={sort}
             category={category}
@@ -334,19 +312,7 @@ export default async function ShopPage({
             maxPrice={maxPrice}
             search={searchQ}
           />
-        </div>
-      </header>
-
-      {cmsCategory?.blocks?.length ? (
-        <div className="mb-10">
-          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
-        </div>
-      ) : null}
-
-      <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
-        <ShopFilterDrawer activeFilterCount={activeFilterCount}>
-          <aside className="w-full space-y-12">
-          <ShopFilterGroup title="Category">
+          <ShopFilterGroup title="Category" defaultOpen>
             <ul className="space-y-4">
               <li>
                 <Link
@@ -723,7 +689,7 @@ export default async function ShopPage({
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
                 <CatalogProductCard
                   key={product.id}

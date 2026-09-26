@@ -11,11 +11,10 @@ import {
 
 import type { CartLine } from "@/lib/cart";
 import {
-  CART_STORAGE_KEY,
-  CART_UPDATED_EVENT,
   readCart,
   readCartRevision,
   selectHydratedCart,
+  subscribeToCartUpdates,
   writeCart,
 } from "@/lib/cart";
 import { readResponseJson } from "@/lib/read-response-json";
@@ -109,14 +108,9 @@ export function CartProvider({
   useEffect(() => {
     void refresh();
     const syncLocalLines = () => setLines(readCart());
-    const syncStorage = (event: StorageEvent) => {
-      if (event.key === CART_STORAGE_KEY) syncLocalLines();
-    };
-    window.addEventListener(CART_UPDATED_EVENT, syncLocalLines);
-    window.addEventListener("storage", syncStorage);
+    const unsubscribe = subscribeToCartUpdates(syncLocalLines);
     return () => {
-      window.removeEventListener(CART_UPDATED_EVENT, syncLocalLines);
-      window.removeEventListener("storage", syncStorage);
+      unsubscribe();
     };
   }, [refresh]);
 

@@ -3,6 +3,87 @@
   "generatedFrom": "apps/web/src/app",
   "entries": [
     {
+      "route": "/account/addresses",
+      "source": "apps/web/src/app/(public)/account/addresses/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": true, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/banks-cards",
+      "source": "apps/web/src/app/(public)/account/banks-cards/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": false, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/notifications",
+      "source": "apps/web/src/app/(public)/account/notifications/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": false, "unauthorized": true, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/orders",
+      "source": "apps/web/src/app/(public)/account/orders/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": true, "empty": false, "blocked": true, "unauthorized": true, "failure": true, "retry": true, "success": true }
+    },
+    {
+      "route": "/account/password",
+      "source": "apps/web/src/app/(public)/account/password/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": false, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/preferences",
+      "source": "apps/web/src/app/(public)/account/preferences/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": true, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/privacy",
+      "source": "apps/web/src/app/(public)/account/privacy/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": false, "unauthorized": false, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/profile",
+      "source": "apps/web/src/app/(public)/account/profile/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": false, "failure": false, "retry": false, "success": false }
+    },
+    {
+      "route": "/account/vouchers",
+      "source": "apps/web/src/app/(public)/account/vouchers/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/(public)/account/loading.tsx",
+      "errorBoundary": null,
+      "verification": "static-inventory",
+      "signals": { "fetch": false, "form": false, "loading": false, "empty": false, "blocked": true, "unauthorized": false, "failure": false, "retry": false, "success": false }
+    },
+    {
       "route": "/admin/analytics",
       "source": "apps/web/src/app/(dashboard)/admin/analytics/page.tsx",
       "client": false,
@@ -1574,6 +1655,25 @@
         "empty": false,
         "blocked": false,
         "unauthorized": false,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
+      "route": "/login",
+      "source": "apps/web/src/app/(public)/login/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
         "failure": true,
         "retry": false,
         "success": false

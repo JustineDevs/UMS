@@ -70,6 +70,20 @@ function boundedInteger(
   return Math.min(maximum, Number(value));
 }
 
+// A published product without approved media cannot be rendered as a usable
+// storefront item. Keep legacy rows out of public catalog reads until staff
+// attach a canonical product or variant image.
+function publishedMediaPredicate(alias: string): string {
+  return `AND ((${alias}.thumbnail IS NOT NULL AND ${alias}.thumbnail NOT ILIKE '%gvsyfyaqxfrunoghgqiq.supabase.co%') OR EXISTS (
+    SELECT 1
+    FROM public.product_variant published_media_variant
+    WHERE published_media_variant.product_id = ${alias}.id
+      AND published_media_variant.deleted_at IS NULL
+      AND published_media_variant.thumbnail IS NOT NULL
+      AND published_media_variant.thumbnail NOT ILIKE '%gvsyfyaqxfrunoghgqiq.supabase.co%'
+  ))`;
+}
+
 function mapRow(row: CatalogRow): CatalogProduct {
   const variants = Array.isArray(row.variants)
     ? row.variants.filter((variant): variant is Record<string, unknown> =>
@@ -154,7 +168,7 @@ export async function listPublishedProducts(
             count(*) OVER() AS total_count
      FROM public.product p
      LEFT JOIN public.product_variant v ON v.product_id = p.id AND v.deleted_at IS NULL
-     WHERE p.deleted_at IS NULL AND p.status = 'published' ${filters.join(" ")}
+     WHERE p.deleted_at IS NULL AND p.status = 'published' ${publishedMediaPredicate("p")} ${filters.join(" ")}
      GROUP BY p.id
      ORDER BY p.updated_at DESC, p.id
      LIMIT $${limitParameter} OFFSET $${offsetParameter}`,
@@ -265,7 +279,7 @@ export async function getPublishedProductByHandle(
             1 AS total_count
      FROM public.product p
      LEFT JOIN public.product_variant v ON v.product_id = p.id AND v.deleted_at IS NULL
-     WHERE p.handle = $1 AND p.deleted_at IS NULL AND p.status = 'published'
+     WHERE p.handle = $1 AND p.deleted_at IS NULL AND p.status = 'published' ${publishedMediaPredicate("p")}
      GROUP BY p.id`,
     [normalized],
   );
@@ -379,6 +393,7 @@ export async function handleCatalogCategoriesRequest(
          ON p.id = pcp.product_id
         AND p.deleted_at IS NULL
         AND p.status = 'published'
+        ${publishedMediaPredicate("p")}
       WHERE pc.deleted_at IS NULL
         AND pc.is_active = true
       GROUP BY pc.id, pc.handle, pc.name, pc.parent_category_id, pc.rank
@@ -426,6 +441,7 @@ export async function handleCollectionRequest(
        FROM public.product_collection pc
        LEFT JOIN public.product p
          ON p.collection_id = pc.id AND p.deleted_at IS NULL AND p.status = 'published'
+         ${publishedMediaPredicate("p")}
        LEFT JOIN public.product_variant v
          ON v.product_id = p.id AND v.deleted_at IS NULL
       WHERE pc.handle = $1 AND pc.deleted_at IS NULL

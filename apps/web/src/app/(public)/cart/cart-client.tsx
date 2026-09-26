@@ -9,10 +9,10 @@ import {
   writeCart,
   updateLineQuantity,
   readCartRevision,
-  CART_STORAGE_KEY,
   cartAvailabilityMessage,
   parseCartQuantityInput,
   isCartCheckoutBlocked,
+  subscribeToCartUpdates,
 } from "@/lib/cart";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
 import { useCart } from "@/context/CartContext";
@@ -146,7 +146,11 @@ export function CartPageClient() {
       }
       const next = mergeReconciledCartLines(current, payload.lines ?? []);
       setLineErrors({});
-      writeCart(next);
+      // The current page applies the authoritative response immediately via
+      // replaceLines. Avoid emitting the same-tab update event here: the cart
+      // subscription treats that event as an external change and would start
+      // reconciliation again indefinitely.
+      writeCart(next, { sameTab: false });
       replaceLines(next);
       if (typeof payload.currency === "string" && payload.currency.trim()) {
         setCurrencyCode(payload.currency.trim().toUpperCase());
@@ -192,8 +196,7 @@ export function CartPageClient() {
     setMounted(true);
     if (isHydrating) return;
     void reconcile();
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== CART_STORAGE_KEY) return;
+    const onCartUpdate = () => {
       reconcileAbortRef.current?.abort();
       reconcileSequenceRef.current += 1;
       // Adopt the persisted envelope before reconciling so another tab cannot
@@ -201,13 +204,13 @@ export function CartPageClient() {
       refresh();
       void reconcile();
     };
-    window.addEventListener("storage", onStorage);
+    const unsubscribe = subscribeToCartUpdates(onCartUpdate);
     return () => {
       reconcileAbortRef.current?.abort();
       if (reconcileTimerRef.current !== null) {
         window.clearTimeout(reconcileTimerRef.current);
       }
-      window.removeEventListener("storage", onStorage);
+      unsubscribe();
     };
   }, [isHydrating, reconcile]);
 
@@ -407,7 +410,7 @@ export function CartPageClient() {
     checkoutBlocked || reconciling || Boolean(reconcileError);
 
   return (
-    <div className="space-y-8" data-cart-source={hydrationSource}>
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start" data-cart-source={hydrationSource}>
       <p className="sr-only" role="status" aria-live="polite">
         {quantityStatus}
       </p>
@@ -415,7 +418,7 @@ export function CartPageClient() {
         {lines.map((l) => (
           <li
             key={l.variantId}
-            className="flex gap-3 border-b border-outline-variant/20 pb-4"
+            className="flex gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm"
           >
             {l.thumbnail ? (
               <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-md border border-outline-variant/20 bg-surface-container">
@@ -597,7 +600,8 @@ export function CartPageClient() {
           </li>
         ))}
       </ul>
-      <div className="flex items-center justify-between border-t border-outline-variant/20 pt-4">
+      <aside className="h-fit space-y-6 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm lg:sticky lg:top-28">
+      <div className="flex items-center justify-between border-b border-outline-variant/20 pb-5">
         <div>
           <span className="text-sm font-semibold text-on-surface-variant">
             Cart total
@@ -661,7 +665,7 @@ export function CartPageClient() {
           </button>
         </div>
       ) : null}
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+      <div className="flex flex-col gap-3">
         <Link
           href="/shop"
           className="inline-flex min-h-11 items-center justify-center rounded-lg border border-outline-variant/30 px-6 py-3 text-sm font-semibold text-primary hover:bg-surface-container-low"
@@ -704,6 +708,7 @@ export function CartPageClient() {
               : "Remove unavailable items or reduce quantities before checkout."}
         </p>
       ) : null}
+      </aside>
     </div>
   );
 }

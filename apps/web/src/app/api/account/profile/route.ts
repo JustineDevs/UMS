@@ -60,7 +60,7 @@ async function patchWorkerProfile(req: Request): Promise<Response> {
       {
         error: "Please sign in again before changing your profile or addresses.",
         code: "RECENT_AUTH_REQUIRED",
-        reauthUrl: "/sign-in?callbackUrl=%2Faccount&reauth=1",
+        reauthUrl: "/login?callbackUrl=%2Faccount&reauth=1",
       },
       { status: 401 },
     );

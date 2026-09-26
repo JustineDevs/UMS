@@ -57,7 +57,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       ) {
         redirecting.current = true;
         const next = `${pathname}${search ? `?${search}` : ""}`;
-        router.replace(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+        router.replace(`/login?callbackUrl=${encodeURIComponent(next)}`);
         return;
       }
       setChecked(true);

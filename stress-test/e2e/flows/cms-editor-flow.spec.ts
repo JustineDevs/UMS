@@ -23,6 +23,7 @@ test.describe("@admin CMS canonical editor", () => {
     await expect(
       page.locator('[aria-label="Visual page builder"]'),
     ).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Ai Assistant", exact: true }).click();
 
     if (test.info().title.startsWith("CMS-05..")) {
       const response = await page.request.get(
@@ -95,7 +96,6 @@ test.describe("@admin CMS canonical editor", () => {
   test("CMS-01..CMS-04 unified workspace, persisted preview source, and selection", async ({
     page,
   }) => {
-    await page.getByRole("button", { name: "Ai Assistant", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Context", exact: true }),
     ).toBeVisible();

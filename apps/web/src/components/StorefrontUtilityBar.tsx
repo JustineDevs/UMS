@@ -1,13 +1,31 @@
 import Link from "next/link";
 
 const linkClass =
-  "font-body text-[10px] xs:text-[11px] sm:text-xs tracking-wide text-on-primary/90 hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary whitespace-nowrap transition-colors";
+  "font-body text-[10px] xs:text-[11px] sm:text-xs tracking-wide text-on-primary/85 hover:text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-primary whitespace-nowrap transition-colors";
 
 export function StorefrontUtilityBar() {
   return (
-    <div className="pointer-events-none border-b border-on-primary/15 bg-primary text-on-primary [&_a]:pointer-events-auto">
-      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-end gap-x-3 overflow-x-auto px-[clamp(0.75rem,3vw,2rem)] py-1 sm:gap-x-4">
+    <div
+      className="relative z-10 isolate border-b border-on-primary/15 bg-primary text-on-primary"
+      data-cms-id="storefront-utility-bar"
+      data-cms-label="Utility bar"
+    >
+      <div className="mx-auto flex w-full max-w-[1600px] items-center justify-between gap-x-3 overflow-x-auto px-[clamp(0.75rem,3vw,2rem)] py-1 sm:gap-x-4">
         <span className="sr-only">Utility links</span>
+        <div className="flex shrink-0 items-center gap-x-3 sm:gap-x-4">
+          <Link href="/contact?topic=sell" className={linkClass}>
+            Sell with us
+          </Link>
+          <span className="text-on-primary/30" aria-hidden="true">|</span>
+          <Link href="/about#app" className={linkClass}>
+            Download app
+          </Link>
+          <span className="hidden text-on-primary/30 sm:inline" aria-hidden="true">|</span>
+          <Link href="/contact" className="hidden font-body text-[10px] tracking-wide text-on-primary/85 hover:text-on-primary sm:inline sm:text-xs">
+            Follow us
+          </Link>
+        </div>
+        <div className="flex min-w-0 items-center justify-end gap-x-3 sm:gap-x-4">
         <Link href="/track" className={linkClass}>
           Track order
         </Link>
@@ -23,12 +41,13 @@ export function StorefrontUtilityBar() {
         <Link href="/search" className={linkClass}>
           Search
         </Link>
-        <Link href="/sign-in" className={linkClass}>
+        <Link href="/login" className={linkClass}>
           Sign in
         </Link>
         <Link href="/preferences" className={linkClass}>
           Local preferences
         </Link>
+        </div>
       </div>
     </div>
   );

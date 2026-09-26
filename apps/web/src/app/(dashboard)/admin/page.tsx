@@ -76,7 +76,7 @@ export default async function AdminDashboardPage({
 
   const authDisabled = process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
   if (!authDisabled && (!session?.user || !isStaffRole(session.user.role ?? ""))) {
-    redirect(`/sign-in?callbackUrl=${encodeURIComponent("/admin")}`);
+    redirect(`/login?callbackUrl=${encodeURIComponent("/admin")}`);
   }
 
   const canDashboard = authDisabled || staffHasPermission(staffPermissionListForSession(session), "dashboard:read");

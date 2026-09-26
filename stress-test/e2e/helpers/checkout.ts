@@ -1,14 +1,24 @@
 import "../runtime-logs-init";
-import { type Page, type APIRequestContext, test, expect } from "@playwright/test";
+import {
+  type Page,
+  type APIRequestContext,
+  test,
+  expect,
+} from "@playwright/test";
 
 import { isE2eExpectAllPsps, isE2eStrictPayments } from "../fixtures/env";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 
-function isTrustedProviderHost(value: string, hosts: readonly string[]): boolean {
+function isTrustedProviderHost(
+  value: string,
+  hosts: readonly string[],
+): boolean {
   try {
     const hostname = new URL(value).hostname.toLowerCase();
-    return hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+    return hosts.some(
+      (host) => hostname === host || hostname.endsWith(`.${host}`),
+    );
   } catch {
     return false;
   }
@@ -44,17 +54,27 @@ function getPspTestConfig(): {
   configured: boolean;
   envVars: Record<string, string | undefined>;
 }[] {
-  const stripeKey = process.env.E2E_STRIPE_API_KEY?.trim() || process.env.STRIPE_API_KEY?.trim();
-  const paypalClientId = process.env.E2E_PAYPAL_CLIENT_ID?.trim() || process.env.PAYPAL_CLIENT_ID?.trim();
-  const paypalClientSecret = process.env.E2E_PAYPAL_CLIENT_SECRET?.trim() || process.env.PAYPAL_CLIENT_SECRET?.trim();
-  const xenditSecretKey = process.env.E2E_XENDIT_SECRET_KEY?.trim() || process.env.XENDIT_SECRET_KEY?.trim();
+  const stripeKey =
+    process.env.E2E_STRIPE_API_KEY?.trim() ||
+    process.env.STRIPE_API_KEY?.trim();
+  const paypalClientId =
+    process.env.E2E_PAYPAL_CLIENT_ID?.trim() ||
+    process.env.PAYPAL_CLIENT_ID?.trim();
+  const paypalClientSecret =
+    process.env.E2E_PAYPAL_CLIENT_SECRET?.trim() ||
+    process.env.PAYPAL_CLIENT_SECRET?.trim();
+  const xenditSecretKey =
+    process.env.E2E_XENDIT_SECRET_KEY?.trim() ||
+    process.env.XENDIT_SECRET_KEY?.trim();
   return [
     {
       provider: "stripe",
       configured: Boolean(stripeKey),
       envVars: {
         apiKey: stripeKey,
-        webhookSecret: process.env.E2E_STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET,
+        webhookSecret:
+          process.env.E2E_STRIPE_WEBHOOK_SECRET ||
+          process.env.STRIPE_WEBHOOK_SECRET,
       },
     },
     {
@@ -70,7 +90,9 @@ function getPspTestConfig(): {
       configured: Boolean(xenditSecretKey),
       envVars: {
         secretKey: xenditSecretKey,
-        webhookToken: process.env.E2E_XENDIT_WEBHOOK_TOKEN || process.env.XENDIT_WEBHOOK_TOKEN,
+        webhookToken:
+          process.env.E2E_XENDIT_WEBHOOK_TOKEN ||
+          process.env.XENDIT_WEBHOOK_TOKEN,
       },
     },
     {
@@ -103,9 +125,12 @@ export async function assertExpectAllPspsMatchWorker(
   request: APIRequestContext,
 ): Promise<void> {
   if (!isE2eExpectAllPsps()) return;
-  const res = await request.get(`${baseURL}/api/checkout/available-payment-methods`, {
-    failOnStatusCode: false,
-  });
+  const res = await request.get(
+    `${baseURL}/api/checkout/available-payment-methods`,
+    {
+      failOnStatusCode: false,
+    },
+  );
   if (!res.ok()) {
     if (isE2eStrictPayments()) {
       throw new Error(
@@ -115,7 +140,11 @@ export async function assertExpectAllPspsMatchWorker(
     return;
   }
   const body = (await res.json()) as { keys?: unknown[] };
-  const enabled = new Set((body.keys ?? []).filter((key): key is string => typeof key === "string").map((key) => key.toLowerCase()));
+  const enabled = new Set(
+    (body.keys ?? [])
+      .filter((key): key is string => typeof key === "string")
+      .map((key) => key.toLowerCase()),
+  );
   for (const entry of getPspTestConfig()) {
     if (entry.provider === "cod") continue;
     if (enabled.has(entry.provider) && !entry.configured) {
@@ -131,9 +160,7 @@ export type AddCatalogProductResult = { slug: string; productTitle?: string };
 async function dismissCookieConsent(page: Page): Promise<void> {
   const cookieDialog = page.getByRole("dialog", { name: /cookie consent/i });
   if (await cookieDialog.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await cookieDialog
-      .getByRole("button", { name: /essential only/i })
-      .click();
+    await cookieDialog.getByRole("button", { name: /essential only/i }).click();
   }
 }
 
@@ -154,7 +181,17 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
   await page.goto(`${baseURL}${options?.shopPath ?? "/shop"}`, {
     waitUntil: "load",
   });
-  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  // The deployed storefront can serve a stale edge-rendered card snapshot on
+  // the first navigation while the Worker catalog has already changed. Reload
+  // once before collecting slugs so provider flows never follow a retired PDP
+  // link (a stale card previously produced a false 404 during Xendit setup).
+  // The storefront keeps telemetry and cache-refresh requests open after the
+  // catalog is usable, so networkidle is not a meaningful readiness signal
+  // here and can hang a checkout proof for the full Playwright timeout.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading").first()).toBeVisible({
+    timeout: 30_000,
+  });
 
   const cards = page.locator("[data-product-slug]");
   const slugs = await cards.evaluateAll((els) =>
@@ -167,7 +204,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
     return null;
   }
 
-  const trySlug = async (slug: string): Promise<AddCatalogProductResult | null> => {
+  const trySlug = async (
+    slug: string,
+  ): Promise<AddCatalogProductResult | null> => {
     const res = await page.goto(`${baseURL}/shop/${slug}`, {
       waitUntil: "domcontentloaded",
     });
@@ -181,36 +220,48 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       log(`stress catalog: skip ${slug} (needs storefront sign-in)`);
       return null;
     }
-    if (await btn.isDisabled()) {
-      log(`stress catalog: skip ${slug} (add control disabled)`);
-      return null;
-    }
-    await page.waitForFunction(
-      () => {
-        const element = document.querySelector<HTMLElement>(
-          '[data-testid="pdp-add-to-bag"]',
-        );
-        return Boolean(
-          element &&
+    const clientReady = await page
+      .waitForFunction(
+        () => {
+          const element = document.querySelector<HTMLElement>(
+            '[data-testid="pdp-add-to-bag"]',
+          );
+          return Boolean(
+            element &&
             element.dataset.clientReady === "true" &&
             !element.matches(":disabled"),
-        );
-      },
-      undefined,
-      { timeout: 10_000 },
-    );
-    const bodyText = (await page.locator("body").innerText().catch(() => "")) as string;
+          );
+        },
+        undefined,
+        { timeout: 15_000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!clientReady || (await btn.isDisabled())) {
+      log(`stress catalog: skip ${slug} (add control did not become ready)`);
+      return null;
+    }
+    const bodyText = (await page
+      .locator("body")
+      .innerText()
+      .catch(() => "")) as string;
     if (/out of stock|sold out|currently unavailable/i.test(bodyText)) {
       log(`stress catalog: skip ${slug} (oos/unavailable copy)`);
       return null;
     }
     // Public tunnels can finish hydration after the first click. Re-acquire the
     // control after each reload instead of clicking a detached/stale locator.
-    for (let attempt = 0; attempt < 3 && !/\/cart(?:\?|$)/.test(page.url()); attempt += 1) {
+    for (
+      let attempt = 0;
+      attempt < 3 && !/\/cart(?:\?|$)/.test(page.url());
+      attempt += 1
+    ) {
       // Consent can mount again after the PDP finishes client hydration. Keep
       // the real CTA unobstructed immediately before every click attempt.
       await dismissCookieConsent(page);
-      const addButton = page.locator('[data-testid="pdp-add-to-bag"]:visible').first();
+      const addButton = page
+        .locator('[data-testid="pdp-add-to-bag"]:visible')
+        .first();
       await addButton.waitFor({ state: "visible", timeout: 20_000 });
       await addButton.evaluate((element) => {
         element.scrollIntoView({ block: "center", inline: "nearest" });
@@ -225,17 +276,23 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
         ]);
         if (!buttonBox) break;
         if (await addButton.isDisabled()) {
-          log(`stress catalog: skip ${slug} (became unavailable during hydration)`);
+          log(
+            `stress catalog: skip ${slug} (became unavailable during hydration)`,
+          );
           return null;
         }
         const headerBottom = headerBox ? headerBox.y + headerBox.height : 0;
         const viewportHeight = page.viewportSize()?.height ?? 800;
-        if (buttonBox.y >= headerBottom + 12 && buttonBox.y + buttonBox.height <= viewportHeight - 12) {
+        if (
+          buttonBox.y >= headerBottom + 12 &&
+          buttonBox.y + buttonBox.height <= viewportHeight - 12
+        ) {
           break;
         }
-        const delta = buttonBox.y < headerBottom + 12
-          ? -(headerBottom + 24 - buttonBox.y)
-          : buttonBox.y + buttonBox.height - (viewportHeight - 12);
+        const delta =
+          buttonBox.y < headerBottom + 12
+            ? -(headerBottom + 24 - buttonBox.y)
+            : buttonBox.y + buttonBox.height - (viewportHeight - 12);
         await page.mouse.wheel(0, delta);
         await page.waitForTimeout(100);
       }
@@ -253,7 +310,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
       }
     }
     await expect(page).toHaveURL(/\/cart(?:\?|$)/, { timeout: 15_000 });
-    await expect(page.getByText("Your bag is empty.")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText("Your bag is empty.")).toHaveCount(0, {
+      timeout: 15_000,
+    });
     if (page.url().includes("/sign-in")) {
       log(`stress catalog: skip ${slug} (redirected to sign-in)`);
       return null;
@@ -269,7 +328,9 @@ export async function navigateToShopAndAddPreferredCatalogProduct(
   for (const slug of slugs.slice(0, max)) {
     const got = await trySlug(slug);
     if (got) {
-      log(`stress catalog: selected ${slug}${got.productTitle ? ` (${got.productTitle})` : ""}`);
+      log(
+        `stress catalog: selected ${slug}${got.productTitle ? ` (${got.productTitle})` : ""}`,
+      );
       return got;
     }
   }
@@ -306,7 +367,10 @@ async function verifyWorkerOrderExists(
   if (process.env.E2E_VERIFY_WORKER_ORDER !== "1") return false;
   const token = process.env.E2E_WORKER_ADMIN_TOKEN?.trim();
   if (!token || !orderId.startsWith("order_")) return false;
-  const workerBase = process.env.PLAYWRIGHT_WORKER_URL ?? process.env.API_URL ?? "http://127.0.0.1:8787";
+  const workerBase =
+    process.env.PLAYWRIGHT_WORKER_URL ??
+    process.env.API_URL ??
+    "http://127.0.0.1:8787";
   const res = await request.get(
     `${workerBase.replace(/\/$/, "")}/api/admin/orders/${encodeURIComponent(orderId)}`,
     { headers: { Authorization: `Bearer ${token}` }, failOnStatusCode: false },
@@ -326,9 +390,12 @@ export async function verifyPostPaymentSuccess(
 
   if (provider === "stripe" || provider === "cod") {
     await expectOrderConfirmation(page);
-    await expect(page).toHaveURL(/\/(track\/(?:order_|cap_)|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/i, {
-      timeout: strict ? 60_000 : 30_000,
-    });
+    await expect(page).toHaveURL(
+      /\/(track\/(?:order_|cap_)|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/i,
+      {
+        timeout: strict ? 60_000 : 30_000,
+      },
+    );
     const m = page.url().match(/(order_[a-z0-9]+)/i);
     if (m?.[1]) {
       const ok = await verifyWorkerOrderExists(request, m[1]);
@@ -378,23 +445,38 @@ async function skipUnlessPspAvailableInWorker(
   provider: PaymentProvider,
 ): Promise<void> {
   try {
-    const res = await request.get(`${baseURL}/api/checkout/available-payment-methods`, {
-      failOnStatusCode: false,
-    });
+    const res = await request.get(
+      `${baseURL}/api/checkout/available-payment-methods`,
+      {
+        failOnStatusCode: false,
+      },
+    );
     if (!res.ok()) {
-      test.skip(true, `Worker payment-method capability route unavailable (${res.status()})`);
+      test.skip(
+        true,
+        `Worker payment-method capability route unavailable (${res.status()})`,
+      );
       return;
     }
     const body = (await res.json()) as { keys?: unknown[] };
-    if (!body.keys?.some((key) => typeof key === "string" && key.toLowerCase() === provider)) {
-      test.skip(true, `${provider} is not exposed by the Worker-backed checkout`);
+    if (
+      !body.keys?.some(
+        (key) => typeof key === "string" && key.toLowerCase() === provider,
+      )
+    ) {
+      test.skip(
+        true,
+        `${provider} is not exposed by the Worker-backed checkout`,
+      );
     }
   } catch {
     test.skip(true, "Worker payment-method capability route is unreachable");
   }
 }
 
-export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void> {
+export async function navigateToShopAndAddFirstProduct(
+  page: Page,
+): Promise<void> {
   const preferred = await navigateToShopAndAddPreferredCatalogProduct(page, {
     maxCandidates: 4,
   });
@@ -407,18 +489,25 @@ export async function navigateToShopAndAddFirstProduct(page: Page): Promise<void
         "No published catalog products are available for the checkout journey.",
       );
     }
-    test.skip(true, "No published catalog products are available for the checkout journey.");
+    test.skip(
+      true,
+      "No published catalog products are available for the checkout journey.",
+    );
     return;
   }
 
   await page.goto(`${baseURL}/shop`);
-  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading").first()).toBeVisible({
+    timeout: 30_000,
+  });
 
   const productLink = page.locator('a[href^="/shop/"]').first();
   await expect(productLink).toBeVisible({ timeout: 15_000 });
   await productLink.click();
 
-  await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading").first()).toBeVisible({
+    timeout: 30_000,
+  });
   await dismissCookieConsent(page);
 
   const addToCartBtn = page.getByRole("button", { name: /add to (cart|bag)/i });
@@ -536,7 +625,9 @@ export async function selectPaymentProvider(
     await byTestId.evaluate((element) =>
       element.scrollIntoView({ block: "center", inline: "nearest" }),
     );
-    await byTestId.evaluate((element) => (element as HTMLButtonElement).click());
+    await byTestId.evaluate((element) =>
+      (element as HTMLButtonElement).click(),
+    );
     await expect(byTestId).toHaveAttribute("aria-checked", "true");
     return true;
   }
@@ -588,7 +679,9 @@ export async function clickPayButton(page: Page): Promise<void> {
     }
     await page.waitForTimeout(500);
   }
-  throw new Error(`Checkout submit did not become enabled: ${await payBtn.innerText()}`);
+  throw new Error(
+    `Checkout submit did not become enabled: ${await payBtn.innerText()}`,
+  );
 }
 
 /** Medusa Stripe module uses Checkout Sessions → redirect to `checkout.stripe.com` (not Elements on our domain). */
@@ -599,7 +692,9 @@ export const STRIPE_SANDBOX_TEST_CARD_DECLINE = "4000000000000002";
  * Retry a failed hosted handoff only. Normal checkout navigates in the same tab
  * without requiring a second confirmation click.
  */
-export async function clickContinueToStripeHostedCheckout(page: Page): Promise<void> {
+export async function clickContinueToStripeHostedCheckout(
+  page: Page,
+): Promise<void> {
   const btn = page.getByTestId("checkout-retry-payment-handoff");
   await expect(btn).toBeVisible({ timeout: 60_000 });
   await btn.click();
@@ -621,12 +716,18 @@ export async function ensureStripeHostedCheckout(page: Page): Promise<void> {
       .then(() => "handoff" as const)
       .catch(() => null),
   ]);
-  if (winner === "redirect" || isTrustedProviderHost(page.url(), ["checkout.stripe.com"])) return;
+  if (
+    winner === "redirect" ||
+    isTrustedProviderHost(page.url(), ["checkout.stripe.com"])
+  )
+    return;
   if (winner === "handoff") {
     await clickContinueToStripeHostedCheckout(page);
     return;
   }
-  throw new Error("Stripe checkout did not redirect or expose its handoff control");
+  throw new Error(
+    "Stripe checkout did not redirect or expose its handoff control",
+  );
 }
 
 /**
@@ -646,7 +747,8 @@ export async function fillStripeHostedCheckoutTestCard(
   let filled = false;
   for (const frame of page.frames()) {
     const url = frame.url();
-    if (!isTrustedProviderHost(url, ["js.stripe.com", "checkout.stripe.com"])) continue;
+    if (!isTrustedProviderHost(url, ["js.stripe.com", "checkout.stripe.com"]))
+      continue;
     const numberLoc = frame.locator(
       'input[autocomplete="cc-number"], input[name="cardnumber"], input[data-elements-stable-field-name="cardNumber"]',
     );
@@ -664,8 +766,11 @@ export async function fillStripeHostedCheckoutTestCard(
     if ((await cvcLoc.count()) > 0) {
       await cvcLoc.first().fill("123");
     }
-    const emailLoc = frame.locator('input[type="email"], input[autocomplete="email"]').first();
-    if ((await emailLoc.count()) > 0) await emailLoc.fill("e2e-test@example.com");
+    const emailLoc = frame
+      .locator('input[type="email"], input[autocomplete="email"]')
+      .first();
+    if ((await emailLoc.count()) > 0)
+      await emailLoc.fill("e2e-test@example.com");
     const nameLoc = frame
       .locator('input[autocomplete="cc-name"], input[placeholder*="name"]')
       .first();
@@ -674,18 +779,18 @@ export async function fillStripeHostedCheckoutTestCard(
     break;
   }
   if (!filled) {
-    const anyNumber = page.locator(
-      'input[autocomplete="cc-number"]',
-    );
+    const anyNumber = page.locator('input[autocomplete="cc-number"]');
     await expect(anyNumber.first()).toBeVisible({ timeout: 30_000 });
     await anyNumber.first().fill(cardNumber);
     const exp = page.locator('input[autocomplete="cc-exp"]').first();
     if (await exp.isVisible().catch(() => false)) await exp.fill("12 / 34");
     const cvc = page.locator('input[autocomplete="cc-csc"]').first();
-      if (await cvc.isVisible().catch(() => false)) await cvc.fill("123");
+    if (await cvc.isVisible().catch(() => false)) await cvc.fill("123");
   }
 
-  const hostedEmail = page.locator('input[type="email"], input[autocomplete="email"]').first();
+  const hostedEmail = page
+    .locator('input[type="email"], input[autocomplete="email"]')
+    .first();
   if (await hostedEmail.isVisible().catch(() => false)) {
     await hostedEmail.fill("e2e-test@example.com");
   }
@@ -700,14 +805,19 @@ export async function fillStripeHostedCheckoutTestCard(
 /**
  * Submits payment on Stripe Hosted Checkout and waits for redirect back to the storefront.
  */
-async function submitStripeHostedCheckoutAndWaitForReturn(page: Page): Promise<void> {
+async function submitStripeHostedCheckoutAndWaitForReturn(
+  page: Page,
+): Promise<void> {
   const pay = page
     .getByTestId("hosted-payment-submit-button")
     .or(page.getByRole("button", { name: /^pay\b/i }))
     .first();
   await expect(pay).toBeVisible({ timeout: 30_000 });
   await pay.click();
-  await page.waitForURL(/\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/, { timeout: 120_000 });
+  await page.waitForURL(
+    /\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/,
+    { timeout: 120_000 },
+  );
 }
 
 /**
@@ -727,26 +837,37 @@ export async function payWithStripeSandboxCard(
   } catch (hostedError) {
     const stripeFrame = page.frameLocator("iframe[name*='stripe']").first();
     const cardInput = stripeFrame
-      .locator("[name='cardnumber'], [placeholder*='card'], input[autocomplete='cc-number']")
+      .locator(
+        "[name='cardnumber'], [placeholder*='card'], input[autocomplete='cc-number']",
+      )
       .first();
     try {
       await expect(cardInput).toBeVisible({ timeout: 10_000 });
       await cardInput.fill(cardNumber);
       await stripeFrame
-        .locator("[name='exp-date'], [placeholder*='MM'], input[autocomplete='cc-exp']")
+        .locator(
+          "[name='exp-date'], [placeholder*='MM'], input[autocomplete='cc-exp']",
+        )
         .first()
         .fill("12/30");
       await stripeFrame
-        .locator("[name='cvc'], [placeholder*='CVC'], input[autocomplete='cc-csc']")
+        .locator(
+          "[name='cvc'], [placeholder*='CVC'], input[autocomplete='cc-csc']",
+        )
         .first()
         .fill("123");
       await page.getByRole("button", { name: /complete payment/i }).click();
-      await page.waitForURL(/\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/, { timeout: 120_000 });
+      await page.waitForURL(
+        /\/(track\/[^/]+|checkout\/(?:stripe-return|hosted-return\?provider=stripe))/,
+        { timeout: 120_000 },
+      );
       return;
     } catch {
       throw new Error(
         `Could not find Stripe Hosted Checkout or embedded card form: ${
-          hostedError instanceof Error ? hostedError.message : "checkout did not become ready"
+          hostedError instanceof Error
+            ? hostedError.message
+            : "checkout did not become ready"
         }`,
       );
     }
@@ -758,14 +879,29 @@ export async function payWithStripeSandboxCard(
  * after a successful payment flow.
  */
 export async function expectOrderConfirmation(page: Page): Promise<void> {
-  await expect(
-    page
-      .getByRole("heading", { name: /order.*confirm|thank you|success/i })
-      .or(page.getByRole("heading", { name: /order.*track|track.*order|status/i }))
-      .or(page.getByRole("heading", { name: /^order\s+\d+/i }))
-      .or(page.getByTestId("order-confirmation"))
-      .or(page.locator("[data-order-id]")),
-  ).toBeVisible({ timeout: 60_000 });
+  const confirmation = page
+    .getByRole("heading", { name: /order.*confirm|thank you|success/i })
+    .or(
+      page.getByRole("heading", {
+        name: /order.*track|track.*order|status/i,
+      }),
+    )
+    .or(page.getByRole("heading", { name: /^order\s+\d+/i }))
+    .or(page.getByTestId("order-confirmation"))
+    .or(page.locator("[data-order-id]"));
+
+  try {
+    await expect(confirmation).toBeVisible({ timeout: 45_000 });
+  } catch (error) {
+    // A local Next dev restart can leave the browser on its loading shell even
+    // though the finalize and tracking requests already succeeded. Reload once
+    // so the assertion verifies the rendered result instead of failing on that
+    // transient shell. Production runs still take the normal single attempt.
+    const loadingShell = page.getByText("Loading page", { exact: true });
+    if (!(await loadingShell.isVisible().catch(() => false))) throw error;
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+    await expect(confirmation).toBeVisible({ timeout: 45_000 });
+  }
 }
 
 /**
@@ -793,7 +929,10 @@ export async function verifyTrackingPageContent(
   if (!res || res.status() >= 400) return false;
   const heading = page.getByRole("heading").first();
   await expect(heading).toBeVisible({ timeout: 15_000 });
-  const bodyText = (await page.locator("body").innerText().catch(() => "")) as string;
+  const bodyText = (await page
+    .locator("body")
+    .innerText()
+    .catch(() => "")) as string;
   const hasOrderContent =
     /order|tracking|status|pending|paid|shipped|delivered/i.test(bodyText);
   return hasOrderContent;

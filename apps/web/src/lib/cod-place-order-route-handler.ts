@@ -73,6 +73,12 @@ export async function handleCodPlaceOrderRequest(
     if (typeof body.correlationId === "string" && body.correlationId.trim()) {
       correlationId = body.correlationId.trim();
     }
+    if (!correlationId) {
+      return NextResponse.json(
+        { error: "correlationId is required" },
+        { status: 400 },
+      );
+    }
     const requestedCartId =
       typeof body.cartId === "string" && body.cartId.trim()
         ? body.cartId.trim()

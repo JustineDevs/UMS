@@ -75,17 +75,19 @@ export function HostedCheckoutReturn({
   useIsomorphicLayoutEffect(() => {
     if (!failed) return;
     let frame = 0;
-    let retry = 0;
+    const retries: number[] = [];
     const focusRecoveryLink = () => {
       recoveryLinkRef.current?.focus();
     };
     frame = window.requestAnimationFrame(() => {
       focusRecoveryLink();
-      retry = window.setTimeout(focusRecoveryLink, 0);
+      retries.push(window.setTimeout(focusRecoveryLink, 0));
+      retries.push(window.setTimeout(focusRecoveryLink, 50));
+      retries.push(window.setTimeout(focusRecoveryLink, 150));
     });
     return () => {
       window.cancelAnimationFrame(frame);
-      window.clearTimeout(retry);
+      for (const retry of retries) window.clearTimeout(retry);
     };
   }, [failed, provider, status]);
   useEffect(() => {
@@ -287,6 +289,7 @@ export function HostedCheckoutReturn({
           <Link
             href="/checkout"
             ref={recoveryLinkRef}
+            autoFocus={failed}
             data-testid="hosted-return-back-to-checkout"
             className="inline-flex items-center justify-center rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
           >
