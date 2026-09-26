@@ -231,6 +231,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                 <h2 className="mt-2 font-headline text-2xl font-bold tracking-tight text-primary">
                   Order history
                 </h2>
+                <p className="mt-1 text-sm text-on-surface-variant">View and manage your past orders.</p>
               </div>
               <Link
                 href="/shop"

@@ -149,13 +149,11 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
 
   return (
     <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 md:col-span-2">
-      <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
-        Profile &amp; saved addresses
+      <h2 className="font-headline text-2xl font-bold tracking-tight text-primary">
+        My addresses
       </h2>
       <p className="mt-2 text-sm text-on-surface-variant">
-        We validate Philippine mobile numbers. Saved addresses speed up checkout
-        copy-paste; the payment step may still ask you to confirm details with
-        your provider.
+        Manage your shipping addresses and choose a default for checkout.
       </p>
 
       {err ? (

@@ -62,6 +62,9 @@ export function ProductReviewsSection({
     count > 0
       ? allReviews.reduce((sum, r) => sum + r.rating, 0) / count
       : 0;
+  const recommendationRate = count > 0
+    ? Math.round((allReviews.filter((review) => review.rating >= 4).length / count) * 100)
+    : 0;
 
   return (
     <section
@@ -88,6 +91,9 @@ export function ProductReviewsSection({
                 No reviews yet. Be the first to share your experience.
               </p>
             )}
+            {count > 0 ? (
+              <p className="mt-4 text-sm text-on-surface-variant"><span className="rounded-full bg-primary px-2 py-1 text-xs font-semibold text-on-primary">{recommendationRate}%</span> of reviewers would recommend this product</p>
+            ) : null}
             <a
               href="#write-review"
               className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
@@ -97,7 +103,7 @@ export function ProductReviewsSection({
           </div>
           {count > 0 ? (
             <div className="flex flex-col gap-4 sm:items-end">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
                 <span className="font-headline text-3xl font-bold tabular-nums text-primary sm:text-4xl">
                   {average.toFixed(1)}
                 </span>
@@ -105,6 +111,10 @@ export function ProductReviewsSection({
                   <StarRatingDisplay value={average} size="md" />
                   <span className="text-xs text-on-surface-variant">out of 5</span>
                 </div>
+              </div>
+              <div className="hidden w-full max-w-xs sm:block">
+                <p className="mb-1 text-xs font-semibold text-on-surface-variant">Quality</p>
+                <div className="h-1 rounded-full bg-outline-variant/20"><div className="h-1 rounded-full bg-primary" style={{ width: `${Math.min(100, (average / 5) * 100)}%` }} /></div>
               </div>
               <div className="w-full max-w-xs">
                 <RatingHistogram reviews={allReviews} total={count} />

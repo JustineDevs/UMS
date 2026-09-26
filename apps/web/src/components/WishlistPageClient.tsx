@@ -253,7 +253,7 @@ export function WishlistPageClient() {
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-4">
-            <p className="text-sm text-on-surface-variant">{items.length} saved item{items.length === 1 ? "" : "s"}</p>
+            <p className="text-sm text-on-surface-variant">{items.length} item{items.length === 1 ? "" : "s"} in your wishlist</p>
             <div className="flex flex-wrap items-center gap-2">
               <label className="sr-only" htmlFor="wishlist-sort">Sort saved items</label>
               <select id="wishlist-sort" value={sort} onChange={(event) => setSort(event.target.value as "date" | "name")} className="h-10 rounded-md border border-outline-variant/30 bg-transparent px-3 text-sm text-primary">
@@ -263,14 +263,14 @@ export function WishlistPageClient() {
               <button type="button" onClick={() => void handleShare()} className="h-10 rounded-md border border-outline-variant/30 px-3 text-sm font-semibold text-primary hover:bg-surface-container-low">Share</button>
             </div>
           </div>
-          <ul className="grid gap-4 sm:grid-cols-2">
+          <ul className="divide-y divide-outline-variant/20 overflow-hidden rounded-xl border border-outline-variant/20 bg-surface-container-lowest">
             {[...items].sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : b.addedAt.localeCompare(a.addedAt)).map((item) => (
               <li
                 key={`${item.slug}:${item.medusaProductId ?? ""}`}
-                className="flex min-h-48 flex-col justify-between gap-6 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5"
+                className="flex flex-col justify-between gap-5 p-5 sm:flex-row sm:items-center"
               >
                 <div className="min-w-0">
-                  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Saved item</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Saved item</p>
                   <Link
                     href={`/shop/${item.slug}`}
                     className="font-headline font-semibold text-primary hover:underline"

@@ -292,7 +292,7 @@ export function CheckoutClient({
 
   return (
     <main className="storefront-page-shell motion-surface max-w-7xl">
-      <div className="mb-8 border-b border-outline-variant/25 pb-7"><p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">// CHECKOUT</p><h1 className="mt-3 font-headline text-4xl font-extrabold tracking-tighter text-primary sm:text-5xl">Complete your order</h1></div>
+      <div className="mb-8 border-b border-outline-variant/25 pb-7"><h1 className="font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">Checkout</h1><p className="mt-2 text-sm text-on-surface-variant">Complete your purchase securely.</p></div>
 
       {/* Checkout progress indicator */}
       <nav aria-label="Checkout progress" className="mb-8">
