@@ -272,7 +272,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               <div className="space-y-3 py-8 text-sm text-on-surface-variant">
                 <p>Sign in to view your order history.</p>
                 <Link
-                  href="/sign-in?callbackUrl=/account"
+                  href="/login?callbackUrl=/account"
                   className="font-semibold text-primary underline"
                 >
                   Sign in to your account

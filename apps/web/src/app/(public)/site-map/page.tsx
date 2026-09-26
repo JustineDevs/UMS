@@ -19,7 +19,7 @@ const links: { href: string; label: string }[] = [
   { href: "/wishlist", label: "Saved items" },
   { href: "/track", label: "Track order" },
   { href: "/account", label: "My account" },
-  { href: "/sign-in", label: "Sign in" },
+  { href: "/login", label: "Login" },
   { href: "/register", label: "Register" },
   { href: "/help", label: "Help center" },
   { href: "/faq", label: "FAQ" },

@@ -143,7 +143,7 @@ export function CheckoutClient({
         </p>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <Link
-            href={`/sign-in?callbackUrl=${encodeURIComponent("/checkout")}`}
+            href={`/login?callbackUrl=${encodeURIComponent("/checkout")}`}
             data-testid="checkout-guest-sign-in"
             className="inline-flex rounded bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
           >
@@ -375,7 +375,7 @@ export function CheckoutClient({
             <p className="mt-0.5 text-xs text-on-surface-variant">
               Enter your email below for order updates. Cash on delivery
               requires a{" "}
-              <Link href="/sign-in?callbackUrl=/checkout" className="underline">
+              <Link href="/login?callbackUrl=/checkout" className="underline">
                 signed-in profile
               </Link>
               .

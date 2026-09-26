@@ -13,7 +13,7 @@ export function WatermelonRegister({ callbackUrl }: { callbackUrl: string }) {
   };
 
   return (
-    <main id="main-content" aria-labelledby="sign-in-heading">
+    <main id="main-content" aria-label="Create your account">
       <Auth04
         brandName="Universal Music Store"
         heading="Create your account"
@@ -22,9 +22,9 @@ export function WatermelonRegister({ callbackUrl }: { callbackUrl: string }) {
         subheading="Join Universal Music Store and keep your orders in one place."
         googleLabel="Continue with Google"
         footerPrompt="Already have an account?"
-        footerActionLabel="Sign in"
+        footerActionLabel="Log in"
         onGoogleLogin={() => void handleGoogleLogin()}
-        onFooterAction={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`; }}
+        onFooterAction={() => { window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`; }}
         onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
         onLogin={() => { window.location.href = "/contact?topic=account"; }}
         footerLinks={[

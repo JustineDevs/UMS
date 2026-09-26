@@ -46,7 +46,7 @@ export function AccountSignInState({ message = "Sign in to manage this part of y
     <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
       <h2 className="font-headline text-xl font-bold text-primary">Sign in required</h2>
       <p className="mt-2 text-sm leading-6 text-on-surface-variant">{message}</p>
-      <Link href="/sign-in?callbackUrl=%2Faccount%2Fprofile" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary hover:opacity-90">
+      <Link href="/login?callbackUrl=%2Faccount%2Fprofile" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary hover:opacity-90">
         Sign in
       </Link>
     </section>

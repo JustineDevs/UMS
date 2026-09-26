@@ -29,7 +29,7 @@ async function updateSupabaseSession(request: NextRequest): Promise<NextResponse
   if (request.nextUrl.pathname.startsWith("/account")) {
     if (!data.user) {
       const signIn = request.nextUrl.clone();
-      signIn.pathname = "/sign-in";
+      signIn.pathname = "/login";
       signIn.searchParams.set("callbackUrl", request.nextUrl.pathname);
       return NextResponse.redirect(signIn);
     }

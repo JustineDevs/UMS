@@ -18,7 +18,7 @@ const ROUTES: { path: string; file: string }[] = [
   { path: "/contact", file: "contact" },
   { path: "/help", file: "help" },
   { path: "/faq", file: "faq" },
-  { path: "/sign-in", file: "sign-in" },
+  { path: "/login", file: "login" },
   { path: "/register", file: "register" },
   { path: "/track", file: "track" },
   { path: "/shipping", file: "shipping" },

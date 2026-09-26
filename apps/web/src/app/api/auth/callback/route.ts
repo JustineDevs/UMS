@@ -13,10 +13,10 @@ export async function GET(request: NextRequest) {
     request,
     request.nextUrl.searchParams.get("origin"),
   );
-  if (!code) return NextResponse.redirect(new URL("/sign-in?error=OAuthCallback", origin));
+  if (!code) return NextResponse.redirect(new URL("/login?error=OAuthCallback", origin));
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) return NextResponse.redirect(new URL("/sign-in?error=OAuthCallback", origin));
+  if (error) return NextResponse.redirect(new URL("/login?error=OAuthCallback", origin));
   const { data } = await supabase.auth.getUser();
   const googleIdentity = data.user?.identities?.find((identity) => identity.provider === "google");
   const adminDestination = destination === "/admin" || destination.startsWith("/admin/");
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     : data.user;
   if (!session) {
     await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/sign-in?error=AccessDenied", origin));
+    return NextResponse.redirect(new URL("/login?error=AccessDenied", origin));
   }
   return NextResponse.redirect(new URL(destination, origin));
 }

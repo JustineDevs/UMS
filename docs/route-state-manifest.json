@@ -1661,6 +1661,25 @@
       }
     },
     {
+      "route": "/login",
+      "source": "apps/web/src/app/(public)/login/page.tsx",
+      "client": false,
+      "loadingBoundary": "apps/web/src/app/loading.tsx",
+      "errorBoundary": "apps/web/src/app/(public)/error.tsx",
+      "verification": "static-inventory",
+      "signals": {
+        "fetch": false,
+        "form": false,
+        "loading": true,
+        "empty": false,
+        "blocked": false,
+        "unauthorized": true,
+        "failure": true,
+        "retry": false,
+        "success": false
+      }
+    },
+    {
       "route": "/sign-in",
       "source": "apps/web/src/app/(public)/sign-in/page.tsx",
       "client": false,

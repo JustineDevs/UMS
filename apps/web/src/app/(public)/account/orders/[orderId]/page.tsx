@@ -102,7 +102,7 @@ export default async function AccountOrderPage({
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!session || !userEmail) {
     redirect(
-      `/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}`,
+      `/login?callbackUrl=/account/orders/${encodeURIComponent(orderId)}`,
     );
   }
 

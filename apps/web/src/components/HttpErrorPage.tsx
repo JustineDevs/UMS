@@ -103,7 +103,7 @@ export function HttpErrorPage({
               ) : null}
               {code === 401 || code === 403 ? (
                 <Button asChild variant="default" size="lg" className="uppercase tracking-widest">
-                  <Link href="/sign-in">Sign in</Link>
+                  <Link href="/login">Sign in</Link>
                 </Button>
               ) : null}
               <Button

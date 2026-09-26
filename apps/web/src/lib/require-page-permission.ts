@@ -6,7 +6,7 @@ export async function requirePagePermission(permissionKey: string): Promise<void
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return;
   const session = await getAdminSession();
   if (!session?.user) {
-    redirect("/sign-in");
+    redirect("/login");
   }
   const perms = staffPermissionListForSession(session);
   if (!staffHasPermission(perms, permissionKey)) {
@@ -20,7 +20,7 @@ export async function requireAnyPagePermission(permissionKeys: readonly string[]
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return;
   const session = await getAdminSession();
   if (!session?.user) {
-    redirect("/sign-in");
+    redirect("/login");
   }
   const perms = staffPermissionListForSession(session);
   if (!permissionKeys.some((k) => staffHasPermission(perms, k))) {

@@ -214,7 +214,7 @@ export function WishlistPageClient() {
           Sign in to save favorites and keep them with your account on this device.
         </p>
         <Link
-          href={`/sign-in?callbackUrl=${encodeURIComponent("/wishlist")}`}
+          href={`/login?callbackUrl=${encodeURIComponent("/wishlist")}`}
           className="inline-flex rounded-lg bg-primary px-6 py-3 text-sm font-bold text-on-primary hover:opacity-90"
         >
           Sign in to view saved items

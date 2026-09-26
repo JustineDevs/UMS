@@ -39,7 +39,7 @@ export default async function OrderReturnPage({
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!userEmail) {
     redirect(
-      `/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`,
+      `/login?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`,
     );
   }
 

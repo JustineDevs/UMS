@@ -9,7 +9,7 @@ export default function AccountPasswordPage() {
       <AccountUnavailableState
         title="Password changes are managed by sign-in"
         message="Storefront accounts use secure Google sign-in. There is no local password stored in this app, so password changes are handled by your identity provider."
-        actionHref="/sign-in?callbackUrl=%2Faccount%2Fprofile&reauth=1"
+        actionHref="/login?callbackUrl=%2Faccount%2Fprofile&reauth=1"
         actionLabel="Re-authenticate"
       />
     </AccountRouteFrame>

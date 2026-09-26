@@ -33,7 +33,7 @@ async function updateSupabaseSession(request: NextRequest): Promise<NextResponse
   });
   const { data } = await supabase.auth.getUser();
   if (!data.user && (request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/guide-demos"))) {
-    const signIn = request.nextUrl.clone(); signIn.pathname = "/sign-in"; signIn.searchParams.set("callbackUrl", request.nextUrl.pathname); return NextResponse.redirect(signIn);
+    const signIn = request.nextUrl.clone(); signIn.pathname = "/login"; signIn.searchParams.set("callbackUrl", request.nextUrl.pathname); return NextResponse.redirect(signIn);
   }
   if (data.user && request.nextUrl.pathname.startsWith("/guide-demos") && !isEmailAllowedForGuideDemos(data.user.email)) return NextResponse.redirect(new URL("/admin?denied=guide-demos", request.url));
   return response;

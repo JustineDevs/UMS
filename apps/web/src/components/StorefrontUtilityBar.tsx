@@ -41,7 +41,7 @@ export function StorefrontUtilityBar() {
         <Link href="/search" className={linkClass}>
           Search
         </Link>
-        <Link href="/sign-in" className={linkClass}>
+        <Link href="/login" className={linkClass}>
           Sign in
         </Link>
         <Link href="/preferences" className={linkClass}>

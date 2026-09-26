@@ -40,7 +40,7 @@ export function WishlistToggle({
     if (pending) return;
     if (status !== "authenticated") {
       const next = pathname || `/shop/${slug}`;
-      router.push(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+      router.push(`/login?callbackUrl=${encodeURIComponent(next)}`);
       return;
     }
     setPending(true);
