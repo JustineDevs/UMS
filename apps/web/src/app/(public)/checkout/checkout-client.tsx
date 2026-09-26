@@ -76,6 +76,7 @@ export function CheckoutClient({
     profileGate,
     setProfileGate,
     profileMissing,
+    profileSummary,
     fetchProfileStatus,
     providerAvailable,
     refresh,
@@ -519,7 +520,7 @@ export function CheckoutClient({
 
           <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
-              Stay in touch
+              Contact Information
             </h2>
             <label
               htmlFor="checkout-email"
@@ -541,6 +542,10 @@ export function CheckoutClient({
               }
               className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
             />
+            <label className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
+              <input type="checkbox" className="size-4 accent-primary" />
+              Email me with news and offers
+            </label>
             <p className="text-xs text-on-surface-variant mt-2">
               {paymentMethod === "COD" ? (
                 <>
@@ -671,21 +676,57 @@ export function CheckoutClient({
 
           <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
-              Delivery and pickup
+              Shipping Address
             </h2>
-            <p className="text-sm text-on-surface-variant">
-              Your primary saved address from onboarding is on file.
+            {profileSummary?.shippingAddresses[0] ? (() => {
+              const address = profileSummary.shippingAddresses[0];
+              const addressLine = [address.line1, address.line2, address.barangay]
+                .filter(Boolean)
+                .join(", ");
+              return (
+                <div className="space-y-4">
+                  <label className="block text-xs font-medium text-on-surface-variant">
+                    Country
+                    <input readOnly value={address.country === "PH" ? "Philippines" : address.country ?? ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-xs font-medium text-on-surface-variant">
+                      Full Name
+                      <input readOnly value={address.fullName} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                    </label>
+                    <label className="block text-xs font-medium text-on-surface-variant">
+                      Phone
+                      <input readOnly value={address.phone || profileSummary.phone || ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                    </label>
+                  </div>
+                  <label className="block text-xs font-medium text-on-surface-variant">
+                    Address
+                    <input readOnly value={addressLine} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-xs font-medium text-on-surface-variant">
+                      Postal Code
+                      <input readOnly value={address.postalCode ?? ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                    </label>
+                    <label className="block text-xs font-medium text-on-surface-variant">
+                      City / Province
+                      <input readOnly value={[address.city, address.province].filter(Boolean).join(", ")} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                    </label>
+                  </div>
+                  <Link href="/account/profile" className="inline-flex text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline">
+                    Edit delivery details
+                  </Link>
+                </div>
+              );
+            })() : (
+              <p className="text-sm text-on-surface-variant">
+                Your primary saved address from onboarding is on file. Update it under Account if anything is wrong.
+              </p>
+            )}
+            <p className="mt-4 text-sm leading-relaxed text-on-surface-variant">
               {paymentMethod === "COD"
-                ? " Cash on delivery ships to that address."
-                : " Some payment methods may ask you to confirm shipping or contact details before you pay."}
-            </p>
-            <p className="mt-3 text-sm text-on-surface-variant leading-relaxed">
-              <strong className="text-primary">
-                Buy online, pick up in store:
-              </strong>{" "}
-              When your order supports it, choose store pickup on the payment or
-              delivery step, or write &quot;Cavite pickup&quot; in order
-              comments and confirm with support if you do not see pickup.
+                ? "Cash on delivery ships to this saved address."
+                : "Some payment methods may ask you to confirm shipping or contact details before you pay."}
             </p>
           </section>
         </div>

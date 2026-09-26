@@ -64,6 +64,21 @@ export type CheckoutEmbeddedData = {
 };
 
 type ProfileGate = "idle" | "loading" | "complete" | "incomplete" | "error";
+type CheckoutProfileSummary = {
+  displayName: string | null;
+  phone: string | null;
+  shippingAddresses: Array<{
+    fullName: string;
+    phone?: string;
+    line1: string;
+    line2?: string;
+    barangay?: string;
+    city: string;
+    province: string;
+    postalCode?: string;
+    country?: string;
+  }>;
+};
 export type CheckoutPhase =
   | "idle"
   | "starting"
@@ -130,6 +145,8 @@ export function useCheckoutClient({
   >("idle");
   const [profileGate, setProfileGate] = useState<ProfileGate>("idle");
   const [profileMissing, setProfileMissing] = useState<string[]>([]);
+  const [profileSummary, setProfileSummary] =
+    useState<CheckoutProfileSummary | null>(null);
   const [quoteReviewAcknowledged, setQuoteReviewAcknowledged] = useState(false);
   const [foreignCheckoutActive, setForeignCheckoutActive] = useState(false);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
@@ -156,7 +173,9 @@ export function useCheckoutClient({
       const data = (await res.json()) as {
         complete?: boolean;
         missingFields?: string[];
+        profile?: CheckoutProfileSummary | null;
       };
+      setProfileSummary(data.profile ?? null);
       setProfileMissing(
         Array.isArray(data.missingFields) ? data.missingFields : [],
       );
@@ -321,6 +340,7 @@ export function useCheckoutClient({
     if (authStatus !== "authenticated" || !session?.user) {
       setProfileGate("idle");
       setProfileMissing([]);
+      setProfileSummary(null);
       return;
     }
     let cancelled = false;
@@ -1300,6 +1320,7 @@ export function useCheckoutClient({
     profileGate,
     setProfileGate,
     profileMissing,
+    profileSummary,
     fetchProfileStatus,
     providerAvailable,
     refresh,
