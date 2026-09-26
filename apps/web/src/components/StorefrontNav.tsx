@@ -1,15 +1,8 @@
-import type { CmsNavigationPayload } from "@universal-music-store/platform-data";
-import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { IconBag, IconHeart, IconPerson } from "./NavActionIcons";
-import { StorefrontMainNav } from "./StorefrontMainNav";
 
-export function StorefrontNav({
-  navigation,
-}: {
-  navigation?: CmsNavigationPayload;
-}) {
+export function StorefrontNav() {
   return (
     <nav
       className="relative w-full min-w-0 max-w-full font-headline tracking-tight shadow-[0px_8px_24px_rgba(0,0,0,0.06)]"
@@ -23,22 +16,12 @@ export function StorefrontNav({
             href="/"
             data-cms-id="header-brand"
             data-cms-label="Brand"
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center transition-opacity duration-200 hover:opacity-85 sm:h-12 sm:w-12"
+            className="shrink-0 text-lg font-semibold tracking-tight transition-opacity duration-200 hover:opacity-85"
             data-testid="nav-home"
             aria-label="Universal Music Store, home"
           >
-            <Image
-              src="/brand/universal-music-store-logo-abstract.png"
-              alt="Universal Music Store"
-              width={1080}
-              height={1080}
-              className="h-full w-full object-contain object-center invert"
-              sizes="(max-width: 640px) 44px, (max-width: 1024px) 52px, 56px"
-              unoptimized
-              priority
-            />
+            Universal Music Store
           </Link>
-          <span className="hidden shrink-0 text-lg font-semibold tracking-tight sm:inline">Universal Music Store</span>
           <form action="/shop" method="get" className="flex min-w-0 flex-1 items-center">
             <label htmlFor="storefront-search" className="sr-only">Search products</label>
             <input
@@ -59,12 +42,9 @@ export function StorefrontNav({
             <Link href="/account" data-testid="nav-account" className="text-on-primary transition-transform duration-200 hover:scale-95" aria-label="Account"><IconPerson /></Link>
           </div>
         </div>
-        <div className="mx-auto hidden max-w-[1600px] items-center gap-4 overflow-x-auto px-[clamp(0.75rem,3vw,2rem)] pb-2 text-[10px] text-on-primary/75 sm:flex sm:text-xs">
-          {[["/shop?category=guitars", "Guitars"], ["/shop?category=amplifiers", "Amplifiers"], ["/shop?category=effects", "Effects"], ["/shop?category=keyboards", "Keyboards & pianos"], ["/shop?category=drums", "Drums"], ["/shop?category=accessories", "Accessories & gear"]].map(([href, label]) => <Link key={href} href={href} className="shrink-0 hover:text-on-primary">{label}</Link>)}
+        <div className="mx-auto hidden max-w-[1600px] items-center gap-5 overflow-x-auto px-[clamp(0.75rem,3vw,2rem)] pb-2 text-[10px] text-on-primary/75 sm:flex sm:gap-7 sm:text-xs md:gap-8">
+          {[["/shop?category=guitars", "Guitars"], ["/shop?category=amplifiers", "Amplifiers"], ["/shop?category=effects", "Effects"], ["/shop?category=keyboards", "Keyboards & pianos"], ["/shop?category=drums", "Drums"], ["/shop?category=accessories", "Accessories & gear"]].map(([href, label]) => <Link key={href} href={href} className="shrink-0 whitespace-nowrap hover:text-on-primary">{label}</Link>)}
         </div>
-      </div>
-      <div className="flex min-h-12 items-center justify-center border-b border-outline-variant/20 bg-surface-container-lowest px-[clamp(0.75rem,3vw,2rem)] text-primary">
-        <StorefrontMainNav navigation={navigation} />
       </div>
     </nav>
   );

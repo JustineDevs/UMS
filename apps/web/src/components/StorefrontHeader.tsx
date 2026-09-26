@@ -10,7 +10,7 @@ export type StorefrontHeaderSections = {
 
 export function StorefrontHeader({
   announcement,
-  navigation,
+  navigation: _navigation,
   sections,
 }: {
   announcement?: React.ReactNode;
@@ -31,7 +31,7 @@ export function StorefrontHeader({
     >
       {showAnnouncement ? announcement : null}
       {showUtilityBar ? <StorefrontUtilityBar /> : null}
-      {showPrimaryNav ? <StorefrontNav navigation={navigation} /> : null}
+      {showPrimaryNav ? <StorefrontNav /> : null}
     </header>
   );
 }
