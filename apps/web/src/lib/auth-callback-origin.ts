@@ -17,3 +17,26 @@ export function isAllowedBrowserOrigin(value: string): boolean {
     return false;
   }
 }
+
+/** Preserve the browser-facing deployment origin during OAuth completion. */
+export function resolveAuthCallbackOrigin(
+  request: Request,
+  requestedOrigin: string | null,
+): string {
+  if (requestedOrigin && isAllowedBrowserOrigin(requestedOrigin)) {
+    return new URL(requestedOrigin).origin;
+  }
+
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",", 1)[0]?.trim();
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim();
+  if (forwardedProto && forwardedHost) {
+    try {
+      const forwardedOrigin = new URL(`${forwardedProto}://${forwardedHost}`).origin;
+      if (isAllowedBrowserOrigin(forwardedOrigin)) return forwardedOrigin;
+    } catch {
+      // Fall through to the request URL for malformed proxy metadata.
+    }
+  }
+
+  return new URL(request.url).origin;
+}
