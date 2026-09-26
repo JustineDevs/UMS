@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@universal-music-store/ui";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
+import { FeaturedProductsCarousel } from "@/components/home/FeaturedProductsCarousel";
 import { RatingBadge } from "@/components/foundations/rating-badge";
 import type { Product } from "@universal-music-store/types";
 import type { CmsBlock, StorefrontHomePayload, StorefrontHomeSectionLayout } from "@universal-music-store/platform-data";
@@ -12,10 +13,6 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useLayoutEffect, useRef, useEffect, type CSSProperties } from "react";
 import { batchScrollRevealChildren } from "@/lib/gsap-scroll-system";
-import {
-  isKnownUnavailableExternalImage,
-  shouldUnoptimizeImage,
-} from "@/lib/image-helpers";
 import { normalizeCmsDomStyle } from "@/lib/cms-dom-edit";
 import { sanitizeCmsHtml } from "@universal-music-store/validation";
 
@@ -52,38 +49,10 @@ function sectionStyle(layout?: StorefrontHomeSectionLayout): CSSProperties | und
   };
 }
 
-function heroFontClass(style: HeroStyle["headlineFont"]): string {
-  if (style === "body") return "font-body";
-  if (style === "mono") return "font-mono";
-  return "font-headline";
-}
-
-function heroToneClass(style: HeroStyle["textTone"]): string {
-  if (style === "neutral") return "text-on-surface";
-  if (style === "muted") return "text-on-surface-variant";
-  return "text-primary";
-}
-
 function heroLeadToneClass(style: HeroStyle["textTone"]): string {
   if (style === "neutral") return "text-on-surface-variant";
   if (style === "muted") return "text-on-surface-variant/90";
   return "text-primary/80";
-}
-
-function heroTitleSizeClass(style: HeroStyle["headlineSize"]): string {
-  if (style === "compact") {
-    return "text-[clamp(1.9rem,6.2vw,3.6rem)] md:text-[clamp(2.1rem,5.6vw,4rem)]";
-  }
-  if (style === "hero") {
-    return "text-[clamp(2.3rem,8vw,5.25rem)] md:text-[clamp(2.7rem,7vw,5.6rem)]";
-  }
-  return "text-[clamp(2rem,7.5vw,4.75rem)] md:text-[clamp(2.25rem,6.5vw,4.5rem)]";
-}
-
-function heroWidthClass(style: HeroStyle["contentWidth"]): string {
-  if (style === "extra") return "max-w-[min(100%,52rem)] lg:max-w-[60rem]";
-  if (style === "wide") return "max-w-[min(100%,48rem)] lg:max-w-[54rem]";
-  return "max-w-[min(100%,42rem)] lg:max-w-[48rem]";
 }
 
 function heroLeadWidthClass(style: HeroStyle["contentWidth"]): string {
@@ -189,12 +158,9 @@ export function HomeScrollExperience({
   visualBlocks = [],
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const line1Ref = useRef<HTMLSpanElement>(null);
-  const line2Ref = useRef<HTMLSpanElement>(null);
   const leadRef = useRef<HTMLParagraphElement>(null);
   const ctaRef = useRef<HTMLAnchorElement>(null);
   const partnersRef = useRef<HTMLDivElement>(null);
-  const asideRef = useRef<HTMLDivElement>(null);
   const latestHeaderRef = useRef<HTMLDivElement>(null);
   const productsGridRef = useRef<HTMLDivElement>(null);
 
@@ -560,11 +526,7 @@ export function HomeScrollExperience({
   }, [home.domOverrides]);
 
   const heroStyle = home.hero.style;
-  const heroTone = heroToneClass(heroStyle.textTone);
   const heroLeadTone = heroLeadToneClass(heroStyle.textTone);
-  const heroFont = heroFontClass(heroStyle.headlineFont);
-  const heroTitleSize = heroTitleSizeClass(heroStyle.headlineSize);
-  const heroWidth = heroWidthClass(heroStyle.contentWidth);
   const heroLeadWidth = heroLeadWidthClass(heroStyle.contentWidth);
 
   useLayoutEffect(() => {
@@ -574,20 +536,6 @@ export function HomeScrollExperience({
     const ease = "power3.out";
     const ctx = gsap.context(() => {
       const heroTl = gsap.timeline({ defaults: { duration: 0.8, ease } });
-      if (line1Ref.current) {
-        heroTl.from(line1Ref.current, {
-          x: 100,
-          duration: 0.8,
-          ease,
-        });
-      }
-      if (line2Ref.current) {
-        heroTl.from(
-          line2Ref.current,
-          { y: 30, duration: 0.8, ease },
-          "-=0.5",
-        );
-      }
       if (leadRef.current) {
         heroTl.from(
           leadRef.current,
@@ -607,13 +555,6 @@ export function HomeScrollExperience({
           partnersRef.current,
           { y: 24, duration: 0.75, ease },
           "-=0.48",
-        );
-      }
-      if (asideRef.current) {
-        heroTl.from(
-          asideRef.current,
-          { scale: 1.04, duration: 1, ease: "power2.out" },
-          "-=0.9",
         );
       }
 
@@ -653,9 +594,6 @@ export function HomeScrollExperience({
     };
   }, [products.length, home.hero.line1]);
 
-  const heroImage = home.hero.imageUrl?.trim();
-  const heroVideo = home.hero.mediaType === "video" ? home.hero.videoUrl?.trim() : "";
-
   return (
     <div
       ref={rootRef}
@@ -669,19 +607,6 @@ export function HomeScrollExperience({
         className="relative flex min-h-[clamp(22rem,72svh,40rem)] w-full items-center overflow-hidden bg-surface-container-low storefront-section-x py-10 sm:py-14 md:py-16 lg:py-20"
       >
         <div className="relative z-10 mx-auto w-full max-w-[1600px]">
-          <h1
-            className={`mb-6 ${heroWidth} ${heroFont} ${heroTitleSize} font-extrabold leading-[1.02] tracking-tighter ${heroTone} sm:mb-8`}
-          >
-              <span ref={line1Ref} data-cms-id="home-hero-title" data-uvs-id="home-hero-title" data-cms-label="Headline" className="block">
-              {home.hero.line1}
-            </span>
-            <span
-              ref={line2Ref}
-              className={`block text-[clamp(1.2rem,4.2vw,2.75rem)] font-bold tracking-tight ${heroTone}`}
-            >
-              {home.hero.line2}
-            </span>
-          </h1>
           <p
             ref={leadRef}
             data-cms-id="home-hero-lead"
@@ -776,35 +701,8 @@ export function HomeScrollExperience({
             </div>
           </div>
         </div>
-        <div
-          ref={asideRef}
-          className="pointer-events-none absolute right-0 top-0 h-full w-full opacity-35 md:w-1/2 md:opacity-100"
-        >
-          {heroVideo ? (
-            <video src={heroVideo} className="h-full w-full object-cover" autoPlay muted loop playsInline aria-label="Hero background video" />
-          ) : heroImage ? (
-            isKnownUnavailableExternalImage(heroImage) ? (
-              <div className="flex h-full w-full items-end justify-start bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high p-6 md:p-10">
-                <div className="max-w-sm rounded-xl bg-white/85 px-4 py-3 text-sm font-medium text-on-surface shadow-sm">
-                  Featured image unavailable
-                </div>
-              </div>
-            ) : (
-              <div className="relative h-full w-full">
-                <Image
-                  src={heroImage}
-                  alt=""
-                  fill
-                  priority
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  className="object-cover"
-                  unoptimized={shouldUnoptimizeImage(heroImage)}
-                />
-              </div>
-            )
-          ) : (
-            <div className="h-full w-full bg-surface-container-high" aria-hidden />
-          )}
+        <div className="absolute right-0 top-0 h-full w-full md:w-1/2">
+          <FeaturedProductsCarousel products={products} />
         </div>
       </section>
 
