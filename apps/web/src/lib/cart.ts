@@ -69,6 +69,11 @@ export function parseCartQuantityInput(value: string): number | null {
 export const CART_STORAGE_KEY = "ums-commerce-cart-v5";
 const LEGACY_CART_STORAGE_KEYS = ["ums-commerce-cart-v3", "ums-commerce-cart-v4"];
 export const CART_UPDATED_EVENT = "ums-cart-updated";
+export const CART_BROADCAST_CHANNEL = "ums-cart-updated-v5";
+const CART_BROADCAST_SOURCE =
+  typeof globalThis.crypto?.randomUUID === "function"
+    ? globalThis.crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
 const CART_MERGE_KEY = "ums-commerce-cart-merge-v1";
 const CART_STORAGE_VERSION = 1;
 
@@ -83,9 +88,42 @@ function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
-function notifyCartUpdated(): void {
-  if (typeof window?.dispatchEvent !== "function") return;
-  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+function notifyCartUpdated(options: { sameTab?: boolean } = {}): void {
+  if (options.sameTab !== false && typeof window?.dispatchEvent === "function") {
+    window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+  }
+  if (typeof window.BroadcastChannel !== "function") return;
+  const channel = new window.BroadcastChannel(CART_BROADCAST_CHANNEL);
+  channel.postMessage({ type: "cart-updated", source: CART_BROADCAST_SOURCE });
+  channel.close();
+}
+
+/**
+ * Subscribe to cart changes made by this tab and by other tabs.
+ * BroadcastChannel is the primary cross-tab signal; the storage event remains
+ * as a compatibility fallback for browsers that do not implement it.
+ */
+export function subscribeToCartUpdates(onUpdate: () => void): () => void {
+  if (!isBrowser()) return () => undefined;
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === CART_STORAGE_KEY) onUpdate();
+  };
+  window.addEventListener(CART_UPDATED_EVENT, onUpdate);
+  window.addEventListener("storage", onStorage);
+  const channel =
+    typeof window.BroadcastChannel === "function"
+      ? new window.BroadcastChannel(CART_BROADCAST_CHANNEL)
+      : null;
+  const onBroadcast = (event: MessageEvent<{ source?: string }>) => {
+    if (event.data?.source !== CART_BROADCAST_SOURCE) onUpdate();
+  };
+  channel?.addEventListener("message", onBroadcast);
+  return () => {
+    window.removeEventListener(CART_UPDATED_EVENT, onUpdate);
+    window.removeEventListener("storage", onStorage);
+    channel?.removeEventListener("message", onBroadcast);
+    channel?.close();
+  };
 }
 
 function normalizeCartLine(line: unknown): CartLine | null {
@@ -216,7 +254,10 @@ export function readCart(): CartLine[] {
   return normalized;
 }
 
-export function writeCart(lines: CartLine[]): void {
+export function writeCart(
+  lines: CartLine[],
+  options: { notify?: boolean; sameTab?: boolean } = {},
+): void {
   if (!isBrowser()) return;
   const currentRaw = localStorage.getItem(CART_STORAGE_KEY);
   let revision = 0;
@@ -235,7 +276,7 @@ export function writeCart(lines: CartLine[]): void {
     lines: normalizeCartLines(lines),
   };
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
-  notifyCartUpdated();
+  if (options.notify !== false) notifyCartUpdated(options);
 }
 
 export function readCartRevision(): number {

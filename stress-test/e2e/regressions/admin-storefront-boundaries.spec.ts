@@ -18,7 +18,11 @@ test.describe("admin and storefront boundary regressions", () => {
     // The unified app may canonicalize 127.0.0.1 to the configured public
     // origin (localhost locally, the deployed host in production). The
     // security invariant is that auth stays on that configured origin.
-    const expectedOrigin = new URL(adminBase).origin;
+    const configuredOrigin =
+      process.env.NEXT_PUBLIC_SITE_URL ??
+      process.env.PUBLIC_STOREFRONT_URL ??
+      adminBase;
+    const expectedOrigin = new URL(configuredOrigin).origin;
     expect(new URL(page.url()).origin).toBe(expectedOrigin);
   });
 

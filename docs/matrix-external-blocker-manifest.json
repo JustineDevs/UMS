@@ -374,16 +374,6 @@
       "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
     },
     {
-      "matrixId": "C4-38",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "medusa"
-      ],
-      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
       "matrixId": "C4-39",
       "matrix": ".omx/context/full-task(4).md",
       "markers": [
@@ -3730,7 +3720,7 @@
     {
       "matrixId": "C4-50",
       "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-50 | COD success browser flow is not fully proven | Complete profile, quote, order, tracking, and inventory flow | COD auth-disabled browser success passed on 2026-08-22 with tracking redirect | NEEDS-VERIFICATION |"
+      "row": "| C4-50 | COD success browser flow is not fully proven | Complete profile, quote, order, tracking, and inventory flow | Fresh real-session browser run completed COD checkout, reached /track/:orderId, and verified the same pending order in admin. Evidence: artifacts/verification/C4-50.json. | VERIFIED |"
     },
     {
       "matrixId": "C4-74",
@@ -3805,7 +3795,7 @@
     {
       "matrixId": "C5-53",
       "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-53 | Wishlist add | `WishlistPageClient.tsx` delegates existing/new wishlist variants to `addCartLine({ quantity: 1 })`; `cart.test.ts` proves quantity 2 after two one-unit adds; storefront suite 170/170 passes on 2026-08-22 | One-unit behavior is shared with PDP/cart insertion rather than duplicated | P1 | Browser auth-backed wishlist click remains a separate external verification row | NEEDS-VERIFICATION |"
+      "row": "| C5-53 | Wishlist add | `WishlistPageClient.tsx` delegates existing/new wishlist variants to `addCartLine({ quantity: 1 })`; `cart.test.ts` proves quantity 2 after two one-unit adds; fresh local Chromium real-session run passed 1/1 on 2026-09-25 with live Worker wishlist/cart routes, reload persistence, and add-to-bag verification | One-unit behavior is shared with PDP/cart insertion and the authenticated browser flow now proves the complete mutation path | P1 | Fresh real-session evidence is attached in C5-53.json and wishlist-real-session-local-20260925T214500Z.log | VERIFIED |"
     },
     {
       "matrixId": "C5-55",

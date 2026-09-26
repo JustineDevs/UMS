@@ -267,6 +267,7 @@ test("records provider-confirmed payment state only for a trusted attempt correl
         assert.equal(values?.[0], "paid");
         assert.equal(values?.[4], "123e4567-e89b-12d3-a456-426614174000");
         assert.equal(values?.[5], "cs_123");
+        assert.equal(values?.[7], "pi_123");
         return {
           rows: [{ correlation_id: "123e4567-e89b-12d3-a456-426614174000" }] as unknown as T[],
           rowCount: 1,
@@ -286,6 +287,7 @@ test("records provider-confirmed payment state only for a trusted attempt correl
     data: {
       object: {
         id: "cs_123",
+        payment_intent: "pi_123",
         metadata: { correlation_id: "123e4567-e89b-12d3-a456-426614174000" },
       },
     },

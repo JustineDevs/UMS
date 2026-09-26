@@ -71,4 +71,19 @@ describe("capturePostHogEvent", () => {
     assert.equal(parsed.properties.ok, true);
     globalThis.fetch = originalFetch;
   });
+
+  it("prefers a project token over a personal API key for capture", async () => {
+    process.env.POSTHOG_API_KEY = "phx_personal-management-key";
+    process.env.POSTHOG_PROJECT_TOKEN = "phc_project-token";
+    process.env.POSTHOG_HOST = "https://app.posthog.com";
+    let body: string | null = null;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (_input, init) => {
+      body = typeof init?.body === "string" ? init.body : null;
+      return new Response(null, { status: 200 });
+    };
+    await capturePostHogEvent({ event: "checkout_test", distinctId: "anon" });
+    assert.equal(JSON.parse(body ?? "{}").api_key, "phc_project-token");
+    globalThis.fetch = originalFetch;
+  });
 });

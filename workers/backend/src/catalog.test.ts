@@ -53,6 +53,10 @@ test("lists published products with bounded pagination and variant data", async 
   assert.match(query, /p\.title ILIKE \$1/);
   assert.deepEqual(values, ["%guitar%", 100, 2]);
   assert.match(query, /p\.status = 'published'/);
+  assert.match(query, /p\.thumbnail IS NOT NULL/);
+  assert.match(query, /p\.thumbnail NOT ILIKE/);
+  assert.match(query, /published_media_variant\.thumbnail IS NOT NULL/);
+  assert.match(query, /published_media_variant\.thumbnail NOT ILIKE/);
   assert.match(query, /v\.deleted_at IS NULL/);
 });
 

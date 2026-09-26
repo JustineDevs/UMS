@@ -78,6 +78,12 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     E2E_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD,
     UVS_E2E_REAL_SESSION: process.env.UVS_E2E_REAL_SESSION,
     ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
+    ...(localE2eOrganizationId
+      ? {
+          DEFAULT_ORGANIZATION_ID: localE2eOrganizationId,
+          CMS_ORGANIZATION_ID: localE2eOrganizationId,
+        }
+      : {}),
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_DISABLED: process.env.AUTH_DISABLED,
     AUTH_DISABLE: process.env.AUTH_DISABLE,
@@ -90,6 +96,7 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     UVS_DEV_WEB_MAX_OLD_SPACE_MB: useProductionWebServer
       ? undefined
       : process.env.UVS_DEV_WEB_MAX_OLD_SPACE_MB ?? "3072",
+    UVS_DEV_WEB_PORT: webPort,
   };
 }
 
@@ -97,7 +104,9 @@ function storefrontServerEnv(): Record<string, string | undefined> {
  * Default `127.0.0.1` avoids `ECONNREFUSED ::1` on Windows when Next binds IPv4 only.
  * Override with PLAYWRIGHT_BASE_URL when needed.
  */
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const webPort = process.env.PLAYWRIGHT_WEB_PORT ?? "3000";
+const baseURL =
+  process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${webPort}`;
 const tunnelBypass = process.env.PLAYWRIGHT_TUNNEL_BYPASS?.trim();
 
 /**
@@ -108,6 +117,21 @@ const storefrontWebServerUrl =
   process.env.PLAYWRIGHT_STOREFRONT_WEBSERVER_URL ??
   new URL("/api/health", baseURL).toString();
 const workerPort = process.env.CLOUDFLARE_DEV_PORT ?? "8787";
+
+/**
+ * Real-session local proofs use the staff identity's organization. Keep this
+ * opt-in and local to Playwright's Wrangler process so Preview/Production
+ * bindings remain unchanged.
+ */
+const localE2eOrganizationId = process.env.UVS_E2E_LOCAL_ORGANIZATION_ID?.trim();
+if (localE2eOrganizationId && !/^[A-Za-z0-9._@-]+$/.test(localE2eOrganizationId)) {
+  throw new Error(
+    "UVS_E2E_LOCAL_ORGANIZATION_ID contains unsupported characters; use a simple local organization id",
+  );
+}
+const localE2eWorkerVars = localE2eOrganizationId
+  ? ` --var DEFAULT_ORGANIZATION_ID:${localE2eOrganizationId} --var CMS_ORGANIZATION_ID:${localE2eOrganizationId}`
+  : "";
 
 const reuseDevServer = !process.env.CI && !useProductionWebServer;
 const configuredWorkers = Number(
@@ -172,7 +196,7 @@ export default defineConfig({
       : [
         {
           command:
-            `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --show-interactive-dev-session=false --port ${workerPort}`,
+            `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --show-interactive-dev-session=false --port ${workerPort}${localE2eWorkerVars}`,
           url: process.env.PLAYWRIGHT_WORKER_URL ?? `http://127.0.0.1:${workerPort}/healthz`,
           reuseExistingServer: reuseDevServer,
           timeout: 180_000,
@@ -181,6 +205,12 @@ export default defineConfig({
           env: {
             ...process.env,
             NODE_ENV: "development",
+            ...(localE2eOrganizationId
+              ? {
+                  DEFAULT_ORGANIZATION_ID: localE2eOrganizationId,
+                  CMS_ORGANIZATION_ID: localE2eOrganizationId,
+                }
+              : {}),
             CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_MEDUSA_HYPERDRIVE:
               process.env.MEDUSA_DB_URL ?? "",
             CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE:
@@ -189,7 +219,7 @@ export default defineConfig({
         },
         {
           command: useProductionWebServer
-            ? "pnpm --filter @universal-music-store/web exec next start --hostname 127.0.0.1 --port 3000"
+            ? `pnpm --filter @universal-music-store/web exec next start --hostname 127.0.0.1 --port ${webPort}`
             : "pnpm --filter @universal-music-store/web dev",
           url: storefrontWebServerUrl,
           // Critical release proof serves the already-built artifact. Normal

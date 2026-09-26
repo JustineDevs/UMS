@@ -19,6 +19,7 @@ const SAFE_FINALIZATION_ERRORS = new Set([
 
 type PaymentAttempt = {
   correlation_id: string;
+  organization_id: string | null;
   cart_id: string;
   provider: string;
   amount_minor: number | string | null;
@@ -107,10 +108,10 @@ export async function finalizeNativeOrder(
   database: WorkerDatabaseClient,
   correlationId: string,
   organizationId?: string,
-): Promise<{ orderId: string; replayed: boolean }> {
+): Promise<{ orderId: string; replayed: boolean; organizationId?: string }> {
   return withWorkerTransaction(database, async (transaction) => {
     const attemptResult = await transaction.query<PaymentAttempt>(
-      `SELECT correlation_id, cart_id, provider, amount_minor, currency,
+      `SELECT correlation_id, organization_id, cart_id, provider, amount_minor, currency,
               provider_payment_id, provider_payload, status, medusa_order_id
        FROM public.payment_attempts
        WHERE correlation_id = $1::uuid
@@ -121,7 +122,7 @@ export async function finalizeNativeOrder(
     const attempt = attemptResult.rows[0];
     if (!attempt) throw new Error("payment_attempt_not_found");
     if (attempt.medusa_order_id)
-      return { orderId: attempt.medusa_order_id, replayed: true };
+      return { orderId: attempt.medusa_order_id, replayed: true, ...(attempt.organization_id ? { organizationId: attempt.organization_id } : {}) };
     const codPlacement =
       attempt.provider?.toLowerCase() === "cod" &&
       attempt.status.toLowerCase() === "initiated";
@@ -140,13 +141,24 @@ export async function finalizeNativeOrder(
       [correlationId],
     );
     if (recoveredOrder.rows[0]?.id) {
+      if (organizationId?.trim()) {
+        await transaction.query(
+          `UPDATE public.order
+           SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+             'organization_id', $2::text,
+             'store_id', $2::text
+           ), updated_at = now()
+           WHERE id = $1`,
+          [recoveredOrder.rows[0].id, organizationId.trim()],
+        );
+      }
       await transaction.query(
         `UPDATE public.payment_attempts
          SET medusa_order_id = $2, checkout_state = 'completed', finalized_at = COALESCE(finalized_at, now()), updated_at = now()
          WHERE correlation_id = $1::uuid AND ($3::text IS NULL OR organization_id = $3::text) AND medusa_order_id IS NULL`,
         [correlationId, recoveredOrder.rows[0].id, organizationId ?? null],
       );
-      return { orderId: recoveredOrder.rows[0].id, replayed: true };
+      return { orderId: recoveredOrder.rows[0].id, replayed: true, ...(attempt.organization_id ? { organizationId: attempt.organization_id } : {}) };
     }
 
     const cartResult = await transaction.query<Cart>(
@@ -202,7 +214,10 @@ export async function finalizeNativeOrder(
           ...cart.metadata,
           source: "worker-native",
           ...(organizationId?.trim()
-            ? { store_id: organizationId.trim() }
+            ? {
+                organization_id: organizationId.trim(),
+                store_id: organizationId.trim(),
+              }
             : {}),
           worker_payment_correlation_id: correlationId,
         }),
@@ -393,7 +408,7 @@ export async function finalizeNativeOrder(
        WHERE correlation_id = $1::uuid AND ($3::text IS NULL OR organization_id = $3::text) AND medusa_order_id IS NULL`,
       [correlationId, orderId, organizationId ?? null],
     );
-    return { orderId, replayed: false };
+    return { orderId, replayed: false, ...(attempt.organization_id ? { organizationId: attempt.organization_id } : {}) };
   });
 }
 
@@ -409,7 +424,7 @@ export async function finalizeNativeOrderAcrossDatabases(
   correlationId: string,
   organizationId?: string,
   env: { XENDIT_SECRET_KEY?: string } = {},
-): Promise<{ orderId: string; replayed: boolean }> {
+): Promise<{ orderId: string; replayed: boolean; organizationId?: string }> {
   if (env.XENDIT_SECRET_KEY) {
     const xenditAttempt = await appDatabase.query<PaymentAttempt & {
       provider_session_id: string | null;
@@ -492,8 +507,14 @@ export async function finalizeNativeOrderAcrossDatabases(
       `SELECT medusa_order_id FROM public.payment_attempts WHERE correlation_id = $1::uuid AND ($2::text IS NULL OR organization_id = $2::text)`,
       [correlationId, organizationId ?? null],
     );
-    if (existing.rows[0]?.medusa_order_id)
-      return { orderId: existing.rows[0].medusa_order_id, replayed: true };
+    if (existing.rows[0]?.medusa_order_id) {
+      const existingAttempt = await appDatabase.query<{ organization_id: string | null }>(
+        `SELECT organization_id FROM public.payment_attempts WHERE correlation_id = $1::uuid AND ($2::text IS NULL OR organization_id = $2::text)`,
+        [correlationId, organizationId ?? null],
+      );
+      const existingOrganizationId = existingAttempt.rows[0]?.organization_id;
+      return { orderId: existing.rows[0].medusa_order_id, replayed: true, ...(existingOrganizationId ? { organizationId: existingOrganizationId } : {}) };
+    }
     throw new Error("payment_finalization_in_progress");
   }
   const splitClient: WorkerDatabaseClient = {

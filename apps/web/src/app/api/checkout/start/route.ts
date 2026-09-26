@@ -85,7 +85,7 @@ async function startWorkerCheckout(input: {
     );
   }
   const localLoopbackOrigin =
-    process.env.NODE_ENV !== "production" &&
+    (process.env.NODE_ENV !== "production" || process.env.UVS_E2E_LOCAL === "1") &&
     (origin.hostname === "localhost" || origin.hostname === "127.0.0.1");
   if (origin.protocol !== "https:" && !localLoopbackOrigin) {
     return NextResponse.json(

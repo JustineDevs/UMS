@@ -139,9 +139,9 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
         <CardContent className="p-0">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="mb-1 font-headline text-lg font-bold text-primary uppercase">
+              <h2 className="mb-1 font-headline text-lg font-bold text-primary uppercase">
                 {product.name.toUpperCase()}
-              </h3>
+              </h2>
               <p className="font-body text-xs uppercase tracking-widest text-on-surface-variant">
                 {firstVariant?.finish ?? ""}
               </p>

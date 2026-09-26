@@ -136,7 +136,7 @@ test("admin refund uses payment data state, provider idempotency, and APP audit"
   });
   const paymentQuery = state.queries.find((query) => query.text.includes("FROM public.payment p"));
   assert.ok(paymentQuery);
-  assert.match(paymentQuery.text, /o\.metadata->>'organization_id' = \$3/);
+  assert.match(paymentQuery.text, /COALESCE\(o\.metadata->>'organization_id', o\.metadata->>'store_id'\) = \$3/);
   assert.equal(paymentQuery.text.includes("p.captured_amount"), false);
   const audit = state.queries.find((query) => query.role === "app" && query.text.includes("INSERT INTO public.payment_refund_audit"));
   assert.ok(audit);
@@ -159,6 +159,39 @@ test("admin refund uses payment data state, provider idempotency, and APP audit"
   assert.ok(claim);
   assert.match(String(claim.values[0]), /^[a-f0-9]{64}$/);
   assert.notEqual(claim.values[0], "refund-1");
+});
+
+test("admin refund finds Xendit payment request identity in native session payload", async () => {
+  const state = fixture();
+  const originalFactory = state.env.databaseFactory;
+  state.env.XENDIT_SECRET_KEY = "xnd_test_key";
+  state.env.providerFetch = async (input, init) => {
+    const request = new Request(input, init);
+    assert.equal(request.url, "https://api.xendit.co/refunds");
+    const body = await request.json() as { payment_request_id?: string; reference_id?: string; reason?: string };
+    assert.equal(body.payment_request_id, "pr_test");
+    assert.equal(body.reference_id, "order_1");
+    assert.equal(body.reason, "REQUESTED_BY_CUSTOMER");
+    return new Response(JSON.stringify({ refund_id: "refund_xendit", status: "SUCCEEDED" }), { status: 200 });
+  };
+  state.env.databaseFactory = (role) => {
+    const database = originalFactory(role);
+    const query = database.query.bind(database);
+    database.query = async (text, values) => {
+      if (role === "medusa" && text.includes("FROM public.payment p")) {
+        return { rows: [{ id: "pay_xendit", order_id: "order_1", amount: 1200, currency_code: "PHP", provider_id: "pp_xendit_xendit", data: { providerPayload: { xenditSession: { payment_request_id: "pr_test" } }, captured_amount_minor: 1200 } }] as never[], rowCount: 1 };
+      }
+      return query(text, values);
+    };
+    return database;
+  };
+  const response = await handleAdminRefundRequest(new Request("https://api.example.com/api/admin/orders/order_1/refund", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${adminToken()}`, "Content-Type": "application/json", "Idempotency-Key": "refund-xendit-1" },
+    body: JSON.stringify({ amount_minor: 1200 }),
+  }), state.env, "order_1");
+  assert.equal(response.status, 200);
+  assert.equal((await response.json() as { provider: string }).provider, "xendit");
 });
 
 test("admin refund persists Stripe pending status without claiming completion", async () => {

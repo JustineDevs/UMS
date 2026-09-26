@@ -74,6 +74,7 @@ export type CheckoutPhase =
   | "error";
 const FINALIZE_POLL_MS = 2_000;
 const FINALIZE_POLL_MAX = 20;
+const PROFILE_STATUS_TIMEOUT_MS = 15_000;
 const STRIPE_CANCEL_MESSAGE =
   "You left the card checkout before paying. Your bag is unchanged. Choose a payment method and continue when you are ready.";
 const localAuthBypass =
@@ -101,9 +102,10 @@ export function useCheckoutClient({
   const medusaPreviewAbortRef = useRef<AbortController | null>(null);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(() =>
-    initialReviewMessage?.trim() ||
-    (initialStripeCheckoutCancel ? STRIPE_CANCEL_MESSAGE : null),
+  const [error, setError] = useState<string | null>(
+    () =>
+      initialReviewMessage?.trim() ||
+      (initialStripeCheckoutCancel ? STRIPE_CANCEL_MESSAGE : null),
   );
   const [loading, setLoading] = useState(false);
   const [checkoutPhase, setCheckoutPhase] = useState<CheckoutPhase>("idle");
@@ -148,6 +150,7 @@ export function useCheckoutClient({
     try {
       const res = await fetch("/api/account/profile/status", {
         cache: "no-store",
+        signal: AbortSignal.timeout(PROFILE_STATUS_TIMEOUT_MS),
       });
       if (!res.ok) return "error";
       const data = (await res.json()) as {
@@ -350,9 +353,9 @@ export function useCheckoutClient({
         }
         return r.json();
       })
-      .then((d: { balance?: number }) =>
-        { if (!cancelled) setLoyaltyBalance(Number(d.balance ?? 0)); },
-      )
+      .then((d: { balance?: number }) => {
+        if (!cancelled) setLoyaltyBalance(Number(d.balance ?? 0));
+      })
       .catch((reason: unknown) => {
         if (cancelled) return;
         setLoyaltyBalance(0);
@@ -362,7 +365,9 @@ export function useCheckoutClient({
             : "Loyalty balance is temporarily unavailable.",
         );
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [session?.user?.email]);
 
   const refresh = useCallback(() => {

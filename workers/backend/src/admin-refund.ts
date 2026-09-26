@@ -81,8 +81,13 @@ function payloadValue(data: Record<string, unknown> | null, keys: string[]): str
     const value = data?.[key];
     if (typeof value === "string" && value.trim()) return value.trim();
   }
-  const nested = data?.providerPayload;
-  if (nested && typeof nested === "object" && !Array.isArray(nested)) return payloadValue(nested as Record<string, unknown>, keys);
+  for (const nestedKey of ["providerPayload", "xenditSession"]) {
+    const nested = data?.[nestedKey];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      const value = payloadValue(nested as Record<string, unknown>, keys);
+      if (value) return value;
+    }
+  }
   return null;
 }
 
@@ -153,7 +158,8 @@ export async function handleAdminRefundRequest(
     const result = await executeIdempotently(store, scopedKey, hash, async () => {
       const ownedOrder = await withRole(env, "medusa", (medusa) => medusa.query<{ id: string }>(
         `SELECT id FROM public."order"
-          WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2
+          WHERE id = $1 AND deleted_at IS NULL
+            AND COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2
           LIMIT 1`,
         [orderId, principal.organizationId],
       ));
@@ -164,7 +170,9 @@ export async function handleAdminRefundRequest(
              FROM public.payment p
              JOIN public.order_payment_collection opc ON opc.payment_collection_id = p.payment_collection_id
              JOIN public."order" o ON o.id = opc.order_id AND o.deleted_at IS NULL
-            WHERE opc.order_id = $1 AND o.metadata->>'organization_id' = $3 AND p.deleted_at IS NULL
+            WHERE opc.order_id = $1
+              AND COALESCE(o.metadata->>'organization_id', o.metadata->>'store_id') = $3
+              AND p.deleted_at IS NULL
               AND ($2::text IS NULL OR p.id = $2)
             ORDER BY p.created_at ASC`,
           [orderId, paymentId, principal.organizationId],
@@ -247,7 +255,7 @@ export async function handleAdminRefundRequest(
           const major = (amount / (10 ** decimals)).toFixed(decimals);
           providerResult = await refundPayPalCapture({ clientId: env.PAYPAL_CLIENT_ID ?? "", clientSecret: env.PAYPAL_CLIENT_SECRET ?? "", sandbox: (env.PAYPAL_ENVIRONMENT ?? "sandbox") !== "production", captureId: providerPaymentId, amountMajor: major, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
         } else {
-          providerResult = await refundXenditPayment({ secretKey: env.XENDIT_SECRET_KEY ?? "", paymentRequestId: providerPaymentId, amountMinor: amount, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
+          providerResult = await refundXenditPayment({ secretKey: env.XENDIT_SECRET_KEY ?? "", paymentRequestId: providerPaymentId, referenceId: orderId, amountMinor: amount, currency: payment.currency_code, idempotencyKey: providerKey, fetcher: env.providerFetch });
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "provider_error";

@@ -218,6 +218,12 @@ async function saveProduct(database: WorkerDatabaseClient, appDatabase: WorkerDa
     const thumbnail = value.imageUrls !== undefined
       ? value.imageUrls[0] ?? value.thumbnail ?? null
       : value.thumbnail ?? current?.thumbnail ?? null;
+    // A published product without approved media is not a usable storefront
+    // product. Fail before persisting the status so the catalog cannot expose
+    // an image-less product card or PDP.
+    if (value.status === "published" && !thumbnail) {
+      return json({ error: "catalog_media_required", code: "CATALOG_MEDIA_REQUIRED" }, 400);
+    }
     if (!current) await tx.query("INSERT INTO public.product (id, title, handle, description, status, thumbnail, metadata, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,now(),now())", [pid, value.title.trim(), handle, value.description ?? null, value.status ?? "draft", thumbnail, JSON.stringify(metadata)]);
     else await tx.query("UPDATE public.product SET title=$2, handle=$3, description=$4, status=$5, thumbnail=$6, metadata=$7::jsonb, updated_at=now() WHERE id=$1", [pid, value.title.trim(), handle, value.description ?? null, value.status ?? "draft", thumbnail, JSON.stringify(metadata)]);
     const shipping = (await tx.query<{ id: string }>("SELECT id FROM public.shipping_profile WHERE deleted_at IS NULL ORDER BY created_at LIMIT 1")).rows[0];
@@ -341,6 +347,9 @@ export async function handleAdminCatalogProductMutationRequest(request: Request,
   const parsed = input(value); if (!parsed) return json({ error: "invalid_product_payload" }, 400);
   const variants = pairs(parsed);
   if (!parsed.title.trim() || !variants.length) return json({ error: "invalid_product_payload" }, 400);
+  if (!productId && parsed.status === "published" && !(parsed.imageUrls?.length || parsed.thumbnail)) {
+    return json({ error: "catalog_media_required", code: "CATALOG_MEDIA_REQUIRED" }, 400);
+  }
   const variantPairs = new Set(variants.map((variant) => `${variant.size}\u0000${variant.color}`));
   if ((parsed.matrixCellStocks ?? []).some((stock) => !variantPairs.has(`${stock.sizeLabel}\u0000${stock.colorLabel}`))) {
     return json({ error: "invalid_product_payload" }, 400);

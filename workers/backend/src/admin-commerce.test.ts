@@ -357,6 +357,41 @@ describe("Worker admin commerce contracts", () => {
     assert.equal(invalid.status, 400);
   });
 
+  it("rejects publishing a new product without approved media", async () => {
+    let commerceTouched = false;
+    const response = await handleAdminCatalogProductMutationRequest(
+      new Request("https://worker.test/api/admin/catalog/products", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${await staffToken()}`,
+          "Idempotency-Key": "published-product-without-media",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: "Canary",
+          pricePhp: 5997,
+          status: "published",
+        }),
+      }),
+      {
+        query: async <T extends Record<string, unknown>>() => {
+          commerceTouched = true;
+          return { rows: [] as T[], rowCount: 0 };
+        },
+        end: async () => undefined,
+      },
+      { JWT_SECRET: "test-secret" },
+      undefined,
+      database,
+    );
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "catalog_media_required",
+      code: "CATALOG_MEDIA_REQUIRED",
+    });
+    assert.equal(commerceTouched, false);
+  });
+
   it("rejects prices that cannot be represented as a safe PHP minor-unit amount", async () => {
     let commerceTouched = false;
     const response = await handleAdminCatalogProductMutationRequest(

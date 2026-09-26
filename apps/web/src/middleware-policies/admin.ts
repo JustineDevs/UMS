@@ -8,9 +8,9 @@ import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
   if (
-    process.env.UVS_E2E_LOCAL === "1" &&
     process.env.UVS_E2E_REAL_SESSION === "1" &&
     process.env.VERCEL !== "1" &&
+    (process.env.UVS_E2E_LOCAL === "1" || process.env.NODE_ENV === "development") &&
     request.cookies.has(E2E_SESSION_COOKIE)
   ) return response;
   // Keep the documented local-auth development mode consistent with the page/session layer.
@@ -56,9 +56,9 @@ function ensureRequestId(request: NextRequest): {
 async function hasSupabaseUser(request: NextRequest): Promise<boolean> {
   if (process.env.AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production") return true;
   if (
-    process.env.UVS_E2E_LOCAL === "1" &&
     process.env.UVS_E2E_REAL_SESSION === "1" &&
     process.env.VERCEL !== "1" &&
+    (process.env.UVS_E2E_LOCAL === "1" || process.env.NODE_ENV === "development") &&
     request.cookies.has(E2E_SESSION_COOKIE)
   ) return true;
   const url = process.env.SUPABASE_URL?.trim();

@@ -59,7 +59,7 @@ test("order status updates the tenant-owned commerce projection and canonical AP
   const response = await handleAdminOrderStatusRequest(request(await bearer()), db.commerce, db.app, { JWT_SECRET: "order-status-secret" }, "order_1");
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "processing" });
-  assert.ok(db.commerceCalls.some((sql) => sql.includes("metadata->>'organization_id' = $2")));
+  assert.ok(db.commerceCalls.some((sql) => sql.includes("COALESCE(metadata->>'organization_id', metadata->>'store_id') = $2")));
   assert.ok(db.appCalls.some((sql) => sql.includes("append_canonical_order_state")));
   assert.ok(db.appCalls.some((sql) => sql.includes("worker_idempotency_records")));
 });
