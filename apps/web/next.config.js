@@ -110,11 +110,9 @@ function imageRemotePatterns() {
     }));
   return [
     ...fromEnv,
-    {
-      protocol: "https",
-      hostname: "cdn.simpleicons.org",
-      pathname: "/**",
-    },
+    { protocol: "https", hostname: "images.stripeassets.com", pathname: "/**" },
+    { protocol: "https", hostname: "www.paypalobjects.com", pathname: "/**" },
+    { protocol: "https", hostname: "www.xendit.co", pathname: "/**" },
     {
       protocol: "https",
       hostname: "lh3.googleusercontent.com",
