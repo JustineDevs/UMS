@@ -32,6 +32,17 @@ test("accepts separate APP Hyperdrive bindings in both environments", () => {
   });
 });
 
+test("rejects root-level shared vars that could leak across environments", () => {
+  const result = validateWorkerConfig(validConfig.replace(
+    '"env": {',
+    '"vars": { "PUBLIC_SITE_URL": "https://universalmusic.vercel.app" }, "env": {',
+  ));
+  assert.deepEqual(result, {
+    ok: false,
+    message: "Worker vars must be declared inside dev and production; root-level shared vars are not allowed.",
+  });
+});
+
 test("rejects a config that only binds the Medusa database", () => {
   const result = validateWorkerConfig(validConfig.replaceAll("APP_HYPERDRIVE", "MEDUSA_HYPERDRIVE"));
   assert.equal(result.ok, false);

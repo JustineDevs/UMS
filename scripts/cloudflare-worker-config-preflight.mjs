@@ -20,6 +20,14 @@ export function validateWorkerConfig(config) {
       message: `Worker-only deployment cannot contain a container binding/runtime reference: ${forbidden}`,
     };
   }
+  const envStart = config.indexOf('"env"');
+  const rootConfig = envStart >= 0 ? config.slice(0, envStart) : config;
+  if (/"vars"\s*:/.test(rootConfig)) {
+    return {
+      ok: false,
+      message: "Worker vars must be declared inside dev and production; root-level shared vars are not allowed.",
+    };
+  }
   const environments = [
     ["dev", environmentBlock(config, "dev", "production")],
     ["production", environmentBlock(config, "production")],
