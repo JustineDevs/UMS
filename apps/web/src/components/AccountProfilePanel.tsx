@@ -258,13 +258,23 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         {addresses.map((a, i) => (
               <li
                 key={a.id ?? `${a.line1 ?? "address"}-${a.city ?? "city"}-${a.postalCode ?? "postal"}-${a.country ?? "country"}`}
-                className="rounded-lg border border-outline-variant/15 p-4"
+                className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm"
               >
-                <div className="mb-3 flex justify-end">
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/15 pb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-outline-variant/25 bg-surface-container-low px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                      {a.label?.trim() || "Address"}
+                    </span>
+                    {a.isDefault || (addresses.every((address) => address.isDefault !== true) && i === 0) ? (
+                      <span className="rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-primary">
+                        Default
+                      </span>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
                     onClick={() => removeAddress(i)}
-                    className="text-xs text-on-surface-variant underline"
+                    className="text-xs font-semibold text-on-surface-variant underline underline-offset-2"
                   >
                     Remove
                   </button>

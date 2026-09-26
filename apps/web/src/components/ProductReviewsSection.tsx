@@ -88,6 +88,12 @@ export function ProductReviewsSection({
                 No reviews yet. Be the first to share your experience.
               </p>
             )}
+            <a
+              href="#write-review"
+              className="mt-5 inline-flex min-h-11 items-center rounded-lg border border-primary px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
+            >
+              Write a review
+            </a>
           </div>
           {count > 0 ? (
             <div className="flex flex-col gap-4 sm:items-end">
@@ -114,10 +120,12 @@ export function ProductReviewsSection({
           onReviewsChange={setAllReviews}
         />
 
-        <ProductReviewForm
-          productSlug={productSlug}
-          medusaProductId={medusaProductId}
-        />
+        <div id="write-review" className="scroll-mt-24">
+          <ProductReviewForm
+            productSlug={productSlug}
+            medusaProductId={medusaProductId}
+          />
+        </div>
       </div>
     </section>
   );
