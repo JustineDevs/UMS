@@ -3,7 +3,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { AddToCartSection } from "@/components/AddToCartSection";
-import { CatalogProductCard } from "@/components/CatalogProductCard";
+import { PdpRelatedItems } from "@/components/PdpRelatedItems";
 import {
   ProductDetailsAccordions,
   ProductSpecifications,
@@ -19,7 +19,7 @@ import { TrustBadgesStrip } from "@/components/TrustBadgesStrip";
 import { ProductViewTracker } from "@/components/ProductViewTracker";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import { ShareProductButton } from "@/components/ShareProductButton";
-import { fetchProductBySlug, fetchRelatedProducts } from "@/lib/catalog-fetch";
+import { fetchProductBySlug, fetchProductsPage, fetchRelatedProducts } from "@/lib/catalog-fetch";
 import { fetchProductQaEntries } from "@/lib/product-qa";
 import {
   fetchProductReviews,
@@ -128,14 +128,38 @@ export default async function ProductPage({ params }: Props) {
 
   const { product } = res;
 
-  const [relatedRes, reviews, qaEntries] = await Promise.all([
+  const [relatedRes, categoryRes, brandRes, reviews, qaEntries] = await Promise.all([
     withPdpDeadline(fetchRelatedProducts(product, 4), { kind: "ok", products: [] }),
+    withPdpDeadline(
+      product.category?.trim()
+        ? fetchProductsPage(6, { category: product.category, sort: "newest" })
+        : Promise.resolve({ kind: "ok" as const, products: [], total: 0 }),
+      { kind: "ok", products: [], total: 0 },
+    ),
+    withPdpDeadline(
+      product.brand?.trim()
+        ? fetchProductsPage(6, { brand: product.brand, sort: "newest" })
+        : Promise.resolve({ kind: "ok" as const, products: [], total: 0 }),
+      { kind: "ok", products: [], total: 0 },
+    ),
     withPdpDeadline(fetchProductReviews(slug, { medusaProductId: product.id }), []),
     withPdpDeadline(fetchProductQaEntries(slug, { medusaProductId: product.id }), []),
   ]);
   const reviewSummary = summarizeProductReviews(reviews);
   const relatedProducts =
     relatedRes.kind === "ok" ? relatedRes.products : [];
+  const withoutCurrent = (products: typeof relatedProducts) =>
+    products.filter((item) => item.id !== product.id);
+  const relatedByCategory = withoutCurrent(
+    categoryRes.kind === "ok" && categoryRes.products.length
+      ? categoryRes.products
+      : relatedProducts,
+  );
+  const relatedByBrand = withoutCurrent(
+    brandRes.kind === "ok" && brandRes.products.length
+      ? brandRes.products
+      : relatedProducts.filter((item) => item.brand === product.brand),
+  );
 
   const minPrice = Math.min(...product.variants.map((v) => v.price));
   const typeRun = [...new Set(product.variants.map((v) => v.type))]
@@ -190,7 +214,7 @@ export default async function ProductPage({ params }: Props) {
         </nav>
         <ProductViewTracker slug={slug} id={product.id} />
         <ProductVariantProvider product={product}>
-        <div className="grid w-full grid-cols-1 items-start gap-10 lg:gap-14 xl:grid-cols-2 xl:gap-16 2xl:gap-20">
+        <div className="grid w-full grid-cols-1 items-start gap-10 lg:gap-14 xl:grid-cols-[minmax(0,1.1fr)_minmax(26rem,0.9fr)] xl:gap-16 2xl:gap-20">
           <div className="min-w-0 space-y-8 xl:max-w-none">
             <ProductGalleryCarousel
               key={product.id}
@@ -206,7 +230,7 @@ export default async function ProductPage({ params }: Props) {
           </div>
 
         <div className="min-w-0 flex flex-col justify-start">
-          <div className="space-y-2 mb-8">
+          <div className="space-y-2 mb-8 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6">
             {product.category && (
               <span className="text-xs font-label uppercase tracking-widest text-secondary">
                 {product.category}
@@ -217,6 +241,22 @@ export default async function ProductPage({ params }: Props) {
                 {product.brand}
               </p>
             ) : null}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="rounded bg-primary px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-on-primary">
+                {product.brand || "Universal Music Store"}
+              </span>
+              {(() => {
+                const compareAt = product.variants
+                  .map((variant) => variant.compareAtPrice)
+                  .filter((value): value is number => typeof value === "number" && value > minPrice)
+                  .sort((a, b) => a - b)[0];
+                return compareAt ? (
+                  <span className="rounded bg-secondary px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-on-secondary">
+                    Save PHP {(compareAt - minPrice).toLocaleString("en-PH")}
+                  </span>
+                ) : null;
+              })()}
+            </div>
             <h1 className="text-4xl md:text-5xl font-headline font-bold tracking-tighter text-primary">
               {product.name}
             </h1>
@@ -257,8 +297,10 @@ export default async function ProductPage({ params }: Props) {
                 url={canonicalUrl(`/shop/${product.slug}`)}
               />
             </div>
-            <ShippingDeliveryEstimate />
-            <TrustBadgesStrip />
+            <div className="space-y-4">
+              <ShippingDeliveryEstimate />
+              <TrustBadgesStrip />
+            </div>
             <div className="border-t border-outline-variant/20 pt-8">
               <ProductSpecifications product={product} />
               <ProductAudioHub product={product} />
@@ -310,23 +352,25 @@ export default async function ProductPage({ params }: Props) {
         </section>
       ) : null}
 
-      {relatedProducts.length > 0 ? (
-        <section
-          className="mt-16 border-t border-outline-variant/20 pt-16"
-          aria-labelledby="related-heading"
-        >
-          <h2
-            id="related-heading"
-            className="mb-8 font-headline text-xl font-bold uppercase tracking-wider text-primary"
-          >
-            You may also like
-          </h2>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {relatedProducts.map((p) => (
-              <CatalogProductCard key={p.id} product={p} />
-            ))}
-          </div>
-        </section>
+      <section className="mt-16" id="product-information" aria-label="Product information">
+        <nav className="sticky top-0 z-10 flex gap-8 border-b border-outline-variant/20 bg-surface/95 py-4 backdrop-blur" aria-label="Product information tabs">
+          <a href="#description" className="border-b-2 border-primary pb-3 text-sm font-semibold text-primary">Description</a>
+          <a href="#reviews" className="pb-3 text-sm font-semibold text-on-surface-variant hover:text-primary">Reviews</a>
+        </nav>
+        <div id="description" className="mt-8 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 md:p-8">
+          <h2 className="font-headline text-2xl font-bold text-primary">{product.name}</h2>
+          {product.description ? (
+            <div className="mt-5 whitespace-pre-line text-sm leading-7 text-on-surface-variant">{product.description}</div>
+          ) : (
+            <p className="mt-5 text-sm text-on-surface-variant">Product description coming soon.</p>
+          )}
+        </div>
+      </section>
+
+      {relatedByCategory.length || relatedByBrand.length ? (
+        <div className="mt-16">
+          <PdpRelatedItems byCategory={relatedByCategory} byBrand={relatedByBrand} />
+        </div>
       ) : null}
 
       <ProductQaSection entries={qaEntries} />
