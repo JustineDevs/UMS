@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { Banknote } from "lucide-react";
+import { PaymentProviderLogo } from "@/components/PaymentProviderLogo";
 
 type FooterColumn = { title: string; links: { label: string; href: string }[] };
 type FooterLink = { label: string; href: string };
@@ -59,12 +61,12 @@ export function StorefrontFooterClient({
         </div>
 
         <div className="mt-14 flex flex-col gap-6 border-t border-neutral-200 pt-6 text-sm text-neutral-600 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <span className="font-medium text-neutral-900">Payments</span>
-            <span>Stripe</span>
-            <span>PayPal</span>
-            <span>Xendit</span>
-            <span>Cash on delivery</span>
+          <div className="flex flex-wrap items-center gap-3" aria-label="Accepted payment methods">
+            <span className="mr-1 font-medium text-neutral-900">Payments</span>
+            <span className="inline-flex h-9 items-center rounded border border-neutral-200 bg-white px-2"><PaymentProviderLogo providerKey="STRIPE" label="Stripe" /></span>
+            <span className="inline-flex h-9 items-center rounded border border-neutral-200 bg-white px-2"><PaymentProviderLogo providerKey="PAYPAL" label="PayPal" /></span>
+            <span className="inline-flex h-9 items-center rounded border border-neutral-200 bg-white px-2"><PaymentProviderLogo providerKey="XENDIT" label="Xendit" /></span>
+            <span className="inline-flex h-9 items-center gap-1 rounded border border-neutral-200 bg-white px-2 text-neutral-800" title="Cash on delivery"><Banknote className="size-5" aria-hidden="true" /><span className="sr-only">Cash on delivery</span></span>
           </div>
           {socialLinks.length > 0 ? (
             <div className="flex items-center gap-4" aria-label="Social links">

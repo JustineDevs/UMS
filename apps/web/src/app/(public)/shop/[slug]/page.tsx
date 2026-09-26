@@ -352,21 +352,6 @@ export default async function ProductPage({ params }: Props) {
         </section>
       ) : null}
 
-      <section className="mt-16" id="product-information" aria-label="Product information">
-        <nav className="sticky top-0 z-10 flex gap-8 border-b border-outline-variant/20 bg-surface/95 py-4 backdrop-blur" aria-label="Product information tabs">
-          <a href="#description" className="border-b-2 border-primary pb-3 text-sm font-semibold text-primary">Description</a>
-          <a href="#reviews" className="pb-3 text-sm font-semibold text-on-surface-variant hover:text-primary">Reviews</a>
-        </nav>
-        <div id="description" className="mt-8 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-6 md:p-8">
-          <h2 className="font-headline text-2xl font-bold text-primary">{product.name}</h2>
-          {product.description ? (
-            <div className="mt-5 whitespace-pre-line text-sm leading-7 text-on-surface-variant">{product.description}</div>
-          ) : (
-            <p className="mt-5 text-sm text-on-surface-variant">Product description coming soon.</p>
-          )}
-        </div>
-      </section>
-
       {relatedByCategory.length || relatedByBrand.length ? (
         <div className="mt-16">
           <PdpRelatedItems byCategory={relatedByCategory} byBrand={relatedByBrand} />
