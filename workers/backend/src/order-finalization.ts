@@ -140,6 +140,17 @@ export async function finalizeNativeOrder(
       [correlationId],
     );
     if (recoveredOrder.rows[0]?.id) {
+      if (organizationId?.trim()) {
+        await transaction.query(
+          `UPDATE public.order
+           SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+             'organization_id', $2::text,
+             'store_id', $2::text
+           ), updated_at = now()
+           WHERE id = $1`,
+          [recoveredOrder.rows[0].id, organizationId.trim()],
+        );
+      }
       await transaction.query(
         `UPDATE public.payment_attempts
          SET medusa_order_id = $2, checkout_state = 'completed', finalized_at = COALESCE(finalized_at, now()), updated_at = now()
@@ -202,7 +213,10 @@ export async function finalizeNativeOrder(
           ...cart.metadata,
           source: "worker-native",
           ...(organizationId?.trim()
-            ? { store_id: organizationId.trim() }
+            ? {
+                organization_id: organizationId.trim(),
+                store_id: organizationId.trim(),
+              }
             : {}),
           worker_payment_correlation_id: correlationId,
         }),
