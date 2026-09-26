@@ -34,7 +34,7 @@ export function StorefrontFooterClient({
             <div>
               <h2 className="text-sm font-semibold uppercase tracking-[0.16em]">Our store</h2>
               <p className="mt-3 max-w-xs text-sm leading-6 text-neutral-600">
-                Instruments, studio gear, and accessories delivered across the Philippines.
+                Your source for instruments, studio gear, and accessories across the Philippines.
               </p>
               <p className="mt-3 text-sm font-medium text-neutral-900">Online store · Philippines</p>
             </div>
@@ -77,7 +77,7 @@ export function StorefrontFooterClient({
           ) : null}
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 border-t border-neutral-200 pt-5 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-6 flex flex-col gap-3 text-xs text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
           <p>{copyright}</p>
           {bottomLinks.length > 0 ? (
             <nav aria-label="Footer secondary" className="flex flex-wrap gap-x-4 gap-y-2">
