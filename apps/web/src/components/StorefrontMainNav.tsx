@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
@@ -13,8 +14,21 @@ import {
 
 type FlatItem = { href: string; label: string; badge?: string };
 
-const DEFAULT_ITEMS: FlatItem[] = [
-  { href: "/shop", label: "Shop" },
+const DEFAULT_ITEMS: CmsNavLink[] = [
+  {
+    href: "/shop",
+    label: "Shop",
+    children: [
+      { href: "/shop", label: "All instruments" },
+      { href: "/shop?category=guitars", label: "Guitars" },
+      { href: "/shop?category=amplifiers", label: "Amplifiers" },
+      { href: "/shop?category=effects", label: "Effects" },
+      { href: "/shop?category=keyboards", label: "Keyboards & pianos" },
+      { href: "/shop?category=drums", label: "Drums" },
+      { href: "/shop?category=accessories", label: "Accessories & gear" },
+    ],
+  },
+  { href: "/search", label: "Search" },
   { href: "/about", label: "About" },
 ];
 
@@ -123,9 +137,7 @@ function MegaTrigger({
         ) : null}
         {link.label}
         {link.badge ? <NavBadge text={link.badge} /> : null}
-        <span className="material-symbols-outlined ml-0.5 text-sm opacity-60" aria-hidden>
-          expand_more
-        </span>
+        <ChevronDown className="ml-0.5 size-4 opacity-60" aria-hidden="true" />
       </Link>
       <div
         className="pointer-events-none invisible absolute left-1/2 top-full z-40 w-[min(100vw-2rem,28rem)] -translate-x-1/2 pt-2 opacity-0 transition-[transform,opacity,visibility] group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100"
@@ -270,7 +282,7 @@ export function StorefrontMainNav({
           }}
         >
           Menu
-          <span className="material-symbols-outlined text-base" aria-hidden>menu</span>
+          <Menu className="size-4" aria-hidden="true" />
         </button>
       </div>
 
@@ -296,7 +308,7 @@ export function StorefrontMainNav({
                 className="rounded p-2 text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 onClick={() => setMobileOpen(false)}
               >
-                <span className="material-symbols-outlined" aria-hidden>close</span>
+                <X className="size-5" aria-hidden="true" />
               </button>
             </div>
             <nav aria-label="Mobile site navigation" className="flex flex-col gap-1 py-5">

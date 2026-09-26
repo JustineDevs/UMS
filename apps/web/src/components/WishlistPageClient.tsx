@@ -23,6 +23,7 @@ export function WishlistPageClient() {
   const { status } = useSession();
   const [items, setItems] = useState<WishlistEntry[]>([]);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [sort, setSort] = useState<"date" | "name">("date");
   const addingRef = useRef<Record<string, AddToBagState>>({});
   const [addingStates, setAddingStates] = useState<Record<string, AddToBagState>>({});
 
@@ -105,6 +106,19 @@ export function WishlistPageClient() {
       reader.readAsText(file);
     };
     input.click();
+  }
+
+  async function handleShare() {
+    const shareUrl = `${window.location.origin}/wishlist`;
+    try {
+      const share = (navigator as unknown as { share?: (..._args: [{ title?: string; url?: string }]) => Promise<void> }).share;
+      if (share) await share.call(navigator, { title: "My saved items", url: shareUrl });
+      else await navigator.clipboard.writeText(shareUrl);
+      setStatusMsg(share ? "Wishlist shared." : "Wishlist link copied.");
+    } catch {
+      setStatusMsg("Sharing was cancelled.");
+    }
+    setTimeout(() => setStatusMsg(null), 3000);
   }
 
   async function handleClear() {
@@ -238,22 +252,32 @@ export function WishlistPageClient() {
         </div>
       ) : (
         <>
-          <ul className="divide-y divide-outline-variant/20 rounded-lg border border-outline-variant/20">
-            {items.map((item) => (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant/20 pb-4">
+            <p className="text-sm text-on-surface-variant">{items.length} saved item{items.length === 1 ? "" : "s"}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="sr-only" htmlFor="wishlist-sort">Sort saved items</label>
+              <select id="wishlist-sort" value={sort} onChange={(event) => setSort(event.target.value as "date" | "name")} className="h-10 rounded-md border border-outline-variant/30 bg-transparent px-3 text-sm text-primary">
+                <option value="date">Recently added</option>
+                <option value="name">Name</option>
+              </select>
+              <button type="button" onClick={() => void handleShare()} className="h-10 rounded-md border border-outline-variant/30 px-3 text-sm font-semibold text-primary hover:bg-surface-container-low">Share</button>
+            </div>
+          </div>
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {[...items].sort((a, b) => sort === "name" ? a.name.localeCompare(b.name) : b.addedAt.localeCompare(a.addedAt)).map((item) => (
               <li
                 key={`${item.slug}:${item.medusaProductId ?? ""}`}
-                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                className="flex min-h-48 flex-col justify-between gap-6 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-5"
               >
                 <div className="min-w-0">
+                  <p className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-on-surface-variant">Saved item</p>
                   <Link
                     href={`/shop/${item.slug}`}
                     className="font-headline font-semibold text-primary hover:underline"
                   >
                     {item.name}
                   </Link>
-                  <p className="mt-1 truncate text-xs text-on-surface-variant">
-                    /{item.slug}
-                  </p>
+                  <p className="mt-2 truncate text-xs text-on-surface-variant">/{item.slug}</p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <button

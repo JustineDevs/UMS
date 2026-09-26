@@ -23,6 +23,7 @@ import { AccountSectionNav } from "@/components/AccountSectionNav";
 import { AccountPrivacyControls } from "@/components/AccountPrivacyControls";
 import { AccountMarketingPreferencesPanel } from "@/components/AccountMarketingPreferencesPanel";
 import { AccountOrderPreferencesPanel } from "@/components/AccountOrderPreferencesPanel";
+import { PackageCheck, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -104,11 +105,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
       <div className="grid min-w-0 gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="min-w-0 self-start lg:sticky lg:top-28">
           <div className="mb-5 hidden items-center gap-3 lg:flex">
-            <span className="grid size-10 place-items-center rounded-2xl bg-primary text-on-primary">
-              <span className="material-symbols-outlined text-[20px]">
-                person
-              </span>
-            </span>
+              <span className="grid size-10 place-items-center rounded-2xl bg-primary text-on-primary"><UserRound className="size-5" aria-hidden="true" /></span>
             <div>
               <p className="font-headline text-xs font-bold uppercase tracking-[0.18em] text-primary">
                 My account
@@ -290,18 +287,14 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
               </div>
             ) : orderViewState === "ready" ? (
               visibleOrders.length > 0 ? (
-                <ul className="divide-y divide-outline-variant/15">
+                <ul className="space-y-3 pt-5">
                   {visibleOrders.map((order) => (
                     <li
                       key={order.id}
-                      className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"
+                      className="flex flex-col gap-4 rounded-xl border border-outline-variant/20 bg-surface-container-lowest p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-low text-primary">
-                          <span className="material-symbols-outlined text-[20px]">
-                            package_2
-                          </span>
-                        </span>
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-container-low text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span>
                         <div>
                           <p className="text-sm font-semibold text-primary">
                             Order #{order.displayId}
@@ -321,6 +314,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
                                 )
                               : ""}
                           </p>
+                          <span className="mt-2 inline-flex rounded-full bg-surface-container-low px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary">{order.status.replace(/_/g, " ")}</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-end">
