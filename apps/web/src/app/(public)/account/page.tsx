@@ -23,7 +23,7 @@ import { AccountSectionNav } from "@/components/AccountSectionNav";
 import { AccountPrivacyControls } from "@/components/AccountPrivacyControls";
 import { AccountMarketingPreferencesPanel } from "@/components/AccountMarketingPreferencesPanel";
 import { AccountOrderPreferencesPanel } from "@/components/AccountOrderPreferencesPanel";
-import { PackageCheck, UserRound } from "lucide-react";
+import { MapPin, PackageCheck, Pencil, ShieldCheck, UserRound } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -38,7 +38,7 @@ export const metadata: Metadata = buildPageMetadata({
 });
 
 const accountNav = [
-  ["overview", "Overview", "dashboard"],
+  ["overview", "Profile", "person"],
   ["orders", "Orders", "receipt_long"],
   ["profile", "Profile & addresses", "person"],
   ["notifications", "Notifications", "notifications"],
@@ -84,9 +84,6 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     orderCount: orders.length,
   });
   const profileAvatar = profile?.avatarUrl ?? user?.image ?? null;
-  const currency =
-    stats.currency ??
-    (stats.lifetimeSpend === null ? "Multiple currencies" : "PHP");
   const visibleOrders = orders.filter((order) => {
     const matchesStatus = accountOrderMatchesStatusFilter(
       order.status,
@@ -163,60 +160,34 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
             </nav>
           </header>
 
-          <section
-            id="overview"
-            className="scroll-mt-28 overflow-hidden rounded-[2rem] bg-primary p-6 text-on-primary shadow-[0_24px_60px_rgba(49,46,43,0.14)] sm:p-9"
-          >
-            <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+          <section id="overview" className="scroll-mt-28 space-y-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-on-primary/65">
-                  Account overview
-                </p>
-                <h1 className="max-w-xl font-headline text-4xl font-extrabold tracking-[-0.06em] sm:text-5xl">
-                  {user
-                    ? "Welcome back" +
-                      (user.name ? ", " + user.name.split(" ")[0] : "") +
-                      "."
-                    : "Your account, in one place."}
-                </h1>
-                <p className="mt-4 max-w-lg text-sm leading-6 text-on-primary/75">
-                  Manage your profile, saved addresses, orders, and shopping
-                  preferences. Payment cards stay with your checkout provider.
-                </p>
+                <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">Profile</h1>
+                <p className="mt-1 text-sm text-on-surface-variant">Manage your account profile and delivery details.</p>
               </div>
-              {!user ? (
-                <Link
-                  href="/sign-in?callbackUrl=/account"
-                  className="inline-flex min-h-11 w-fit items-center gap-2 rounded-xl bg-on-primary px-4 py-2.5 text-sm font-semibold text-primary hover:opacity-90"
-                >
-                  Sign in <span aria-hidden="true">↗</span>
-                </Link>
-              ) : null}
+              <span className="hidden text-sm text-on-surface-variant sm:inline">Home <span aria-hidden="true">›</span> Profile</span>
             </div>
-            <dl className="mt-9 grid grid-cols-2 gap-3 border-t border-on-primary/15 pt-5 sm:grid-cols-3">
-              <div>
-                <dt className="text-xs text-on-primary/60">Orders placed</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.orderCount}
-                </dd>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-4">
+                  {profileAvatar ? <Image src={profileAvatar} alt="" width={64} height={64} className="size-16 rounded-full object-cover" referrerPolicy="no-referrer" unoptimized={shouldUnoptimizeImage(profileAvatar)} /> : <span className="grid size-16 place-items-center rounded-full bg-surface-container-low text-primary"><UserRound className="size-7" aria-hidden="true" /></span>}
+                  <div><h2 className="font-headline text-xl font-bold text-primary">{user?.name || profile?.displayName || "Your profile"}</h2><p className="mt-1 text-sm text-on-surface-variant">{user?.email || "Sign in to manage your profile"}</p></div>
+                </div>
+                <a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Edit</a>
               </div>
-              <div>
-                <dt className="text-xs text-on-primary/60">Lifetime spend</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.lifetimeSpend === null
-                    ? "Unavailable"
-                    : `${currency} ${stats.lifetimeSpend.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}
-                </dd>
-              </div>
-              <div className="col-span-2 sm:col-span-1">
-                <dt className="text-xs text-on-primary/60">Average order</dt>
-                <dd className="mt-1 font-headline text-2xl font-bold tabular-nums">
-                  {stats.averageOrderValue === null
-                    ? "Unavailable"
-                    : `${currency} ${stats.averageOrderValue.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`}
-                </dd>
-              </div>
-            </dl>
+              <dl className="mt-7 grid gap-5 border-t border-outline-variant/15 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div><dt className="text-xs text-on-surface-variant">Name</dt><dd className="mt-1 text-sm font-semibold text-primary">{profile?.displayName || user?.name || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Email address</dt><dd className="mt-1 break-all text-sm font-semibold text-primary">{user?.email || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Phone</dt><dd className="mt-1 text-sm font-semibold text-primary">{profile?.phone || "Not provided"}</dd></div>
+                <div><dt className="text-xs text-on-surface-variant">Orders</dt><dd className="mt-1 text-sm font-semibold text-primary">{stats.orderCount}</dd></div>
+              </dl>
+            </section>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7">
+              <div className="flex items-center justify-between"><div className="flex items-center gap-3"><MapPin className="size-5 text-primary" aria-hidden="true" /><h2 className="font-headline text-lg font-bold text-primary">Address</h2></div><a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Edit</a></div>
+              {profile?.shippingAddresses?.[0] ? <div className="mt-5 grid gap-5 border-t border-outline-variant/15 pt-5 sm:grid-cols-2"><div><p className="text-xs text-on-surface-variant">Default address</p><p className="mt-1 text-sm font-semibold text-primary">{profile.shippingAddresses[0].fullName}</p><p className="mt-1 text-sm leading-6 text-on-surface-variant">{profile.shippingAddresses[0].line1}, {profile.shippingAddresses[0].barangay}, {profile.shippingAddresses[0].city}, {profile.shippingAddresses[0].province}</p></div><div><p className="text-xs text-on-surface-variant">Phone</p><p className="mt-1 text-sm font-semibold text-primary">{profile.shippingAddresses[0].phone}</p></div></div> : <p className="mt-5 border-t border-outline-variant/15 pt-5 text-sm text-on-surface-variant">No saved shipping address yet. Add one to speed up checkout.</p>}
+            </section>
+            <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm sm:p-7"><div className="flex items-center justify-between"><div className="flex items-center gap-3"><ShieldCheck className="size-5 text-primary" aria-hidden="true" /><h2 className="font-headline text-lg font-bold text-primary">Security</h2></div><a href="#profile" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-outline-variant/30 px-3 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low"><Pencil className="size-4" aria-hidden="true" /> Manage</a></div><p className="mt-4 text-sm text-on-surface-variant">Your account uses secure Google sign-in. Payment cards remain with the checkout provider.</p></section>
           </section>
 
           <section
