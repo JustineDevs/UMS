@@ -15,7 +15,6 @@ type FlatItem = { href: string; label: string; badge?: string };
 
 const DEFAULT_ITEMS: FlatItem[] = [
   { href: "/shop", label: "Shop" },
-  { href: "/collections", label: "Collections" },
   { href: "/about", label: "About" },
 ];
 
@@ -29,6 +28,10 @@ const ICON_MAP: Record<string, string> = {
 function linkActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || (href !== "/" && pathname.startsWith(href));
+}
+
+function withoutCollections<T extends { href: string }>(items: T[]): T[] {
+  return items.filter((item) => item.href !== "/collections");
 }
 
 function scrollToSamePageHash(event: MouseEvent<HTMLAnchorElement>, href: string) {
@@ -46,11 +49,11 @@ function flatForMobile(nav: CmsNavigationPayload | undefined): FlatItem[] {
   if (!nav) return [];
   const src =
     nav.headerLinksMobile.length > 0 ? nav.headerLinksMobile : nav.headerLinks;
-  return src.map((l) => ({
+  return withoutCollections(src.map((l) => ({
     href: l.href,
     label: l.label,
     badge: l.badge,
-  }));
+  })));
 }
 
 function NavBadge({ text }: { text: string }) {
@@ -200,7 +203,7 @@ export function StorefrontMainNav({
 
   const desktopLinks =
     navigation && navigation.headerLinks.length > 0
-      ? navigation.headerLinks
+      ? withoutCollections(navigation.headerLinks)
       : null;
 
   useEffect(() => {

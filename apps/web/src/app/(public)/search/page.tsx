@@ -54,10 +54,6 @@ export default function SearchPage() {
         <Link href="/shop" className="text-primary underline">
           All products
         </Link>
-        {" · "}
-        <Link href="/collections" className="text-primary underline">
-          Collections
-        </Link>
       </p>
     </main>
   );

@@ -20,6 +20,11 @@ test.describe("storefront smoke", () => {
     await expect(page.getByTestId("nav-checkout")).toBeVisible();
   });
 
+  test("primary navigation does not expose collections", async ({ page }) => {
+    await page.goto("/shop", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("link", { name: "Collections", exact: true })).toHaveCount(0);
+  });
+
   test("about route is a dedicated navigable storefront surface", async ({ page }) => {
     await page.goto("/about");
     await expect(page.getByRole("heading", { name: /music gear that earns its place/i })).toBeVisible();

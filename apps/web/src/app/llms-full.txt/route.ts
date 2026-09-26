@@ -18,7 +18,6 @@ export async function GET() {
     "## Key pages",
     `- ${canonicalUrl("/")}`,
     `- ${canonicalUrl("/shop")}`,
-    `- ${canonicalUrl("/collections")}`,
     `- ${canonicalUrl("/blog")}`,
     `- ${canonicalUrl("/faq")}`,
     `- ${canonicalUrl("/help")}`,

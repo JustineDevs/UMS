@@ -18,7 +18,6 @@ export async function GET() {
     "## Start here",
     `- [Home](${canonicalUrl("/")})`,
     `- [Shop](${canonicalUrl("/shop")})`,
-    `- [Collections](${canonicalUrl("/collections")})`,
     `- [Help center](${canonicalUrl("/help")})`,
     `- [FAQ](${canonicalUrl("/faq")})`,
     "",

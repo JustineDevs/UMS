@@ -14,7 +14,6 @@ export const metadata: Metadata = buildPageMetadata({
 const links: { href: string; label: string }[] = [
   { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
-  { href: "/collections", label: "Collections" },
   { href: "/search", label: "Search" },
   { href: "/checkout", label: "Checkout / bag" },
   { href: "/wishlist", label: "Saved items" },
