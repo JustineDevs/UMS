@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Heart } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -73,12 +74,10 @@ export function WishlistToggle({
       }
       className={`inline-flex items-center justify-center rounded border border-outline-variant/40 p-3 transition-colors hover:border-primary disabled:cursor-wait disabled:opacity-60 ${className}`}
     >
-      <span
-        className={`material-symbols-outlined text-[22px] ${on ? "text-primary" : "text-on-surface-variant"}`}
-        style={on ? { fontVariationSettings: '"FILL" 1' } : undefined}
-      >
-        favorite
-      </span>
+      <Heart
+        aria-hidden="true"
+        className={`size-[22px] ${on ? "fill-current text-primary" : "text-on-surface-variant"}`}
+      />
       {!mounted ? <span className="sr-only">Save</span> : null}
     </button>
   );

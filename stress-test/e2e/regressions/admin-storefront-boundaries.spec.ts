@@ -64,6 +64,12 @@ test.describe("admin and storefront boundary regressions", () => {
     await expect(description).toBeVisible();
     await expect(specifications).toBeVisible();
 
+    // Icon labels must never leak as visible text when the optional icon font
+    // is unavailable; the PDP owns its controls with rendered SVG icons.
+    await expect(page.getByText("expand_more", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("favorite", { exact: true })).toHaveCount(0);
+    expect(await page.locator('[data-pdp-section] svg').count()).toBeGreaterThanOrEqual(5);
+
     const left = await overview.boundingBox();
     const right = await description.boundingBox();
     const build = await buildNotes.boundingBox();
