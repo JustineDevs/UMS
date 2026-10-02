@@ -12,6 +12,7 @@ import {
   type CmsMutationRecord,
   type CmsNode,
 } from "@universal-music-store/platform-data";
+import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readResponseJson } from "@/lib/read-response-json";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
@@ -279,8 +280,11 @@ export function CmsPagesManager({
     const pageUrl = isHomepage
       ? `${cmsPreviewOrigin()}/`
       : `${cmsPreviewOrigin()}/p/${page.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
-    const previewUrl = cmsPagePreviewUrl(pageUrl, page.preview_token);
-    window.open(previewUrl, "_blank", "noopener,noreferrer");
+    const previewUrl = sanitizeTrustedPublicUrl(
+      cmsPagePreviewUrl(pageUrl, page.preview_token),
+      [cmsPreviewOrigin()],
+    );
+    if (previewUrl) window.open(previewUrl, "_blank", "noopener,noreferrer");
   };
 
   const deletePage = async (id: string) => {
@@ -529,7 +533,11 @@ export function CmsPagesManager({
     const pageUrl = isHomepage
       ? `${cmsPreviewOrigin()}/?adminPreview=1`
       : `${cmsPreviewOrigin()}/p/${editing.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
-    const previewUrl = cmsPagePreviewUrl(pageUrl, editing.preview_token);
+    const previewUrl =
+      sanitizeTrustedPublicUrl(
+        cmsPagePreviewUrl(pageUrl, editing.preview_token),
+        [cmsPreviewOrigin()],
+      ) ?? "";
     const settings = (
       <div className="space-y-4 text-xs">
         <div>
