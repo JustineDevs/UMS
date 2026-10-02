@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import {
   defaultStorefrontPreferences,
   readStorefrontPreferences,
@@ -8,18 +8,36 @@ import {
   type StorefrontPreferences,
 } from "@universal-music-store/user-preferences";
 
+const serverStorefrontPreferences = defaultStorefrontPreferences();
+let cachedStorefrontPreferences: StorefrontPreferences | null = null;
+
+function getStorefrontPreferencesSnapshot(): StorefrontPreferences {
+  const next = readStorefrontPreferences();
+  if (
+    cachedStorefrontPreferences &&
+    cachedStorefrontPreferences.language === next.language &&
+    cachedStorefrontPreferences.measurementUnit === next.measurementUnit &&
+    cachedStorefrontPreferences.density === next.density &&
+    cachedStorefrontPreferences.reduceMotion === next.reduceMotion
+  ) {
+    return cachedStorefrontPreferences;
+  }
+  cachedStorefrontPreferences = next;
+  return next;
+}
+
 export function PreferencesControls() {
-  const [prefs, setPrefs] = useState<StorefrontPreferences>(
-    defaultStorefrontPreferences,
+  const prefs = useSyncExternalStore(
+    (onStoreChange) => {
+      window.addEventListener("storefront-prefs-updated", onStoreChange);
+      return () => window.removeEventListener("storefront-prefs-updated", onStoreChange);
+    },
+    getStorefrontPreferencesSnapshot,
+    () => serverStorefrontPreferences,
   );
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    setPrefs(readStorefrontPreferences());
-  }, []);
-
   const update = useCallback((patch: Partial<StorefrontPreferences>) => {
-    setPrefs((prev) => ({ ...prev, ...patch }));
     writeStorefrontPreferences(patch);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);

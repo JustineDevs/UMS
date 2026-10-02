@@ -1,7 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@universal-music-store/ui";
+import { useSession } from "@/lib/auth-client";
+import { staffHasPermission } from "@universal-music-store/platform-data";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 type ReviewRow = {
   id: string;
@@ -24,13 +28,33 @@ type ReviewRow = {
   open_report_count: number;
 };
 
+function reviewErrorMessage(error: string | undefined, fallback: string) {
+  if (error?.toLowerCase().includes("worker backend is unavailable")) {
+    return "Review moderation is temporarily unavailable. Try again shortly.";
+  }
+  switch (error) {
+    case "invalid_filter":
+      return "That review filter is not available. Choose another status or clear the search.";
+    case "worker_unavailable":
+    case "Failed to fetch":
+    case "NetworkError":
+    case "Load failed":
+      return "Review moderation is temporarily unavailable. Try again shortly.";
+    default:
+      return error || fallback;
+  }
+}
+
 export function ReviewsModerationClient() {
+  const { data: session } = useSession();
+  const canModerate = staffHasPermission(session?.user?.permissions ?? [], "content:write");
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const didInitialLoad = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +67,7 @@ export function ReviewsModerationClient() {
       const res = await fetch(`/api/admin/reviews?${p.toString()}`);
       const j = (await res.json()) as { reviews?: ReviewRow[]; error?: string };
       if (!res.ok) {
-        setError(j.error ?? "Failed to load");
+        setError(reviewErrorMessage(j.error, "Failed to load reviews."));
         setRows([]);
         return;
       }
@@ -57,6 +81,8 @@ export function ReviewsModerationClient() {
   }, [statusFilter, q]);
 
   useEffect(() => {
+    if (didInitialLoad.current) return;
+    didInitialLoad.current = true;
     void load();
   }, [load]);
 
@@ -71,7 +97,7 @@ export function ReviewsModerationClient() {
       });
       const j = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError(j.error ?? "Update failed");
+        setError(reviewErrorMessage(j.error, "Unable to update review."));
         return;
       }
       await load();
@@ -84,34 +110,42 @@ export function ReviewsModerationClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-slate-600">
+      <div className="rounded-lg border border-border bg-card p-4">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[12rem_minmax(0,1fr)_auto] lg:items-end">
+        <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
           Status
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-          >
-            <option value="">All</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="hidden">Hidden</option>
-          </select>
+          <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+            <SelectTrigger aria-label="Filter reviews by status" size="sm" className="h-10 w-full bg-background"><SelectValue placeholder={statusFilter || "All reviews"} /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All reviews</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="hidden">Hidden</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
-        <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-slate-600">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground lg:min-w-[200px]">
           Search (body, name, email)
-          <input
+          <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void load()}
-            className="rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-            placeholder="Min 2 characters"
+            aria-label="Search reviews"
+            className="h-10 bg-background"
+            placeholder="Search customer, product, or review text"
           />
+          {q.trim().length === 1 ? <span className="text-xs font-normal text-destructive">Enter at least 2 characters or clear the search.</span> : null}
         </label>
-        <Button type="button" variant="secondary" onClick={() => void load()}>
-          Apply
+        <Button type="button" variant="secondary" disabled={q.trim().length === 1} onClick={() => void load()} className="h-10 w-full lg:w-auto">
+          Apply filters
         </Button>
+        </div>
+        {!canModerate ? (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100" role="status">
+            Review actions are unavailable for your role. Ask an administrator for content moderation access.
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -119,7 +153,18 @@ export function ReviewsModerationClient() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <div aria-label="Loading review moderation queue" aria-live="polite" className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4">
+          <div className="min-w-[760px] animate-pulse space-y-3">
+            <div className="grid grid-cols-6 gap-4 border-b border-slate-100 pb-3">
+              {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-3 rounded bg-slate-200" />)}
+            </div>
+            {Array.from({ length: 5 }, (_, row) => (
+              <div key={row} className="grid grid-cols-6 gap-4 border-b border-slate-100 py-4 last:border-0">
+                {Array.from({ length: 6 }, (_, column) => <div key={column} className="h-4 rounded bg-slate-100" />)}
+              </div>
+            ))}
+          </div>
+        </div>
       ) : rows.length === 0 ? (
         <p className="text-sm text-slate-500">No reviews match.</p>
       ) : (
@@ -170,7 +215,7 @@ export function ReviewsModerationClient() {
                       <Button
                         type="button"
                         size="sm"
-                        disabled={acting === r.id}
+                        disabled={!canModerate || acting === r.id}
                         onClick={() => void moderate(r.id, "approved")}
                       >
                         Approve
@@ -181,7 +226,7 @@ export function ReviewsModerationClient() {
                         type="button"
                         size="sm"
                         variant="secondary"
-                        disabled={acting === r.id}
+                        disabled={!canModerate || acting === r.id}
                         onClick={() => void moderate(r.id, "hidden")}
                       >
                         Hide
@@ -192,7 +237,7 @@ export function ReviewsModerationClient() {
                         type="button"
                         size="sm"
                         variant="secondary"
-                        disabled={acting === r.id}
+                        disabled={!canModerate || acting === r.id}
                         onClick={() => void moderate(r.id, "rejected")}
                       >
                         Reject
@@ -202,7 +247,7 @@ export function ReviewsModerationClient() {
                       type="button"
                       size="sm"
                       variant="secondary"
-                      disabled={acting === r.id}
+                      disabled={!canModerate || acting === r.id}
                       onClick={() => void moderate(r.id, r.status as "approved" | "rejected" | "hidden", !r.shadow_banned)}
                     >
                       {r.shadow_banned ? "Unshadow" : "Shadow ban"}

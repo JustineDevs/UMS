@@ -45,10 +45,22 @@ export function createInventoryStream(
 
       const send = async () => {
         if (closed || sendInFlight) return;
+        if (req.signal.aborted) {
+          close();
+          return;
+        }
         sendInFlight = true;
+        if (closed) {
+          sendInFlight = false;
+          return;
+        }
+        if (req.signal.aborted) {
+          sendInFlight = false;
+          close();
+          return;
+        }
         try {
           const result = await fetchPage({ limit: pageSize, offset, signal: req.signal });
-          if (closed) return;
           const payload = adminInventoryStreamResponseSchema.safeParse({ rows: result.rows, page, pageSize, total: result.total });
           if (!payload.success) {
             controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ code: "INVENTORY_STREAM_FAILED", retryable: true })}\n\n`));
@@ -69,7 +81,12 @@ export function createInventoryStream(
         }
       };
 
-      await send();
+      if (closed) return;
+      // Start the first refresh immediately, but do not block stream setup on
+      // it. The request may be cancelled while the upstream inventory read is
+      // in flight; `send` owns the abort/close checks and the interval should
+      // still be installed for the next refresh.
+      void send();
       if (closed) return;
       interval = setInterval(() => void send(), TICK_MS);
     },

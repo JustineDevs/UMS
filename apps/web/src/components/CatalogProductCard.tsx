@@ -7,8 +7,8 @@ import { Badge, Card, CardContent } from "@universal-music-store/ui";
 import type { Product } from "@universal-music-store/types";
 import {
   BrowsePriceFreshnessCue,
-  buildFreshnessSignature,
 } from "@/components/BrowsePriceFreshnessCue";
+import { buildFreshnessSignature } from "@/components/browse-price-freshness";
 import { QuickViewButton } from "@/components/QuickViewButton";
 import { trackProductClick } from "@/lib/analytics";
 import {
@@ -20,9 +20,11 @@ type Props = {
   product: Product;
   /** Image rotation interval while the card is hovered (ms). */
   intervalMs?: number;
+  /** Mark the first visible card as high priority when it is above the fold. */
+  priority?: boolean;
 };
 
-export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
+export function CatalogProductCard({ product, intervalMs = 3000, priority = false }: Props) {
   const urls: string[] = [];
   const compareAtPrices: number[] = [];
   for (const image of product.images) {
@@ -31,7 +33,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
   const [idx, setIdx] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const types = [...new Set(product.variants.map((v) => v.type))].sort();
+  const types = [...new Set(product.variants.flatMap((v) => (v.type ? [v.type] : [])))].sort();
   const minPrice = Math.min(...product.variants.map((v) => v.price));
   for (const variant of product.variants) {
     if (typeof variant.compareAtPrice === "number" && variant.compareAtPrice > 0) {
@@ -66,13 +68,14 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
 
   return (
     <Card className="overflow-hidden border border-outline-variant/15 bg-surface-container-lowest shadow-sm transition-shadow duration-300 hover:shadow-md">
-      <Link
-        href={`/shop/${product.slug}`}
-        className="group block"
-        data-product-id={product.id}
-        data-product-slug={product.slug}
-        onClick={() => trackProductClick({ slug: product.slug, id: product.id })}
-      >
+      <div className="group relative">
+        <Link
+          href={`/shop/${product.slug}`}
+          className="block"
+          data-product-id={product.id}
+          data-product-slug={product.slug}
+          onClick={() => trackProductClick({ slug: product.slug, id: product.id })}
+        >
         <div
           className="relative aspect-square overflow-hidden bg-surface-container-low"
           onMouseEnter={() => {
@@ -101,13 +104,12 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
                 Types
               </Badge>
               <div
-                role="tooltip"
-                aria-label={`Available types: ${types.join(", ")}`}
+                aria-hidden="true"
                 className="pointer-events-none absolute right-0 top-full z-30 mt-2 max-w-[min(240px,70vw)] opacity-0 transition-opacity duration-200 group-hover/sizes:opacity-100"
               >
-                <div className="rounded-md bg-primary px-3 py-2 text-left text-xs font-medium leading-relaxed text-on-primary shadow-lg">
+                <span className="block rounded-md bg-primary px-3 py-2 text-left text-xs font-medium leading-relaxed text-on-primary shadow-lg">
                   {types.join(" · ")}
-                </div>
+                </span>
               </div>
             </div>
           )}
@@ -121,6 +123,7 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
               className="object-cover transition-transform duration-700 group-hover:scale-[1.02]"
               unoptimized={shouldUnoptimizeImage(imageUrl)}
+              priority={priority || idx === 0}
             />
           ) : (
             <div className="absolute inset-0 flex items-end bg-gradient-to-br from-surface-container-high via-surface-container-low to-surface-container-high p-4">
@@ -130,13 +133,13 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
             </div>
           )}
 
-          <div className="pointer-events-none absolute bottom-4 left-4 right-4 translate-y-4 opacity-0 transition-[transform,opacity] duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-            <span className="block w-full bg-primary py-3 text-center text-xs font-bold uppercase tracking-widest text-on-primary">
-              View product
-            </span>
-          </div>
         </div>
-        <CardContent className="p-4">
+        </Link>
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 translate-y-2 opacity-0 transition-[transform,opacity] duration-200 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 sm:group-hover:pointer-events-auto sm:group-focus-within:pointer-events-auto">
+          <QuickViewButton slug={product.slug} />
+        </div>
+      </div>
+      <CardContent className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="mb-1 line-clamp-2 font-headline text-sm font-bold text-primary uppercase">
@@ -163,10 +166,15 @@ export function CatalogProductCard({ product, intervalMs = 3000 }: Props) {
               <span className="block text-[9px] text-on-surface-variant uppercase tracking-wider">VAT incl.</span>
             </div>
           </div>
-        </CardContent>
-      </Link>
+      </CardContent>
       <div className="px-4 pb-4">
-        <QuickViewButton slug={product.slug} />
+        <Link
+          href={`/shop/${product.slug}`}
+          className="block w-full bg-primary py-3 text-center text-xs font-bold uppercase tracking-widest text-on-primary transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          onClick={() => trackProductClick({ slug: product.slug, id: product.id })}
+        >
+          View product
+        </Link>
       </div>
     </Card>
   );

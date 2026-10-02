@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { isDirectVideoFileUrl } from "@/lib/catalog-asset-url";
 import {
   buildCatalogPreviewModel,
@@ -12,6 +13,9 @@ export type CatalogPreviewLayoutDensity = "compact" | "comfortable" | "spacious"
 type Props = CatalogPreviewModelInput & {
   /** Driven by parent workspace width (e.g. collapsible activity sidebar). */
   layoutDensity?: CatalogPreviewLayoutDensity;
+  previewOpen?: boolean;
+  onPreviewOpenChange?: (_open: boolean) => void;
+  hideLauncher?: boolean;
 };
 
 type PreviewMode = "card" | "pdp";
@@ -39,6 +43,7 @@ function SegmentTab({
       {children}
     </button>
   );
+
 }
 
 function CardHeroImage({ src, alt }: { src: string; alt: string }) {
@@ -226,29 +231,42 @@ export function CatalogProductPreview(props: Props) {
   const [selectedSize, setSelectedSize] = useState(model.defaultSize);
   const [selectedColor, setSelectedColor] = useState(model.defaultColor);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const expanded = props.previewOpen ?? internalExpanded;
+  const setExpanded = useCallback((next: boolean | ((_current: boolean) => boolean)) => {
+    const value = typeof next === "function" ? next(expanded) : next;
+    if (props.previewOpen === undefined) setInternalExpanded(value);
+    props.onPreviewOpenChange?.(value);
+  }, [expanded, props.onPreviewOpenChange, props.previewOpen]);
 
   useEffect(() => {
-    if (!model.sizes.includes(selectedSize)) {
-      setSelectedSize(model.defaultSize);
-    }
-  }, [model.defaultSize, model.sizes, selectedSize]);
+    if (!expanded) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [expanded, setExpanded]);
 
-  useEffect(() => {
-    if (!model.colors.includes(selectedColor)) {
-      setSelectedColor(model.defaultColor);
-    }
-  }, [model.colors, model.defaultColor, selectedColor]);
-
-  useEffect(() => {
-    if (activeMediaIndex >= model.media.length) {
-      setActiveMediaIndex(0);
-    }
-  }, [activeMediaIndex, model.media.length]);
+  const effectiveSelectedSize = model.sizes.includes(selectedSize)
+    ? selectedSize
+    : model.defaultSize;
+  const effectiveSelectedColor = model.colors.includes(selectedColor)
+    ? selectedColor
+    : model.defaultColor;
+  const effectiveActiveMediaIndex =
+    activeMediaIndex < model.media.length ? activeMediaIndex : 0;
 
   const selectedVariant =
     model.variants.find(
       (variant) =>
-        variant.size === selectedSize && variant.color === selectedColor,
+        variant.size === effectiveSelectedSize &&
+        variant.color === effectiveSelectedColor,
     ) ?? model.variants[0];
 
   const frameWidth =
@@ -280,12 +298,18 @@ export function CatalogProductPreview(props: Props) {
       ? "text-2xl font-headline font-bold tracking-tight text-primary sm:text-3xl"
       : "text-3xl font-headline font-bold tracking-tight text-primary sm:text-4xl";
 
-  return (
+  const previewSection = (
     <section
       aria-label="Storefront catalog preview"
-      className={`rounded-2xl border border-outline-variant/20 bg-surface-container-low/50 ${shellPad}`}
+      role={expanded ? "dialog" : undefined}
+      aria-modal={expanded ? true : undefined}
+      className={
+        expanded
+          ? "fixed inset-0 z-[60] flex min-h-0 w-screen max-w-none flex-col overflow-y-auto rounded-none border-0 bg-background p-4 shadow-2xl sm:p-6 lg:p-8"
+          : `rounded-2xl border border-outline-variant/20 bg-surface-container-low/50 ${shellPad}`
+      }
     >
-      <div className="flex flex-col gap-3 border-b border-outline-variant/15 pb-4">
+      <div className="flex flex-col gap-3 border-b border-outline-variant/15 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
             Real-time preview
@@ -294,7 +318,8 @@ export function CatalogProductPreview(props: Props) {
             Reflects unsaved fields. Pick layout and viewport below.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+          <div className={expanded ? "flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center" : "hidden"}>
           <div
             className="inline-flex w-full max-w-full rounded-xl border border-outline-variant/25 bg-surface-container-low/80 p-1 sm:w-auto"
             role="group"
@@ -325,10 +350,39 @@ export function CatalogProductPreview(props: Props) {
               Desktop
             </SegmentTab>
           </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-label={expanded ? "Close full-screen preview" : "Open full-screen preview"}
+            className="min-h-[44px] rounded-lg border border-outline-variant/30 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-on-surface transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {expanded ? "Close preview" : "Expand preview"}
+          </button>
         </div>
       </div>
 
-      <div className={`mt-3 rounded-2xl border border-outline-variant/15 bg-white ${innerPad}`}>
+      {!expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-3 flex min-h-16 w-full items-center justify-between gap-4 rounded-xl border border-outline-variant/20 bg-white px-4 py-3 text-left transition-colors hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-on-surface">
+              {model.title || "Untitled product"}
+            </span>
+            <span className="mt-1 block text-xs text-on-surface-variant">
+              {model.status === "published" ? "Published" : "Draft preview"} · {model.cardPriceLabel}
+            </span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary">
+            Open preview
+          </span>
+        </button>
+      ) : null}
+
+      <div className={`${expanded ? "mt-3" : "hidden"} rounded-2xl border border-outline-variant/15 bg-white ${innerPad}`}>
         <div className={`${frameWidth}`}>
           {mode === "card" ? (
             <div
@@ -344,21 +398,21 @@ export function CatalogProductPreview(props: Props) {
                   </div>
                 ) : null}
                 <div className="h-[200px] w-full bg-surface-container-low sm:h-[220px]">
-                  {model.media[activeMediaIndex]?.kind === "image" ? (
+                  {model.media[effectiveActiveMediaIndex]?.kind === "image" ? (
                     <CardHeroImage
-                      src={model.media[activeMediaIndex]!.url}
+                      src={model.media[effectiveActiveMediaIndex]!.url}
                       alt={model.title}
                     />
-                  ) : model.media[activeMediaIndex]?.kind === "video" &&
-                    isDirectVideoFileUrl(model.media[activeMediaIndex]!.url) ? (
+                  ) : model.media[effectiveActiveMediaIndex]?.kind === "video" &&
+                    isDirectVideoFileUrl(model.media[effectiveActiveMediaIndex]!.url) ? (
                     <video
-                      src={model.media[activeMediaIndex]!.url}
+                      src={model.media[effectiveActiveMediaIndex]!.url}
                       className="h-full w-full object-cover"
                       muted
                       playsInline
                       preload="metadata"
                     />
-                  ) : model.media[activeMediaIndex]?.kind === "video" ? (
+                  ) : model.media[effectiveActiveMediaIndex]?.kind === "video" ? (
                     <div className="flex h-full w-full items-center justify-center bg-slate-950 text-[10px] font-bold uppercase tracking-[0.2em] text-white">
                       Clip preview
                     </div>
@@ -405,7 +459,7 @@ export function CatalogProductPreview(props: Props) {
           ) : (
             <div className="grid min-w-0 gap-6">
               <MediaFrame
-                activeIndex={activeMediaIndex}
+                activeIndex={effectiveActiveMediaIndex}
                 onChange={setActiveMediaIndex}
                 media={model.media}
                 title={model.title}
@@ -416,7 +470,7 @@ export function CatalogProductPreview(props: Props) {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     {model.categoryLabels[0] ? (
-                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-secondary">
+                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
                         {model.categoryLabels[0]}
                       </span>
                     ) : null}
@@ -440,7 +494,7 @@ export function CatalogProductPreview(props: Props) {
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-on-surface">
                       Color:{" "}
-                      <span className="font-normal text-secondary">
+                      <span className="font-normal text-on-surface-variant">
                         {selectedVariant?.color ?? model.defaultColor}
                       </span>
                     </p>
@@ -451,7 +505,7 @@ export function CatalogProductPreview(props: Props) {
                           type="button"
                           onClick={() => setSelectedColor(color)}
                           className={`rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-wider transition ${
-                            selectedColor === color
+                            effectiveSelectedColor === color
                               ? "border-primary bg-primary text-white"
                               : "border-outline-variant/30 bg-white text-on-surface-variant"
                           }`}
@@ -476,7 +530,7 @@ export function CatalogProductPreview(props: Props) {
                           type="button"
                           onClick={() => setSelectedSize(size)}
                           className={`rounded-xl px-3 py-3 text-sm font-medium transition ${
-                            selectedSize === size
+                            effectiveSelectedSize === size
                               ? "bg-primary text-white"
                               : "bg-surface-container-low text-on-surface"
                           }`}
@@ -532,4 +586,9 @@ export function CatalogProductPreview(props: Props) {
       </div>
     </section>
   );
+
+  if (props.hideLauncher && !expanded) return null;
+  return expanded && typeof document !== "undefined"
+    ? createPortal(previewSection, document.body)
+    : previewSection;
 }

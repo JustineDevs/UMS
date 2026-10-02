@@ -470,9 +470,9 @@ const server = http.createServer((req, res) => {
         state.lastPrintAt = new Date().toISOString();
         json(res, req, 200, { ok: true });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        state.lastError = msg;
-        json(res, req, 502, { error: msg });
+        console.error("[terminal-agent] receipt printing failed", e);
+        state.lastError = "Receipt printing failed";
+        json(res, req, 502, { error: "Receipt printing failed" });
       }
     });
     return;
@@ -516,9 +516,9 @@ const server = http.createServer((req, res) => {
         state.lastPrintAt = new Date().toISOString();
         json(res, req, 200, { ok: true });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        state.lastError = msg;
-        json(res, req, 502, { error: msg });
+        console.error("[terminal-agent] label printing failed", e);
+        state.lastError = "Label printing failed";
+        json(res, req, 502, { error: "Label printing failed" });
       }
     });
     return;
@@ -545,9 +545,9 @@ const server = http.createServer((req, res) => {
         state.lastError = null;
         json(res, req, 200, { ok: true });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        state.lastError = msg;
-        json(res, req, 502, { error: msg });
+        console.error("[terminal-agent] drawer opening failed", e);
+        state.lastError = "Cash drawer operation failed";
+        json(res, req, 502, { error: "Cash drawer operation failed" });
       }
     });
     return;

@@ -4,7 +4,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const apiRoot = path.join(root, "apps/web/src/app/api");
-const specPath = path.join(root, "internal/reference/admin-open-api.yaml");
+const specPath = path.join(root, ".internal/internal/reference/admin-open-api.yaml");
 
 async function routeFiles(dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });

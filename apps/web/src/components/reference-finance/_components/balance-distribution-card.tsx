@@ -1,19 +1,11 @@
 "use client";
 
 import * as React from "react";
-import dynamic from "next/dynamic";
 
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
-
-const BalanceDistributionChart = dynamic(
-  () => import("./balance-distribution-chart").then((module) => module.BalanceDistributionChart),
-  {
-    loading: () => <div className="mx-auto aspect-square h-50 animate-pulse rounded-lg bg-muted/40" aria-hidden="true" />,
-    ssr: false,
-  },
-);
+import { BalanceDistributionChart } from "./balance-distribution-chart";
 
 type BalanceKey = "investment" | "main" | "reserve" | "savings";
 
@@ -44,13 +36,18 @@ const getAccountColor = (key: BalanceKey) => {
 };
 
 export function BalanceDistributionCard({ balanceData }: { balanceData: FinanceBalancePoint[] }) {
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [currency, setCurrency] = React.useState<Currency>("PHP");
   const chartData = balanceData.map((item) => ({ ...item, fill: getAccountColor(item.key) }));
   const totalBalance = balanceData.reduce((total, item) => total + item.amount, 0);
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4">
         <CardTitle className="font-normal">Account Allocation</CardTitle>
         <CardAction>
           <Select onValueChange={(value) => setCurrency(value as Currency)} value={currency}>
@@ -71,11 +68,7 @@ export function BalanceDistributionCard({ balanceData }: { balanceData: FinanceB
       </CardHeader>
 
       <CardContent className="grid items-center gap-4 sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)]">
-        <BalanceDistributionChart
-          balanceData={chartData}
-          totalBalance={totalBalance}
-          currency={currency}
-        />
+        {mounted ? <BalanceDistributionChart balanceData={chartData} totalBalance={totalBalance} currency={currency} /> : <div className="mx-auto aspect-square h-50 w-full animate-pulse rounded-lg bg-muted/40" aria-hidden="true" />}
 
         <div className="flex min-w-0 flex-col gap-3">
           {chartData.map((item) => (

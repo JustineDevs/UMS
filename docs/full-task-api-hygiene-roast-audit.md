@@ -4,13 +4,22 @@ Audit date: 2026-09-20
 Repository: `/home/justine/Downloads/UVS`
 Mode: implementation follow-up and evidence synthesis; findings are updated as fixes land, while externally gated evidence remains explicitly open.
 
-## Current verification snapshot — 2026-09-23
+## Current verification snapshot — 2026-09-29
 
 The generated OpenAPI reference was regenerated after the source-drift gate
-identified two stale route hashes. The current reference contains 278
-operations, 320 executable schemas, and 598 matching route source hashes.
+identified stale route hashes. The current reference contains 280 operations,
+323 executable schemas, 0 unresolved schemas, and 603 matching route source
+hashes.
 `pnpm quality:contracts` passes all local contract-boundary checks. This does
 not replace deployed authenticated/provider evidence.
+
+The linked production deployment is now live-contract verified: Vercel
+deployment `dpl_5LVno3rqv48wDBzDjegU2jWCgHZr` reached READY for the
+`universalmusic` project, and `pnpm check:deployed-health-contract` passed
+against the production alias. Provider-backed authenticated flows, safe SQL
+execution plans, and long-duration browser memory evidence remain separate
+release gates; read-only planner probes are recorded, while production
+traffic/cardinality and `EXPLAIN ANALYZE` evidence remain open.
 
 ## Scope and method
 
@@ -33,16 +42,17 @@ This is not a thin AI wrapper. It is a real ecommerce and operations platform wi
 
 The principal weakness is not lack of functionality. It is contract truth and boundary hygiene:
 
-- The admin OpenAPI inventory contains 276 operations, 318 executable schema entries, zero heuristic schema entries, zero unresolved/non-authoritative entries, and 594 source hashes; raw CSV exports are explicitly documented as binary responses.
-- The consistency gate passes for 193 local admin operations, but it checks route/operation presence and metadata—not exact request/response schema fidelity.
-- Request/response schemas are fully executable in the current reference: 318 entries are runtime-backed, with zero heuristic or unresolved entries. Security metadata remains explicitly source-inferred until executable authorization tests exist.
+- The current OpenAPI inventory contains 280 operations, 323 executable schema entries, zero heuristic schema entries, 0 unresolved entries, and 603 source hashes; raw CSV exports are explicitly documented as binary responses.
+- The consistency gate passes for 196 local admin operations, but it checks route/operation presence and metadata—not exact request/response schema fidelity.
+- Request/response schemas are executable for all 323 generated entries. Security metadata remains explicitly source-inferred until executable authorization tests exist.
 - Historical baseline: 13 embedded `x-source` handler snapshots differed from the current route files; the generator now emits only `x-source-path` plus SHA-256 fingerprints, so full handler snapshots are no longer duplicated in the contract artifact.
 - The generator derives route inventory from the route tree and response schemas from route-owned executable contracts. Every operation now carries `x-contract-metadata-status: source-inferred` plus an explicit warning: permission, tenant scope, and replay fields are static source evidence, not executable authorization proof. Source SHA-256 fingerprints detect drift; no response schema is currently marked non-authoritative.
 - The repository currently contains 205 Next route handlers and 60 Worker modules. The generated ownership manifest reports zero direct `web-platform-database` storefront routes and no direct admin database route; overlapping commerce/admin domains are Worker-owned through explicit proxies.
 - UI inventory contains 92 pages. The route-state manifest now records seven state signals (loading, empty, blocked, unauthorized, failure, retry, success) for every page, but its evidence class is explicitly `static-inventory`; this still does not prove runtime behavior in a browser.
 - The targeted web dead-surface cleanup removed the 3 unused files, unused web dependency, and dead web/SDK exports. A fresh unconfigured monorepo Knip scan still reports 20 entrypoint/config-like files, 2 package dependencies, 11 dev dependencies, 10 utility/test exports, and the deliberate system `act` binary; these require ownership/configuration review and are not claimed resolved.
-- React Doctor reports 198 source warnings and 0 errors; the remaining warning backlog is tracked by category, with other security-sensitive items explicitly called out separately. The latest reduction also removes prop-adjustment effects from search and checkout initialization while preserving navigation reset behavior through keyed remounts.
+- React Doctor reports 102 source warnings and 0 errors; the remaining warning backlog is tracked by category, with other security-sensitive items explicitly called out separately. The latest reduction also removes hydration-state initialization, prop-adjustment effects, stale property reads, render-only mutation state, and multi-field form setter churn while preserving navigation reset behavior through keyed remounts.
 - Docker has no running project containers; the stopped Act container is residue, not active runtime.
+- Turbo/Vercel environment propagation is now declared explicitly in `turbo.json`; the latest production build no longer emits the missing-environment-variable warning.
 
 Judgment scores based on repository evidence:
 
@@ -62,8 +72,8 @@ The product is operationally real, but claims such as “strict OpenAPI contract
 | Claim | Status | Evidence | Enforced? | Misleading? | Recommendation |
 |---|---|---|---|---|---|
 | Worker-native backend is the complete backend runtime | Real but partial / boundary conflict | `AGENTS.md:40-61`, `wrangler.jsonc`, `workers/backend/src/index.ts` | Worker routes, queues, and Hyperdrive are real | Yes if read as “no meaningful Next server API remains” | Define one authoritative backend boundary and classify each Next route as proxy, frontend-only BFF, or migration debt. |
-| Admin API is implemented and route-consistent | Real but narrow | `stress-test/scripts/check-admin-openapi.mjs`; gate output: 193 operations match; 594 source hashes | Route/method presence, executable body/response schemas, and source drift are checked; security metadata is explicitly source-inferred | Yes if interpreted as full auth/scope/replay proof | Keep executable route metadata declarations and operation-level auth/scope/replay tests as the remaining contract lane. |
-| Admin OpenAPI has executable request/response schemas | Resolved for schema authority; semantic runtime proof remains partial | `scripts/generate-admin-openapi-docs.mjs`; current reference has 318 executable schema entries, zero heuristic entries, zero unresolved entries, and 594 matching source hashes | Schema authority and source drift are gated; exact route-by-route runtime status/body semantics and authorization are not all browser/provider-proven | Add route-family runtime contract tests and deployed authenticated evidence; do not label this as universal production proof | Keep generated reference, route-owned contracts, and runtime tests in the same change. |
+| Admin API is implemented and route-consistent | Real but narrow | `scripts/stress-test/tools/check-admin-openapi.mjs`; gate output: 196 operations match; 603 source hashes | Route/method presence, executable body/response schemas, and source drift are checked; security metadata is explicitly source-inferred | Yes if interpreted as full auth/scope/replay proof | Keep executable route metadata declarations and operation-level auth/scope/replay tests as the remaining contract lane. |
+| Admin OpenAPI has executable request/response schemas | Resolved for schema authority; semantic runtime proof remains partial | `scripts/generate-admin-openapi-docs.mjs`; current reference has 323 executable schema entries, zero heuristic entries, 0 unresolved entries, and 603 matching source hashes | Schema authority and source drift are gated; exact route-by-route runtime status/body semantics and authorization are not all browser/provider-proven | Add route-family runtime contract tests and deployed authenticated evidence; do not label this as universal production proof | Keep generated reference, route-owned contracts, and runtime tests in the same change. |
 | All admin endpoints have authentication, permissions, audit, and validation | Real but partial | `apps/web/src/lib/requireStaffSession.ts`, `admin-mutation-idempotency.ts`, Worker guards; direct route inventory | Guards exist, but static metadata cannot prove every branch and audit path | Yes as an absolute statement | Add per-route executable assertions for auth, scope, audit, validation, and error media type. |
 | Every mutation has durable replay protection | Real but partial | Idempotency helpers and Worker stores; OpenAPI has 118 required markers across all operations | Many admin mutations are protected; metadata marks some global mutations as not required | Potentially | Make idempotency policy explicit by operation class and test duplicate/concurrent requests. |
 | RFC-style problem responses are standardized | Real but partial | `apps/web/src/lib/staff-api-response.ts`; `ProblemResponse` in OpenAPI | Helper emits `application/problem+json`; not every handler is proven to use it | Yes if claimed globally | Enforce response wrapping at the route boundary and contract-test all declared 4xx/5xx responses. |
@@ -116,8 +126,8 @@ The product is operationally real, but claims such as “strict OpenAPI contract
 
 ### Contract and documentation risks
 
-- **Resolved:** generated OpenAPI contains 318 executable schema entries and zero heuristic or unresolved entries. Authorization metadata remains a separate executable-test workstream.
-- **Resolved:** stale embedded source snapshots were removed; the current YAML contains source paths and 594 source hashes, verified against the route tree.
+- **Resolved:** generated OpenAPI contains 323 executable schema entries, zero heuristic entries, and no unresolved entries. Authorization metadata remains a separate executable-test workstream.
+- **Resolved:** stale embedded source snapshots were removed; the current YAML contains source paths and 603 source hashes, verified against the route tree.
 - **High:** OpenAPI operation metadata is heuristic. `contractMetadata()` infers permission, tenant scope, and idempotency from source text.
 - **Medium:** global OpenAPI security and per-operation security are duplicated, increasing noise.
 - **Resolved with a bounded evidence marker:** every generated operation now includes `x-runtime-statuses`, derived from literal route status branches and checked by the OpenAPI gate; full semantic response-body/status contract tests remain a separate runtime-verification concern.
@@ -145,10 +155,10 @@ The product is operationally real, but claims such as “strict OpenAPI contract
 - **Resolved:** the admin delivery-operations read now uses explicit courier and open-exception projections with tenant filters and 200-row caps instead of `SELECT *`; mutation responses remain separately contract-validated.
 - **Resolved:** the Worker CMS category, CMS page lock, and delivery-logistics list paths now use explicit column projections instead of `SELECT *`; focused regressions assert the production queries remain projected.
 - **Resolved:** campaign listing uses an explicit projection with a 500-row cap, and segment-member detail reads are capped at 10,000 rows; campaign execution remains paged at 500 rows rather than materializing an unbounded audience.
-- **Medium:** the repository has 198 source React Doctor warnings; the current zero-error result does not mean warning-free hygiene. The highest-confidence JSON-LD, preview-iframe, upstream-response, URL-validation, admin-form accessibility, placeholder-only field, stale-load, stuck-loading, retry/error-state, re-entry, numeric-input, static-I/O, loading-finalization, repeated formatter construction, linear lookup, broad-transition, unstable-key, locale/timezone determinism, redundant map/filter, state-updater side-effect, analytics aggregation, independent-await, internal-navigation, visual-builder sandbox bridge, and CMS mutation re-entry findings are resolved with shared serialization, sandbox boundaries, status-aware parsing, explicit control labels, cancellation, finally-based cleanup, bounded parallel work, deterministic formatting, and regression coverage. CI now enforces a non-regression budget of 286 warnings via `REACT_DOCTOR_WARNING_BUDGET`.
+- **Medium:** the repository has 102 source React Doctor warnings; the current zero-error result does not mean warning-free hygiene. The highest-confidence JSON-LD, preview-iframe, upstream-response, URL-validation, admin-form accessibility, placeholder-only field, stale-load, stuck-loading, retry/error-state, re-entry, numeric-input, static-I/O, loading-finalization, repeated formatter construction, linear lookup, broad-transition, unstable-key, locale/timezone determinism, redundant map/filter, state-updater side-effect, analytics aggregation, independent-await, internal-navigation, visual-builder sandbox bridge, and CMS mutation re-entry findings are resolved with shared serialization, sandbox boundaries, status-aware parsing, explicit control labels, cancellation, finally-based cleanup, bounded parallel work, deterministic formatting, and regression coverage. CI now enforces a non-regression budget of 102 warnings via `REACT_DOCTOR_WARNING_BUDGET`.
 - **Resolved at the architectural boundary:** React Doctor’s two webhook-signature warnings are false positives for the Next routes. The Next handlers are deliberately secretless signed proxies; `scripts/check-webhook-proxy-boundary.mjs` now proves required signature/replay headers are forwarded and that the Cloudflare Worker verifies signatures and persists replay protection in `workers/backend/src/channel-events-admin.ts` and `workers/backend/src/nango-webhook.ts`. This check runs in `quality:contracts`.
 - **Resolved:** the main CMS storefront editor now uses `sandbox="allow-scripts"`; selection, mutation, frame state, and CSS-variable discovery cross the iframe through validated `postMessage` contracts, eliminating the same-origin DOM bridge.
-- **Low/medium:** the targeted web dead surfaces are removed, but the unconfigured monorepo scan still contains entrypoint/config false-positive candidates and package-level dependency cleanup work. `act` remains an intentional system-provided local-CI executable.
+- **Resolved:** the configured monorepo Knip scan (`pnpm quality:knip`) is clean with no findings. The repository still retains intentional terminal-agent, demo, script, and CI entrypoints; they are explicitly owned rather than deleted based on default discovery false positives. `act` remains an intentional system-provided local-CI executable.
 
 ### Evidence and product truth risks
 
@@ -165,7 +175,6 @@ The following matrix covers every operation in `internal/reference/admin-open-ap
 
 | Method | Route | Flags | Permission metadata | Tenant metadata | Idempotency metadata | Runtime source |
 |---|---|---|---|---|---|---|
-| GET | `/account/loyalty` | S,E | internal-signature | False | False | `apps/web/src/app/api/account/loyalty/route.ts` |
 | GET | `/account/marketing-preferences` | S,L | internal-signature | False | False | `apps/web/src/app/api/account/marketing-preferences/route.ts` |
 | PATCH | `/account/marketing-preferences` | V,N,S | internal-signature | False | False | `apps/web/src/app/api/account/marketing-preferences/route.ts` |
 | GET | `/account/order-preferences` | S,L | internal-signature | False | False | `apps/web/src/app/api/account/order-preferences/route.ts` |
@@ -622,7 +631,7 @@ This matrix covers all 102 operations in `internal/reference/pancake-open-api.ya
 
 ### P2 — Reduce hygiene noise
 
-1. Triage the 198 remaining source React Doctor warnings by category and ownership; security-sensitive findings must be fixed or explicitly constrained before release.
+1. Triage the 102 remaining source React Doctor warnings by category and ownership; security-sensitive findings must be fixed or explicitly constrained before release.
 2. Fix warnings that affect server/client boundaries, effects, render purity, accessibility, and unnecessary rerenders first.
 3. Resolved: add a warning budget so new warnings fail CI while legacy warnings remain explicitly tracked; lower the budget whenever a warning class is removed.
 4. Keep Knip as a review signal, but distinguish generated/reference/demo files from production files.
@@ -678,9 +687,9 @@ Implemented and verified in the current checkout:
 - Middleware route-family observability is available behind `UVS_ROUTE_METRICS=1`, emitting bounded request-id, status, cache, method, family, and middleware-duration records without enabling production logging by default.
 - Deleted-route Next validator artifacts are cleaned before web typecheck.
 
-Current evidence: focused web contract tests and full web tests pass 541/541, Worker tests pass 381/381, workspace typecheck/lint pass, and the contract/security/migration boundary gate passes. The OpenAPI reference contains 276 operations, 318 executable schemas, zero heuristic/unresolved schemas, and 594 matching source hashes; raw CSV exports are represented as binary responses.
+Current evidence: focused web contract tests and full web tests pass 595/595, Worker tests pass 519/519, workspace typecheck/lint pass, and the contract/security/migration boundary gate passes. The OpenAPI reference contains 280 operations, 323 executable schemas, zero heuristic schemas, 0 unresolved schemas, and 603 matching source hashes; raw CSV exports are represented as binary responses.
 
-The matrix evidence gate now distinguishes terminal external blockers from unresolved local work: 403 rows are inventoried, 355 have explicit blocked classifications with hashed recovery records, 41 are verified with durable evidence, and 7 remain unresolved local findings. This is not a completion claim; the unresolved rows still require implementation and proof.
+The matrix evidence gate now distinguishes terminal external blockers from unresolved local work: 403 rows are inventoried, 344 have explicit blocked classifications with hashed recovery records, 59 are verified with durable evidence, and 0 remain unresolved local findings. This is not a completion claim; the blocked rows still require their stated external recovery runs and are not completion evidence.
 
 The static route-state inventory also now covers all 92 UI pages with loading and error boundaries (92/92 each). This closes the missing-boundary inventory finding; runtime state behavior still requires authenticated browser evidence.
 
@@ -689,16 +698,35 @@ The static route-state inventory also now covers all 92 UI pages with loading an
 This snapshot is retained as historical evidence. The later “Current authoritative
 snapshot” below supersedes its route, hash, and test counts.
 
-This snapshot supersedes earlier counts in this document. The route-ownership manifest contains 205 API route files; 8 remain `web-platform-database` and 3 of those are admin routes. The OpenAPI reference contains 276 operations, the checked admin subset reports 193 matches, and the source-drift gate reports 597 matching operation/schema hashes.
+This snapshot supersedes earlier counts in this document. The route-ownership manifest contains 207 API route files with no unsafe Worker-origin database imports. The OpenAPI reference contains 280 operations, the checked admin subset reports 196 matches, and the source-drift gate reports 603 matching operation/schema hashes.
 
-`/admin/payments/{id}/mark-review`, `/admin/payments/{id}/retry`, workflow entity/transition operations, `/admin/voids`, `/admin/reconciliation`, and `/admin/pin-approval` are now Worker-owned. Retry finalization uses the two-database Worker finalization primitive with staff bearer authentication, organization-scoped payment correlation, durable Hyperdrive idempotency, bounded safe errors, and audit logging; it no longer depends on a Next internal secret or direct service-role database access. Focused workflow/payment/void/reconciliation/PIN tests pass; the full Worker suite is being refreshed after this migration.
+`/admin/payments/{id}/mark-review`, `/admin/payments/{id}/retry`, workflow entity/transition operations, `/admin/voids`, `/admin/reconciliation`, and `/admin/pin-approval` are now Worker-owned. Retry finalization uses the two-database Worker finalization primitive with staff bearer authentication, organization-scoped payment correlation, durable Hyperdrive idempotency, bounded safe errors, and audit logging; it no longer depends on a Next internal secret or direct service-role database access. Focused workflow/payment/void/reconciliation/PIN tests pass; the current full Worker suite passes 519/519.
 
-Current local verification gates pass after regeneration: admin guard, OpenAPI matching/source drift, webhook boundary, route ownership, route-state coverage (92/92 loading and 92/92 error boundaries), storefront client boundary, migration boundary, and audit triage. Workspace typecheck and lint also pass. Provider-backed deployed authentication, safe SQL plans, source-root reconciliation, and long-duration browser memory evidence remain explicit release gates.
+Current local verification gates pass after regeneration: admin guard, OpenAPI matching/source drift, webhook boundary, route ownership, route-state coverage (92/92 loading and 92/92 error boundaries), storefront client boundary, migration boundary, responsive design, cron workflow, and audit triage. Workspace typecheck and lint also pass. Provider-backed hosted Xendit success and long-duration browser memory evidence remain explicit release gates. Safe SQL `EXPLAIN ANALYZE` evidence now exists for both configured databases in read-only transactions; production traffic/cardinality mapping remains open for performance sign-off.
 
 The workflow entity list is also Worker-owned with organization-scoped explicit projection, validated pagination/entity filters, and focused tests; `/admin/workflow/transition` remains a separate mutation migration and is still counted among the seven direct admin routes.
 
 ## Current authoritative snapshot (2026-09-21, tracking revocation migration)
 
-The generated ownership manifest now reports 205 API route files with zero direct `web-platform-database` storefront routes and no direct admin database route. Cart abandonment, review helpful/report mutations, receipt upload, the CRM bridge, tracking-capability revocation, courier telemetry ingress, terminal drawer execution, customer-account response validation, wishlist response validation, cron responses, checkout-intent recovery, profile updates, COD payload hydration, newsletter responses, checkout mutation responses, limiter fail-closed behavior, and cart/chat/payment-retry/catalog/finalization provider error redaction are Worker-owned or bounded at the Next proxy boundary with their respective signed forwarding, bearer/CSRF, private-storage, replay, signature, device, and timeout controls. OpenAPI remains 276 operations with 193 checked admin matches and 594 matching source hashes. The complete Worker suite passes 381/381 and the full web suite passes 541/541; Worker typecheck, workspace typecheck/lint, and all contract boundary gates pass. Deployed authenticated/provider-backed evidence, source-root reconciliation, and long-duration memory soak remain open release gates.
+The generated ownership manifest now reports 207 API route files with no unsafe Worker-origin database imports. Cart abandonment, review helpful/report mutations, receipt upload, the CRM bridge, tracking-capability revocation, courier telemetry ingress, terminal drawer execution, customer-account response validation, wishlist response validation, cron responses, checkout-intent recovery, profile updates, COD payload hydration, newsletter responses, checkout mutation responses, limiter fail-closed behavior, and cart/chat/payment-retry/catalog/finalization provider error redaction are Worker-owned or bounded at the Next proxy boundary with their respective signed forwarding, bearer/CSRF, private-storage, replay, signature, device, and timeout controls. OpenAPI remains 280 operations with 196 checked admin matches and 603 matching source hashes. The complete Worker suite passes 519/519 and the full web suite passes 595/595; Worker typecheck, workspace typecheck/lint, and all contract boundary gates pass. Provider-backed hosted Xendit success, safe SQL plans, and long-duration memory soak remain open release gates.
 
 Vercel deployment availability is separately verified: the connected `universalmusic` Next.js project has READY `dev` preview commit `c97937c` and READY `main` production commit `81aada3`, both from `JustineDevs/UMS`. This does not prove that the current dirty checkout is the source for either deployment.
+
+## Current evidence correction — 2026-09-29
+
+The older deployment paragraph above is retained as historical evidence. The
+current checkout was subsequently deployed through the linked `universalmusic`
+project as `dpl_5LVno3rqv48wDBzDjegU2jWCgHZr`, and the live `/api/health/sop`
+contract passed with Worker readiness. Provider-backed sandbox reruns also
+passed for Stripe completion/decline, PayPal hosted/inline/cancel/decline and
+admin visibility, and Xendit failure/expiry plus admin visibility. The hosted
+Xendit success browser step remains unverified: the local sandbox reached the
+hosted return only after its callback was sent to the deployed origin, which
+cannot share the local checkout session; the deployed
+`/api/checkout/available-payment-methods` currently exposes only `COD`.
+Production Xendit credentials/configuration must be enabled and rerun on the
+deployed origin before this gate can close.
+The interactive CMS memory soak remains an open release gate. Safe SQL `EXPLAIN
+ANALYZE` evidence is now grounded in read-only transactions against both
+configured databases; production traffic/cardinality mapping remains open and
+is not inferred from static or non-analyze planner coverage.

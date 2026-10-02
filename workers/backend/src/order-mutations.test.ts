@@ -17,7 +17,13 @@ function token(email = "buyer@example.com"): string {
   return `${header}.${payload}.${signature}`;
 }
 
-function fixture(orderStatus = "completed") {
+function fixture(
+  orderStatus = "completed",
+  identity: { customer_id: string | null; email: string | null } = {
+    customer_id: "cus_1",
+    email: "buyer@example.com",
+  },
+) {
   const queries: Array<{ role: string; text: string; values: readonly unknown[] }> = [];
   const env = {
     JWT_SECRET: "test-secret",
@@ -32,10 +38,10 @@ function fixture(orderStatus = "completed") {
             return { rows: [], rowCount: 1 };
           }
           if (role === "medusa" && text.startsWith("UPDATE public.\"order\"")) {
-            return { rows: [{ id: "order_1", customer_id: "cus_1", email: "buyer@example.com", status: "canceled" }] as T[], rowCount: 1 };
+            return { rows: [{ id: "order_1", ...identity, status: "canceled" }] as T[], rowCount: 1 };
           }
           if (role === "medusa" && text.includes('FROM public."order"')) {
-            return { rows: [{ id: "order_1", customer_id: "cus_1", email: "buyer@example.com", status: orderStatus }] as T[], rowCount: 1 };
+            return { rows: [{ id: "order_1", ...identity, status: orderStatus }] as T[], rowCount: 1 };
           }
           if (role === "medusa" && text.includes("FROM public.order_item")) {
             return { rows: [{ id: "oit_1", quantity: 2, return_requested_quantity: 0, return_received_quantity: 0, return_dismissed_quantity: 0, written_off_quantity: 0 }] as T[], rowCount: 1 };
@@ -78,6 +84,26 @@ test("order cancellation updates only an owned cancellable order", async () => {
   assert.ok(fixtureState.queries.some((query) => query.text.includes("UPDATE public.\"order\"")));
 });
 
+test("order cancellation hides a foreign order and never updates it", async () => {
+  const fixtureState = fixture("pending", {
+    customer_id: "cus_other",
+    email: "other@example.com",
+  });
+  const response = await handleOrderCancellationRequest(
+    new Request("https://api.example.com/store/customers/me/orders/order_1/cancel", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Idempotency-Key": "cancel-foreign" },
+    }),
+    fixtureState.env,
+    "order_1",
+  );
+  assert.equal(response.status, 404);
+  assert.equal(
+    fixtureState.queries.some((query) => query.text.includes("UPDATE public.\"order\"")),
+    false,
+  );
+});
+
 test("return request validates remaining quantity and records APP review work", async () => {
   const fixtureState = fixture();
   const response = await handleOrderReturnRequest(
@@ -106,4 +132,32 @@ test("return request rejects duplicate lines before touching either database", a
   );
   assert.equal(response.status, 400);
   assert.equal(fixtureState.queries.length, 0);
+});
+
+test("return request forbids a foreign order before reading its lines or recording audit", async () => {
+  const fixtureState = fixture("completed", {
+    customer_id: "cus_other",
+    email: "other@example.com",
+  });
+  const response = await handleOrderReturnRequest(
+    new Request("https://api.example.com/store/orders/return", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token()}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": "return-foreign",
+      },
+      body: JSON.stringify({ orderId: "order_1", items: [{ item_id: "oit_1", quantity: 1 }] }),
+    }),
+    fixtureState.env,
+  );
+  assert.equal(response.status, 403);
+  assert.equal(
+    fixtureState.queries.some((query) => query.text.includes("FROM public.order_item")),
+    false,
+  );
+  assert.equal(
+    fixtureState.queries.some((query) => query.text.includes("customer_return_request_audit")),
+    false,
+  );
 });

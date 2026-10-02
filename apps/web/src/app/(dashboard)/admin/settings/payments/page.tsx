@@ -4,13 +4,12 @@ import { Download, RotateCw, Settings2 } from "lucide-react";
 import { listRecentPaymentAttempts } from "@universal-music-store/platform-data";
 
 import { Button } from "@/components/ui/button";
-import { AdminPageHeader, AuditTimeline } from "@/components/admin-console";
+import { AdminPageHeader } from "@/components/admin-console";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BalanceDistributionCard, type FinanceBalancePoint } from "@/components/reference-finance/_components/balance-distribution-card";
 import { FinanceNotification } from "@/components/reference-finance/_components/finance-notification";
 import { IncomeBreakdown } from "@/components/reference-finance/_components/income-breakdown";
 import { OverviewKpis } from "@/components/reference-finance/_components/overview-kpis";
-import { QuickActions } from "@/components/reference-finance/_components/quick-actions";
 import { TransactionsOverviewCard, type FinanceTransactionPoint } from "@/components/reference-finance/_components/transactions-overview-card";
 import { UpcomingTransactions } from "@/components/reference-finance/_components/upcoming-transactions";
 import { Wallet } from "@/components/reference-finance/_components/wallet";
@@ -76,10 +75,10 @@ export default async function PaymentSettingsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <AdminPageHeader title="Personal Finances" subtitle={formattedDate} actions={<div className="flex flex-wrap items-center gap-3">
+      <AdminPageHeader title="Personal Finances" subtitle={formattedDate} actions={<div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
         <div className="flex items-center gap-1.5 text-muted-foreground text-xs"><RotateCw className="size-4" /><span>Updated {attempts[0]?.updated_at ? format(new Date(attempts[0].updated_at), "MMM d, h:mm a") : "not available"}</span></div>
-        <Button asChild size="sm" variant="outline"><Link href="/admin/settings"><Settings2 />Settings</Link></Button>
-        <Button asChild size="sm" variant="outline"><a href="/api/admin/payment-attempts/export"><Download data-icon="inline-start" />Export CSV</a></Button>
+        <Button asChild size="sm" variant="outline"><Link href="/admin/settings/preferences"><Settings2 />Settings</Link></Button>
+        <Button asChild size="sm" variant="outline"><Link href="/api/admin/payment-attempts/export"><Download data-icon="inline-start" />Export CSV</Link></Button>
       </div>} />
       <Tabs defaultValue={activeTab === "accounts" ? "12-months" : activeTab === "transactions" ? "custom" : "30-days"} className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -98,10 +97,9 @@ export default async function PaymentSettingsPage({
             <div className="xl:col-span-7"><TransactionsOverviewCard data={transactionData} /></div>
             <div className="xl:col-span-5"><BalanceDistributionCard balanceData={balanceDataWithPercentages} /></div>
           </div>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-            <div className="xl:col-span-4"><Wallet /></div>
-            <div className="xl:col-span-4"><UpcomingTransactions /></div>
-            <div className="xl:col-span-4"><QuickActions /></div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Wallet />
+            <UpcomingTransactions />
           </div>
         </TabsContent>
         <TabsContent value="12-months">
@@ -118,7 +116,6 @@ export default async function PaymentSettingsPage({
           </div>
         </TabsContent>
       </Tabs>
-      <AuditTimeline title="Recent payment activity" />
     </div>
   );
 }

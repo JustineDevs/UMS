@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useReducer, useRef } from "react";
 import {
   Alert,
   AlertDescription,
@@ -10,9 +10,43 @@ import {
   Label,
   Textarea,
 } from "@universal-music-store/ui";
-import { getRecaptchaToken, RecaptchaScript } from "@/components/RecaptchaScript";
+import { RecaptchaScript } from "@/components/RecaptchaScript";
+import { getRecaptchaToken } from "@/lib/recaptcha-client";
 
 type SubmitStatus = "idle" | "sending" | "sent" | "error";
+type FormState = {
+  name: string;
+  senderEmail: string;
+  orderNumber: string;
+  subject: string;
+  body: string;
+  submitStatus: SubmitStatus;
+  errorMsg: string | null;
+};
+type FormAction =
+  | { type: "field"; field: "name" | "senderEmail" | "orderNumber" | "subject" | "body"; value: string }
+  | { type: "sending" }
+  | { type: "sent" }
+  | { type: "error"; message: string }
+  | { type: "validation-error"; message: string };
+
+const initialFormState: FormState = {
+  name: "",
+  senderEmail: "",
+  orderNumber: "",
+  subject: "",
+  body: "",
+  submitStatus: "idle",
+  errorMsg: null,
+};
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  if (action.type === "field") return { ...state, [action.field]: action.value };
+  if (action.type === "sending") return { ...state, submitStatus: "sending", errorMsg: null };
+  if (action.type === "sent") return { ...initialFormState, submitStatus: "sent" };
+  if (action.type === "error") return { ...state, submitStatus: "error", errorMsg: action.message };
+  return { ...state, errorMsg: action.message };
+}
 
 export function ContactSupportForm({
   supportEmail,
@@ -24,13 +58,8 @@ export function ContactSupportForm({
   const email =
     supportEmail?.trim() && supportEmail.includes("@") ? supportEmail.trim() : undefined;
   const phone = supportPhone?.trim() || undefined;
-  const [name, setName] = useState("");
-  const [senderEmail, setSenderEmail] = useState("");
-  const [orderNumber, setOrderNumber] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
-  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [form, dispatch] = useReducer(formReducer, initialFormState);
+  const { name, senderEmail, orderNumber, subject, body, submitStatus, errorMsg } = form;
   const submittingRef = useRef(false);
 
   const handleSubmit = useCallback(
@@ -38,12 +67,11 @@ export function ContactSupportForm({
       e.preventDefault();
       if (submitStatus === "sending" || submittingRef.current) return;
       if (!body.trim() || !senderEmail.trim()) {
-        setErrorMsg("Please fill in your email and message.");
+        dispatch({ type: "validation-error", message: "Please fill in your email and message." });
         return;
       }
       submittingRef.current = true;
-      setSubmitStatus("sending");
-      setErrorMsg(null);
+      dispatch({ type: "sending" });
       try {
         const recaptchaToken = await getRecaptchaToken("contact");
         const res = await fetch("/api/forms/contact", {
@@ -62,15 +90,9 @@ export function ContactSupportForm({
           const json = (await res.json().catch(() => ({}))) as { error?: string };
           throw new Error(json.error ?? `HTTP ${res.status}`);
         }
-        setSubmitStatus("sent");
-        setName("");
-        setSenderEmail("");
-        setOrderNumber("");
-        setSubject("");
-        setBody("");
+        dispatch({ type: "sent" });
       } catch (err) {
-        setSubmitStatus("error");
-        setErrorMsg(err instanceof Error ? err.message : "Submission failed. Please try again.");
+        dispatch({ type: "error", message: err instanceof Error ? err.message : "Submission failed. Please try again." });
       } finally {
         submittingRef.current = false;
       }
@@ -129,7 +151,7 @@ export function ContactSupportForm({
             <Input
               id="contact-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => dispatch({ type: "field", field: "name", value: e.target.value })}
               className="max-w-md"
               autoComplete="name"
             />
@@ -143,7 +165,7 @@ export function ContactSupportForm({
               type="email"
               required
               value={senderEmail}
-              onChange={(e) => setSenderEmail(e.target.value)}
+              onChange={(e) => dispatch({ type: "field", field: "senderEmail", value: e.target.value })}
               className="max-w-md"
               autoComplete="email"
             />
@@ -155,7 +177,7 @@ export function ContactSupportForm({
             <Input
               id="contact-order-number"
               value={orderNumber}
-              onChange={(e) => setOrderNumber(e.target.value)}
+              onChange={(e) => dispatch({ type: "field", field: "orderNumber", value: e.target.value })}
               className="max-w-md"
               autoComplete="off"
               placeholder="example: order_1234"
@@ -168,7 +190,7 @@ export function ContactSupportForm({
             <Input
               id="contact-subject"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => dispatch({ type: "field", field: "subject", value: e.target.value })}
               className="max-w-md"
               autoComplete="off"
             />
@@ -181,7 +203,7 @@ export function ContactSupportForm({
               id="contact-body"
               required
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={(e) => dispatch({ type: "field", field: "body", value: e.target.value })}
               rows={6}
               className="max-w-lg"
             />

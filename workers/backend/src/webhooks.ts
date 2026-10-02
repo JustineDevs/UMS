@@ -170,7 +170,13 @@ function eventId(provider: WebhookProvider, value: unknown): string | null {
   if (typeof candidate === "string" && candidate.trim()) return candidate.trim();
   if (provider !== "xendit") return null;
   const resource = recordAt(record.data);
-  const resourceId = stringField(resource, "id");
+  const resourceId = stringField(
+    resource,
+    "id",
+    "payment_session_id",
+    "payment_request_id",
+    "payment_id",
+  );
   const type = stringField(record, "event", "event_type", "type");
   if (!resourceId || !type) return null;
   const version = stringField(resource, "updated") ?? stringField(record, "created");
@@ -294,7 +300,14 @@ function paymentStatus(
         type,
       )) ||
     (provider === "xendit" &&
-      ["paid", "succeeded", "payment.succeeded", "capture"].includes(type))
+      [
+        "paid",
+        "succeeded",
+        "payment.succeeded",
+        "payment_session.completed",
+        "payment.capture",
+        "capture",
+      ].includes(type))
   )
     return "paid";
   if (["cancelled", "canceled"].includes(type)) return "cancelled";
@@ -304,6 +317,9 @@ function paymentStatus(
       "payment_failed",
       "payment.failed",
       "checkout.session.expired",
+      "payment_session.expired",
+      "payment.failure",
+      "payment_session.failed",
       "expired",
     ].includes(type)
   )

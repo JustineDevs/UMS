@@ -223,7 +223,12 @@ function status(row: OrderRow): string {
     metadata.cod_capture_complete !== true
   )
     return "pending_payment";
-  if (!/captured|partially_captured/i.test(row.payment_status ?? ""))
+  const paymentStatus = String(row.payment_status ?? "")
+    .trim()
+    .toLowerCase();
+  if (
+    !new Set(["captured", "partially_captured", "completed"]).has(paymentStatus)
+  )
     return "pending_payment";
   const fulfillment = row.fulfillment_status ?? "";
   if (["delivered", "partially_delivered"].includes(fulfillment))
@@ -242,6 +247,12 @@ function status(row: OrderRow): string {
 
 function shipments(row: OrderRow): Array<Record<string, unknown>> {
   const metadata = row.metadata ?? {};
+  const expectedDelivery =
+    typeof metadata.pancake_pos_expected_delivery === "string"
+      ? metadata.pancake_pos_expected_delivery
+      : typeof metadata.jnt_expected_delivery === "string"
+        ? metadata.jnt_expected_delivery
+        : undefined;
   const source =
     Array.isArray(metadata.pancake_pos_shipments) &&
     metadata.pancake_pos_shipments.length > 0
@@ -263,6 +274,16 @@ function shipments(row: OrderRow): Array<Record<string, unknown>> {
         ...(typeof shipment.status === "string"
           ? { status: shipment.status }
           : {}),
+        ...(typeof shipment.source === "string"
+          ? { source: shipment.source.slice(0, 64) }
+          : typeof shipment.carrier_slug === "string"
+            ? { source: shipment.carrier_slug.slice(0, 64) }
+            : {}),
+        ...(typeof shipment.expected_delivery === "string"
+          ? { expected_delivery: shipment.expected_delivery }
+          : expectedDelivery
+            ? { expected_delivery: expectedDelivery }
+            : {}),
         ...(typeof shipment.carrier_slug === "string"
           ? { carrier_slug: shipment.carrier_slug }
           : {}),
@@ -313,7 +334,7 @@ export async function handleTrackingRequest(
               'city', oa.city, 'province', oa.province,
               'postal_code', oa.postal_code
             ) END AS shipping_address,
-            CASE WHEN $2::text = 'confirmation' THEN COALESCE((SELECT json_agg(json_build_object(
+            COALESCE((SELECT json_agg(json_build_object(
               'id', oli.id, 'title', COALESCE(oli.title, ''),
               'quantity', COALESCE(oi.quantity, 0),
               'unit_price', COALESCE(oi.unit_price, 0),
@@ -321,13 +342,12 @@ export async function handleTrackingRequest(
               FROM public.order_item oi
               JOIN public.order_line_item oli ON oli.id = oi.item_id
                 AND oli.deleted_at IS NULL
-             WHERE oi.order_id = o.id AND oi.deleted_at IS NULL), '[]'::json)
-              ELSE NULL END AS items
+             WHERE oi.order_id = o.id AND oi.deleted_at IS NULL), '[]'::json) AS items
        FROM public."order" o
        LEFT JOIN public.order_address oa ON oa.id = o.shipping_address_id
       WHERE o.id = $1 AND o.deleted_at IS NULL
       LIMIT 1`,
-    [capability.id, capability.purpose],
+    [capability.id],
   );
   const row = result.rows[0];
   if (!row) return json({ error: "not_found" }, 404);
@@ -357,6 +377,12 @@ export async function handleTrackingRequest(
       updated_at: row.updated_at,
     },
     shipments: shipments(row),
+    orderSummary: {
+      total: Number(row.total ?? 0) / 100,
+      currency: "PHP",
+      items: Array.isArray(row.items) ? row.items : [],
+      shipping_address: row.shipping_address ?? null,
+    },
     ...(capability.scope ? { capabilityScope: capability.scope } : {}),
   };
   if (capability.purpose === "confirmation") {

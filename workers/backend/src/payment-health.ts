@@ -8,12 +8,14 @@ type PaymentHealthEnv = {
   PAYPAL_WEBHOOK_ID?: string;
   PAYPAL_ENVIRONMENT?: string;
   XENDIT_WEBHOOK_TOKEN?: string;
+  PUBLIC_WORKER_URL?: string;
 };
 
 type ProviderStatus = {
   enabled: boolean;
   webhookConfigured: boolean;
   sandboxMode?: boolean;
+  expectedWebhookEndpoint?: string;
   notes?: string;
 };
 
@@ -32,6 +34,11 @@ function allowed(claims: WorkerAuthClaims): boolean {
 function organization(claims: WorkerAuthClaims): string | null {
   const value = claims.organization_id ?? claims.org_id;
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function expectedWebhookEndpoint(env: PaymentHealthEnv, provider: string): string | undefined {
+  const base = env.PUBLIC_WORKER_URL?.trim().replace(/\/$/, "");
+  return base ? `${base}/webhooks/${provider}` : undefined;
 }
 
 export async function handlePaymentHealthRequest(
@@ -58,16 +65,19 @@ export async function handlePaymentHealthRequest(
   const stripe: ProviderStatus = {
     enabled: connected.has("stripe"),
     webhookConfigured: Boolean(env.STRIPE_WEBHOOK_SECRET?.trim()),
+    expectedWebhookEndpoint: expectedWebhookEndpoint(env, "stripe"),
   };
   const paypal: ProviderStatus = {
     enabled: connected.has("paypal"),
     webhookConfigured: Boolean(env.PAYPAL_WEBHOOK_ID?.trim()),
     sandboxMode: paypalSandbox,
+    expectedWebhookEndpoint: expectedWebhookEndpoint(env, "paypal"),
     notes: !env.PAYPAL_WEBHOOK_ID?.trim() ? "PAYPAL_WEBHOOK_ID is required for webhook verification." : undefined,
   };
   const xendit: ProviderStatus = {
     enabled: connected.has("xendit"),
     webhookConfigured: Boolean(env.XENDIT_WEBHOOK_TOKEN?.trim()),
+    expectedWebhookEndpoint: expectedWebhookEndpoint(env, "xendit"),
   };
   const cod: ProviderStatus = { enabled: true, webhookConfigured: true, notes: "COD does not use provider webhooks." };
   const production = (env.PAYPAL_ENVIRONMENT ?? "").trim().toLowerCase() === "production" || (env.PAYPAL_ENVIRONMENT ?? "").trim().toLowerCase() === "live";

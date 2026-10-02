@@ -1,40 +1,50 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore, useState } from "react";
 import { Heart } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import {
   persistWishlistMutation,
+  onWishlistChange,
   toggleWishlist,
   wishlistContains,
 } from "@/lib/wishlist";
+import { useHydrated } from "@/lib/use-hydrated";
 
 type Props = {
   slug: string;
   name: string;
   /** Medusa product id from catalog; optional for legacy call sites. */
   medusaProductId?: string;
+  imageUrl?: string;
+  price?: number;
+  currencyCode?: string;
   className?: string;
+  compact?: boolean;
 };
 
 export function WishlistToggle({
   slug,
   name,
   medusaProductId,
+  imageUrl,
+  price,
+  currencyCode,
   className = "",
+  compact = false,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const { status } = useSession();
-  const [on, setOn] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const [pending, setPending] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    setOn(wishlistContains(slug, medusaProductId));
-  }, [slug, medusaProductId]);
+  const subscribe = useCallback(onWishlistChange, []);
+  const getSnapshot = useCallback(
+    () => wishlistContains(slug, medusaProductId),
+    [slug, medusaProductId],
+  );
+  const on = useSyncExternalStore(subscribe, getSnapshot, () => false);
 
   const handleClick = useCallback(async () => {
     if (pending) return;
@@ -50,18 +60,22 @@ export function WishlistToggle({
       ...(medusaProductId?.trim()
         ? { medusaProductId: medusaProductId.trim() }
         : {}),
+      ...(imageUrl?.trim() ? { imageUrl: imageUrl.trim() } : {}),
+      ...(typeof price === "number" && Number.isFinite(price) ? { price } : {}),
+      ...(currencyCode?.trim()
+        ? { currencyCode: currencyCode.trim().toUpperCase() }
+        : {}),
     };
     const next = !wishlistContains(slug, medusaProductId);
     try {
       await persistWishlistMutation(entry, next ? "add" : "remove");
       toggleWishlist(entry);
-      setOn(next);
     } catch {
       // Keep the local state unchanged when the server rejects the mutation.
     } finally {
       setPending(false);
     }
-  }, [slug, name, medusaProductId, status, router, pathname, pending]);
+  }, [slug, name, medusaProductId, imageUrl, price, currencyCode, status, router, pathname, pending]);
 
   return (
     <button
@@ -72,7 +86,7 @@ export function WishlistToggle({
       aria-label={
         on ? "Remove from saved items" : "Save item to your list"
       }
-      className={`inline-flex items-center justify-center rounded bg-surface-container-low p-3 transition-colors hover:bg-surface-container-high disabled:cursor-wait disabled:opacity-60 ${className}`}
+      className={`${compact ? "size-11 rounded-none bg-transparent p-0 hover:bg-transparent" : "rounded bg-surface-container-low p-3 hover:bg-surface-container-high"} inline-flex items-center justify-center transition-colors disabled:cursor-wait disabled:opacity-60 ${className}`}
     >
       <Heart
         aria-hidden="true"

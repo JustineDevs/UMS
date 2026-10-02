@@ -15,7 +15,10 @@ export const dynamic = "force-static";
  */
 export default function NotFound() {
   return (
-    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-surface px-6 py-16 text-center text-on-surface">
+    <main
+      id="main-content"
+      className="flex min-h-[100dvh] flex-col items-center justify-center bg-surface px-6 py-16 text-center text-on-surface"
+    >
       <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-on-surface-variant">
         HTTP 404
       </p>

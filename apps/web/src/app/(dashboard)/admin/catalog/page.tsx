@@ -1,12 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  AdminBreadcrumbs,
   AdminEmptyState,
-  AuditTimeline,
-  CrudManagerLayout,
+  AdminPageHeader,
+  AdminPageShell,
 } from "@/components/admin-console";
-import { AdminTechnicalDetails } from "@/components/AdminTechnicalDetails";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,8 +27,6 @@ import {
 } from "@/components/ui/table";
 import {
   fetchCatalogProductsForAdmin,
-  getAdminProductEditUrl,
-  getAdminProductsIndexUrl,
   type CatalogAdminProduct,
 } from "@/lib/catalog-admin-bridge";
 import {
@@ -38,7 +34,6 @@ import {
   fetchAllInventoryRows,
 } from "@/lib/inventory-admin-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
-import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 
 function formatAggregatedStock(
   p: CatalogAdminProduct,
@@ -125,10 +120,9 @@ export default async function CatalogPage({
     ? []
     : await fetchAllInventoryRows({ batchSize: 100 });
   const stockByProduct = aggregateStockAvailableByProductId(inventoryRows);
-
-  const shopOrigin = getStorefrontPublicOrigin();
-
-  const fullEditorUrl = getAdminProductsIndexUrl();
+  const publishedOnPage = products.filter((product) => product.status === "published").length;
+  const draftOnPage = products.filter((product) => product.status !== "published").length;
+  const variantsOnPage = products.reduce((sum, product) => sum + product.variantCount, 0);
 
   const commerceBanner = commerceUnavailable ? (
     <div className="rounded border border-outline-variant/30 bg-surface-container-high px-4 py-3 text-sm">
@@ -215,81 +209,44 @@ export default async function CatalogPage({
     </div>
   );
 
-  const actions = (
-    <>
-      <Button asChild variant="outline">
-        <Link href="/admin">Back to dashboard</Link>
-      </Button>
-      <Button asChild>
-        <Link href="/admin/catalog/new">Add product</Link>
-      </Button>
-      <Button asChild variant="outline">
-        <a href={fullEditorUrl} target="_blank" rel="noopener noreferrer">
-          Open full catalog in store admin
-        </a>
-      </Button>
-    </>
-  );
-
   return (
-    <CrudManagerLayout
-      title="Products"
-      subtitle="Published products and categories match what shoppers see. Stock is the total available units across variants. Use the full store admin for complex pricing and many variants per product."
-      breadcrumbs={
-        <AdminBreadcrumbs
-          items={[
-            { label: "Dashboard", href: "/admin" },
-            { label: "Products" },
-          ]}
-        />
-      }
-      bannerSlot={bannerSlot}
-      filters={filters}
-      actions={actions}
-      inspector={
-        <AuditTimeline
-          resourcePrefix="product:"
-          title="Recent catalog changes"
-        />
-      }
-    >
-      <div className="mb-6 flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-outline-variant/15 bg-surface-container-low/80 px-4 py-3 text-sm">
-        <span className="font-semibold text-on-surface">Connected areas</span>
-        <Link className="text-primary hover:underline" href="/admin/inventory">
-          Inventory
-        </Link>
-        <span className="text-on-surface-variant/50" aria-hidden>
-          |
-        </span>
-        <Link className="text-primary hover:underline" href="/admin/orders">
-          Orders
-        </Link>
-        <span className="text-on-surface-variant/50" aria-hidden>
-          |
-        </span>
-        <Link className="text-primary hover:underline" href="/admin/pos">
-          POS
-        </Link>
-        <span className="text-on-surface-variant/50" aria-hidden>
-          |
-        </span>
-        <a
-          className="text-primary hover:underline"
-          href={`${shopOrigin}/shop`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Storefront shop
-        </a>
+    <AdminPageShell hideHeader bannerSlot={bannerSlot}>
+      <AdminPageHeader
+        title="Products"
+        subtitle="Manage the products and variants your customers see in the storefront."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild>
+              <Link href="/admin/catalog/new">Add product</Link>
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <p className="text-sm font-medium text-foreground">Total products</p>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{count}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Across the catalog</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <p className="text-sm font-medium text-foreground">Published</p>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{publishedOnPage}</p>
+          <p className="mt-1 text-xs text-muted-foreground">On the current page</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <p className="text-sm font-medium text-foreground">Variants</p>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{variantsOnPage}</p>
+          <p className="mt-1 text-xs text-muted-foreground">On the current page</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <p className="text-sm font-medium text-foreground">Draft or review</p>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{draftOnPage}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Needs catalog attention</p>
+        </article>
       </div>
 
-      <AdminTechnicalDetails className="mb-6 max-w-3xl">
-        <p>
-          The full store admin opens in a new tab for advanced edits. Stock
-          totals need a warehouse link for each item. If stock shows a dash,
-          open Inventory or the full store admin to set quantities.
-        </p>
-      </AdminTechnicalDetails>
+      {filters}
 
       <Card>
         <CardHeader className="border-b">
@@ -416,14 +373,6 @@ export default async function CatalogPage({
                         >
                           Edit here
                         </Link>
-                        <a
-                          href={getAdminProductEditUrl(p.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant hover:underline"
-                        >
-                          Store admin
-                        </a>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -478,12 +427,6 @@ export default async function CatalogPage({
         </div>
       ) : null}
 
-      <p className="mt-8 max-w-3xl text-xs leading-relaxed text-on-surface-variant">
-        Orders, inventory, and point of sale share the same catalog as checkout.
-        Stock is available quantity when each variant is linked to inventory.
-        Rules for collections, discounts, and shipping are managed in the full
-        store admin.
-      </p>
-    </CrudManagerLayout>
+    </AdminPageShell>
   );
 }

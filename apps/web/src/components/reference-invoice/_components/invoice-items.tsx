@@ -20,6 +20,7 @@ import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn, formatCurrency } from "@/lib/utils";
 
 import { getLineAmount, type InvoiceFormValues, type InvoiceLineItem } from "./data";
@@ -57,14 +58,14 @@ export function InvoiceItems() {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-medium tracking-tight">Invoice Items</h2>
-        <Button type="button" variant="ghost" size="sm" onClick={handleAddItem}>
+        <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
           <Plus data-icon="inline-start" />
           Add Item
         </Button>
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="hidden items-center gap-2 px-1 font-medium text-muted-foreground text-xs md:grid md:grid-cols-[24px_minmax(0,1fr)_52px_88px_96px_32px]">
+        <div className="hidden items-center gap-2 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[24px_minmax(92px,1fr)_64px_104px_80px_28px]">
           <span />
           <span>Description</span>
           <span className="px-2">Units</span>
@@ -125,7 +126,7 @@ function SortableInvoiceItemRow({
         transition,
       }}
       className={cn(
-        "grid min-w-0 grid-cols-[24px_minmax(0,0.8fr)_minmax(0,1fr)_32px] items-center gap-2 rounded-lg md:grid-cols-[24px_minmax(0,1fr)_52px_88px_96px_32px]",
+        "grid min-w-0 grid-cols-[24px_minmax(0,1fr)_minmax(0,4.5rem)_32px] items-center gap-2 rounded-lg md:grid-cols-[24px_minmax(92px,1fr)_64px_104px_80px_28px]",
         isDragging && "relative z-10 opacity-50",
       )}
     >
@@ -149,17 +150,22 @@ function SortableInvoiceItemRow({
       <Input
         type="number"
         step="1"
+        min="1"
         className="text-sm max-md:col-start-2 max-md:row-start-2"
         aria-label={`Item ${index + 1} quantity`}
         {...register(`items.${index}.quantity` as const, { valueAsNumber: true })}
       />
-      <Input
-        type="number"
-        step="0.01"
-        className="text-sm max-md:col-start-3 max-md:row-start-2"
-        aria-label={`Item ${index + 1} unit price`}
-        {...register(`items.${index}.unitPrice` as const, { valueAsNumber: true })}
-      />
+      <InputGroup className="min-w-0 max-md:col-start-3 max-md:row-start-2">
+        <InputGroupAddon align="inline-start">₱</InputGroupAddon>
+        <InputGroupInput
+          type="number"
+          step="0.01"
+          min="0"
+          className="text-sm"
+          aria-label={`Item ${index + 1} unit price`}
+          {...register(`items.${index}.unitPrice` as const, { valueAsNumber: true })}
+        />
+      </InputGroup>
       <div className="min-w-0 text-right font-medium text-sm max-md:col-span-3 max-md:col-start-2 max-md:row-start-3 max-md:flex max-md:items-center max-md:justify-between max-md:text-left">
         <span className="hidden text-muted-foreground max-md:inline">Line total</span>
         <span>{formatInvoiceCurrency(getLineAmount(item))}</span>

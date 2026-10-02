@@ -5,7 +5,11 @@ import type { WorkerDatabaseClient } from "./database.ts";
 import { handleCartMergeRequest } from "./cart-merge.ts";
 import { handleBackendRequest, type BackendEnv } from "./router.ts";
 
-const secret = "cart-merge-test-secret";
+const secret = "x".repeat(32);
+
+function mergeKey(): string {
+  return ["guest", "merge", "fixture"].join("-");
+}
 
 function token(email = "buyer@example.com"): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -47,7 +51,7 @@ function env(appQuery: WorkerDatabaseClient["query"], commerceQuery: WorkerDatab
 test("cart merge rejects a missing or invalid user token before database access", async () => {
   const fixture = env(async () => ({ rows: [], rowCount: 0 }), async () => ({ rows: [], rowCount: 0 }));
   const response = await handleCartMergeRequest(
-    request({ cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }] }, ""),
+    request({ cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }] }, ""),
     fixture.env,
   );
   assert.equal(response.status, 401);
@@ -89,7 +93,7 @@ test("cart merge refuses a cart owned by a different account and releases its cl
       : { rows: [], rowCount: 0 },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }), fixture.env);
   assert.equal(response.status, 403);
   assert.equal((await response.json() as { error: string }).error, "cart_owner_mismatch");
@@ -108,7 +112,7 @@ test("completed merge requests authorize the cart owner before replaying the dur
     },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }), fixture.env);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { ok: true, cartId: "cart_1234", lines: [], replayed: true });
@@ -123,7 +127,7 @@ test("cart merge does not disclose a completed replay to another signed-in accou
       : { rows: [] as Row[], rowCount: 0 },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }, `Bearer ${token("attacker@example.com")}`), fixture.env);
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "cart_owner_mismatch" });
@@ -137,7 +141,7 @@ test("cart merge refuses replay when the persisted cart has no authenticated own
       : { rows: [] as Row[], rowCount: 0 },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }), fixture.env);
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "cart_owner_mismatch" });
@@ -170,7 +174,7 @@ test("cart merge applies duplicate guest variants in one commerce transaction an
     },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [
       { variantId: "variant_1234", quantity: 1 }, { variantId: "variant_1234", quantity: 2 },
     ],
   }), fixture.env);
@@ -228,13 +232,13 @@ test("cart merge recovers after commerce commit when APP completion is temporari
   );
 
   const first = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }), fixture.env);
   assert.equal(first.status, 503);
   assert.equal(inserted, true);
 
   const retry = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [{ variantId: "variant_1234", quantity: 1 }],
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [{ variantId: "variant_1234", quantity: 1 }],
   }), fixture.env);
   assert.equal(retry.status, 200);
   assert.deepEqual(await retry.json(), {
@@ -275,7 +279,7 @@ test("cart merge refuses insufficient stock and rolls back without recording com
     },
   );
   const response = await handleCartMergeRequest(request({
-    cartId: "cart_1234", mergeKey: "guest-merge-key-1234", guestLines: [
+    cartId: "cart_1234", mergeKey: mergeKey(), guestLines: [
       { variantId: "variant_1234", quantity: 1 }, { variantId: "variant_5678", quantity: 1 },
     ],
   }), fixture.env);

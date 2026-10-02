@@ -11,6 +11,7 @@ import {
   handleSocialProofRequest,
   handleCollectionsRequest,
   handleCatalogCategoriesRequest,
+  handleCatalogFacetsRequest,
   handleCollectionRequest,
   handleRegionsRequest,
 } from "./catalog.ts";
@@ -273,6 +274,40 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
+// Public CMS reads are requested by several page loaders at the same time.
+// Coalesce only the in-flight request so a route sweep cannot stampede the
+// database; completed responses are never retained in Worker memory.
+const publicReadInFlight = new Map<string, Promise<Response>>();
+
+export async function coalescePublicRead(
+  key: string,
+  operation: () => Promise<Response>,
+): Promise<Response> {
+  const pending = publicReadInFlight.get(key);
+  if (pending) return (await pending).clone();
+
+  const promise = operation();
+  publicReadInFlight.set(key, promise);
+  try {
+    return (await promise).clone();
+  } finally {
+    if (publicReadInFlight.get(key) === promise) publicReadInFlight.delete(key);
+  }
+}
+
+function publicReadKey(
+  request: Request,
+  env: BackendEnv,
+): string | null {
+  const url = new URL(request.url);
+  if (
+    url.pathname !== "/store/navigation" &&
+    url.pathname !== "/store/announcements" &&
+    url.pathname !== "/storefront/public-metadata"
+  ) return null;
+  return `${env.CMS_ORGANIZATION_ID ?? env.DEFAULT_ORGANIZATION_ID ?? ""}:${url.pathname}${url.search}`;
+}
+
 function allowedOrigin(request: Request, env: BackendEnv): string | null {
   const origin = request.headers.get("Origin");
   if (!origin) return null;
@@ -306,6 +341,22 @@ function nativeRouteFailureCode(error: unknown): string {
   return typeof candidate === "string" ? candidate : "UNKNOWN";
 }
 
+function nativeRouteFailureDetails(error: unknown): {
+  errorName: string;
+  errorMessage: string;
+} {
+  if (error instanceof Error) {
+    return {
+      errorName: error.name,
+      errorMessage: error.message.slice(0, 160),
+    };
+  }
+  return {
+    errorName: typeof error,
+    errorMessage: "non_error_failure",
+  };
+}
+
 export function nativeRouteFailureResponse(error: unknown, id: string): Response {
   // PostgreSQL's undefined-table error means the deployed Worker schema is
   // behind the database it is connected to. Reporting that as a catalog outage
@@ -329,6 +380,7 @@ function logNativeRouteFailure(
   const route =
     Object.entries(matches).find(([, match]) => Boolean(match))?.[0] ??
     "unknown";
+  const details = nativeRouteFailureDetails(error);
   console.error(
     JSON.stringify({
       event: "worker_native_route_failed",
@@ -336,6 +388,7 @@ function logNativeRouteFailure(
       route,
       databaseRole: nativeDatabaseRole(matches),
       errorCode,
+      ...details,
     }),
   );
 }
@@ -376,7 +429,7 @@ function hasConfiguredDatabaseForRole(
 
 export async function probeWorkerDatabaseRoles(
   env: BackendEnv,
-  probe: (role: WorkerDatabaseRole) => Promise<boolean> = async (_role) => {
+  probe: (_: WorkerDatabaseRole) => Promise<boolean> = async (_role) => {
     if (!hasConfiguredDatabaseForRole(env, _role)) return false;
     try {
       return await withWorkerDatabase(
@@ -534,6 +587,8 @@ export async function handleBackendRequest(
     request.method === "GET" &&
     (path === "/health" || path === "/healthz" || path === "/readyz")
   ) {
+    // /health and /healthz are liveness endpoints. Only /readyz probes the
+    // database roles and is suitable for dependency-aware readiness checks.
     const databaseRoles =
       path === "/readyz" ? await probeWorkerDatabaseRoles(env) : null;
     const ready =
@@ -569,6 +624,8 @@ export async function handleBackendRequest(
     request.method === "GET" && path === "/store/collections";
   const catalogCategoriesMatch =
     request.method === "GET" && path === "/store/catalog/categories";
+  const catalogFacetsMatch =
+    request.method === "GET" && path === "/store/catalog/facets";
   const searchSuggestionsMatch =
     request.method === "GET" && path === "/store/search/suggestions";
   const socialProofMatch =
@@ -1136,7 +1193,7 @@ export async function handleBackendRequest(
   const cmsAdminMediaDetailMatch = ["GET", "PATCH", "DELETE"].includes(
     request.method,
   )
-    ? path.match(/^\/(?:api\/)?admin\/cms\/media\/([^/]+)$/)
+    ? path.match(/^\/(?:api\/)?admin\/(?:cms|catalog)\/media\/([^/]+)$/)
     : null;
   const navigationMatch =
     request.method === "GET" && path === "/store/navigation";
@@ -2884,7 +2941,7 @@ export async function handleBackendRequest(
         status: nativeResponse.status,
         headers,
       });
-    } catch (error) {
+    } catch {
       return jsonError("catalog_product_mutation_unavailable", id, 503);
     }
   }
@@ -3854,6 +3911,7 @@ export async function handleBackendRequest(
         regionsMatch ||
         collectionsMatch ||
         catalogCategoriesMatch ||
+        catalogFacetsMatch ||
         searchSuggestionsMatch ||
         collectionMatch ||
         productMatch ||
@@ -3933,9 +3991,10 @@ export async function handleBackendRequest(
     (!webhookMatch || hasConfiguredDatabaseForRole(env, "app"))
   ) {
     try {
-      const nativeResponse = await withWorkerDatabase(
-        env as BackendEnv & WorkerDatabaseEnv,
-        async (database) =>
+      const executeNativeRead = () =>
+        withWorkerDatabase(
+          env as BackendEnv & WorkerDatabaseEnv,
+          async (database) =>
           cmsAdminFormSubmissionsExportMatch
             ? handleCmsAdminFormSubmissionsExportRequest(request, database, env)
             : cmsAdminFormSubmissionsMatch
@@ -4351,6 +4410,11 @@ export async function handleBackendRequest(
                                                                                                                                       env.CMS_ORGANIZATION_ID ??
                                                                                                                                         env.DEFAULT_ORGANIZATION_ID,
                                                                                                                                     )
+                                                                                                                                                                                                  : catalogFacetsMatch
+                                                                                                                                                                                                    ? handleCatalogFacetsRequest(
+                                                                                                                                                                                                        request,
+                                                                                                                                                                                                        database,
+                                                                                                                                                                                                      )
                                                                                                                                                                                                   : catalogCategoriesMatch
                                                                                                                                                                                                     ? handleCatalogCategoriesRequest(
                                                                                                                                                                                                         request,
@@ -4430,8 +4494,12 @@ export async function handleBackendRequest(
                                                                                                                                                     request,
                                                                                                                                                     database,
                                                                                                                                                   ),
-        nativeDatabaseRole(nativeRouteMatches),
-      );
+            nativeDatabaseRole(nativeRouteMatches),
+          );
+      const publicReadKeyValue = publicReadKey(request, env);
+      const nativeResponse = publicReadKeyValue
+        ? await coalescePublicRead(publicReadKeyValue, executeNativeRead)
+        : await executeNativeRead();
       const headers = new Headers(nativeResponse.headers);
       headers.set("X-Request-ID", id);
       headers.set("Referrer-Policy", "no-referrer");

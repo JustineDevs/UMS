@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const next = request.nextUrl.searchParams.get("next");
-  const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/account";
+  const destination = next?.startsWith("/") && !next.startsWith("//") ? next : "/account/profile";
   const origin = resolveAuthCallbackOrigin(
     request,
     request.nextUrl.searchParams.get("origin"),

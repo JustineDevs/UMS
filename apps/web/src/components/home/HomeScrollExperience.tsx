@@ -33,7 +33,7 @@ type Partner = {
   name: string;
   href: string;
   logo: string;
-  imageClassName?: string;
+  logoClass?: string;
 };
 
 type HeroStyle = StorefrontHomePayload["hero"]["style"];
@@ -71,6 +71,7 @@ const PARTNERS: Partner[] = [
     name: "BOSS Katana",
     href: "https://www.boss.info/global/categories/amplifiers/katana/",
     logo: "/UVS/partners/BOSS KATANA GEN/boss-katana-gen.png",
+    logoClass: "scale-[1.8]",
   },
   {
     name: "Blackstar",
@@ -101,7 +102,7 @@ const PARTNERS: Partner[] = [
     name: "Lyric",
     href: "https://www.lyric.ph/",
     logo: "/UVS/partners/Lyric/Lyric.png",
-    imageClassName: "md:scale-[1.8]",
+    logoClass: "scale-[1.35]",
   },
   {
     name: "Marshall",
@@ -122,29 +123,26 @@ const PARTNERS: Partner[] = [
     name: "Severo",
     href: "https://www.facebook.com/SeveroGuitars/",
     logo: "/UVS/partners/Severo/Severo-guitars.png",
-    imageClassName: "md:scale-[1.45]",
+    logoClass: "scale-[1.8]",
   },
   {
     name: "Squier by Fender",
     href: "https://www.fender.com/collections/squier",
     logo: "/UVS/partners/Squeir by Fender/squier-by-fender-logo.png",
-    imageClassName: "md:scale-[1.5]",
+    logoClass: "scale-[1.8]",
   },
   {
     name: "Thomson",
     href: "https://www.thomson.ph/",
     logo: "/UVS/partners/Thomson/thomson-logo(0).png",
-    imageClassName: "md:scale-[1.6]",
   },
   {
     name: "Yamaha",
     href: "https://www.yamaha.com/",
     logo: "/UVS/partners/Yamaha/yamaha-logo.png",
-    imageClassName: "md:scale-[1.45]",
+    logoClass: "scale-[1.8]",
   },
 ];
-
-const marqueePartners = [...PARTNERS, ...PARTNERS, ...PARTNERS];
 
 /**
  * Home layout with hero stagger and scroll reveals (GSAP ScrollTrigger).
@@ -604,106 +602,106 @@ export function HomeScrollExperience({
         data-uvs-id="home-hero"
         data-cms-label="Hero"
         style={sectionStyle(home.hero.layout)}
-        className="relative flex min-h-[clamp(22rem,72svh,40rem)] w-full items-center overflow-hidden bg-surface-container-low storefront-section-x py-10 sm:py-14 md:py-16 lg:py-20"
+        className="relative w-full overflow-hidden bg-transparent storefront-section-x py-10 sm:py-14 md:py-16 lg:py-20"
       >
         <div className="relative z-10 mx-auto w-full max-w-[1600px]">
-          <p
-            ref={leadRef}
-            data-cms-id="home-hero-lead"
-            data-uvs-id="home-hero-lead"
-            data-cms-label="Supporting text"
-            className={`mb-8 ${heroLeadWidth} font-body text-base leading-relaxed ${heroLeadTone} sm:mb-10 sm:text-lg`}
-          >
-            {home.hero.lead}{" "}
-            {home.hero.showPrivacyLink ? (
-              <Link
-                href="/privacy"
-                className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+          <div className="grid grid-cols-1 items-stretch gap-8 md:grid-cols-2 md:gap-10">
+            <div className="flex flex-col justify-center">
+              <h1
+                data-cms-id="home-hero-title"
+                data-uvs-id="home-hero-title"
+                data-cms-label="Hero title"
+                className="mb-5 max-w-xl font-headline text-4xl font-extrabold leading-tight tracking-tight text-primary sm:text-5xl"
               >
-                Privacy policy
-              </Link>
-            ) : null}
-          </p>
-          <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button
-              asChild
-              className="bg-gradient-to-br from-primary to-primary-container px-8 py-3.5 font-medium sm:px-10 sm:py-4"
-            >
-              <Link ref={ctaRef} data-cms-id="home-hero-cta" data-uvs-id="home-hero-cta" data-cms-label="Primary action" href={home.hero.ctaHref || "/shop"}>
-                {home.hero.ctaLabel}
-              </Link>
-            </Button>
-            <RatingBadge
-              rating={socialProof.reviewSummary.average}
-              title={`${socialProof.customerCount.toLocaleString("en-PH")} customers`}
-              subtitle={`${socialProof.reviewSummary.count.toLocaleString("en-PH")} reviews`}
-              theme="black"
-              className="shrink-0 sm:ml-2"
-            />
+                {home.hero.line1}
+              </h1>
+              <p
+                ref={leadRef}
+                data-cms-id="home-hero-lead"
+                data-uvs-id="home-hero-lead"
+                data-cms-label="Supporting text"
+                className={`mb-8 ${heroLeadWidth} font-body text-base leading-relaxed ${heroLeadTone} sm:mb-10 sm:text-lg`}
+              >
+                {home.hero.lead}
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:mt-0 sm:flex-row sm:flex-wrap sm:items-center">
+                <Button
+                  asChild
+                  className="bg-primary px-8 py-3.5 font-medium text-on-primary sm:px-10 sm:py-4"
+                >
+                  <Link ref={ctaRef} data-cms-id="home-hero-cta" data-uvs-id="home-hero-cta" data-cms-label="Primary action" href="/shop">
+                    {home.hero.ctaLabel}
+                  </Link>
+                </Button>
+                {socialProof.customerCount >= 10 && socialProof.reviewSummary.count >= 5 ? (
+                  <RatingBadge
+                    rating={socialProof.reviewSummary.average}
+                    title={`${socialProof.customerCount.toLocaleString("en-PH")} customers`}
+                    subtitle={`${socialProof.reviewSummary.count.toLocaleString("en-PH")} reviews`}
+                    theme="black"
+                    className="shrink-0 sm:ml-2"
+                  />
+                ) : null}
+              </div>
+            </div>
+            <FeaturedProductsCarousel products={products} />
           </div>
+
           <div
             ref={partnersRef}
-            className="mt-8 w-full max-w-[min(100%,38rem)]"
+            className="mt-10 sm:mt-12"
           >
             <div className="mb-3 flex flex-col gap-1">
               <span data-cms-id="home-hero-eyebrow" data-uvs-id="home-hero-eyebrow" data-cms-label="Eyebrow" className="font-headline text-[0.7rem] font-bold uppercase tracking-[0.3em] text-on-surface-variant">
-                Partners with
+                Official brand partners
               </span>
               <span className="text-[0.7rem] font-medium text-on-surface-variant">
                 Official brands & logistics partners
               </span>
             </div>
             <div
-            data-cms-id="home-hero-partners"
-            data-uvs-id="home-hero-partners"
+              data-cms-id="home-hero-partners"
+              data-uvs-id="home-hero-partners"
               data-cms-label="Partner marquee"
-              className="group relative overflow-hidden py-2 [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]"
-              aria-label="Partners logo marquee"
+              className="group relative overflow-hidden py-2 [mask-image:linear-gradient(90deg,transparent,black_6%,black_94%,transparent)]"
+              role="list"
+              aria-label="Official brand and logistics partners"
             >
-              <div
-                className="flex min-w-max items-center gap-6 motion-safe:animate-[partner-marquee_24s_linear_infinite] motion-reduce:animate-none group-hover:[animation-play-state:paused] group-focus-within:[animation-play-state:paused]"
-                role="list"
-                aria-label="Official brand and logistics partners"
-              >
-                {marqueePartners.map((partner, index) => {
-                  const isDecorativeClone = index >= PARTNERS.length;
-                  return (
-                    <li
-                      key={`${partner.name}-${partner.href}-${index}`}
-                      role="listitem"
-                      aria-hidden={isDecorativeClone || undefined}
-                      className="flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center"
-                    >
-                    <a
-                      href={partner.href}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="group/logo flex h-14 w-[clamp(7.25rem,14vw,9rem)] shrink-0 items-center justify-center rounded-lg bg-transparent px-3 opacity-80 transition-[transform,opacity,filter] duration-300 hover:-translate-y-0.5 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                      aria-label={`Visit ${partner.name} official site`}
-                      tabIndex={isDecorativeClone ? -1 : undefined}
-                    >
-                      <span className="sr-only">{partner.name}</span>
-                      <div className="relative h-full w-full">
+              <div className="flex min-w-max motion-safe:animate-[partner-marquee_36s_linear_infinite] motion-reduce:animate-none group-focus-within:[animation-play-state:paused]">
+                {[0, 1].map((copyIndex) => (
+                  <div
+                    key={copyIndex}
+                    className="flex shrink-0 gap-8"
+                    role="listitem"
+                    aria-hidden={copyIndex === 1 || undefined}
+                  >
+                    {PARTNERS.map((partner) => (
+                      <a
+                        key={`${partner.name}-${copyIndex}`}
+                        href={partner.href}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        aria-hidden={copyIndex === 1 || undefined}
+                        tabIndex={copyIndex === 1 ? -1 : undefined}
+                        className="flex h-16 w-40 shrink-0 items-center justify-center px-3 opacity-70 focus-visible:outline-2 focus-visible:outline-primary"
+                        aria-label={`Visit ${partner.name} official site`}
+                      >
+                        <span className="sr-only">{partner.name}</span>
                         <Image
                           src={encodeURI(partner.logo)}
                           alt=""
-                          fill
-                          sizes="(max-width: 768px) 42vw, 180px"
-                          className={`object-contain object-center transition-transform duration-300 group-hover/logo:scale-[1.03] ${
-                            partner.imageClassName ?? ""
-                          }`}
+                          width={160}
+                          height={56}
+                          sizes="160px"
+                          className={`h-12 w-full object-contain object-center ${partner.logoClass ?? ""}`}
                         />
-                      </div>
-                    </a>
-                    </li>
-                  );
-                })}
+                      </a>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-        <div className="absolute right-0 top-0 h-full w-full md:w-1/2">
-          <FeaturedProductsCarousel products={products} />
         </div>
       </section>
 
@@ -712,7 +710,7 @@ export function HomeScrollExperience({
         data-uvs-id="home-latest"
         data-cms-label="Latest products"
         style={sectionStyle(home.sectionLayout?.latest)}
-        className="scroll-mt-[5.5rem] bg-surface-container-low py-14 sm:py-16 md:py-24 storefront-section-x"
+        className="scroll-mt-[5.5rem] bg-transparent py-14 sm:py-16 md:py-24 storefront-section-x"
       >
         <div className="mx-auto max-w-[1600px]">
           <div
@@ -727,7 +725,7 @@ export function HomeScrollExperience({
             </h2>
             <div className="mx-8 hidden h-0.5 flex-grow bg-outline-variant opacity-20 md:block" />
             <Link
-              href={home.latestSection.viewAllHref || "/shop"}
+              href="/shop"
               className="font-medium text-primary transition-[text-decoration-color] hover:underline"
             >
               {home.latestSection.viewAllLabel}
@@ -753,9 +751,9 @@ export function HomeScrollExperience({
               data-cms-label="Product grid"
               className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 lg:grid-cols-4"
             >
-              {products.map((product) => (
+              {products.map((product, index) => (
                 <div key={product.id} data-home-product>
-                  <CatalogProductCard product={product} />
+                  <CatalogProductCard product={product} priority={index === 0} />
                 </div>
               ))}
             </div>

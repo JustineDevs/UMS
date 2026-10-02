@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ProductReviewRow } from "@/lib/product-reviews";
 import { ProductReviewForm } from "@/components/ProductReviewForm";
 import { ProductReviewsFeedClient } from "@/components/ProductReviewsFeedClient";
@@ -56,7 +56,11 @@ export function ProductReviewsSection({
   medusaProductId: string;
   reviews: ProductReviewRow[];
 }) {
-  const [allReviews, setAllReviews] = useState(reviews);
+  const [additionalReviews, setAdditionalReviews] = useState<ProductReviewRow[]>([]);
+  const allReviews = useMemo(() => {
+    const seen = new Set(reviews.map((review) => review.id));
+    return [...reviews, ...additionalReviews.filter((review) => !seen.has(review.id))];
+  }, [additionalReviews, reviews]);
   const count = allReviews.length;
   const average =
     count > 0
@@ -92,7 +96,9 @@ export function ProductReviewsSection({
           reviews={reviews}
           productSlug={productSlug}
           medusaProductId={medusaProductId}
-          onReviewsChange={setAllReviews}
+          onReviewsChange={(nextReviews) => {
+            setAdditionalReviews(nextReviews.filter((review) => !reviews.some((initial) => initial.id === review.id)));
+          }}
         />
 
         <div id="write-review" className="scroll-mt-24">

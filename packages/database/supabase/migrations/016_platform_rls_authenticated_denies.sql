@@ -145,10 +145,15 @@ create policy admin_operator_notes_deny_authenticated
 -- 12. legacy_import_runs: deny authenticated
 -- ============================================================================
 
-drop policy if exists legacy_import_runs_deny_authenticated on public.legacy_import_runs;
-create policy legacy_import_runs_deny_authenticated
-  on public.legacy_import_runs
-  for all
-  to authenticated
-  using (false)
-  with check (false);
+do $$
+begin
+  if to_regclass('public.legacy_import_runs') is not null then
+    execute 'drop policy if exists legacy_import_runs_deny_authenticated on public.legacy_import_runs';
+    execute 'create policy legacy_import_runs_deny_authenticated
+      on public.legacy_import_runs
+      for all
+      to authenticated
+      using (false)
+      with check (false)';
+  end if;
+end $$;

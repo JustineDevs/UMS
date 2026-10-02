@@ -60,8 +60,8 @@ export default function LoginPage({
     <div className="flex min-h-screen w-full flex-col bg-white dark:bg-neutral-950">
       <div className="flex flex-1 flex-col lg:flex-row">
         <div className="flex w-full flex-1 items-center justify-center px-6 py-12 sm:px-12">
-          <div className="w-full max-w-md space-y-8">
-            <div className="space-y-1">
+          <div className="flex w-full max-w-md flex-col gap-8">
+            <div className="flex flex-col gap-1">
               <h1 id="sign-in-heading" className="text-3xl font-bold tracking-tight text-neutral-950 dark:text-neutral-50">
                 {heading}
               </h1>
@@ -81,8 +81,8 @@ export default function LoginPage({
 
             {!socialOnly ? <>
               <div className="flex items-center gap-3"><div className="h-px flex-1 bg-border" /><span className="text-muted-foreground text-sm font-medium tracking-widest">or</span><div className="h-px flex-1 bg-border" /></div>
-              <div className="space-y-1"><label htmlFor="email" className="text-sm font-medium">Work Email</label><input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-muted h-10 w-full rounded-md border px-3 text-sm" /></div>
-              <div className="space-y-1"><div className="flex items-center justify-between"><label htmlFor="password" className="text-sm font-medium">Password</label><button type="button" onClick={onForgotPassword} className="text-xs underline-offset-4 hover:underline">Forgot password?</button></div><input id="password" type="password" placeholder="••••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-muted h-10 w-full rounded-md border px-3 text-sm" /></div>
+              <div className="flex flex-col gap-1"><label htmlFor="email" className="text-sm font-medium">Work Email</label><input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className="bg-muted h-10 w-full rounded-md border px-3 text-sm" /></div>
+              <div className="flex flex-col gap-1"><div className="flex items-center justify-between"><label htmlFor="password" className="text-sm font-medium">Password</label><button type="button" onClick={onForgotPassword} className="text-xs underline-offset-4 hover:underline">Forgot password?</button></div><input id="password" type="password" placeholder="••••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-muted h-10 w-full rounded-md border px-3 text-sm" /></div>
             </> : null}
 
             <div className="flex items-center gap-3">
@@ -104,7 +104,7 @@ export default function LoginPage({
               <button
                 type="button"
                 onClick={onFooterAction ?? onCreateAccount}
-                className="font-medium text-neutral-950 underline-offset-4 transition-all hover:underline dark:text-neutral-50"
+                className="font-medium text-neutral-950 underline-offset-4 transition-[color,text-decoration-color] duration-150 hover:underline dark:text-neutral-50"
               >
                 {footerActionLabel}
               </button>

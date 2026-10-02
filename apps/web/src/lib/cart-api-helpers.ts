@@ -187,22 +187,6 @@ export async function retrieveCartLines(
   }
 }
 
-/**
- * Retrieves a Worker cart. The legacy fields parameter is ignored by the Worker contract.
- */
-export async function retrieveCartRaw(
-  cartId: string,
-  fields: string,
-): Promise<Record<string, unknown> | null> {
-  void fields;
-  try {
-    return await retrieveWorkerCart(cartId);
-  } catch (error) {
-    if (isMissingWorkerCartError(error)) return null;
-    throw error;
-  }
-}
-
 type WorkerCart = {
   id: string;
   region_id?: string | null;

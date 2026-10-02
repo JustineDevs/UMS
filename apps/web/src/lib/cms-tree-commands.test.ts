@@ -67,3 +67,14 @@ test("replays text, html, and attribute commands", () => {
   const attribute = applyCmsMutation(html ?? before, { type: "set-attribute", nodeId: "hero", key: "aria-label", before: undefined, after: "Hero" }, "after");
   assert.equal((attribute?.[0].props.attributes as Record<string, unknown>)?.["aria-label"], "Hero");
 });
+
+test("replays complete prop snapshots used by live DOM overrides", () => {
+  const before = [{ id: "hero", type: "hero", componentId: "hero", props: { domOverrides: {} }, slots: {} }];
+  const after = [{ id: "hero", type: "hero", componentId: "hero", props: { domOverrides: { "__visual_path:hero.title": { "style.color": "#e11d48" } } }, slots: {} }];
+  const mutation = { type: "set-prop" as const, nodeId: "hero", key: "__props", before: before[0].props, after: after[0].props };
+  const history = recordCmsCommand(createCmsHistory(), before, after, mutation);
+  const undone = undoCmsCommand(history, after);
+  assert.deepEqual(undone.state, before);
+  const redone = redoCmsCommand(undone.history, before);
+  assert.deepEqual(redone.state, after);
+});

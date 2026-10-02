@@ -83,7 +83,7 @@ export function TopProducts({
             </div>
           </>
         ) : (
-          <div className="flex min-h-43 items-center justify-center rounded-lg border border-dashed text-center">
+          <div className="flex min-h-44 items-center justify-center rounded-lg border border-dashed text-center">
             <div className="max-w-xs px-6">
               <div className="font-medium text-sm">No inventory distribution</div>
               <div className="mt-1 text-muted-foreground text-sm">

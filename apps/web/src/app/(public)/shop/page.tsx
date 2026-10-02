@@ -28,6 +28,7 @@ import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { ShopFilterDrawer } from "@/components/ShopFilterDrawer";
 import { ShopFilterGroup } from "@/components/ShopFilterGroup";
+import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import {
   buildPageMetadata,
@@ -132,6 +133,18 @@ export default async function ShopPage({
   }
   const q = diagnostics.query;
 
+  // Category landing pages have their own canonical route. Keep legacy
+  // /shop?category=... links from recreating the old duplicate heading and
+  // preserve any other active shop filters while removing the category key.
+  if (q.category) {
+    const canonical = new URLSearchParams();
+    for (const [key, value] of Object.entries(sp)) {
+      if (key === "category" || key === "locale") continue;
+      if (typeof value === "string" && value.trim()) canonical.set(key, value);
+    }
+    redirect(canonical.toString() ? `/shop?${canonical}` : "/shop");
+  }
+
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
   const finish = q.finish?.trim() || undefined;
@@ -210,9 +223,6 @@ export default async function ShopPage({
 
   const sidebarWarning = secondaryCommerceFailure(catRes, facetRes);
 
-  const totalActive = categories.reduce((s, c) => s + c.count, 0);
-  const allProductsCountLabel =
-    categories.length > 0 ? totalActive : total;
   const hasMore = offset + products.length < total;
 
   const base = (): ShopQuery => ({
@@ -267,22 +277,29 @@ export default async function ShopPage({
           />
         </div>
       ) : null}
-      <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
-        <div className="min-w-0">
-          <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
-            // SHOP CATALOG
-          </p>
-          <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
-            {category ?? "All categories"}
-          </h1>
-          {searchQ ? (
+      {searchQ ? (
+        <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+          <div className="min-w-0">
+            <h1 className="font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+              Search results
+            </h1>
             <p className="mt-4 font-body text-base text-on-surface-variant">
-              Search results for{" "}
-              <strong className="text-primary">{searchQ}</strong>
+              Search results for <strong className="text-primary">{searchQ}</strong>
             </p>
-          ) : null}
-        </div>
-      </header>
+          </div>
+        </header>
+      ) : (
+        <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+          <div className="min-w-0">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              // SHOP CATALOG
+            </p>
+            <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+              All categories
+            </h1>
+          </div>
+        </header>
+      )}
 
       {cmsCategory?.blocks?.length ? (
         <div className="mb-10">
@@ -292,11 +309,7 @@ export default async function ShopPage({
 
       <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
         <ShopFilterDrawer activeFilterCount={activeFilterCount}>
-          <aside className="w-full space-y-10">
-          <div className="border-b border-outline-variant/20 pb-5">
-            <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-primary">All categories</h2>
-            <p className="mt-2 text-xs leading-5 text-on-surface-variant">Browse the catalog by instrument family.</p>
-          </div>
+          <aside className="w-full space-y-6">
           <ShopSortSelect
             value={sort}
             category={category}
@@ -312,62 +325,22 @@ export default async function ShopPage({
             maxPrice={maxPrice}
             search={searchQ}
           />
-          <ShopFilterGroup title="Category" defaultOpen>
-            <ul className="space-y-4">
-              <li>
-                <Link
-                  href={h({
-                    category: undefined,
-                    type,
-                    finish,
-                    pickupConfig,
-                    bodyWood,
-                    condition,
-                    skillLevel,
-                    shippingSpeed,
-                  })}
-                  aria-current={!category ? "page" : undefined}
-                  className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
-                    !category
-                      ? "font-medium text-primary"
-                      : "text-on-surface-variant hover:text-primary"
-                  }`}
-                >
-                  <span>All</span>
-                  <span className="text-[10px] text-on-surface-variant">
-                    ({allProductsCountLabel})
-                  </span>
-                </Link>
-              </li>
-              {categories.map((c) => (
-                <li key={c.category}>
-                  <Link
-                    href={h({
-                      category: c.category,
-                      type: undefined,
-                      finish: undefined,
-                      pickupConfig: undefined,
-                      bodyWood: undefined,
-                      condition: undefined,
-                      skillLevel: undefined,
-                      shippingSpeed: undefined,
-                    })}
-                    aria-current={category === c.category ? "page" : undefined}
-                    className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
-                      category === c.category
-                        ? "font-medium text-primary"
-                        : "text-on-surface-variant hover:text-primary"
-                    }`}
-                  >
-                    <span>{c.category}</span>
-                    <span className="text-[10px]">({c.count})</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </ShopFilterGroup>
-
-          <ShopFilterGroup title="Type">
+          <CatalogSearchTypeahead
+            initialQ={searchQ}
+            category={category}
+            type={type}
+            finish={finish}
+            brand={brand}
+            pickupConfig={pickupConfig}
+            bodyWood={bodyWood}
+            condition={condition}
+            skillLevel={skillLevel}
+            shippingSpeed={shippingSpeed}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            sort={sort}
+          />
+          <ShopFilterGroup title="Type" defaultOpen>
             {facets.types.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 No types in this view.
@@ -409,7 +382,7 @@ export default async function ShopPage({
                 No finishes in this view.
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {facets.finishes.map((col) => {
                   const active = finish === col;
                   return (
@@ -425,7 +398,7 @@ export default async function ShopPage({
                         shippingSpeed,
                         })}
                       aria-current={active ? "page" : undefined}
-                      className={`flex min-h-11 items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
+                      className={`flex min-h-11 items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 lg:min-h-9 ${
                         active ? "ring-1 ring-primary" : ""
                       }`}
                     >
@@ -449,7 +422,7 @@ export default async function ShopPage({
                 Set brand on products in store metadata to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.brands.map((b) => {
                   const active = brand === b;
                   return (
@@ -464,7 +437,7 @@ export default async function ShopPage({
                           shippingSpeed,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -503,7 +476,7 @@ export default async function ShopPage({
                 Add pickup config metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.pickupConfigs.map((value) => {
                   const active = pickupConfig === value;
                   return (
@@ -513,7 +486,7 @@ export default async function ShopPage({
                           pickupConfig: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -534,7 +507,7 @@ export default async function ShopPage({
                 Add body wood metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.bodyWoods.map((value) => {
                   const active = bodyWood === value;
                   return (
@@ -544,7 +517,7 @@ export default async function ShopPage({
                           bodyWood: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -565,7 +538,7 @@ export default async function ShopPage({
                 Add condition metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.conditions.map((value) => {
                   const active = condition === value;
                   return (
@@ -575,7 +548,7 @@ export default async function ShopPage({
                           condition: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -596,7 +569,7 @@ export default async function ShopPage({
                 Add skill level metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.skillLevels.map((value) => {
                   const active = skillLevel === value;
                   return (
@@ -606,7 +579,7 @@ export default async function ShopPage({
                           skillLevel: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -627,7 +600,7 @@ export default async function ShopPage({
                 Add shipping speed metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.shippingSpeeds.map((value) => {
                   const active = shippingSpeed === value;
                   return (
@@ -636,7 +609,7 @@ export default async function ShopPage({
                         href={h({
                           shippingSpeed: active ? undefined : value,
                         })}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"

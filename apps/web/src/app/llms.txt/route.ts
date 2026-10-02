@@ -33,7 +33,7 @@ export async function GET() {
     "",
     "## Popular categories",
     ...(categories.kind === "ok"
-      ? categories.summaries.slice(0, 10).map((category) => `- [${category.category}](${canonicalUrl(`/shop?category=${encodeURIComponent(category.category)}`)})`)
+      ? categories.summaries.slice(0, 10).map((category) => `- [${category.category}](${canonicalUrl("/shop")})`)
       : []),
   ];
 

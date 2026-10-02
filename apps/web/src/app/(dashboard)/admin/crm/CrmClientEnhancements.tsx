@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Nango from "@nangohq/frontend";
 import {
   Dialog,
@@ -164,6 +165,15 @@ export function CrmClientEnhancements({
   });
   const [activePanel, setActivePanel] = useState<ActivePanel | null>(null);
 
+  useEffect(() => {
+    const openPanelFromHash = () => {
+      if (window.location.hash === "#segments") setActivePanel("segments");
+    };
+    openPanelFromHash();
+    window.addEventListener("hashchange", openPanelFromHash);
+    return () => window.removeEventListener("hashchange", openPanelFromHash);
+  }, []);
+
   const fetchSegments = useCallback(async () => {
     const res = await fetch("/api/admin/segments");
     if (res.ok) {
@@ -219,6 +229,15 @@ export function CrmClientEnhancements({
     void fetchBridge();
     void fetchNango();
   }, [fetchBridge, fetchNango, fetchSegments]);
+
+  useEffect(() => {
+    if (!showSegmentForm) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowSegmentForm(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showSegmentForm]);
 
   async function handleClvLookup() {
     if (!clvEmail.trim()) return;
@@ -386,7 +405,7 @@ export function CrmClientEnhancements({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border bg-card p-4 shadow-xs ring-1 ring-foreground/10">
+      <div className="rounded-xl bg-card p-4 shadow-xs">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold">CRM workspace controls</p>
@@ -467,7 +486,7 @@ export function CrmClientEnhancements({
             </Button>
           </div>
           {clvResult ? (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded bg-surface-container-low p-3">
                 <p className="text-[10px] uppercase tracking-widest text-on-surface-variant">
                   Total spent
@@ -798,13 +817,21 @@ export function CrmClientEnhancements({
         </DialogContent>
       </Dialog>
 
-      {showSegmentForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      {showSegmentForm && typeof document !== "undefined" ? createPortal(
+        <dialog
+          open
+          className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6"
+          aria-labelledby="create-segment-title"
+          onCancel={(event) => {
+            event.preventDefault();
+            setShowSegmentForm(false);
+          }}
+        >
           <form
             onSubmit={handleCreateSegment}
-            className="w-full max-w-sm space-y-5 rounded-xl bg-white p-8 shadow-2xl"
+            className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm space-y-5 overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8"
           >
-            <h2 className="text-lg font-bold font-headline">Create segment</h2>
+            <h2 id="create-segment-title" className="text-lg font-bold font-headline">Create segment</h2>
             <input
               required
               aria-label="Segment name"
@@ -842,8 +869,9 @@ export function CrmClientEnhancements({
               </Button>
             </div>
           </form>
-        </div>
-      )}
+        </dialog>,
+        document.body,
+      ) : null}
     </div>
   );
 }

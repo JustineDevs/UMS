@@ -5,6 +5,7 @@ import {
   handleCatalogProductRequest,
   handleCatalogProductsRequest,
   handleCatalogCategoriesRequest,
+  handleCatalogFacetsRequest,
   handleCatalogSearchSuggestionsRequest,
   handleCollectionsRequest,
   handleCollectionRequest,
@@ -89,6 +90,94 @@ test("drops media URLs from the decommissioned catalog project", async () => {
   assert.equal(response.products[0]?.variants[0]?.thumbnail, null);
 });
 
+test("applies category filtering and deterministic name ordering in the Worker query", async () => {
+  let query = "";
+  let values: readonly unknown[] = [];
+  const response = await listPublishedProducts(
+    new Request("https://api.test/store/products?category=guitars&sort=name_asc"),
+    {
+      async query<Row>(text: string, parameters: readonly unknown[] = []): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        values = parameters;
+        return { rows: [], rowCount: 0 };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+
+  assert.deepEqual(response, { products: [], count: 0, limit: 20, offset: 0 });
+  assert.match(query, /product_category_product category_link/);
+  assert.match(query, /category_row\.handle = \$1/);
+  assert.match(query, /ORDER BY p\.title ASC, p\.id/);
+  assert.deepEqual(values, ["guitars", 20, 0]);
+});
+
+test("pushes brand and PHP price filtering and ordering into the Worker query", async () => {
+  let query = "";
+  let values: readonly unknown[] = [];
+  await listPublishedProducts(
+    new Request("https://api.test/store/products?brand=Yamaha&minPrice=1000.50&maxPrice=5000&sort=price_asc"),
+    {
+      async query<Row>(text: string, parameters: readonly unknown[] = []): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        values = parameters;
+        return { rows: [], rowCount: 0 };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+
+  assert.match(query, /p\.metadata ->> 'brand'/);
+  assert.match(query, /sellable_variant\.manage_inventory = FALSE/);
+  assert.match(query, /product_variant_inventory_item sellable_pvi/);
+  assert.match(query, /p\.metadata ->> 'brand_name'/);
+  assert.match(query, /pr\.currency_code = 'php'/);
+  assert.match(query, /ORDER BY .* ASC NULLS LAST, p\.id/s);
+  assert.deepEqual(values, ["Yamaha", 100050, 500000, 20, 0]);
+});
+
+test("pushes every supported variant attribute filter into the Worker query", async () => {
+  let query = "";
+  let values: readonly unknown[] = [];
+  await listPublishedProducts(
+    new Request("https://api.test/store/products?type=Electric&finish=Natural&pickupConfig=HSS&bodyWood=Mahogany&condition=New&skillLevel=Beginner&shippingSpeed=Express"),
+    {
+      async query<Row>(text: string, parameters: readonly unknown[] = []): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        values = parameters;
+        return { rows: [], rowCount: 0 };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+
+  assert.equal((query.match(/FROM public\.product_variant vf/g) ?? []).length, 7);
+  assert.match(query, /product_variant_option vf_pvo/);
+  assert.match(query, /product_option_value vf_pov/);
+  assert.match(query, /vf\.metadata ->> 'pickup_config'/);
+  assert.match(query, /p\.metadata ->> 'pickup_config'/);
+  assert.deepEqual(values, ["Electric", "Natural", "HSS", "Mahogany", "New", "Beginner", "Express", 20, 0]);
+});
+
+test("keeps product metadata fallbacks in catalog facets", async () => {
+  let query = "";
+  const response = await handleCatalogFacetsRequest(
+    new Request("https://api.test/store/catalog/facets?category=guitars"),
+    {
+      async query<Row>(text: string): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        return { rows: [], rowCount: 0 };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.match(query, /vp\.metadata AS product_metadata/);
+  assert.match(query, /COALESCE\(vv\.metadata ->> key, vv\.product_metadata ->> key\)/);
+  assert.match(query, /COALESCE\(vv\.metadata ->> 'condition', vv\.product_metadata ->> 'condition'\)/);
+});
+
 test("returns a cacheable storefront product response", async () => {
   const response = await handleCatalogProductsRequest(
     new Request("https://api.test/store/products"),
@@ -151,11 +240,13 @@ test("returns priced Worker-native search suggestions", async () => {
 
 test("resolves one published product by an exact handle", async () => {
   let values: readonly unknown[] = [];
+  let query = "";
   const product = await getPublishedProductByHandle("canary", {
     async query<Row>(
-      _text: string,
+      text: string,
       parameters: readonly unknown[] = [],
     ): Promise<{ rows: Row[]; rowCount: number }> {
+      query = text;
       values = parameters;
       return {
         rows: [
@@ -179,6 +270,9 @@ test("resolves one published product by an exact handle", async () => {
   });
   assert.equal(product?.handle, "canary");
   assert.deepEqual(values, ["canary"]);
+  assert.match(query, /'metadata', COALESCE\(v\.metadata/);
+  assert.match(query, /product_variant_option/);
+  assert.match(query, /'inventory_quantity'/);
 });
 
 test("returns 404 without leaking unpublished product data", async () => {
@@ -276,13 +370,50 @@ test("returns active catalog categories with published product counts", async ()
   });
   assert.match(query, /product_category_product/);
   assert.match(query, /p\.status = 'published'/);
+  assert.match(query, /sellable_variant\.manage_inventory = FALSE/);
+});
+
+test("returns catalog facets from canonical variant options and metadata", async () => {
+  let query = "";
+  let values: readonly unknown[] = [];
+  const response = await handleCatalogFacetsRequest(
+    new Request("https://api.test/store/catalog/facets?category=guitars"),
+    {
+      async query<Row>(text: string, parameters: readonly unknown[] = []): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
+        values = parameters;
+        return {
+          rows: [
+            { facet: "types", value: "Electric", product_id: "p-1", raw_products: 4 },
+            { facet: "brands", value: "Yamaha", product_id: "p-2", raw_products: 4 },
+            { facet: "__quality__", value: null, product_id: null, raw_products: 4 },
+          ] as Row[],
+          rowCount: 2,
+        };
+      },
+      async end(): Promise<void> {},
+    },
+  );
+  assert.deepEqual(await response.json(), {
+    facets: {
+      types: ["Electric"], finishes: [], brands: ["Yamaha"], pickupConfigs: [],
+      bodyWoods: [], conditions: [], skillLevels: [], shippingSpeeds: [],
+    },
+    quality: { rawProducts: 4, mappedProducts: 4, facetValuesSeen: 2, invalidFacetValues: 0 },
+  });
+  assert.match(query, /product_variant_option/);
+  assert.match(query, /visible_products/);
+  assert.match(query, /sellable_variant\.manage_inventory = FALSE/);
+  assert.deepEqual(values, ["guitars"]);
 });
 
 test("returns a published collection with its visible products", async () => {
+  let query = "";
   const response = await handleCollectionRequest(
     new Request("https://api.test/store/collections/guitars"),
     {
-      async query<Row>(): Promise<{ rows: Row[]; rowCount: number }> {
+      async query<Row>(text: string): Promise<{ rows: Row[]; rowCount: number }> {
+        query = text;
         return {
           rows: [{
             id: "col-1", title: "Guitars", handle: "guitars",
@@ -306,4 +437,8 @@ test("returns a published collection with its visible products", async () => {
     }],
     count: 1,
   });
+  assert.match(query, /product_metadata/);
+  assert.match(query, /product_variant_option/);
+  assert.match(query, /'calculated_price'/);
+  assert.match(query, /'inventory_quantity'/);
 });

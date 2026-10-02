@@ -21,6 +21,8 @@ export type AdminPreferences = {
   uiDensity: "comfortable" | "compact";
   /** Default rows for inventory and similar tables */
   inventoryPageSize: 25 | 50 | 100;
+  /** Limit non-essential motion in the admin workspace */
+  reduceMotion: boolean;
 };
 
 function isBrowser(): boolean {
@@ -40,6 +42,7 @@ export function defaultAdminPreferences(): AdminPreferences {
   return {
     uiDensity: "comfortable",
     inventoryPageSize: 25,
+    reduceMotion: false,
   };
 }
 
@@ -105,7 +108,8 @@ export function readAdminPreferences(): AdminPreferences {
         ? parsed.inventoryPageSize
         : 25;
     const uiDensity = parsed.uiDensity === "compact" ? "compact" : "comfortable";
-    return { ...base, inventoryPageSize, uiDensity };
+    const reduceMotion = parsed.reduceMotion === true;
+    return { ...base, inventoryPageSize, uiDensity, reduceMotion };
   } catch {
     return defaultAdminPreferences();
   }

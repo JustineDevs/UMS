@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
+import { Barcode, Ban, CreditCard, Link2, Minus, PackageCheck, Play, Plus, RefreshCw, Search, Square, Tag, X } from "lucide-react";
 import { PH_VAT_RATE, computeDisplayVat } from "@universal-music-store/sdk";
 import type { PosSaleFeatureMetadata } from "@universal-music-store/platform-data";
 import {
@@ -13,12 +15,14 @@ import {
 } from "@/lib/terminal-print";
 import { storeOfflineSale, isOnline as checkOnline } from "@/lib/offline-pos";
 import { useOfflineSync } from "@/lib/use-offline-sync";
+import { useHydrated } from "@/lib/use-hydrated";
 import {
   AdminBreadcrumbs,
   AdminPageHelpFromPath,
   AdminPageShell,
 } from "@/components/admin-console";
 import { PosSaleDetailsPanel } from "@/components/pos/PosSaleDetailsPanel";
+import { Button } from "@universal-music-store/ui";
 
 type CartItem = {
   id: string;
@@ -32,6 +36,10 @@ type CartItem = {
   qty: number;
   imageUrl?: string;
 };
+
+function ModalPortal({ children }: { children: React.ReactNode }) {
+  return typeof document === "undefined" ? null : createPortal(children, document.body);
+}
 
 type VariantLookup = {
   id: string;
@@ -63,6 +71,13 @@ type PosProductHit = {
   price: number;
   imageUrl?: string;
 };
+
+function formatHardwareError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  return /failed to fetch|networkerror|load failed/i.test(message)
+    ? fallback
+    : message || "Hardware command did not complete";
+}
 
 function PosProductImage({
   url,
@@ -109,21 +124,37 @@ export default function POSPage() {
   const [closingCash, setClosingCash] = useState("");
   const [showVoidModal, setShowVoidModal] = useState(false);
   const [voidForm, setVoidForm] = useState({ action: "void_item", reason: "", approver_id: "", pin: "" });
-  const [voidTarget, setVoidTarget] = useState<string | null>(null);
+  const voidTargetRef = useRef<string | null>(null);
   const shiftOpenBusyRef = useRef(false);
   const shiftCloseBusyRef = useRef(false);
   const voidBusyRef = useRef(false);
   const barcodeBusyRef = useRef(false);
   const barcodeInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const [saleSession, setSaleSession] = useState({ id: "LOCAL", openedAt: new Date(0) });
+  const hydrated = useHydrated();
+  const saleSession = useMemo(
+    () => hydrated
+      ? { id: Date.now().toString(36).slice(-5).toUpperCase(), openedAt: new Date() }
+      : { id: "LOCAL", openedAt: new Date(0) },
+    [hydrated],
+  );
 
   useEffect(() => {
-    setSaleSession({
-      id: Date.now().toString(36).slice(-5).toUpperCase(),
-      openedAt: new Date(),
-    });
-  }, []);
+    if (!showShiftOpen && !showCloseShift && !showVoidModal) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (showVoidModal) {
+        setShowVoidModal(false);
+        voidTargetRef.current = null;
+      } else if (showCloseShift) {
+        setShowCloseShift(false);
+      } else {
+        setShowShiftOpen(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showCloseShift, showShiftOpen, showVoidModal]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -230,7 +261,7 @@ export default function POSPage() {
         action: voidForm.action,
         reason: voidForm.reason,
         pin_verified: pinVerified,
-        line_item_id: voidTarget,
+        line_item_id: voidTargetRef.current,
       }),
     });
     if (!res.ok) {
@@ -243,12 +274,12 @@ export default function POSPage() {
       setShowVoidModal(false);
       return;
     }
-    if (voidTarget) {
-      setCart(cart.filter((c) => c.id !== voidTarget));
+    if (voidTargetRef.current) {
+      setCart(cart.filter((c) => c.id !== voidTargetRef.current));
     }
     setShowVoidModal(false);
     setVoidForm({ action: "void_item", reason: "", approver_id: "", pin: "" });
-    setVoidTarget(null);
+    voidTargetRef.current = null;
     setSuccessMessage("Void recorded successfully.");
     } finally {
       voidBusyRef.current = false;
@@ -316,6 +347,10 @@ export default function POSPage() {
   }
 
   async function handlePaymentLink() {
+    if (!activeShift) {
+      setLookupError("Open a shift before generating a payment link.");
+      return;
+    }
     if (cart.length === 0 || linkLoading || commitLoading) return;
     setLinkLoading(true);
     setLookupError(null);
@@ -355,6 +390,10 @@ export default function POSPage() {
   }
 
   async function handleCommitSale() {
+    if (!activeShift) {
+      setLookupError("Open a shift before committing a sale.");
+      return;
+    }
     if (cart.length === 0 || commitLoading || linkLoading) return;
     const cartSnapshot = cart.map((c) => ({
       name: c.name,
@@ -487,7 +526,7 @@ export default function POSPage() {
     try {
       await openCashDrawerRequest();
     } catch (e) {
-      setHardwareMessage(e instanceof Error ? e.message : "Cash drawer did not open");
+      setHardwareMessage(formatHardwareError(e, "Cash drawer is temporarily unavailable. Check the terminal connection and try again."));
     }
   }
 
@@ -502,7 +541,7 @@ export default function POSPage() {
         color: item.color,
         price: item.price,
       }),
-      (m) => setHardwareMessage(m),
+      (m) => setHardwareMessage(formatHardwareError(new Error(m), "Printer is temporarily unavailable. Check the terminal connection and try again.")),
     );
   }
 
@@ -510,7 +549,7 @@ export default function POSPage() {
     setHardwareMessage(null);
     fireAndForgetPrintLabel(
       buildProductLabelPayloadFromLineItem(p),
-      (m) => setHardwareMessage(m),
+      (m) => setHardwareMessage(formatHardwareError(new Error(m), "Printer is temporarily unavailable. Check the terminal connection and try again.")),
     );
   }
 
@@ -638,8 +677,8 @@ export default function POSPage() {
       <div className="flex min-h-0 flex-col gap-8 lg:flex-row">
       <div className="flex-grow space-y-8">
         <header className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-start gap-2">
                 <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
                   {activeShift?.device_name ?? "Terminal 01"}
@@ -651,18 +690,28 @@ export default function POSPage() {
                   ? `Shift open since ${new Date(activeShift.opened_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Manila" })}`
                   : "No active shift. Open a shift to begin."}
               </p>
+              <div className="mt-4 flex flex-wrap gap-2" aria-label="Terminal status">
+                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${activeShift ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                  <span className={`size-2 rounded-full ${activeShift ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  Shift {activeShift ? "open" : "closed"}
+                </span>
+                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${online ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                  <span className={`size-2 rounded-full ${online ? "bg-emerald-500" : "bg-amber-500"}`} />
+                  {online ? "Network connected" : "Offline mode"}
+                </span>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
               {!activeShift ? (
-                <button onClick={() => setShowShiftOpen(true)} className="bg-emerald-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base">play_arrow</span>
+                <Button type="button" variant="secondary" size="lg" onClick={() => setShowShiftOpen(true)} className="min-w-0 max-[379px]:w-full bg-emerald-600 text-white hover:bg-emerald-700">
+                  <Play className="size-4" aria-hidden="true" />
                   Open Shift
-                </button>
+                </Button>
               ) : (
-                <button onClick={() => setShowCloseShift(true)} className="bg-slate-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base">stop</span>
+                <Button type="button" variant="secondary" size="lg" onClick={() => setShowCloseShift(true)} className="min-w-0 max-[379px]:w-full bg-slate-600 text-white hover:bg-slate-700">
+                  <Square className="size-4" aria-hidden="true" />
                   Close Shift
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -671,12 +720,15 @@ export default function POSPage() {
         {successMessage && (
           <div role="status" aria-live="polite" className="bg-emerald-500/10 text-emerald-700 px-4 py-2 rounded text-sm font-medium flex items-center justify-between">
             <span>{successMessage}</span>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setSuccessMessage(null)}
               className="ml-4 text-emerald-600 hover:text-emerald-800"
             >
               Dismiss
-            </button>
+            </Button>
           </div>
         )}
         {lookupError && (
@@ -687,9 +739,7 @@ export default function POSPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
             <label htmlFor="pos-barcode-input" className="sr-only">Barcode or SKU</label>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
-              barcode_scanner
-            </span>
+            <Barcode className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant" aria-hidden="true" />
             <input
               id="pos-barcode-input"
               ref={barcodeInputRef}
@@ -709,9 +759,7 @@ export default function POSPage() {
           </div>
           <div className="relative">
             <label htmlFor="pos-product-search" className="sr-only">Product search</label>
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">
-              search
-            </span>
+            <Search className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant" aria-hidden="true" />
             <input
               id="pos-product-search"
               ref={searchInputRef}
@@ -742,7 +790,9 @@ export default function POSPage() {
               <ul className="space-y-1">
                 {searchResults.map((p) => (
                   <li key={p.variantId}>
-                    <button
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between rounded px-3 py-2 text-left hover:bg-surface-container-high"
                       type="button"
                       onClick={() => {
                         addToCart({
@@ -759,14 +809,13 @@ export default function POSPage() {
                         setSearchInput("");
                         setSearchResults([]);
                       }}
-                      className="w-full text-left rounded px-3 py-2 hover:bg-surface-container-high transition-colors flex justify-between gap-4"
                     >
                       <span className="text-sm font-medium line-clamp-2">{p.name}</span>
                       <span className="text-xs text-on-surface-variant shrink-0">
                         {p.sku ? `${p.sku} · ` : ""}
                         PHP {p.price.toLocaleString("en-PH")}
                       </span>
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -787,16 +836,21 @@ export default function POSPage() {
             {quickProducts.map((p) => (
               <div
                 key={p.variantId}
-                className="relative bg-surface-container-lowest p-4 transition-colors"
+                className="bg-surface-container-lowest p-4 transition-colors"
               >
-                <button
-                  type="button"
-                  onClick={() => printLabelFromQuickProduct(p)}
-                  className="absolute right-2 top-2 z-10 rounded bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
-                >
-                  Label
-                </button>
-                <button
+                <div className="mb-3 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => printLabelFromQuickProduct(p)}
+                    className="rounded bg-surface-container-high px-2 py-1 text-[10px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
+                  >
+                    Label
+                  </Button>
+                </div>
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() =>
                     addToCart({
@@ -811,7 +865,7 @@ export default function POSPage() {
                       imageUrl: p.imageUrl,
                     })
                   }
-                  className="w-full text-left"
+                  className="flex h-auto w-full flex-col items-stretch justify-start gap-0 p-0 text-left"
                 >
                   <div className="relative mb-4 aspect-square w-full overflow-hidden rounded bg-surface-container-high">
                     <PosProductImage
@@ -820,13 +874,13 @@ export default function POSPage() {
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <p className="text-xs font-bold uppercase tracking-tighter font-headline">
+                  <p className="min-h-8 break-words text-xs font-bold uppercase tracking-tighter font-headline line-clamp-2">
                     {p.name}
                   </p>
                   <p className="text-sm text-on-surface-variant mt-1">
                     PHP {p.price.toLocaleString("en-PH")}
                   </p>
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -841,18 +895,23 @@ export default function POSPage() {
               {suggestions.map((p) => (
                 <div
                   key={`s-${p.variantId}`}
-                  className="relative border border-outline-variant/20 bg-surface-container-lowest p-3 hover:border-primary/40 transition-colors"
+                  className="border border-outline-variant/20 bg-surface-container-lowest p-3 hover:border-primary/40 transition-colors"
                 >
-                  <button
-                    type="button"
-                    onClick={() => printLabelFromQuickProduct(p)}
-                    className="absolute right-2 top-2 z-10 rounded bg-surface-container-high px-2 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
-                  >
-                    Label
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
+                  <div className="mb-2 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      type="button"
+                      onClick={() => printLabelFromQuickProduct(p)}
+                      className="rounded bg-surface-container-high px-2 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-on-surface-variant hover:bg-surface-dim"
+                    >
+                      Label
+                    </Button>
+                  </div>
+                  <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() =>
                       addToCart({
                         variantId: p.variantId,
                         name: p.name,
@@ -865,7 +924,7 @@ export default function POSPage() {
                         imageUrl: p.imageUrl,
                       })
                     }
-                    className="w-full pr-12 text-left"
+                    className="flex h-auto w-full flex-col items-stretch justify-start gap-0 p-0 text-left"
                   >
                     <div className="relative mb-2 aspect-[5/4] w-full overflow-hidden rounded bg-surface-container-high">
                       <PosProductImage
@@ -880,7 +939,7 @@ export default function POSPage() {
                     <p className="text-xs text-on-surface-variant mt-1">
                       PHP {p.price.toLocaleString("en-PH")}
                     </p>
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -888,7 +947,7 @@ export default function POSPage() {
         ) : null}
       </div>
 
-      <div className="w-full lg:w-96 flex flex-col h-[calc(100vh-4rem)] sticky top-8">
+      <div className="w-full lg:w-96 flex flex-col h-[calc(100dvh_-_4rem)] sticky top-8">
         <div className="bg-surface-container-lowest/80 backdrop-blur-xl flex flex-col h-full shadow-[0px_20px_40px_rgba(0,0,0,0.04)] rounded-xl overflow-hidden">
           <div className="p-6 bg-primary text-on-primary">
             <h2 className="text-lg font-bold font-headline tracking-tight">
@@ -926,29 +985,38 @@ export default function POSPage() {
                         {item.name}
                       </h4>
                       <div className="flex gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
                           onClick={() => handlePrintLabelForLine(item)}
                           className="text-on-surface-variant hover:text-primary transition-colors"
+                          aria-label={`Print shelf label for ${item.name}`}
                           title="Print shelf label to thermal printer"
                         >
-                          <span className="material-symbols-outlined text-sm">label</span>
-                        </button>
-                        <button
+                          <Tag className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
-                          onClick={() => { setVoidTarget(item.id); setShowVoidModal(true); }}
+                          onClick={() => { voidTargetRef.current = item.id; setShowVoidModal(true); }}
                           className="text-on-surface-variant hover:text-amber-600 transition-colors"
+                          aria-label={`Void ${item.name}`}
                           title="Record void item"
                         >
-                          <span className="material-symbols-outlined text-sm">block</span>
-                        </button>
-                        <button
+                          <Ban className="size-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
                           onClick={() => removeFromCart(item.id)}
                           className="text-on-surface-variant hover:text-error transition-colors"
+                          aria-label={`Remove ${item.name} from cart`}
                         >
-                          <span className="material-symbols-outlined text-sm">close</span>
-                        </button>
+                          <X className="size-4" aria-hidden="true" />
+                        </Button>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -961,25 +1029,27 @@ export default function POSPage() {
                     </div>
                     <div className="mt-3 flex justify-between items-center">
                       <div className="flex items-center gap-3">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
                           onClick={() => updateQty(item.id, -1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
+                          aria-label={`Decrease quantity of ${item.name}`}
                         >
-                          <span className="material-symbols-outlined text-xs">
-                            remove
-                          </span>
-                        </button>
+                          <Minus className="size-3" aria-hidden="true" />
+                        </Button>
                         <span className="text-xs font-bold">{item.qty}</span>
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           type="button"
                           onClick={() => updateQty(item.id, 1)}
                           className="w-6 h-6 flex items-center justify-center bg-surface-container-high rounded hover:bg-surface-dim transition-colors"
+                          aria-label={`Increase quantity of ${item.name}`}
                         >
-                          <span className="material-symbols-outlined text-xs">
-                            add
-                          </span>
-                        </button>
+                          <Plus className="size-3" aria-hidden="true" />
+                        </Button>
                       </div>
                       <span className="text-sm font-medium">
                         PHP {(item.price * item.qty).toLocaleString("en-PH")}
@@ -1005,38 +1075,49 @@ export default function POSPage() {
             </div>
           </div>
           <div className="p-6 space-y-3">
-            <button
-              type="button"
-              disabled={cart.length === 0 || linkLoading}
-              onClick={() => void handlePaymentLink()}
-              className="w-full py-4 px-6 bg-secondary text-on-secondary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined text-lg">link</span>
-              {linkLoading ? "Opening checkout…" : "Generate Payment Link"}
-            </button>
-            <button
-              disabled={cart.length === 0 || commitLoading}
-              onClick={handleCommitSale}
-              className="w-full py-4 px-6 bg-primary text-on-primary font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-95 transition-[transform,opacity] shadow-xl shadow-black/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              <span className="material-symbols-outlined text-lg">
-                shopping_cart_checkout
-              </span>
-              {commitLoading ? "Creating..." : "Commit Sale"}
-            </button>
-            <button
+            {activeShift ? <>
+              <Button
+                variant="secondary"
+                size="lg"
+                type="button"
+                disabled={cart.length === 0 || linkLoading}
+                onClick={() => void handlePaymentLink()}
+                className="w-full uppercase tracking-widest"
+              >
+                <Link2 className="size-5" aria-hidden="true" />
+                {linkLoading ? "Opening checkout…" : "Generate Payment Link"}
+              </Button>
+              <Button
+                variant="default"
+                size="lg"
+                type="button"
+                disabled={cart.length === 0 || commitLoading}
+                onClick={handleCommitSale}
+                className="w-full uppercase tracking-widest shadow-xl shadow-black/10"
+              >
+                <PackageCheck className="size-5" aria-hidden="true" />
+                {commitLoading ? "Creating..." : "Commit Sale"}
+              </Button>
+            </> : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Checkout is locked</p>
+                <p className="mt-1">Open a shift before generating payment links or committing a sale.</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="lg"
               type="button"
               onClick={() => void handleOpenDrawer()}
-              className="w-full py-3 px-6 border border-outline-variant/30 text-on-surface font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-surface-container-high transition-colors"
+              className="w-full uppercase tracking-widest"
             >
-              <span className="material-symbols-outlined text-lg">payments</span>
+              <CreditCard className="size-5" aria-hidden="true" />
               Open cash drawer
-            </button>
-            <p className="text-[10px] text-on-surface-variant leading-relaxed px-1">
-              Receipts and shelf labels use the print program running on this computer. If printing fails, ask
-              whoever maintains your store setup to check the register connection and printer. Barcodes use
-              catalog data when available.
-            </p>
+            </Button>
+            <details className="px-1 text-[10px] text-on-surface-variant">
+              <summary className="cursor-pointer font-semibold">Printer help</summary>
+              <p className="mt-2 leading-relaxed">Receipts and shelf labels use the print program on this computer. Check the register connection and printer if a print job fails.</p>
+            </details>
             {hardwareMessage ? (
               <p role="alert" className="text-xs text-amber-800 px-1">{hardwareMessage}</p>
             ) : null}
@@ -1045,31 +1126,27 @@ export default function POSPage() {
       </div>
       </div>
 
-      <div className="fixed bottom-8 left-72 z-20 flex gap-4">
-        <div className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-          <span className={`w-2 h-2 rounded-full ${activeShift ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
-          {activeShift ? "Shift Active" : "No Shift"}
-        </div>
-        <div className={`px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${online ? "bg-surface-container-highest text-on-surface-variant" : "bg-amber-100 text-amber-800"}`}>
-          <span className={`w-2 h-2 rounded-full ${online ? "bg-emerald-500" : "bg-amber-500 animate-pulse"}`} />
-          {online ? "Online" : "Offline Mode"}
-        </div>
+      <div className="fixed bottom-8 left-0 z-20 flex gap-4 lg:left-72">
         {pendingCount > 0 && (
-          <button
+          <Button
+            type="button"
             onClick={() => void trySync()}
             disabled={syncing}
-            className="bg-surface-container-highest px-4 py-2 rounded-full flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:bg-surface-dim transition-colors disabled:opacity-50"
+            variant="secondary"
+            size="sm"
+            className="rounded-full text-[10px] font-bold uppercase tracking-widest"
           >
-            <span className="material-symbols-outlined text-xs">sync</span>
+            <RefreshCw className="size-3" aria-hidden="true" />
             {syncing ? "Syncing..." : `${pendingCount} pending`}
-          </button>
+          </Button>
         )}
       </div>
 
       {showShiftOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleOpenShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Open Shift</h2>
+        <ModalPortal>
+        <dialog open aria-labelledby="open-shift-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+        <form onSubmit={handleOpenShift} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="open-shift-title" className="text-lg font-bold font-headline">Open Shift</h2>
             <label htmlFor="pos-shift-employee" className="sr-only">Employee ID</label>
             <input id="pos-shift-employee" required placeholder="Employee ID" value={shiftForm.employee_id} onChange={(e) => setShiftForm({ ...shiftForm, employee_id: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <label htmlFor="pos-shift-device" className="sr-only">Device name</label>
@@ -1077,32 +1154,36 @@ export default function POSPage() {
             <label htmlFor="pos-shift-opening-cash" className="sr-only">Opening cash</label>
             <input id="pos-shift-opening-cash" type="number" step="0.01" placeholder="Opening cash" value={shiftForm.opening_cash} onChange={(e) => setShiftForm({ ...shiftForm, opening_cash: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowShiftOpen(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-primary text-on-primary px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Open</button>
+              <Button type="button" variant="ghost" onClick={() => setShowShiftOpen(false)} className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</Button>
+              <Button type="submit" className="text-xs font-bold uppercase tracking-widest">Open</Button>
             </div>
-          </form>
-        </div>
+        </form>
+        </dialog>
+        </ModalPortal>
       )}
 
       {showCloseShift && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCloseShift} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Close Shift</h2>
+        <ModalPortal>
+        <dialog open aria-labelledby="close-shift-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+        <form onSubmit={handleCloseShift} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="close-shift-title" className="text-lg font-bold font-headline">Close Shift</h2>
             <p className="text-sm text-on-surface-variant">Opening cash: PHP {activeShift?.opening_cash?.toLocaleString("en-PH")}</p>
             <label htmlFor="pos-shift-closing-cash" className="sr-only">Closing cash amount</label>
             <input id="pos-shift-closing-cash" required type="number" step="0.01" placeholder="Closing cash amount" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => setShowCloseShift(false)} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-slate-700 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Close Shift</button>
+              <Button type="button" variant="ghost" onClick={() => setShowCloseShift(false)} className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</Button>
+              <Button type="submit" variant="secondary" className="text-xs font-bold uppercase tracking-widest">Close Shift</Button>
             </div>
-          </form>
-        </div>
+        </form>
+        </dialog>
+        </ModalPortal>
       )}
 
       {showVoidModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleVoid} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Void / Override</h2>
+        <ModalPortal>
+        <dialog open aria-labelledby="void-override-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+        <form onSubmit={handleVoid} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="void-override-title" className="text-lg font-bold font-headline">Void / Override</h2>
             <select aria-label="Void action" disabled value={voidForm.action} onChange={(e) => setVoidForm({ ...voidForm, action: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40 disabled:bg-surface-container-low disabled:text-on-surface-variant">
               <option value="void_item">Void Item</option>
             </select>
@@ -1119,11 +1200,12 @@ export default function POSPage() {
               <input id="pos-manager-pin" type="password" placeholder="Manager PIN" value={voidForm.pin} onChange={(e) => setVoidForm({ ...voidForm, pin: e.target.value.replace(/\D/g, "") })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             </div>
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={() => { setShowVoidModal(false); setVoidTarget(null); }} className="px-5 py-2.5 text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</button>
-              <button type="submit" className="bg-amber-600 text-white px-5 py-2.5 text-xs font-bold uppercase tracking-widest hover:opacity-90">Confirm Void</button>
+              <Button type="button" variant="ghost" onClick={() => { setShowVoidModal(false); voidTargetRef.current = null; }} className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Cancel</Button>
+              <Button type="submit" className="bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold uppercase tracking-widest">Confirm Void</Button>
             </div>
-          </form>
-        </div>
+        </form>
+        </dialog>
+        </ModalPortal>
       )}
     </AdminPageShell>
   );

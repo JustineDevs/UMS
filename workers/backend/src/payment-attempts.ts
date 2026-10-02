@@ -309,11 +309,20 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function json(body: Record<string, unknown>, status = 200): Response {
+  return jsonWithHeaders(body, status);
+}
+
+function jsonWithHeaders(
+  body: Record<string, unknown>,
+  status = 200,
+  headers?: Record<string, string>,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "Content-Type": "application/json",
       "Cache-Control": "no-store",
+      ...headers,
     },
   });
 }
@@ -476,9 +485,13 @@ export async function handlePaymentAttemptRecoveryRequest(
     return json({ error: "invalid_provider" }, 400);
   const cartId = cookie(request, "mcart_id");
   const attemptCookie = cookie(request, "checkout_attempt_id");
+  const correlationId = url.searchParams.get("correlation_id")?.trim() ?? "";
   const providerOrderId = url.searchParams.get("provider_order_id")?.trim() ?? "";
-  if (!cartId && !attemptCookie) return json({ error: "checkout_capability_required" }, 401);
+  if (!cartId && !attemptCookie && !correlationId)
+    return json({ error: "checkout_capability_required" }, 401);
   if (attemptCookie && !UUID.test(attemptCookie))
+    return json({ error: "not_found" }, 404);
+  if (correlationId && !UUID.test(correlationId))
     return json({ error: "not_found" }, 404);
 
   type RecoveryRow = {
@@ -490,7 +503,16 @@ export async function handlePaymentAttemptRecoveryRequest(
     medusa_order_id: string | null;
   };
   let result: { rows: RecoveryRow[]; rowCount: number | null };
-  if (cartId && providerOrderId) {
+  const capabilityId = attemptCookie || correlationId;
+  if (capabilityId && !providerOrderId) {
+    result = await database.query<RecoveryRow>(
+      `SELECT correlation_id, cart_id, provider, status, checkout_state, medusa_order_id
+       FROM public.payment_attempts
+       WHERE correlation_id = $1::uuid AND provider = $2
+       LIMIT 1`,
+      [capabilityId, provider],
+    );
+  } else if (cartId && providerOrderId) {
     if (providerOrderId.length > 500) return json({ error: "invalid_provider_order_id" }, 400);
     result = await database.query<RecoveryRow>(
       `SELECT correlation_id, cart_id, provider, status, checkout_state, medusa_order_id
@@ -514,16 +536,20 @@ export async function handlePaymentAttemptRecoveryRequest(
        FROM public.payment_attempts
        WHERE correlation_id = $1::uuid AND provider = $2
        LIMIT 1`,
-      [attemptCookie, provider],
+      [capabilityId, provider],
     );
   }
   const row = result.rows[0];
   if (!row || (cartId && row.cart_id !== cartId)) return json({ found: false });
-  return json({
+  return jsonWithHeaders({
     found: true,
     correlationId: row.correlation_id,
     status: row.status,
     checkoutState: row.checkout_state,
     medusaOrderId: row.medusa_order_id,
+  }, 200, {
+    ...(attemptCookie === row.correlation_id ? {} : {
+      "Set-Cookie": `checkout_attempt_id=${encodeURIComponent(row.correlation_id)}; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax`,
+    }),
   });
 }

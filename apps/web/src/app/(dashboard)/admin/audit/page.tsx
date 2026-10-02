@@ -1,4 +1,4 @@
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import { requirePagePermission } from "@/lib/require-page-permission";
 import { AuditLogExplorer } from "./AuditLogExplorer";
 
@@ -10,13 +10,12 @@ export default async function AuditCompliancePage() {
   return (
     <AdminPageShell
       title="Audit log"
-      subtitle="A log of staff actions. Export needs permission from your administrator."
+      subtitle="Monitor staff actions and investigate changes from one source."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Audit log" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <AuditLogExplorer />
     </AdminPageShell>

@@ -23,6 +23,7 @@ export default async function HostedReturnPage({
     session_id?: string;
     token?: string;
     stripe_session?: string;
+    checkout_correlation_id?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -36,5 +37,12 @@ export default async function HostedReturnPage({
       : typeof sp.stripe_session === "string"
         ? sp.stripe_session
         : undefined;
-  return <HostedCheckoutReturn provider={provider} status={status} providerOrderId={providerOrderId} />;
+  return (
+    <HostedCheckoutReturn
+      provider={provider}
+      status={status}
+      providerOrderId={providerOrderId}
+      correlationId={sp.checkout_correlation_id}
+    />
+  );
 }

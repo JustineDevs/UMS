@@ -23,6 +23,7 @@ export const fetchCache = "force-no-store";
 type OrderItemRow = {
   id?: string;
   title?: string | null;
+  thumbnail?: string | null;
   quantity?: number;
   unit_price?: number;
   total?: number;
@@ -70,11 +71,37 @@ type OrderRow = {
   fulfillments?: FulfillmentRow[] | null;
 };
 
-function formatMoney(amount: number | undefined, currency = "PHP") {
-  return `${currency} ${(amount ?? 0).toLocaleString("en-PH", {
+function formatMoney(
+  amount: number | undefined,
+  currency = "PHP",
+  zeroLabel = "Pending confirmation",
+) {
+  if (amount == null || !Number.isFinite(amount)) return "Unavailable";
+  if (amount === 0) return zeroLabel;
+  return `${currency} ${amount.toLocaleString("en-PH", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatOrderReference(orderId: string, displayId?: string | number) {
+  if (displayId != null && String(displayId).trim()) return String(displayId);
+  const suffix = orderId.replace(/^order_/, "").slice(-6).toUpperCase();
+  return `UMS-${suffix}`;
+}
+
+function isReturnEligible(
+  status?: string,
+  fulfillmentStatus?: string | null,
+  fulfillmentCount = 0,
+) {
+  if (fulfillmentCount === 0) return false;
+  return (
+    ["delivered", "completed"].includes(String(status ?? "").toLowerCase()) ||
+    ["delivered", "completed"].includes(
+      String(fulfillmentStatus ?? "").toLowerCase(),
+    )
+  );
 }
 
 function formatStatus(value: string | null | undefined) {
@@ -118,17 +145,17 @@ export default async function AccountOrderPage({
   if (!order?.id) notFound();
 
   const currency = String(order.currency_code ?? "PHP").toUpperCase();
-  const displayId =
-    order.display_id != null ? String(order.display_id) : String(order.id);
+  const displayId = formatOrderReference(order.id, order.display_id);
   const { steps, currentIndex } = orderStatusSteps(order.status);
+  const fulfillmentCount = order.fulfillments?.length ?? 0;
 
   return (
-    <main className="storefront-page-shell max-w-4xl">
+    <main className="storefront-page-shell storefront-content-wide max-w-6xl">
       <nav
         aria-label="Breadcrumb"
         className="mb-6 flex items-center gap-1 text-xs text-on-surface-variant"
       >
-        <Link href="/account" className="hover:text-primary">
+        <Link href="/account/profile" className="hover:text-primary">
           Account
         </Link>
         <span aria-hidden="true" className="select-none">
@@ -144,6 +171,22 @@ export default async function AccountOrderPage({
           <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary">
             Order #{displayId}
           </h1>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            {order.created_at ? (
+              <>
+                Placed{" "}
+                <time dateTime={order.created_at}>
+                  {new Date(order.created_at).toLocaleDateString("en-PH", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </time>
+                {" · "}
+              </>
+            ) : null}
+            Review your items, payment, and delivery details.
+          </p>
           <dl
             className="mt-3 grid gap-x-5 gap-y-2 text-sm text-on-surface-variant sm:grid-cols-3"
             aria-label="Order state summary"
@@ -223,20 +266,49 @@ export default async function AccountOrderPage({
                 className="py-4 first:pt-0 last:pb-0"
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-primary">
-                      {item.title ?? "Item"}
-                    </p>
-                    <p className="mt-1 text-xs text-on-surface-variant">
-                      Qty {item.quantity ?? 0}
-                      {item.variant?.sku ? ` · SKU ${item.variant.sku}` : ""}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-container-low">
+                      {item.thumbnail ? (
+                        <div
+                          role="img"
+                          aria-label={item.title ?? "Order item"}
+                          className="size-full bg-cover bg-center"
+                          style={{ backgroundImage: `url(${item.thumbnail})` }}
+                        />
+                      ) : (
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                          Item
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-primary">
+                        {item.title ?? "Item"}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-on-surface-variant">
+                        <span
+                          className={`rounded-full px-2.5 py-1 font-semibold ${
+                            (item.quantity ?? 0) > 1
+                              ? "bg-primary text-on-primary"
+                              : "bg-surface-container-low text-primary"
+                          }`}
+                        >
+                          Quantity {item.quantity ?? 0}
+                        </span>
+                        {item.variant?.sku ? (
+                          <span>SKU {item.variant.sku}</span>
+                        ) : null}
+                      </div>
+                    </div>
                   </div>
                   <div className="text-right text-sm text-on-surface-variant">
-                    <p>{formatMoney(item.total, currency)}</p>
+                    <p>
+                      {formatMoney(item.total, currency, "Price pending")}
+                    </p>
                     {item.unit_price != null ? (
                       <p className="mt-1 text-xs">
-                        Unit {formatMoney(item.unit_price, currency)}
+                        Unit{" "}
+                        {formatMoney(item.unit_price, currency, "Price pending")}
                       </p>
                     ) : null}
                   </div>
@@ -261,13 +333,17 @@ export default async function AccountOrderPage({
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-on-surface-variant">Shipping</dt>
                 <dd className="font-medium text-on-surface">
-                  {formatMoney(order.shipping_total, currency)}
+                  {order.shipping_total === 0
+                    ? "Free"
+                    : formatMoney(order.shipping_total, currency)}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-on-surface-variant">Discount</dt>
                 <dd className="font-medium text-on-surface">
-                  {formatMoney(order.discount_total, currency)}
+                  {order.discount_total === 0
+                    ? "None"
+                    : formatMoney(order.discount_total, currency)}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -315,9 +391,21 @@ export default async function AccountOrderPage({
                 <p>{order.shipping_address.country_code}</p>
               </address>
             ) : (
-              <p className="mt-4 text-sm text-on-surface-variant">
-                No shipping address stored on this order.
-              </p>
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                <p className="font-medium">
+                  Shipping details are unavailable.
+                </p>
+                <p className="mt-1 leading-6">
+                  Contact support if you need to confirm the delivery destination
+                  for this order.
+                </p>
+                <Link
+                  href="/help"
+                  className="mt-3 inline-flex font-semibold underline underline-offset-2"
+                >
+                  Contact support
+                </Link>
+              </div>
             )}
           </section>
 
@@ -368,7 +456,21 @@ export default async function AccountOrderPage({
                   );
                 })
               ) : (
-                <p>No shipment records yet.</p>
+                <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-4">
+                  <p className="font-medium text-on-surface">
+                    Tracking starts after payment confirmation.
+                  </p>
+                  <p className="mt-1 leading-6">
+                    We’ll add carrier details here when the order is ready to
+                    ship.
+                  </p>
+                  <Link
+                    href={`/track/${order.id}`}
+                    className="mt-3 inline-flex font-semibold text-primary underline underline-offset-2"
+                  >
+                    View live order status
+                  </Link>
+                </div>
               )}
             </div>
           </section>
@@ -378,12 +480,18 @@ export default async function AccountOrderPage({
               Actions
             </h2>
             <div className="mt-4 flex flex-col gap-3">
-              <Link
-                href={`/account/orders/${order.id}/return`}
-                className="rounded-full border border-outline-variant/30 px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-on-primary"
-              >
-                Request return
-              </Link>
+              {isReturnEligible(
+                order.status,
+                order.fulfillment_status,
+                fulfillmentCount,
+              ) ? (
+                <Link
+                  href={`/account/orders/${order.id}/return`}
+                  className="rounded-full border border-outline-variant/30 px-4 py-2 text-sm font-medium text-primary hover:bg-primary hover:text-on-primary"
+                >
+                  Request return
+                </Link>
+              ) : null}
               <Link
                 href="/help"
                 className="rounded-full border border-outline-variant/30 px-4 py-2 text-sm font-medium text-on-surface-variant hover:text-primary"

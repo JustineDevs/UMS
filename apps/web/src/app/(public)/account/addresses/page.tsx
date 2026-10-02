@@ -12,10 +12,11 @@ export default async function AccountAddressesPage() {
   const email = session?.user.email?.trim() ?? "";
   const result = email ? await loadCustomerProfileResult(email) : { profile: null, unavailable: false };
   return (
-    <AccountRouteFrame title="My Addresses" description="Manage your shipping addresses and choose a default for checkout.">
+    <AccountRouteFrame title="Shipping addresses" description="Manage your primary delivery locations.">
       {!session ? <AccountSignInState message="Sign in to save and manage delivery addresses." /> : (
         <AccountProfilePanel
           initial={{
+            email,
             displayName: result.profile?.displayName ?? null,
             phone: result.profile?.phone ?? null,
             avatarUrl: result.profile?.avatarUrl ?? null,

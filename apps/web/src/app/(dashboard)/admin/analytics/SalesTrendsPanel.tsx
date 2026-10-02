@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { AdminLoadingState } from "@/components/admin-console";
 
 type SalesTrend = {
   period: string;
@@ -27,7 +28,7 @@ export function SalesTrendsPanel() {
         <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
           Sales Trends
         </h3>
-        <p className="text-sm text-on-surface-variant">Loading...</p>
+        <AdminLoadingState label="Loading sales trends" />
       </div>
     );
   }
@@ -48,7 +49,7 @@ export function SalesTrendsPanel() {
               <span className="text-xs font-mono w-16 text-on-surface-variant">{m.period}</span>
               <div className="flex-1 h-6 bg-surface-container-high rounded overflow-hidden">
                 <div
-                  className="bg-secondary h-full transition-[width]"
+                  className="bg-primary h-full transition-[width]"
                   style={{ width: `${(m.revenue / maxRevenue) * 100}%` }}
                 />
               </div>

@@ -12,7 +12,7 @@ export const ContentManager = {
   getAttr: (element: ContentElement, name: string) => element.getAttribute(name),
   setAttr: (element: ContentElement, name: string, value: string) => { element.setAttribute(name, value); return element; },
   getHtml: (element: ContentElement, outer = false) => outer ? element.outerHTML : element.innerHTML,
-  setHtml: (element: ContentElement, html: string) => { element.innerHTML = html; return element; },
+  setHtml: (element: ContentElement, html: string) => { element.innerHTML = sanitizeCmsHtml(html); return element; },
   getText: (element: ContentElement) => element.textContent,
   setText: (element: ContentElement, text: string) => { element.textContent = text; return element; },
 };
@@ -83,3 +83,4 @@ export class ColorPaletteStore {
   remove(name: string): void { this.colors.delete(name); }
   getAll(): ReadonlyMap<string, string> { return new Map(this.colors); }
 }
+import { sanitizeCmsHtml } from "@universal-music-store/validation";

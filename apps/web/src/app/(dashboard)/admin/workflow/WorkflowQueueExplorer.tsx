@@ -97,13 +97,15 @@ export function WorkflowQueueExplorer() {
           />
         </label>
         <div className="flex flex-wrap items-end gap-2 md:col-span-2">
-          <button
+          <Button
+            variant="default"
+            size="sm"
             type="button"
             onClick={() => load()}
             className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
           >
             Apply filters
-          </button>
+          </Button>
         </div>
       </div>
 

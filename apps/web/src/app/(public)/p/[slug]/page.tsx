@@ -83,8 +83,10 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
   return (
     <main className="storefront-page-shell max-w-3xl">
       {jsonLd != null ? (
+        // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd.
         <script
           type="application/ld+json"
+          /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
@@ -119,8 +121,10 @@ export default async function CmsDynamicPage({ params, searchParams }: Props) {
         {page.title}
       </h1>
       {page.body.trim() ? (
+        // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering.
         <div
           className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant"
+          /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering. */
           dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(page.body) }}
         />
       ) : null}

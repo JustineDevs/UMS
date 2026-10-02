@@ -6,6 +6,8 @@ export async function POST(request: Request): Promise<Response> {
   const base = process.env.API_URL?.trim().replace(/\/$/, "");
   if (!base) return Response.json({ error: "worker_api_not_configured" }, { status: 503 });
   const headers = new Headers();
+  // The Worker verifies x-nango-hmac-sha256 against the raw request body;
+  // preserve the signed headers and bytes across this same-origin proxy.
   for (const name of ["content-type", "content-length", "x-nango-hmac-sha256", "x-nango-event-id", "x-nango-webhook-id"] as const) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);

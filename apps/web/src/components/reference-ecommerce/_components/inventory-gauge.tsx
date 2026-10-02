@@ -20,7 +20,7 @@ export function InventoryGauge({
   gaugeSegments: GaugeSegment[];
 }) {
   return (
-    <ChartContainer config={chartConfig} className="mx-auto h-30 w-full">
+    <ChartContainer config={chartConfig} className="mx-auto h-36 w-full aspect-auto sm:h-40">
       <PieChart>
         <Pie
           cx="50%"

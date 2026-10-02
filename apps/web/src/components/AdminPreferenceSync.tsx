@@ -9,6 +9,9 @@ export function AdminPreferenceSync() {
     const apply = () => {
       const p = readAdminPreferences();
       document.documentElement.dataset.adminDensity = p.uiDensity;
+      document.documentElement.dataset.adminMotion = p.reduceMotion
+        ? "reduced"
+        : "full";
     };
     apply();
     window.addEventListener("admin-prefs-updated", apply);

@@ -47,54 +47,10 @@ const ADMIN_PAGE_HELP: Record<string, AdminPageHelpEntry> = {
     usage:
       "Open a shift, scan a barcode or SKU (F1), or search by name (F2). Commit Sale records the order; payment link sends the customer to pay online. Receipts and the cash drawer use the print helper on this computer when it is set up.",
   },
-  "/admin/cms": {
-    purpose: "Website content such as pages, navigation, blog posts, and promotional copy.",
+  "/admin/build": {
+    purpose: "Build and publish the storefront homepage and website content.",
     usage:
-      "Manage the homepage and every other content surface from Pages and the CMS tools. Preview before you publish; the live site shows published content only. Stock levels and prices stay in the catalog, not here.",
-  },
-  "/admin/cms/blog": {
-    purpose: "Articles and updates for your site blog.",
-    usage: "Draft first, set titles and search-friendly fields, then publish. Add links in navigation if readers should find posts from the menu.",
-  },
-  "/admin/cms/commerce": {
-    purpose: "Content blocks for home and featured areas, alongside your real products.",
-    usage: "Edit marketing copy here. Accurate product data stays in the catalog. Publish and check the live site.",
-  },
-  "/admin/cms/site-map": {
-    purpose: "A map of how site sections and addresses fit together for your team.",
-    usage: "Update when you add pages or change URLs so everyone shares the same reference.",
-  },
-  "/admin/cms/forms": {
-    purpose: "Contact and lead forms: fields and where submissions are sent.",
-    usage: "Adjust fields and destinations after you change them, send a test submission. Limits help protect the site from spam.",
-  },
-  "/admin/cms/navigation": {
-    purpose: "Header and footer links visitors see on the website.",
-    usage: "Edit labels and destinations, then publish. Keep external links current and match addresses you actually use.",
-  },
-  "/admin/cms/media": {
-    purpose: "Images and files for website pages, separate from product photos in the catalog.",
-    usage: "Upload, organize, and reuse files. Smaller image files usually load faster for visitors.",
-  },
-  "/admin/cms/redirects": {
-    purpose: "Send visitors from an old address to a new one when you rename or remove pages.",
-    usage: "Add from and to pairs, publish, then open the old address in a browser to confirm it lands correctly.",
-  },
-  "/admin/cms/pages": {
-    purpose: "The single CMS workspace for the storefront homepage and marketing or information pages.",
-    usage: "Homepage is the first managed page in this list. Create other pages, add blocks, preview, then publish. Match navigation entries to the page addresses you choose.",
-  },
-  "/admin/cms/categories": {
-    purpose: "Group content for editors and, where used, for how visitors browse related material.",
-    usage: "Use categories consistently so the team can find content and the site stays organized.",
-  },
-  "/admin/cms/announcement": {
-    purpose: "Banners or bars for promotions, hours, or notices.",
-    usage: "Set text, timing, and who should see it. Turn off or remove when the message is no longer valid.",
-  },
-  "/admin/cms/experiments": {
-    purpose: "Try alternate versions of content or features when your setup supports it.",
-    usage: "Follow your agreed plan for variants and measurement. Do not use this to change official prices or stock.",
+      "Edit the storefront in one workspace, preview before publishing, and keep product stock and prices in Products and Inventory.",
   },
   "/admin/settings/payments": {
     purpose: "See which payment methods are available by region (cards, cash on delivery, and similar).",

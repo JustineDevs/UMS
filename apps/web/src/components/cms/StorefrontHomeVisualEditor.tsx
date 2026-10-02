@@ -13,9 +13,10 @@ import {
 } from "@universal-music-store/platform-data";
 import { useSession } from "@/lib/auth-client";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
+import { readResponseJson } from "@/lib/read-response-json";
 
 const StorefrontPublicMetadataEditor = dynamic(
   () => import("@/components/StorefrontPublicMetadataEditor").then((module) => module.StorefrontPublicMetadataEditor),
@@ -111,7 +112,7 @@ export function StorefrontHomeVisualEditor({
   );
   const [payload, setPayload] = useState<StorefrontHomePayload | null>(null);
   const [blocks, setBlocks] = useState<CmsBlock[]>([]);
-  const [mutations, setMutations] = useState<CmsMutationRecord[]>([]);
+  const mutationsRef = useRef<CmsMutationRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -123,14 +124,14 @@ export function StorefrontHomeVisualEditor({
       fetch("/api/admin/cms/pages?locale=en&slug=home", { signal: controller.signal }),
     ])
       .then(async ([legacyResponse, canonicalResponse]) => {
-        const legacyJson = (await legacyResponse.json()) as {
+        const legacyJson = await readResponseJson<{
           data?: StorefrontHomePayload;
           error?: string;
           devMode?: boolean;
-        };
+        }>(legacyResponse, {});
         if (!legacyResponse.ok) throw new Error(legacyJson.error ?? legacyResponse.statusText);
         const canonicalJson = canonicalResponse.ok
-          ? ((await canonicalResponse.json()) as { data?: Array<{ tree?: CmsNode[] }> })
+          ? await readResponseJson<{ data?: Array<{ tree?: CmsNode[] }> }>(canonicalResponse, {})
           : { data: [] };
         if (!cancelled) {
           const normalizedPayload = mergeStorefrontHomePayload(legacyJson.data);
@@ -189,7 +190,7 @@ export function StorefrontHomeVisualEditor({
           status: "published",
           tree: cmsBlocksToTree(currentBlocks),
           blocks: currentBlocks,
-          mutations,
+          mutations: mutationsRef.current,
         }),
       });
       if (!canonical.ok) {
@@ -220,7 +221,9 @@ export function StorefrontHomeVisualEditor({
       onChange={(next) => {
         setBlocks(next);
       }}
-      onMutation={(mutation) => setMutations((current) => [...current, mutation])}
+      onMutation={(mutation) => {
+        mutationsRef.current = [...mutationsRef.current, mutation];
+      }}
       disabled={!canWrite}
       immersive
       pageTitle="Homepage"
@@ -241,7 +244,7 @@ export function StorefrontHomeVisualEditor({
             </p>
             <p>
               Use the Components panel to add reusable content sections. Homepage
-              sections are kept in the same CMS canvas as ordinary pages.
+              sections are kept in the same Build canvas as ordinary pages.
             </p>
             {saved ? (
               <p className="rounded bg-emerald-50 px-2.5 py-2 text-emerald-700">

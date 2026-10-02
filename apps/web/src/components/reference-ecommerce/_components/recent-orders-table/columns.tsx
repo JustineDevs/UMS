@@ -25,7 +25,7 @@ function PaymentBadge({ status }: { status: OrderRow["payment"] }) {
   if (status === "Paid") {
     return (
       <Badge
-        className="border-green-700/25 text-green-700 dark:border-green-300/25 dark:text-green-300"
+        className="shrink-0 whitespace-nowrap border-green-700/25 text-green-700 dark:border-green-300/25 dark:text-green-300"
         variant="outline"
       >
         <span className="size-1.5 rounded-full bg-current" />
@@ -45,7 +45,7 @@ function PaymentBadge({ status }: { status: OrderRow["payment"] }) {
 
   return (
     <Badge
-      className="border-yellow-700/25 text-yellow-700 dark:border-yellow-300/25 dark:text-yellow-300"
+        className="shrink-0 whitespace-nowrap border-yellow-700/25 text-yellow-700 dark:border-yellow-300/25 dark:text-yellow-300"
       variant="outline"
     >
       <span className="size-1.5 rounded-full bg-current" />
@@ -58,7 +58,7 @@ function FulfillmentBadge({ status }: { status: OrderRow["fulfillment"] }) {
   if (status === "Fulfilled") {
     return (
       <Badge
-        className="border-green-700/25 text-green-700 dark:border-green-300/25 dark:text-green-300"
+        className="shrink-0 whitespace-nowrap border-green-700/25 text-green-700 dark:border-green-300/25 dark:text-green-300"
         variant="outline"
       >
         <span className="size-1.5 rounded-full bg-current" />
@@ -69,7 +69,7 @@ function FulfillmentBadge({ status }: { status: OrderRow["fulfillment"] }) {
 
   if (status === "Returned") {
     return (
-      <Badge variant="destructive">
+      <Badge className="shrink-0 whitespace-nowrap" variant="destructive">
         <span className="size-1.5 rounded-full bg-current" />
         Returned
       </Badge>
@@ -77,7 +77,7 @@ function FulfillmentBadge({ status }: { status: OrderRow["fulfillment"] }) {
   }
 
   return (
-    <Badge variant="destructive">
+    <Badge className="shrink-0 whitespace-nowrap" variant="destructive">
       <span className="size-1.5 rounded-full bg-current" />
       Unfulfilled
     </Badge>
@@ -127,7 +127,7 @@ export const recentOrdersColumns: ColumnDef<OrderRow>[] = [
     id: "statusSummary",
     header: "Status",
     cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2.5 md:min-w-[9.5rem] md:flex-nowrap">
         <PaymentBadge status={row.original.payment} />
         <FulfillmentBadge status={row.original.fulfillment} />
       </div>
@@ -184,7 +184,7 @@ export const recentOrdersColumns: ColumnDef<OrderRow>[] = [
             </Button>
           </div>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent side="top" align="end" sideOffset={8} className="w-40">
           <DropdownMenuLabel>Order Actions</DropdownMenuLabel>
           <DropdownMenuGroup>
             <DropdownMenuItem asChild>

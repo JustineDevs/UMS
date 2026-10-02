@@ -13,7 +13,7 @@ import {
   verifyTrackingToken,
 } from "./tracking-token.js";
 
-const secret = "test-secret-32chars-long-enough";
+const secret = "x".repeat(32);
 
 describe("tracking token", () => {
   let orig: string | undefined;
@@ -147,6 +147,15 @@ describe("tracking token", () => {
     assert.equal(url?.includes("order_opaque"), false);
   });
 
+  it("rejects opaque capabilities with an invalid GCM authentication tag length", () => {
+    const now = 1_700_000_000_000;
+    const token = generateOpaqueTrackingCapability("order_auth_tag", now, 60_000);
+    assert.ok(token);
+    const parts = token!.split(".");
+    parts[5] = Buffer.from("short").toString("base64url");
+    assert.equal(resolveOpaqueTrackingCapability(parts.join("."), now), null);
+  });
+
   it("does not allow tracking capabilities to access confirmation data", () => {
     const now = 1_700_000_000_000;
     const tracking = generateOpaqueTrackingCapability("order_private", now, 60_000);
@@ -157,6 +166,24 @@ describe("tracking token", () => {
     const url = buildOrderConfirmationUrl("https://shop.example", "order_private");
     assert.ok(url?.startsWith("https://shop.example/order-confirmation/cap_v3."));
     assert.equal(url?.includes("order_private"), false);
+  });
+
+  it("supports scoped confirmation capabilities", () => {
+    const url = buildOrderConfirmationUrl(
+      "https://shop.example",
+      "order_private",
+      { customerEmail: "buyer@example.com", storeId: "store-1" },
+    );
+    assert.ok(url?.startsWith("https://shop.example/order-confirmation/cap_v3."));
+    const token = url?.split("/cap_")[1];
+    assert.ok(token);
+    const resolved = resolveOpaqueTrackingCapabilityDetails(
+      token!,
+      Date.now(),
+      "confirmation",
+    );
+    assert.equal(resolved?.scope?.storeId, "store-1");
+    assert.equal(resolved?.scope?.customerEmailHash?.length, 64);
   });
 
   it("binds opaque capabilities to hashed customer and store scope", () => {

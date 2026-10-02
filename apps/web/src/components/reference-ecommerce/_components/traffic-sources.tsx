@@ -22,7 +22,7 @@ export function TrafficSources() {
       </CardHeader>
 
       <CardContent>
-        <div className="flex h-54 items-center justify-center rounded-lg border border-dashed text-center">
+        <div className="flex h-56 items-center justify-center rounded-lg border border-dashed text-center">
           <div className="max-w-sm px-6">
             <div className="font-medium text-sm">Channel attribution is empty</div>
             <div className="mt-1 text-muted-foreground text-sm">

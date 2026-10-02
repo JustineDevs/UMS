@@ -478,6 +478,7 @@ const paymentProviderStatusSchema = z.object({
   enabled: z.boolean(),
   webhookConfigured: z.boolean(),
   sandboxMode: z.boolean().optional(),
+  expectedWebhookEndpoint: z.string().url().optional(),
   notes: z.string().optional(),
 }).strict();
 export const adminPaymentHealthResponseSchema = z.object({
@@ -544,7 +545,8 @@ export const healthResponseSchema = z.object({
 export const healthSopResponseSchema = z.object({
   status: z.enum(["ok", "degraded"]),
   commerceSource: z.literal("cloudflare_worker"),
-  worker: z.object({ configured: z.boolean(), healthReachable: z.boolean() }).strict(),
+  worker: z.object({ configured: z.boolean(), readyReachable: z.boolean() }).strict(),
+  deployment: z.object({ commitSha: z.string().min(1).max(200) }).strict(),
   missingObservabilityEnv: z.array(z.string().max(200)).max(50),
   timestamp: z.string().datetime(),
 }).strict();
@@ -563,6 +565,8 @@ export const catalogDefaultVariantResponseSchema = z.object({
   sku: z.string().max(300),
   price: z.number().finite().nonnegative().nullable(),
   currency: z.string().length(3),
+  productName: z.string().max(500).optional(),
+  imageUrl: z.string().url().max(2_000).nullable().optional(),
 }).strict();
 const cartLineResponseSchema = z.object({
   variantId: z.string().min(1).max(300),
@@ -589,24 +593,6 @@ export const cartResumeResponseSchema = z.object({
 export const loyaltyBalanceResponseSchema = z.object({
   balance: z.number().int().nonnegative().max(1_000_000_000),
   currency: z.literal("php"),
-}).strict();
-const customerLoyaltyAccountSchema = z.object({
-  id: z.string().min(1).max(200),
-  points_balance: z.number().int().nonnegative().max(1_000_000_000),
-  lifetime_points: z.number().int().nonnegative().max(1_000_000_000),
-  tier: z.string().min(1).max(80),
-  updated_at: z.string().datetime(),
-}).strict();
-const customerLoyaltyTransactionSchema = z.object({
-  id: z.string().min(1).max(200),
-  points_delta: z.number().int().max(1_000_000_000).min(-1_000_000_000),
-  reason: z.string().min(1).max(300),
-  order_id: z.string().max(200).nullable(),
-  created_at: z.string().datetime(),
-}).strict();
-export const customerLoyaltyResponseSchema = z.object({
-  account: customerLoyaltyAccountSchema.nullable(),
-  transactions: z.array(customerLoyaltyTransactionSchema).max(50),
 }).strict();
 const customerMarketingPreferenceSchema = z.object({
   channel: z.enum(["email", "order_updates", "back_in_stock", "promotions", "wallet", "platform_updates"]),
@@ -785,7 +771,7 @@ export const checkoutIntentFinalizeResponseSchema = z.object({
   orderId: z.string().min(1).max(300),
   redirectUrl: z.string().url().max(2_000),
 }).passthrough();
-export const codPlaceOrderResponseSchema = z.object({ ok: z.literal(true), orderId: z.string().min(1).max(200), redirectUrl: z.string().url().max(2_000) }).strict();
+export const codPlaceOrderResponseSchema = z.object({ ok: z.literal(true), orderId: z.string().min(1).max(200), redirectUrl: z.string().url().max(2_000), replayed: z.boolean().optional() }).strict();
 export const trackingLinkResponseSchema = z.object({ trackingPageUrl: z.string().url().max(2_000) }).strict();
 export const reviewHelpfulResponseSchema = z.object({ ok: z.literal(true), helpful_votes: z.number().int().nonnegative().max(1_000_000) }).strict();
 export const accountPrivacyErasureResponseSchema = z.object({ ok: z.literal(true) }).strict();
@@ -1388,7 +1374,7 @@ export const storefrontReturnResponseSchema = z.object({
   auditStatus: z.enum(["recorded", "pending"]).optional(),
 }).strict();
 export const adminTrackingCapabilityRevokeResponseSchema = z.object({ ok: z.literal(true), revoked: z.literal(true) }).strict();
-export const adminTerminalMutationResponseSchema = adminMutationOkResponseSchema;
+export const adminTerminalMutationResponseSchema = z.object({ ok: z.literal(true) }).strict();
 export const adminPaymentRetryResponseSchema = z.object({
   ok: z.literal(true),
   orderId: z.string().min(1).max(200),
@@ -1819,7 +1805,6 @@ export const adminResponseContracts = {
   "get /catalog/product-default-variant": catalogDefaultVariantResponseSchema,
   "get /cart/resume": cartResumeResponseSchema,
   "get /checkout/loyalty-balance": loyaltyBalanceResponseSchema,
-  "get /account/loyalty": customerLoyaltyResponseSchema,
   "get /account/marketing-preferences": accountMarketingPreferencesResponseSchema,
   "patch /account/marketing-preferences": accountMarketingPreferencesResponseSchema,
   "get /account/order-preferences": accountOrderPreferencesResponseSchema,
@@ -1973,6 +1958,9 @@ export const adminResponseContracts = {
   "delete /admin/cms/media/{id}": adminCmsMediaDeleteResponseSchema,
   "get /admin/catalog/media": adminCatalogMediaResponseSchema,
   "post /admin/catalog/media": adminCmsMediaItemResponseSchema,
+  "get /admin/catalog/media/{id}": adminCmsMediaDetailResponseSchema,
+  "patch /admin/catalog/media/{id}": adminCmsMediaItemResponseSchema,
+  "delete /admin/catalog/media/{id}": adminCmsMediaDeleteResponseSchema,
   "delete /admin/cms/components/{id}": adminCmsComponentDeleteResponseSchema,
   "get /admin/cms/components": adminCmsComponentsResponseSchema,
   "get /admin/cms/components/{id}": adminCmsComponentResponseSchema,

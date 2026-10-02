@@ -157,6 +157,12 @@ test("finalizes a paid cart using one transaction and links the attempt", async 
   assert.ok(
     queries.some((query) => query.includes("UPDATE public.payment_attempts")),
   );
+  assert.ok(
+    queries.some((query) =>
+      query.includes("FROM public.cart_line_item i") &&
+      query.includes("a.item_id = i.id"),
+    ),
+  );
 });
 
 test("rolls back when the payment is not settled", async () => {
@@ -179,6 +185,29 @@ test("rolls back when the payment is not settled", async () => {
     () => finalizeNativeOrder(database, "00000000-0000-4000-8000-000000000002"),
     /payment_not_settled/,
   );
+});
+
+test("rejects a paid attempt when its amount no longer matches the locked cart", async () => {
+  const statements: string[] = [];
+  const database = client((text) => {
+    statements.push(text);
+    if (text.includes("FROM public.payment_attempts")) {
+      return { rows: [{ correlation_id: "00000000-0000-4000-8000-000000000009", cart_id: "cart_1", provider: "stripe", amount_minor: 5998, currency: "php", provider_payment_id: "pi_test", provider_payload: {}, status: "paid", medusa_order_id: null }], rowCount: 1 };
+    }
+    if (text.includes("FROM public.cart\n")) {
+      return { rows: [{ id: "cart_1", region_id: "reg_1", customer_id: null, sales_channel_id: "sc_1", email: "buyer@example.com", currency_code: "php", shipping_address_id: null, billing_address_id: null, metadata: {} }], rowCount: 1 };
+    }
+    if (text.includes("FROM public.cart_line_item")) {
+      return { rows: [{ id: "line_1", title: "Guitar", quantity: 1, unit_price: "5997", discount_total: 0, variant_id: "var_1", product_id: "prod_1", requires_shipping: true, is_discountable: true, is_tax_inclusive: false, is_custom_price: false, is_giftcard: false }], rowCount: 1 };
+    }
+    if (text.includes("metadata->>'worker_payment_correlation_id'")) return { rows: [], rowCount: 0 };
+    return { rows: [], rowCount: 0 };
+  });
+  await assert.rejects(
+    () => finalizeNativeOrder(database, "00000000-0000-4000-8000-000000000009"),
+    /payment_amount_mismatch/,
+  );
+  assert.equal(statements.some((text) => text.includes("INSERT INTO public.order\n")), false);
 });
 
 test("split topology routes payment attempts to APP and commerce writes to Medusa", async () => {

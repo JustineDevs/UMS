@@ -4,6 +4,23 @@
 
 Date: 2026-08-15
 
+## Current correction layer — 2026-09-29
+
+The historical rows below are not current release evidence. The following
+updates supersede only the rows whose verification state changed after this
+matrix was written:
+
+| Row | Current state | Fresh evidence |
+|---|---|---|
+| C13 | **PARTIAL — local provider matrix verified** | `pnpm test:e2e:psp-full`: 13 passed, 5 intentionally skipped, 0 failed. Stripe, PayPal, and COD success paths plus Xendit failure/expiry paths passed locally. Xendit hosted-success and live webhook/refund behavior still require external HTTPS provider evidence. |
+| C14 | **PASS** | Root `pnpm typecheck` and `pnpm lint` pass; the former historical alias/typecheck failures no longer describe the current unified workspace. |
+| Health contract | **VERIFIED for the current deployment contract** | `pnpm check:deployed-health-contract` validates the required Worker readiness and deployment SHA contract, and the current public Vercel deployment passed it. Any older retired-schema observations below are historical only. |
+| Storefront cron | **IMPLEMENTED locally / remote run evidence remains open** | `pnpm check:cron-workflow` proves all six Worker cron tasks match the scheduled workflow. Recent public `main` cron runs still fail, and their logs require authenticated GitHub access for exact diagnosis. |
+
+Do not reinterpret this correction layer as proof of live provider, database,
+or GitHub-hosted execution. Those remain explicitly external gates. The health
+contract row is the exception: it has current public deployment evidence.
+
 Source of requested findings: `.omx/context/Full-Task-fix.md`.
 
 This is a verification record, not an implementation claim. `PASS` means the
@@ -44,7 +61,7 @@ sandbox behavior.
 |---|---|---|---|
 | F1 | One canonical builder workspace; tools are in-builder panels | FAIL | `rg -n 'CmsToolSurface|CmsNavigationEditor|CmsFormsTable|CmsRedirectsManager' apps/web/src/components/cms/CmsPageBuilder.tsx` still shows independent tool surfaces. Browser route/workspace proof is not present. |
 | F2 | Homepage uses a complete canonical component tree | PARTIAL | Canonical tree schema/conversion is covered by the direct platform command above and `cms-route-contracts.test.ts`; `StorefrontHomeVisualEditor.tsx` still defines the fixed header/hero/footer adapter. |
-| F3 | Preview is the actual storefront renderer, without synthetic product/content markup | FAIL | `rg -n 'Product [0-9]|Latest product|_canvasDocument|Synthetic' apps/web/src/components/cms/CmsPageBuilder.tsx` finds synthetic canvas markup. |
+| F3 | Preview is the actual storefront renderer, without synthetic product/content markup | PASS (local source proof) | `StorefrontHomeVisualEditor` derives `/?adminPreview=1`, and `CmsPageBuilder` renders the supplied `previewUrl` in a sandboxed iframe while sending the canonical draft tree/page body through the preview bridge; the former synthetic product/content markers are absent. Browser save/reload parity remains a separate CMS proof item. |
 | F4 | Component Canvas is real visual DOM authoring | PARTIAL | `rg -n 'cms-component-canvas|contentEditable|Visual component canvas' apps/web/src/components/cms/CmsPageBuilder.tsx` finds an isolated iframe and inline editing, but no browser save/reload proof or full visual definition lifecycle. |
 | F5 | Inspector is registry-driven and covers responsive/content/layout/style/advanced controls | PARTIAL | `rg -n 'PROPERTY_KEYS|LayoutFields|backgroundImage|gridTemplateColumns|boxShadow' apps/web/src/components/cms/CmsPageBuilder.tsx` proves several expanded fields; it does not prove the requested complete registry or responsive state model. |
 | F6 | Slots/variants support validated insertion, nesting, reordering, and definition behavior | PARTIAL | Nested slot schema and round-trip assertions pass; `rg -n 'onDropSlot|onDropBlock|allowedSlot|allowedChildren|lockedStructure' apps/web/src/components/cms/CmsPageBuilder.tsx packages/platform-data/src` shows insertion paths but no complete validation contract or browser proof. |
@@ -73,7 +90,7 @@ sandbox behavior.
 
 | ID | Requested claim/finding | Status | Current evidence and exact proof command |
 |---|---|---|---|
-| C1 | Bag always shows current prices | FAIL | `rg -n 'localStorage|price|confirmed|reconcile' 'apps/web/src/app/(public)/cart/cart-client.tsx'` shows local bag display state; no authoritative snapshot/browser stale-price proof exists. |
+| C1 | Bag always shows current prices | PASS (local proof) | `scripts/stress-test/e2e/smoke/storefront-api-security.spec.ts` test `cart replaces a stale local price with the reconciled catalog price` seeds a stale local amount, returns a newer catalog reconciliation, and asserts the rendered line and total use the reconciled amount. Live provider/catalog deployment proof remains external. |
 | C2 | Checkout recalculates totals server-side | PASS for unit contract | Storefront suite 127/127 includes totals preview and quote tests; focused proof: `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='MedusaTotalsPreview|quote|total'`. |
 | C3 | Stock is checked before payment | PASS for unit contract | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='stock|checkout'` passes the configured logic assertions; live Medusa/cart integration is not included. |
 | C4 | Provider availability is tenant/store bound | PARTIAL | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='payment availability|wallets|Xendit'` passes provider filtering assertions; active organization/store routing is not integration-proven. |
@@ -106,25 +123,25 @@ complete by the existence of a route:
 |---|---|---|---|
 | S1 | Product catalog and product detail are real Medusa-backed surfaces | PASS for logic | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='catalog|product'`; browser rendering is not covered. |
 | S2 | Collections have native detail pages | PARTIAL | `rg -n 'redirect|/shop\?category|collection' 'apps/web/src/app/(public)/collections'`; route behavior needs browser/HTTP assertion. |
-| S3 | Search is a complete accessible combobox | PARTIAL | `rg -n 'role="combobox"|aria-activedescendant|Arrow|Escape|Enter' apps/web/src/components/CatalogSearchTypeahead.tsx`; keyboard and axe proof was not run. |
+| S3 | Search is a complete accessible combobox | PASS (local browser proof) | `scripts/stress-test/e2e/smoke/storefront-ux.spec.ts` verifies active-descendant keyboard selection, empty/outage states, and query recovery; the responsive route matrix also checks the combobox across all explicit viewport bands. |
 | S4 | Saved items are authoritative and synchronized | PARTIAL | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='wishlist|saved'`; server re-resolution exists, but cross-account API proof is absent. |
-| S5 | Public tracking cannot use raw order IDs as authorization | FAIL/PARTIAL | `rg -n 'fetchMedusaTrackByOrderId|verifyTrackingToken|rawOrderId|orderId' 'apps/web/src/app/(public)/track/[orderId]/page.tsx'`; signed-link helper tests pass, but raw-ID rejection is not proven. |
-| S6 | Account/order cancellation/returns enforce ownership | PARTIAL | `rg -n 'session|customer|ownership|order' apps/web/src/app/'(public)'/account apps/web/src/app/api`; cross-account negative browser/API tests are missing. |
-| S7 | Legal/policy content is current and versioned | FAIL | `rg -n 'shipping|returns|privacy|terms|cookies|Static|CMS' apps/web/src/app/'(public)'`; no policy/version audit artifact exists. |
-| S8 | Accessibility claim has tested conformance scope | FAIL | `rg -n 'WCAG|accessibility' apps/web/src/app/'(public)'/accessibility`; no axe/Lighthouse/browser run was performed. |
+| S5 | Public tracking cannot use raw order IDs as authorization | PASS (local browser proof) | `scripts/stress-test/e2e/smoke/storefront-api-security.spec.ts` verifies raw tracking IDs, forged capabilities, and confirmation IDs render bounded recovery states without order data; `storefront-ux.spec.ts` also verifies incomplete capabilities are no-store and rejected. |
+| S6 | Account/order cancellation/returns enforce ownership | PASS (local Worker proof) | `pnpm exec tsx --test workers/backend/src/order-mutations.test.ts` passes authenticated-owner, foreign-cancellation, and foreign-return cases; foreign cancellation returns 404 before UPDATE, and foreign return returns 403 before order-line/audit access. Provider/deployment-level two-session coverage remains an external release check. |
+| S7 | Legal/policy content is current and versioned | PASS (local source/test proof) | `pnpm exec tsx --test apps/web/src/lib/policy-content.test.ts` verifies the shared version/effective-date contract and that shipping, returns, terms, privacy, cookies, and accessibility routes all render `PolicyMeta`. Provider/legal review remains outside local code proof. |
+| S8 | Accessibility claim has tested conformance scope | PASS for audited local surfaces | `scripts/stress-test/e2e/smoke/storefront-axe.spec.ts` runs WCAG 2A/2AA/2.1A/2.1AA axe checks for shop, collections, cart, checkout, policy pages, account in auth-disabled mode, and the mobile filter dialog; full production/provider coverage remains external. |
 | S9 | Sitemap is complete from route/catalog/CMS sources | PARTIAL | Machine sitemap is `/sitemap.xml`; the human-readable route is `/site-map`. Source and Worker coverage remain the evidence surface. |
 | S10 | Newsletter has transactional consent, double opt-in, and unsubscribe lifecycle | PARTIAL | `pnpm --filter @universal-music-store/storefront test -- --test-name-pattern='newsletter'` has no dedicated configured assertion; source/migration inspection finds confirmation flow, but email/provider E2E is absent. |
 | S11 | Helpful votes are unique and atomic | PARTIAL | `rg -n 'review_helpful_votes|rpc\(|ALREADY_VOTED' apps/web/src/app/api/reviews/helpful/'[id]'/route.ts packages/database/supabase/migrations/085_review_helpful_atomic_increment.sql`; no concurrent vote test ran. |
 | S12 | Public mutations have consistent bot protection and rate limits | PARTIAL | Storefront suite and `rg -n 'withBotIdProtection|rateLimit' apps/web/src/app/api`; no abuse/oversized-payload matrix across all public forms ran. |
 | S13 | Wishlist delete reports failures | IMPLEMENTED/UNPROVEN | `rg -n 'delete\(|Unable to update|status: 503' apps/web/src/app/api/wishlist/route.ts`; no route integration test exercises the failure response. |
-| S14 | Image zoom has focus trap and restoration | PARTIAL | `rg -n 'role="dialog"|aria-modal|focus\(|Tab|Escape' apps/web/src/components/ProductImageZoom.tsx`; keyboard browser proof was not run. |
-| S15 | Mobile navigation is a semantic menu/dialog with focus management | PARTIAL | `rg -n 'menu|dialog|aria-expanded|focus|StorefrontMainNav|StorefrontNav' apps/web/src/components`; no mobile Playwright/axe proof exists. |
+| S14 | Image zoom has focus trap and restoration | PASS (local browser proof) | `scripts/stress-test/e2e/smoke/storefront-ux.spec.ts` opens the labelled zoom dialog, verifies focus handling, and verifies focus restoration after close. |
+| S15 | Mobile navigation is a semantic menu/dialog with focus management | PASS (local browser proof) | `scripts/stress-test/e2e/smoke/storefront-ux.spec.ts` opens the mobile menu by keyboard, verifies dialog semantics and close-button focus, then verifies Escape closes it and restores trigger focus. |
 
 ## Stop condition and remaining blockers
 
-The verification stop condition is reached for this lane: the matrix is
-grounded by fresh local test output, and remaining gaps require proof sources
-that were not available or would expand scope into application changes.
+The historical verification stop condition below is retained for audit trail
+purposes. It is superseded by the current evidence refresh above and must not
+be used as the current release verdict.
 
 Remaining blockers are precise:
 

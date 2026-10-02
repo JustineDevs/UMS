@@ -17,17 +17,19 @@ import {
 async function resolveCorrelationId(
   provider: HostedReturnProvider,
   providerOrderId?: string,
+  callbackCorrelationId?: string,
 ): Promise<string | undefined> {
   const storedId = sessionStorage
     .getItem(PAYMENT_CHECKOUT_CORRELATION_STORAGE_KEY)
     ?.trim();
+  const capabilityId = callbackCorrelationId?.trim() || storedId;
   const rec = await fetch(
     `/api/payments/checkout-intents/recover?provider=${encodeURIComponent(provider)}${
       providerOrderId ? `&provider_order_id=${encodeURIComponent(providerOrderId)}` : ""
-    }`,
+    }${capabilityId ? `&correlation_id=${encodeURIComponent(capabilityId)}` : ""}`,
     { credentials: "include" },
   );
-  if (!rec.ok) return storedId || undefined;
+  if (!rec.ok) return capabilityId || undefined;
   const recJson = (await rec.json().catch(() => ({}))) as {
     found?: boolean;
     correlationId?: string;
@@ -44,7 +46,7 @@ async function resolveCorrelationId(
     }
     return id;
   }
-  return storedId || undefined;
+  return capabilityId || undefined;
 }
 
 // Provider webhooks can arrive after the hosted-return redirect. Keep the
@@ -59,10 +61,12 @@ export function HostedCheckoutReturn({
   provider,
   status,
   providerOrderId,
+  correlationId: callbackCorrelationId,
 }: {
   provider: HostedReturnProvider;
   status: HostedReturnStatus;
   providerOrderId?: string;
+  correlationId?: string;
 }) {
   const hasFailedStatus = status === "cancel" || status === "failure";
   const [message, setMessage] = useState(() =>
@@ -112,6 +116,7 @@ export function HostedCheckoutReturn({
       const correlationId = await resolveCorrelationId(
         provider,
         effectiveProviderOrderId,
+        callbackCorrelationId,
       );
       if (disposed) return;
       if (!correlationId) {
@@ -296,7 +301,7 @@ export function HostedCheckoutReturn({
             Back to checkout
           </Link>
           <Link
-            href="/account"
+          href="/account/profile"
             className="inline-flex items-center justify-center rounded border border-outline-variant px-6 py-3 text-sm font-medium text-primary hover:bg-surface-container-low"
           >
             My account

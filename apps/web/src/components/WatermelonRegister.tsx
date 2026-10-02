@@ -1,38 +1,28 @@
 "use client";
 
-import { Auth04 } from "@universal-music-store/ui";
-import { signIn } from "@/lib/auth-client";
+import { signIn } from "@/lib/auth-actions";
+import { StorefrontAuthCard } from "@/components/StorefrontAuthCard";
 
 export function WatermelonRegister({ callbackUrl }: { callbackUrl: string }) {
   const handleGoogleLogin = async () => {
     try {
       await signIn("google", { callbackUrl });
     } catch {
-      window.location.assign(`/register?callbackUrl=${encodeURIComponent(callbackUrl)}&error=ClientConfiguration`);
+      window.location.assign(
+        `/register?callbackUrl=${encodeURIComponent(callbackUrl)}&error=ClientConfiguration`,
+      );
     }
   };
 
   return (
-    <main id="main-content" aria-label="Create your account">
-      <Auth04
-        brandName="Universal Music Store"
-        heading="Create your account"
-        socialOnly
-        showFooter={false}
-        subheading="Join Universal Music Store and keep your orders in one place."
-        googleLabel="Continue with Google"
-        footerPrompt="Already have an account?"
-        footerActionLabel="Log in"
-        onGoogleLogin={() => void handleGoogleLogin()}
-        onFooterAction={() => { window.location.href = `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`; }}
-        onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
-        onLogin={() => { window.location.href = "/contact?topic=account"; }}
-        footerLinks={[
-          { label: "Privacy", href: "/privacy" },
-          { label: "Terms", href: "/terms" },
-          { label: "Support", href: "/contact" },
-        ]}
-      />
-    </main>
+    <StorefrontAuthCard
+      heading="Create your account"
+      subheading="Join Universal Music Store and keep your orders in one place."
+      googleLabel="Continue with Google"
+      onGoogleLogin={() => void handleGoogleLogin()}
+      footerPrompt="Already have an account?"
+      footerLabel="Log in"
+      footerHref={`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+    />
   );
 }

@@ -10,7 +10,7 @@ type Env = {
   fetch?: typeof fetch;
 };
 
-export type PancakeResource =
+type PancakeResource =
   | "orders"
   | "customers"
   | "products"

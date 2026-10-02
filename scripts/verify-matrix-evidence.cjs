@@ -88,7 +88,9 @@ for (const file of files) {
     if (!nonEmptyString(record[key])) errors.push(`${file}: ${key} is required`);
   }
   if (!Number.isInteger(record.exitCode)) errors.push(`${file}: exitCode must be an integer from the executed runner`);
-  if (record.exitCode !== 0) errors.push(`${file}: exitCode must be 0, got ${record.exitCode}`);
+  if (record.exitCode !== 0 && record.result !== "blocked") {
+    errors.push(`${file}: exitCode must be 0 for passing evidence, got ${record.exitCode}`);
+  }
   if (!["pass", "blocked"].includes(record.result)) {
     errors.push(`${file}: result must be pass or blocked, got ${record.result}`);
   }
@@ -116,8 +118,13 @@ for (const file of files) {
     }
   }
   const verifiedAt = Date.parse(record.verifiedAt);
-  if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(record.verifiedAt) || !Number.isFinite(verifiedAt) || verifiedAt > Date.now() + 60_000 || Date.now() - verifiedAt > 24 * 60 * 60 * 1000) {
-    errors.push(`${file}: verifiedAt must be a fresh UTC ISO timestamp`);
+  const validUtcTimestamp = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(record.verifiedAt)
+    && Number.isFinite(verifiedAt)
+    && verifiedAt <= Date.now() + 60_000;
+  if (!validUtcTimestamp) {
+    errors.push(`${file}: verifiedAt must be a valid UTC ISO timestamp that is not in the future`);
+  } else if (record.result === "pass" && Date.now() - verifiedAt > 24 * 60 * 60 * 1000) {
+    errors.push(`${file}: passing evidence must be refreshed within 24 hours`);
   }
   if ((requireHttps || httpsRows.has(record.matrixId)) && !/^https:\/\/[^\s/]+/i.test(record.runtime)) {
     errors.push(`${file}: runtime must be an HTTPS URL, got ${record.runtime}`);

@@ -12,6 +12,9 @@ export type WishlistEntry = {
   name: string;
   /** Medusa `product.id` when added from PDP; keeps identity stable if handle changes. */
   medusaProductId?: string;
+  imageUrl?: string;
+  price?: number;
+  currencyCode?: string;
   addedAt: string;
 };
 
@@ -42,6 +45,15 @@ export function getWishlist(): WishlistEntry[] {
       slug: o.slug,
       name: o.name,
       ...(mid ? { medusaProductId: mid } : {}),
+      ...(typeof o.imageUrl === "string" && o.imageUrl.trim()
+        ? { imageUrl: o.imageUrl.trim() }
+        : {}),
+      ...(typeof o.price === "number" && Number.isFinite(o.price) && o.price >= 0
+        ? { price: o.price }
+        : {}),
+      ...(typeof o.currencyCode === "string" && o.currencyCode.trim()
+        ? { currencyCode: o.currencyCode.trim().toUpperCase() }
+        : {}),
       addedAt:
         typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
     });
@@ -56,7 +68,7 @@ function write(entries: WishlistEntry[]) {
 }
 
 export async function persistWishlistMutation(
-  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId">,
+  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId" | "imageUrl" | "price" | "currencyCode">,
   action: "add" | "remove",
 ): Promise<void> {
   const response = await fetch("/api/wishlist", {
@@ -79,16 +91,27 @@ export async function syncWishlistFromServer(): Promise<WishlistEntry[]> {
   const payload = (await response.json()) as { items?: unknown };
   if (!Array.isArray(payload.items)) throw new Error("Invalid saved items response.");
   const entries: WishlistEntry[] = [];
+  const localByIdentity = new Map(
+    getWishlist().map((item) => [item.medusaProductId ?? item.slug, item]),
+  );
   for (const item of payload.items) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
     if (typeof row.product_slug !== "string" || typeof row.product_name !== "string") continue;
+    const local = localByIdentity.get(
+      typeof row.medusa_product_id === "string" && row.medusa_product_id.trim()
+        ? row.medusa_product_id.trim()
+        : row.product_slug,
+    );
     entries.push({
       slug: row.product_slug,
       name: row.product_name,
       ...(typeof row.medusa_product_id === "string" && row.medusa_product_id.trim()
         ? { medusaProductId: row.medusa_product_id.trim() }
         : {}),
+      ...(local?.imageUrl ? { imageUrl: local.imageUrl } : {}),
+      ...(local?.price != null ? { price: local.price } : {}),
+      ...(local?.currencyCode ? { currencyCode: local.currencyCode } : {}),
       addedAt: typeof row.added_at === "string" ? row.added_at : new Date().toISOString(),
     });
   }
@@ -105,7 +128,7 @@ export function wishlistContains(slug: string, medusaProductId?: string): boolea
 }
 
 export function toggleWishlist(
-  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId">,
+  entry: Pick<WishlistEntry, "slug" | "name" | "medusaProductId" | "imageUrl" | "price" | "currencyCode">,
 ): boolean {
   const list = getWishlist();
   const mid = entry.medusaProductId?.trim();
@@ -125,6 +148,15 @@ export function toggleWishlist(
     slug: entry.slug,
     name: entry.name,
     ...(mid ? { medusaProductId: mid } : {}),
+    ...(("imageUrl" in entry && entry.imageUrl?.trim())
+      ? { imageUrl: entry.imageUrl.trim() }
+      : {}),
+    ...(("price" in entry && typeof entry.price === "number" && Number.isFinite(entry.price))
+      ? { price: entry.price }
+      : {}),
+    ...(("currencyCode" in entry && entry.currencyCode?.trim())
+      ? { currencyCode: entry.currencyCode.trim().toUpperCase() }
+      : {}),
     addedAt: new Date().toISOString(),
   });
   write(list);
@@ -135,38 +167,20 @@ export function clearWishlist(): void {
   write([]);
 }
 
-export function exportWishlistJSON(): string {
-  return JSON.stringify(getWishlist(), null, 2);
-}
-
-export function importWishlistJSON(json: string): number {
-  const parsed = JSON.parse(json) as unknown;
-  if (!Array.isArray(parsed)) return 0;
-  const current = getWishlist();
-  const slugs = new Set(current.map((e) => e.slug));
-  let added = 0;
-  for (const row of parsed) {
-    if (!row || typeof row !== "object") continue;
-    const o = row as Record<string, unknown>;
-    if (typeof o.slug !== "string" || typeof o.name !== "string") continue;
-    if (slugs.has(o.slug)) continue;
-    if (current.length >= MAX_WISHLIST_SIZE) break;
-    const impMid =
-      typeof o.medusaProductId === "string" && o.medusaProductId.trim()
-        ? o.medusaProductId.trim()
-        : undefined;
-    current.push({
-      slug: o.slug,
-      name: o.name,
-      ...(impMid ? { medusaProductId: impMid } : {}),
-      addedAt:
-        typeof o.addedAt === "string" ? o.addedAt : new Date().toISOString(),
-    });
-    slugs.add(o.slug);
-    added++;
-  }
-  write(current);
-  return added;
+export function updateWishlistMetadata(
+  slug: string,
+  metadata: Pick<WishlistEntry, "imageUrl" | "price" | "currencyCode">,
+): void {
+  const entries = getWishlist();
+  const index = entries.findIndex((entry) => entry.slug === slug);
+  if (index < 0) return;
+  entries[index] = {
+    ...entries[index],
+    ...(metadata.imageUrl ? { imageUrl: metadata.imageUrl } : {}),
+    ...(metadata.price != null ? { price: metadata.price } : {}),
+    ...(metadata.currencyCode ? { currencyCode: metadata.currencyCode } : {}),
+  };
+  write(entries);
 }
 
 export function onWishlistChange(callback: () => void): () => void {

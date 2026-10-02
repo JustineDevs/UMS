@@ -25,6 +25,8 @@ const botIdDisabledForLocalAuthBypass =
   process.env.AUTH_DISABLE === "true" ||
   process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" ||
   process.env.NEXT_PUBLIC_AUTH_DISABLE === "true";
+const wishlistSyncLocalE2e =
+  process.env.NEXT_PUBLIC_WISHLIST_SYNC_E2E === "1";
 
 export function StorefrontRuntimeProviders({
   children,
@@ -57,7 +59,10 @@ export function StorefrontRuntimeProviders({
           />
         ) : null}
         <CartSyncOnSignIn />
-        <WishlistSyncOnLogin disabled={botIdDisabledForLocalAuthBypass} />
+        <WishlistSyncOnLogin
+          disabled={botIdDisabledForLocalAuthBypass && !wishlistSyncLocalE2e}
+          allowLocalAuthBypass={wishlistSyncLocalE2e}
+        />
         <StorefrontPreferenceSync />
         <CartAbandonmentBeacon />
         <OnboardingGuard>

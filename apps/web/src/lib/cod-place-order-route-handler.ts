@@ -13,6 +13,9 @@ type PaymentAttemptRow = {
   correlation_id: string;
   provider: string;
   status?: string;
+  checkout_state?: string;
+  medusa_order_id?: string | null;
+  order_id?: string | null;
   quote_fingerprint?: string | null;
   stale_reason?: string | null;
 } | null;
@@ -88,12 +91,16 @@ export async function handleCodPlaceOrderRequest(
     const row = correlationId
       ? await deps.getPaymentAttemptRow(correlationId, cartId)
       : null;
-    const currentQuoteFingerprint = cartId
-      ? await deps.readCurrentQuoteFingerprint(cartId)
+    // A completed checkout may clear the active cart cookie before a retry
+    // reaches this handler. The correlation lookup is capability-bound, so
+    // its cart identity is the safe fallback for idempotent replay.
+    const effectiveCartId = cartId ?? row?.cart_id ?? null;
+    const currentQuoteFingerprint = effectiveCartId
+      ? await deps.readCurrentQuoteFingerprint(effectiveCartId)
       : null;
     const result = await codPlaceOrderRouteLogic({
       correlationId,
-      cartId,
+      cartId: effectiveCartId,
       row,
       currentQuoteFingerprint,
       incrementFinalizeAttempts: deps.incrementFinalizeAttempts,

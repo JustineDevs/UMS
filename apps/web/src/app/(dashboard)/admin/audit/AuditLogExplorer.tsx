@@ -1,19 +1,72 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { staffHasPermission } from "@universal-music-store/platform-data";
-import type { AuditEntry } from "@/components/admin-console/AuditTimeline";
 import { formatAuditActorLabel } from "@/lib/audit-actor-format";
 import {
   formatAuditActionLabel,
   formatAuditResourceLabel,
 } from "@/lib/audit-display-format";
+import { AdminEmptyState, AdminErrorState } from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
 import {
-  AdminEmptyState,
-  AdminErrorState,
-  AdminLoadingState,
-} from "@/components/admin-console";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+type AuditEntry = {
+  id: string;
+  action: string;
+  resource: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+  actor_id?: string | null;
+  users?: { email?: string | null; name?: string | null } | null;
+};
+
+const RESOURCE_OPTIONS = [
+  { value: "", label: "All resources" },
+  { value: "order:", label: "Orders" },
+  { value: "product:", label: "Products" },
+  { value: "inventory_", label: "Inventory" },
+  { value: "cms_", label: "Content and CMS" },
+  { value: "payment", label: "Payments" },
+  { value: "customer", label: "Customers" },
+  { value: "pos_", label: "Point of sale" },
+  { value: "delivery", label: "Delivery" },
+];
+
+const ACTION_OPTIONS = [
+  { value: "", label: "All actions" },
+  { value: "staff_", label: "Staff actions" },
+  { value: "orders.", label: "Order actions" },
+  { value: "inventory.", label: "Inventory actions" },
+  { value: "cms.", label: "Content actions" },
+  { value: "payment", label: "Payment actions" },
+  { value: "crm.", label: "CRM actions" },
+  { value: "delivery.", label: "Delivery actions" },
+  { value: "pos.", label: "POS actions" },
+];
+
+function AuditLogSkeleton() {
+  return (
+    <div
+      aria-label="Loading audit entries"
+      aria-live="polite"
+      className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4"
+    >
+      <div className="space-y-3 animate-pulse">
+        {["w-11/12", "w-9/12", "w-full", "w-10/12", "w-8/12"].map((width, index) => (
+          <div key={index} className={`h-4 rounded bg-muted ${width}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function AuditLogExplorer() {
   const { data: session } = useSession();
@@ -26,6 +79,11 @@ export function AuditLogExplorer() {
   const [limit, setLimit] = useState(50);
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+  const didInitialLoad = useRef(false);
+
+  const resourceLabel = RESOURCE_OPTIONS.find((option) => option.value === resourcePrefix)?.label ?? "All resources";
+  const actionLabel = ACTION_OPTIONS.find((option) => option.value === actionPrefix)?.label ?? "All actions";
 
   const load = useCallback(() => {
     const params = new URLSearchParams();
@@ -35,9 +93,12 @@ export function AuditLogExplorer() {
     if (from.trim()) params.set("from", new Date(from).toISOString());
     if (to.trim()) params.set("to", new Date(to).toISOString());
 
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
     setError(null);
     setEntries(null);
-    fetch(`/api/admin/audit-logs?${params.toString()}`)
+    fetch(`/api/admin/audit-logs?${params.toString()}`, { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Audit log request failed (${r.status})`);
         return r.json();
@@ -50,15 +111,20 @@ export function AuditLogExplorer() {
         }
         setEntries((body.entries as AuditEntry[]) ?? []);
       })
-      .catch(() => {
+      .catch((requestError: unknown) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
         setError("Unable to load audit logs");
         setEntries([]);
       });
   }, [resourcePrefix, actionPrefix, from, to, limit]);
 
   useEffect(() => {
+    if (didInitialLoad.current) return;
+    didInitialLoad.current = true;
     load();
   }, [load]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   function downloadCsv() {
     const params = new URLSearchParams();
@@ -71,92 +137,95 @@ export function AuditLogExplorer() {
     window.location.href = `/api/admin/audit-logs?${params.toString()}`;
   }
 
+  function resetFilters() {
+    setResourcePrefix("");
+    setActionPrefix("");
+    setFrom("");
+    setTo("");
+    setLimit(50);
+  }
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-4 md:grid-cols-2 lg:grid-cols-3">
-        <label className="block text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            Resource prefix
-          </span>
-          <input
-            value={resourcePrefix}
-            onChange={(e) => setResourcePrefix(e.target.value)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
-            placeholder="e.g. order:"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            Action prefix
-          </span>
-          <input
-            value={actionPrefix}
-            onChange={(e) => setActionPrefix(e.target.value)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
-            placeholder="e.g. staff_"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            Limit
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={500}
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value) || 50)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            From
-          </span>
-          <input
-            type="datetime-local"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-on-surface-variant">
-            To
-          </span>
-          <input
-            type="datetime-local"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="mt-1 w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
-          />
-        </label>
-        <div className="flex flex-wrap items-end gap-2">
-          <button
+      <div className="border-y border-border/70 py-5">
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Filter activity</h2>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Narrow the log by the system area, action family, result count, or time window.
+            </p>
+          </div>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+            <div className="block min-w-0 text-sm">
+              <span className="text-xs font-medium text-foreground">Resource</span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">What changed</span>
+              <Select value={resourcePrefix || "all"} onValueChange={(value) => setResourcePrefix(value === "all" ? "" : value)}>
+                <SelectTrigger size="sm" className="mt-2 h-10 w-full"><SelectValue placeholder={resourceLabel} /></SelectTrigger>
+                <SelectContent>{RESOURCE_OPTIONS.map((option) => <SelectItem key={option.value || "all"} value={option.value || "all"}>{option.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="block min-w-0 text-sm">
+              <span className="text-xs font-medium text-foreground">Action</span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">What staff did</span>
+              <Select value={actionPrefix || "all"} onValueChange={(value) => setActionPrefix(value === "all" ? "" : value)}>
+                <SelectTrigger size="sm" className="mt-2 h-10 w-full"><SelectValue placeholder={actionLabel} /></SelectTrigger>
+                <SelectContent>{ACTION_OPTIONS.map((option) => <SelectItem key={option.value || "all"} value={option.value || "all"}>{option.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+            <label className="block min-w-0 text-sm">
+              <span className="text-xs font-medium text-foreground">Rows</span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">Maximum results</span>
+              <input type="number" min={1} max={500} value={limit} onChange={(e) => setLimit(Math.min(500, Math.max(1, Number(e.target.value) || 50)))} className="mt-2 box-border h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" />
+            </label>
+            <label className="block min-w-0 text-sm">
+              <span className="text-xs font-medium text-foreground">From</span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">Start of time window</span>
+              <input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-2 box-border h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" />
+            </label>
+            <label className="block min-w-0 text-sm">
+              <span className="text-xs font-medium text-foreground">To</span>
+              <span className="mt-1 block text-[11px] text-muted-foreground">End of time window</span>
+              <input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} className="mt-2 box-border h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground" />
+            </label>
+          </div>
+        </div>
+        <div className="mt-5 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">Filters apply when you select Apply filters.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" size="sm" type="button" onClick={resetFilters}>
+              Reset
+            </Button>
+          <Button
+            variant="default"
+            size="sm"
             type="button"
             onClick={() => load()}
-            className="rounded bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
+            className="px-4 text-sm font-semibold"
           >
             Apply filters
-          </button>
-          {canExport ? (
-            <button
+          </Button>
+            <Button
+              variant="outline"
+              size="sm"
               type="button"
               onClick={() => downloadCsv()}
-              className="rounded border border-outline-variant/40 px-4 py-2 text-sm font-semibold text-primary"
+              disabled={!canExport}
+              title={canExport ? "Export the filtered audit log as CSV" : "Your role cannot export audit logs"}
+              aria-label={canExport ? "Export audit logs as CSV" : "Audit log export unavailable for your role"}
+              className="px-4 text-sm font-semibold"
             >
               Export CSV
-            </button>
-          ) : null}
+            </Button>
+          </div>
         </div>
       </div>
 
       {error ? (
         <AdminErrorState title="Audit log unavailable" detail={error} />
       ) : null}
-      {!error && entries === null ? (
-        <AdminLoadingState label="Loading audit entries" />
-      ) : null}
+      {!error && entries === null ? <AuditLogSkeleton /> : null}
       {!error && entries && entries.length === 0 ? (
         <AdminEmptyState
           title="No rows match"

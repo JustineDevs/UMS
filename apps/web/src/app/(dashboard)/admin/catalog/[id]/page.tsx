@@ -2,10 +2,8 @@ import Link from "next/link";
 import {
   AdminBreadcrumbs,
   AdminPageShell,
-  AuditTimeline,
 } from "@/components/admin-console";
 import { ProductEditorLoader } from "@/components/catalog/ProductEditorLoader";
-import { Button } from "@/components/ui/button";
 import {
   fetchCatalogProductDetail,
 } from "@/lib/catalog-product-service";
@@ -46,35 +44,8 @@ export default async function CatalogEditPage({
 
   return (
     <AdminPageShell
-      title="Edit product"
-      subtitle={product.title}
-      breadcrumbs={
-        <AdminBreadcrumbs
-          items={[
-            { label: "Dashboard", href: "/admin" },
-            { label: "Products", href: "/admin/catalog" },
-            { label: "Edit" },
-          ]}
-        />
-      }
-      actions={
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link href="/admin/catalog">Back to products</Link>
-          </Button>
-        </div>
-      }
-      inspector={
-        <AuditTimeline
-          resourcePrefix={`product:${product.id}`}
-          title="Changes to this product"
-        />
-      }
-      inspectorCollapsible={{
-        storageKey: `admin.inspector.catalog-product:${product.id}`,
-        expandLabel: "Activity",
-        collapseLabel: "Hide activity",
-      }}
+      hideHeader
+      className="bg-surface-container-low/30"
     >
       <ProductEditorLoader mode="edit" product={product} />
     </AdminPageShell>

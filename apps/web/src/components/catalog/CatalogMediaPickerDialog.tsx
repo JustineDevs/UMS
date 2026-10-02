@@ -17,6 +17,7 @@ type MediaRow = {
 export type PickedMedia = Pick<MediaRow, "id" | "public_url">;
 
 export type CatalogAddPlacement = "main" | "gallery";
+export type CatalogMediaPickerContext = "product" | "builder";
 
 type Props = {
   open: boolean;
@@ -24,7 +25,7 @@ type Props = {
   addPlacement: CatalogAddPlacement;
   onAddPlacementChange: (_placement: CatalogAddPlacement) => void;
   onPickMany: (_media: PickedMedia[]) => void;
-  mediaScope?: "catalog" | "cms";
+  context?: CatalogMediaPickerContext;
 };
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -40,12 +41,13 @@ export function CatalogMediaPickerDialog({
   addPlacement,
   onAddPlacementChange,
   onPickMany,
-  mediaScope = "catalog",
+  context = "product",
 }: Props) {
   const { data: session, status: sessionStatus } = useSession();
-  const writePermission = mediaScope === "cms" ? "content:write" : "catalog:write";
-  const mediaApiPath = mediaScope === "cms" ? "/api/admin/cms/media" : "/api/admin/catalog/media";
-  const mediaPagePath = mediaScope === "cms" ? "/admin/cms/media" : "/admin/catalog/media";
+  const writePermission = "catalog:write";
+  const mediaApiPath = "/api/admin/catalog/media";
+  const mediaPagePath = "/admin/catalog/media";
+  const isBuilderContext = context === "builder";
   const canWrite = staffHasPermission(
     session?.user?.permissions ?? [],
     writePermission,
@@ -64,6 +66,16 @@ export function CatalogMediaPickerDialog({
   const [savingMeta, setSavingMeta] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadAbortRef = useRef<AbortController | null>(null);
+
+  const handleClose = useCallback(() => {
+    loadAbortRef.current?.abort();
+    setQ("");
+    setRows([]);
+    setError(null);
+    setSelectedIds(new Set());
+    setEditingId(null);
+    onClose();
+  }, [onClose]);
 
   const load = useCallback(() => {
     loadAbortRef.current?.abort();
@@ -105,16 +117,6 @@ export function CatalogMediaPickerDialog({
     };
   }, [open, load]);
 
-  useEffect(() => {
-    if (!open) {
-      setQ("");
-      setRows([]);
-      setError(null);
-      setSelectedIds(new Set());
-      setEditingId(null);
-    }
-  }, [open]);
-
   const toggle = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -125,14 +127,14 @@ export function CatalogMediaPickerDialog({
   }, []);
 
   const addSelected = useCallback(() => {
-    const media = rows
-      .filter((m) => selectedIds.has(m.id))
-      .filter((m) => m.public_url.trim())
-      .map(({ id, public_url }) => ({ id, public_url }));
+    const media = rows.reduce<Array<{ id: string; public_url: string }>>((picked, m) => {
+      if (selectedIds.has(m.id) && m.public_url.trim()) picked.push({ id: m.id, public_url: m.public_url });
+      return picked;
+    }, []);
     if (media.length === 0) return;
     onPickMany(media);
-    onClose();
-  }, [rows, selectedIds, onPickMany, onClose]);
+    handleClose();
+  }, [rows, selectedIds, onPickMany, handleClose]);
 
   const openEdit = (m: MediaRow) => {
     setEditingId(m.id);
@@ -237,16 +239,19 @@ export function CatalogMediaPickerDialog({
   const n = selectedIds.size;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
-      role="dialog"
+    <dialog
+      open
       tabIndex={-1}
-      aria-modal="true"
+      className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/45 p-4 sm:p-6"
       aria-labelledby="catalog-media-picker-title"
       aria-describedby="catalog-media-picker-desc"
-      onClick={onClose}
+      onClick={handleClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        handleClose();
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Escape") onClose();
+        if (e.key === "Escape") handleClose();
       }}
     >
       <div
@@ -260,22 +265,21 @@ export function CatalogMediaPickerDialog({
               id="catalog-media-picker-title"
               className="text-base font-semibold text-on-surface"
             >
-              {mediaScope === "cms" ? "Content media library" : "Catalog media library"}
+              Catalog media library
             </h2>
             <p
               id="catalog-media-picker-desc"
               className="mt-1 text-xs leading-relaxed text-on-surface-variant"
             >
-              Preview images and videos, upload new files, or edit names. Select items to add them
-              {mediaScope === "cms"
-                ? "Preview, upload, and select reusable content media."
+              {isBuilderContext
+                ? "Choose an image or video from the shared catalog library for this page."
                 : "Preview images and videos, upload new files, or edit names. Select items to add them to this product."}
             </p>
             <p className="mt-2 text-xs">
               <Link
                 href={mediaPagePath}
                 className="font-medium text-primary underline"
-                onClick={onClose}
+                onClick={handleClose}
               >
               Open full media library
               </Link>{" "}
@@ -285,7 +289,7 @@ export function CatalogMediaPickerDialog({
           <button
             type="button"
             className="rounded-lg border border-outline-variant/30 px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high"
-            onClick={onClose}
+            onClick={handleClose}
           >
             Close
           </button>
@@ -320,34 +324,36 @@ export function CatalogMediaPickerDialog({
           </div>
         ) : null}
 
-        <div
-          className="border-b border-outline-variant/20 px-5 py-3"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Add selected to product
-          </p>
-          <div className="mt-2 flex flex-wrap gap-4 text-sm">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="radio"
-                name="catalog-add-placement"
-                checked={addPlacement === "main"}
-                onChange={() => onAddPlacementChange("main")}
-              />
-              <span>Main photos</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="radio"
-                name="catalog-add-placement"
-                checked={addPlacement === "gallery"}
-                onChange={() => onAddPlacementChange("gallery")}
-              />
-              <span>Gallery</span>
-            </label>
+        {!isBuilderContext ? (
+          <div
+            className="border-b border-outline-variant/20 px-5 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Add selected to product
+            </p>
+            <div className="mt-2 flex flex-wrap gap-4 text-sm">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="radio"
+                  name="catalog-add-placement"
+                  checked={addPlacement === "main"}
+                  onChange={() => onAddPlacementChange("main")}
+                />
+                <span>Main photos</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="radio"
+                  name="catalog-add-placement"
+                  checked={addPlacement === "gallery"}
+                  onChange={() => onAddPlacementChange("gallery")}
+                />
+                <span>Gallery</span>
+              </label>
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="border-b border-outline-variant/20 px-5 py-3">
           <label htmlFor="catalog-media-search" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
@@ -484,10 +490,11 @@ export function CatalogMediaPickerDialog({
             className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 sm:w-auto"
             onClick={addSelected}
           >
-            Add selected to product{n > 0 ? ` (${n})` : ""}
+            {isBuilderContext ? "Use selected media" : "Add selected to product"}
+            {n > 0 ? ` (${n})` : ""}
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

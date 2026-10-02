@@ -1,3 +1,4 @@
+import { format, parseISO } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 
 import {
@@ -22,9 +23,9 @@ export function InvoicePaper({ invoice }: { invoice: InvoiceFormValues }) {
     <article
       style={{ width: INVOICE_PAPER_WIDTH, height: INVOICE_PAPER_HEIGHT }}
       data-print-paper
-      className="relative flex flex-col gap-24 bg-neutral-50 px-12.25 py-11 font-mono text-neutral-950"
+      className="relative flex flex-col gap-16 bg-neutral-50 px-[3.0625rem] py-11 font-mono text-neutral-950"
     >
-      <header className="flex flex-col gap-10">
+      <header className="flex flex-col gap-8">
         <div className="grid grid-cols-2 items-start gap-14">
           <svg className="size-12" viewBox="0 0 48 48" aria-hidden="true">
             <rect width="20" height="20" rx="3" fill="currentColor" />
@@ -35,11 +36,11 @@ export function InvoicePaper({ invoice }: { invoice: InvoiceFormValues }) {
           <h2 className="text-4xl uppercase tracking-widest">Invoice</h2>
         </div>
 
-        <section className="grid grid-cols-2 gap-14 text-sm leading-relaxed">
+        <section className="grid grid-cols-2 gap-10 text-sm leading-relaxed">
           <div>
             <p>Reference: {invoice.referenceNumber}</p>
-            <p>Issued: {invoice.issuedDate}</p>
-            <p>Payment due: {invoice.paymentDueDate}</p>
+            <p>Issued: {formatInvoiceDate(invoice.issuedDate)}</p>
+            <p>Payment due: {formatInvoiceDate(invoice.paymentDueDate)}</p>
           </div>
           <div>
             <p>Issuer</p>
@@ -47,7 +48,7 @@ export function InvoicePaper({ invoice }: { invoice: InvoiceFormValues }) {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-14 text-sm leading-relaxed">
+        <section className="grid grid-cols-2 gap-10 text-sm leading-relaxed">
           <div>
             <p className="mb-4 font-semibold uppercase">From</p>
             <p>{invoice.from.name}</p>
@@ -78,7 +79,7 @@ export function InvoicePaper({ invoice }: { invoice: InvoiceFormValues }) {
           {getInvoiceItems(invoice).map((item) => (
             <div
               key={item.id}
-              className="grid grid-cols-[1fr_74px_116px_116px] border-[oklch(0.86_0_0)] border-b px-3 py-4"
+              className="grid grid-cols-[1fr_74px_116px_116px] border-[oklch(0.86_0_0)] border-b px-3 py-3"
             >
               <span>{item.description}</span>
               <span className="text-right">{item.quantity}</span>
@@ -116,7 +117,7 @@ export function InvoicePaper({ invoice }: { invoice: InvoiceFormValues }) {
         </div>
       </div>
 
-      <footer className="absolute right-12.25 bottom-11 left-12.25 grid grid-cols-2 gap-14 text-neutral-500 text-sm leading-relaxed">
+      <footer className="absolute right-[3.0625rem] bottom-11 left-[3.0625rem] grid grid-cols-2 gap-14 text-neutral-500 text-sm leading-relaxed">
         <div>
           <p>{invoice.from.email}</p>
           <p>{invoice.from.phone}</p>
@@ -136,4 +137,9 @@ function formatInvoiceCurrency(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function formatInvoiceDate(value: string) {
+  const date = parseISO(value);
+  return Number.isNaN(date.getTime()) ? value : format(date, "PPP");
 }

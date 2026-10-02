@@ -231,7 +231,7 @@ function NotificationRow({ notification }: { notification: Notification }) {
           </span>
         )}
       </div>
-      <div className="flex-1 space-y-1">
+      <div className="flex flex-1 flex-col gap-1">
         <div className="flex items-center justify-between gap-2">
           <h4
             className={cn(

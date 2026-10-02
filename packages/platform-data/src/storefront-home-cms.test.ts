@@ -11,6 +11,8 @@ describe("mergeStorefrontHomePayload", () => {
     const m = mergeStorefrontHomePayload(null);
     assert.equal(m.hero.line1, DEFAULT_STOREFRONT_HOME_PAYLOAD.hero.line1);
     assert.equal(m.tiles[0].title, DEFAULT_STOREFRONT_HOME_PAYLOAD.tiles[0].title);
+    assert.equal(m.hero.ctaHref, "/shop");
+    assert.equal(m.tiles[0].href, "/collections/guitars");
     assert.equal(m.hero.style.headlineFont, DEFAULT_STOREFRONT_HOME_PAYLOAD.hero.style.headlineFont);
   });
 

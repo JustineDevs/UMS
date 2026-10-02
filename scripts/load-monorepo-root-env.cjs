@@ -2,7 +2,7 @@
  * Load the repo-root env file into `process.env` before Next reads config.
  * Used by the unified web app `next.config.*` only.
  *
- * Kept under `scripts/` (not `stress-test/`) so production and CI builds never depend on test-only paths.
+ * Kept under `scripts/` (not `scripts/stress-test/`) so production and CI builds never depend on test-only paths.
  */
 const fs = require("fs");
 const path = require("path");

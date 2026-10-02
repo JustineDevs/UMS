@@ -9,10 +9,6 @@ import { unstable_cache } from "next/cache";
 import type { Product } from "@universal-music-store/types";
 import {
   catalogProductFromMedusaRaw,
-  minVariantPrice,
-  productMatchesBrand,
-  productMatchesPriceRange,
-  productMatchesVariantFilters,
 } from "./medusa-catalog-mapper";
 import { readResponseJson } from "./read-response-json";
 
@@ -159,7 +155,7 @@ export function mapWorkerCatalogProduct(
   const variants = (raw.variants ?? []).map((variant) => ({
     ...variant,
     product_id: raw.id,
-    options: [],
+    options: Array.isArray(variant.options) ? variant.options : [],
   }));
   return catalogProductFromMedusaRaw({
     id: raw.id,
@@ -177,18 +173,39 @@ export function mapWorkerCatalogProduct(
   } as never);
 }
 
-async function fetchWorkerProducts(
+export async function fetchWorkerProducts(
   limit: number,
   options: CatalogQuery,
 ): Promise<ProductsPageResult> {
   const base = workerUrl("/store/products");
   if (!base)
     return misconfigured("Set API_URL to the deployed Worker address.");
+  const requestedLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
   const params = new URLSearchParams({
-    limit: "100",
+    limit: String(requestedLimit),
     offset: String(options.offset ?? 0),
   });
   if (options.q?.trim()) params.set("q", options.q.trim());
+  if (options.category?.trim()) params.set("category", options.category.trim());
+  if (
+    options.sort === "name_asc" ||
+    options.sort === "newest" ||
+    options.sort === "price_asc" ||
+    options.sort === "price_desc"
+  )
+    params.set("sort", options.sort);
+  if (options.brand?.trim()) params.set("brand", options.brand.trim());
+  if (options.minPrice != null && Number.isFinite(options.minPrice))
+    params.set("minPrice", String(options.minPrice));
+  if (options.maxPrice != null && Number.isFinite(options.maxPrice))
+    params.set("maxPrice", String(options.maxPrice));
+  if (options.type?.trim()) params.set("type", options.type.trim());
+  if (options.finish?.trim()) params.set("finish", options.finish.trim());
+  if (options.pickupConfig?.trim()) params.set("pickupConfig", options.pickupConfig.trim());
+  if (options.bodyWood?.trim()) params.set("bodyWood", options.bodyWood.trim());
+  if (options.condition?.trim()) params.set("condition", options.condition.trim());
+  if (options.skillLevel?.trim()) params.set("skillLevel", options.skillLevel.trim());
+  if (options.shippingSpeed?.trim()) params.set("shippingSpeed", options.shippingSpeed.trim());
   try {
     const response = await fetch(`${base}?${params}`, {
       headers: { Accept: "application/json" },
@@ -206,27 +223,14 @@ async function fetchWorkerProducts(
         count?: number;
       },
     );
-    let products = (payload.products ?? [])
-      .flatMap((rawProduct) => {
-        const product = mapWorkerCatalogProduct(rawProduct);
-        return product ? [product] : [];
-      })
-      .filter((product) => productMatchesVariantFilters(product, options))
-      .filter((product) => productMatchesBrand(product, options.brand))
-      .filter((product) =>
-        productMatchesPriceRange(product, options.minPrice, options.maxPrice),
-      );
-    if (options.sort === "price_asc" || options.sort === "price_desc") {
-      products.sort((a, b) => {
-        const difference = minVariantPrice(a) - minVariantPrice(b);
-        return options.sort === "price_asc" ? difference : -difference;
-      });
-    } else if (options.sort === "name_asc") {
-      products.sort((a, b) => a.name.localeCompare(b.name));
-    }
+    const products = (payload.products ?? []).reduce<Product[]>((matches, rawProduct) => {
+      const product = mapWorkerCatalogProduct(rawProduct);
+      if (product) matches.push(product);
+      return matches;
+    }, []);
     return {
       kind: "ok",
-      products: products.slice(0, limit),
+      products: products.slice(0, requestedLimit),
       total: Number(payload.count ?? products.length),
     };
   } catch (error) {
@@ -310,6 +314,7 @@ export async function fetchRelatedProducts(
 export async function fetchProductBySlug(
   slug: string,
 ): Promise<ProductBySlugResult> {
+  const requestedSlug = slug.trim().toLowerCase();
   const url = workerUrl(`/store/products/${encodeURIComponent(slug)}`);
   if (!url) return misconfigured("Set API_URL to the deployed Worker address.");
   try {
@@ -332,6 +337,11 @@ export async function fetchProductBySlug(
     const product = payload.product
       ? mapWorkerCatalogProduct(payload.product)
       : null;
+    // Never render a different product at the requested URL. This protects
+    // the PDP, metadata, reviews, and structured data when a stale catalog
+    // index or upstream handle lookup returns the wrong record.
+    if (product && product.slug.trim().toLowerCase() !== requestedSlug)
+      return { kind: "not_found" };
     return product ? { kind: "ok", product } : { kind: "not_found" };
   } catch (error) {
     return catalogServiceError(error);
@@ -388,20 +398,67 @@ export async function fetchCategorySummaries(): Promise<CategorySummariesResult>
 }
 
 export async function fetchVariantFacets(
-  _category?: string,
+  category?: string,
 ): Promise<VariantFacetsResult> {
-  if (!workerBaseUrl())
+  const base = workerUrl("/store/catalog/facets");
+  if (!base)
     return misconfigured("Set API_URL to the deployed Worker address.");
-  return {
-    kind: "ok",
-    facets: emptyFacets,
-    quality: {
-      rawProducts: 0,
-      mappedProducts: 0,
-      facetValuesSeen: 0,
-      invalidFacetValues: 0,
-    },
-  };
+  const params = new URLSearchParams();
+  if (category?.trim()) params.set("category", category.trim());
+  try {
+    const response = await fetch(`${base}?${params}`, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 60, tags: ["storefront:catalog-facets"] },
+    });
+    if (!response.ok)
+      return {
+        kind: "service_error",
+        message: `Worker catalog facets returned ${response.status}`,
+      };
+    const payload = await readResponseJson(
+      response,
+      {} as {
+        facets?: Record<string, unknown>;
+        quality?: {
+          rawProducts?: number;
+          mappedProducts?: number;
+          facetValuesSeen?: number;
+          invalidFacetValues?: number;
+        };
+      },
+    );
+    const facets = {
+      ...emptyFacets,
+      ...Object.fromEntries(
+        Object.entries(payload.facets ?? {}).map(([key, values]) => [
+          key,
+          Array.isArray(values)
+            ? [
+                ...new Set(
+                  values.flatMap((value) => {
+                    if (typeof value !== "string") return [];
+                    const normalized = value.trim();
+                    return normalized ? [normalized] : [];
+                  }),
+                ),
+              ]
+            : [],
+        ]),
+      ),
+    } as typeof emptyFacets;
+    return {
+      kind: "ok",
+      facets,
+      quality: {
+        rawProducts: Number(payload.quality?.rawProducts ?? 0),
+        mappedProducts: Number(payload.quality?.mappedProducts ?? 0),
+        facetValuesSeen: Number(payload.quality?.facetValuesSeen ?? 0),
+        invalidFacetValues: Number(payload.quality?.invalidFacetValues ?? 0),
+      },
+    };
+  } catch (error) {
+    return catalogServiceError(error);
+  }
 }
 
 export async function fetchProductSlugsForSitemap(

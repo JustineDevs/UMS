@@ -228,17 +228,17 @@ const SelectGroup = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 SelectGroup.displayName = "SelectGroup";
 
-const SelectValue = ({ placeholder }: { placeholder?: React.ReactNode }) => {
+const SelectValue = ({ placeholder, children }: { placeholder?: React.ReactNode; children?: React.ReactNode }) => {
   const { value, items } = useSelectContext();
   const selected = items.find((item) => item.value === value);
-  return <>{selected?.label ?? placeholder ?? null}</>;
+  return <>{selected?.label ?? children ?? placeholder ?? null}</>;
 };
 SelectValue.displayName = "SelectValue";
 
 const SelectTrigger = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, children, onClick, onKeyDown, disabled, id, ...props }, ref) => {
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { size?: "sm" | "default" }
+>(({ className, children, onClick, onKeyDown, disabled, id, size = "default", ...props }, ref) => {
   const { open, setOpen, disabled: selectDisabled, triggerRef, contentId } = useSelectContext();
   const isDisabled = Boolean(disabled || selectDisabled);
 
@@ -255,7 +255,8 @@ const SelectTrigger = React.forwardRef<
       aria-controls={contentId}
       disabled={isDisabled}
       className={cn(
-        "flex h-10 w-full items-center justify-between rounded border border-outline-variant/30 bg-surface-container-high px-3 py-2 text-xs font-medium uppercase tracking-wider text-on-surface ring-offset-background placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        "flex w-full items-center justify-between rounded border border-outline-variant/30 bg-surface-container-high px-3 py-2 text-xs font-medium uppercase tracking-wider text-on-surface ring-offset-background placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+        size === "sm" ? "h-8" : "h-10",
         className,
       )}
       onClick={(event) => {
@@ -283,8 +284,8 @@ SelectTrigger.displayName = "SelectTrigger";
 
 const SelectContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { position?: "item-aligned" | "popper" }
->(({ className, children, position = "popper", ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & { position?: "item-aligned" | "popper"; align?: "start" | "center" | "end"; side?: "top" | "right" | "bottom" | "left" }
+>(({ className, children, position = "popper", align: _align, side: _side, ...props }, ref) => {
   const {
     open,
     setOpen,
@@ -333,7 +334,7 @@ const SelectContent = React.forwardRef<
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [highlightedValue, items, open, setHighlightedValue, setOpen, setValue, value]);
 
-  if (!open || !mounted) {
+  if (!mounted) {
     return null;
   }
 
@@ -346,6 +347,8 @@ const SelectContent = React.forwardRef<
       id={contentId}
       role="listbox"
       aria-orientation="vertical"
+      aria-hidden={!open}
+      hidden={!open}
       style={style}
       className={cn(
         "z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border border-outline-variant/25 bg-surface-container-lowest text-on-surface shadow-md",

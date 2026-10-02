@@ -6,7 +6,11 @@
 
 :root {
   --admin-primary: 0 0 0;
-  --admin-on-primary: 226 226 226;
+  /* Shared responsive contract: admin composition is valid from 0px through
+     the widest supported viewport, with the bands below defining transitions. */
+  --responsive-viewport-min: 0px;
+  --responsive-viewport-max: 100vw;
+  --admin-on-primary: 255 255 255;
   --admin-primary-container: 59 59 59;
   --admin-background: 247 249 251;
   --admin-surface: 247 249 251;
@@ -22,10 +26,10 @@
   --admin-on-surface-variant: 71 71 71;
   --admin-outline: 119 119 119;
   --admin-outline-variant: 198 198 198;
-  --admin-secondary: 81 95 116;
-  --admin-secondary-container: 199 213 238;
-  --admin-on-secondary-container: 13 28 47;
-  --admin-on-secondary: 255 255 255;
+  --admin-secondary: 255 255 255;
+  --admin-secondary-container: 242 242 242;
+  --admin-on-secondary-container: 0 0 0;
+  --admin-on-secondary: 0 0 0;
   --admin-tertiary: 49 60 79;
   --admin-tertiary-container: 106 117 138;
   --admin-on-tertiary-container: 255 255 255;
@@ -38,6 +42,8 @@
   --admin-radius: 0.25rem;
   --admin-card-radius: 0.75rem;
   --admin-page-gutter: 1.5rem;
+  --admin-page-px: var(--admin-page-gutter);
+  --admin-page-py: 1.5rem;
   --admin-section-gap: 1.5rem;
   --admin-card-gap: 1rem;
   --admin-control-height: 2.25rem;
@@ -73,6 +79,68 @@
   --radius: var(--admin-radius);
 }
 
+/* Explicit admin composition bands. The base rule is valid at 0px and each
+   range only changes gutters/rhythm; cards and tables must still own their
+   internal overflow so no route can widen the document. */
+@media (max-width: 379px) {
+  :root { --admin-page-gutter: 0.75rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1rem; --admin-section-gap: 1rem; --admin-card-gap: 0.75rem; }
+}
+
+@media (min-width: 380px) and (max-width: 639px) {
+  :root { --admin-page-gutter: 1rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.125rem; --admin-section-gap: 1.125rem; --admin-card-gap: 0.75rem; }
+}
+
+@media (min-width: 640px) and (max-width: 767px) {
+  :root { --admin-page-gutter: 1.125rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.25rem; --admin-section-gap: 1.25rem; --admin-card-gap: 0.875rem; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  :root { --admin-page-gutter: 1.25rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.375rem; --admin-section-gap: 1.375rem; --admin-card-gap: 0.875rem; }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root { --admin-page-gutter: 1.5rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.5rem; --admin-section-gap: 1.5rem; --admin-card-gap: 1rem; }
+}
+
+@media (min-width: 1280px) and (max-width: 1535px) {
+  :root { --admin-page-gutter: 1.75rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.5rem; --admin-section-gap: 1.5rem; --admin-card-gap: 1rem; }
+}
+
+@media (min-width: 1536px) and (max-width: 1919px) {
+  :root { --admin-page-gutter: 2rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 1.75rem; --admin-section-gap: 1.75rem; --admin-card-gap: 1.125rem; }
+}
+
+@media (min-width: 1920px) and (max-width: 2559px) {
+  :root { --admin-page-gutter: 2.5rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 2rem; --admin-section-gap: 2rem; --admin-card-gap: 1.25rem; }
+}
+
+@media (min-width: 2560px) {
+  :root { --admin-page-gutter: 3rem; --admin-page-px: var(--admin-page-gutter); --admin-page-py: 2rem; --admin-section-gap: 2rem; --admin-card-gap: 1.5rem; }
+}
+
+/* Keep semantic foreground utilities readable in the admin theme. The
+ * application UI uses shadcn-style classes such as text-primary-foreground,
+ * but the admin palette is defined with RGB component variables above. Map
+ * those foreground utilities explicitly so dark controls never inherit the
+ * page text color. */
+.text-primary-foreground {
+  color: rgb(var(--admin-on-primary));
+}
+
+.text-secondary-foreground {
+  color: rgb(var(--admin-on-secondary));
+}
+
+.text-destructive-foreground {
+  color: rgb(var(--admin-on-error));
+}
+
+.text-card-foreground,
+.text-popover-foreground,
+.text-accent-foreground {
+  color: rgb(var(--admin-on-surface));
+}
+
 @layer base {
   html.lenis {
     height: auto;
@@ -90,7 +158,11 @@
 }
 
 .material-symbols-outlined {
-  font-family: var(--font-material-symbols);
+  /* The icon font is declared by globals.css. Keep the family explicit here:
+   * the old --font-material-symbols variable was never defined, which made
+   * every admin icon fall back to visible ligature text ("shopping_cart",
+   * "article", etc.) instead of rendering an icon. */
+  font-family: "Material Symbols Outlined", sans-serif;
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
 
@@ -113,9 +185,29 @@
   animation: admin-page-enter var(--admin-motion-duration) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Native controls still exist in specialized admin workflows. Give them the
+ * same field geometry and focus language as the shared UI primitives so a
+ * page cannot accidentally reintroduce a different control system. */
+[data-admin-shell] :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  min-height: var(--admin-control-height);
+  border-radius: 0.5rem;
+  border-color: rgb(var(--admin-outline-variant) / 0.7);
+  background-color: rgb(var(--admin-surface-container-lowest));
+  color: rgb(var(--admin-on-surface));
+}
+
+[data-admin-shell] :where(input, select, textarea)::placeholder {
+  color: rgb(var(--admin-on-surface-variant) / 0.7);
+}
+
+[data-admin-shell] :where(input, select, textarea):focus-visible {
+  outline: 2px solid rgb(var(--admin-outline) / 0.7);
+  outline-offset: 2px;
+}
+
 @keyframes admin-page-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -137,4 +229,14 @@
 html[data-admin-density="compact"] #admin-sidebar-nav nav a {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
+}
+
+/* Admin: accessibility motion preference (Settings → Preferences) */
+html[data-admin-motion="reduced"] *,
+html[data-admin-motion="reduced"] *::before,
+html[data-admin-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
 }

@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   pendingCartTrackPayload,
   buildCarrierTrackingUrl,
+  fetchWorkerTrackByToken,
   formatTrackingNumber,
   latestShipmentEventStatus,
   mapMedusaOrderToTrack,
@@ -14,6 +15,56 @@ import {
   trackReadFailure,
   trackingCapabilityScopeMatches,
 } from "./medusa-track-fetch";
+
+test("Worker tracking reads preserve public shipment details and reject unsafe URLs", async () => {
+  const originalApiUrl = process.env.API_URL;
+  const originalFetch = globalThis.fetch;
+  process.env.API_URL = "https://worker.test";
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        order: { order_number: "79", status: "shipped" },
+        shipments: [
+          {
+            id: "shipment-1",
+            tracking_number: "JT-1",
+            status: "shipped",
+            carrier_slug: "jnt",
+            source: "Pancake POS",
+            updated_at: "2026-08-22T00:00:00.000Z",
+            expected_delivery: "2026-08-25",
+            tracking_url: "https://attacker.test/redirect?to=carrier",
+          },
+          {
+            id: "shipment-2",
+            tracking_url: "javascript:alert(1)",
+          },
+        ],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+
+  try {
+    const result = await fetchWorkerTrackByToken("opaque-token");
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.data?.shipments[0], {
+      id: "shipment-1",
+      tracking_number: "JT-1",
+      status: "shipped",
+      carrier_slug: "jnt",
+      source: "Pancake POS",
+      updated_at: "2026-08-22T00:00:00.000Z",
+      expected_delivery: "2026-08-25",
+      tracking_url:
+        "https://www.jtexpress.ph/index/query/gcsSearch.html?bills=JT-1",
+    });
+    assert.equal(result.data?.shipments[1]?.tracking_url, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = originalApiUrl;
+  }
+});
 
 test("tracking scope comparison fails closed for wrong customer or store", () => {
   const capability = {
@@ -174,6 +225,21 @@ test("tracking projection ignores malformed metadata and deduplicates shipments"
 
   assert.equal(result.shipments.length, 1);
   assert.equal(result.shipments[0]?.status, "delivered");
+});
+
+test("unknown provider shipment status is observable and never inherits delivered", () => {
+  const result = mapMedusaOrderToTrack({
+    payment_status: "captured",
+    fulfillment_status: "fulfilled",
+    metadata: {
+      pancake_pos_shipments: [
+        { id: "shipment-unknown", tracking_number: "JT-9", status: "carrier_future_state" },
+      ],
+    },
+  });
+
+  assert.equal(result.shipments[0]?.status, "shipped");
+  assert.equal(result.shipments[0]?.status_quality, "unknown");
 });
 
 test("tracking projection falls back to fulfillment shipments when metadata is empty", () => {

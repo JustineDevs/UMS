@@ -10,6 +10,7 @@ const SAFE_FINALIZATION_ERRORS = new Set([
   "invalid_payment_provider",
   "order_insert_failed",
   "payment_amount_invalid",
+  "payment_amount_mismatch",
   "payment_attempt_not_found",
   "payment_collection_insert_failed",
   "payment_currency_invalid",
@@ -71,6 +72,7 @@ type CartLine = {
   product_type_id: string | null;
   is_custom_price: boolean;
   is_giftcard: boolean;
+  discount_total: string | number | null;
 };
 
 const PAID_STATUSES = new Set(["paid", "completed", "captured"]);
@@ -179,8 +181,11 @@ export async function finalizeNativeOrder(
               variant_title, variant_option_values, requires_shipping, is_discountable,
               is_tax_inclusive, compare_at_unit_price, raw_compare_at_unit_price,
               unit_price, raw_unit_price, metadata, product_type_id, is_custom_price,
+              COALESCE((SELECT sum(a.amount)
+                        FROM public.cart_line_item_adjustment a
+                        WHERE a.item_id = i.id AND a.deleted_at IS NULL), 0) AS discount_total,
               is_giftcard
-       FROM public.cart_line_item
+       FROM public.cart_line_item i
        WHERE cart_id = $1 AND deleted_at IS NULL
        ORDER BY created_at, id`,
       [cart.id],
@@ -194,6 +199,32 @@ export async function finalizeNativeOrder(
       attempt.currency.toLowerCase() !== cart.currency_code.toLowerCase()
     )
       throw new Error("payment_currency_invalid");
+
+    // Recompute the exact cart subtotal while the cart row is locked. The
+    // payment attempt is client/provider-facing state and must not be trusted
+    // as the source of truth for the order amount. Shipping/tax are currently
+    // zero in the native checkout contract, so this is also the complete
+    // authoritative quote used when the attempt was created.
+    const cartAmountMinor = linesResult.rows.reduce((total, line) => {
+      const quantity = Number(line.quantity);
+      const unitPrice = Number(line.unit_price);
+      const discount = Number(line.discount_total ?? 0);
+      if (!Number.isSafeInteger(quantity) || quantity < 1 ||
+          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
+          !Number.isSafeInteger(discount) || discount < 0) {
+        throw new Error("payment_amount_invalid");
+      }
+      const lineTotal = unitPrice * quantity - discount;
+      if (!Number.isSafeInteger(lineTotal) || lineTotal < 0) {
+        throw new Error("payment_amount_invalid");
+      }
+      const next = total + lineTotal;
+      if (!Number.isSafeInteger(next)) throw new Error("payment_amount_invalid");
+      return next;
+    }, 0);
+    if (!Number.isSafeInteger(cartAmountMinor) || cartAmountMinor < 1 || cartAmountMinor !== amountMinor) {
+      throw new Error("payment_amount_mismatch");
+    }
 
     const orderId = id("order");
     const orderResult = await transaction.query(

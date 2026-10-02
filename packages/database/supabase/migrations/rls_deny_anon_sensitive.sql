@@ -24,8 +24,13 @@ create policy retention_jobs_deny_anon on public.retention_jobs for all to anon 
 drop policy if exists audit_logs_deny_anon on public.audit_logs;
 create policy audit_logs_deny_anon on public.audit_logs for all to anon using (false) with check (false);
 
-drop policy if exists legacy_import_runs_deny_anon on public.legacy_import_runs;
-create policy legacy_import_runs_deny_anon on public.legacy_import_runs for all to anon using (false) with check (false);
+do $$
+begin
+  if to_regclass('public.legacy_import_runs') is not null then
+    execute 'drop policy if exists legacy_import_runs_deny_anon on public.legacy_import_runs';
+    execute 'create policy legacy_import_runs_deny_anon on public.legacy_import_runs for all to anon using (false) with check (false)';
+  end if;
+end $$;
 
 drop policy if exists admin_entity_workflow_deny_anon on public.admin_entity_workflow;
 create policy admin_entity_workflow_deny_anon on public.admin_entity_workflow for all to anon using (false) with check (false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signOut } from "@/lib/auth-client";
+import { signOut } from "@/lib/auth-actions";
 
 export function AccountPrivacyControls() {
   const [state, setState] = useState<"idle" | "loading" | "error">("idle");
@@ -44,31 +44,36 @@ export function AccountPrivacyControls() {
   }
 
   return (
-    <section className="mt-6 border-t border-outline-variant/15 pt-5" aria-labelledby="privacy-controls-heading">
-      <h3 id="privacy-controls-heading" className="text-sm font-semibold text-primary">Privacy controls</h3>
-      <p className="mt-2 max-w-xl text-xs leading-5 text-on-surface-variant">
-        Download the account data currently associated with your signed-in account. Financial order records remain retained for legal and operational requirements.
-      </p>
-      <button
-        type="button"
-        onClick={() => void exportData()}
-        disabled={state === "loading"}
-        className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-outline-variant/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-60"
-      >
-        {state === "loading" ? "Preparing export…" : "Download my data"}
-      </button>
-      {state === "error" ? <p className="mt-2 text-xs text-error" role="alert">The export is unavailable right now. Please try again later.</p> : null}
-      <div className="mt-5 border-t border-outline-variant/15 pt-4">
-        <p className="text-xs leading-5 text-on-surface-variant">Account deletion removes personal data where permitted; financial and fraud records may be retained by law.</p>
+    <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-7" aria-labelledby="privacy-controls-heading">
+      <h2 id="privacy-controls-heading" className="font-headline text-xl font-bold text-primary">Privacy Settings</h2>
+      <div className="mt-5 border-t border-outline-variant/15 pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-primary">Request account deletion</h3>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-on-surface-variant">Account deletion removes personal data where permitted; financial and fraud records may be retained by law.</p>
+          </div>
         <button
           type="button"
           onClick={() => void eraseAccount()}
           disabled={erasureState === "loading"}
-          className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-error/40 px-4 py-2 text-sm font-semibold text-error hover:bg-error/5 disabled:opacity-60"
+          className="inline-flex min-h-10 items-center rounded bg-error px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
         >
           {erasureState === "loading" ? "Deleting account…" : "Delete my account"}
         </button>
+        </div>
         {erasureState === "error" ? <p className="mt-2 text-xs text-error" role="alert">Account deletion is unavailable right now. No changes were saved.</p> : null}
+      </div>
+      <div className="mt-7 border-t border-outline-variant/15 pt-5">
+        <p className="text-xs leading-5 text-on-surface-variant">Download the account data currently associated with your signed-in account.</p>
+        <button
+          type="button"
+          onClick={() => void exportData()}
+          disabled={state === "loading"}
+          className="mt-3 inline-flex min-h-10 items-center rounded border border-outline-variant/30 px-4 py-2 text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-60"
+        >
+          {state === "loading" ? "Preparing export…" : "Download my data"}
+        </button>
+        {state === "error" ? <p className="mt-2 text-xs text-error" role="alert">The export is unavailable right now. Please try again later.</p> : null}
       </div>
     </section>
   );

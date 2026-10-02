@@ -150,7 +150,7 @@ export const PLATFORM_FEATURE_MAPPINGS: readonly PlatformFeatureMapping[] = [
     domain: "payroll_remittance",
     label: "Payroll and remittance",
     status: "planned",
-    systemOfRecord: "Not implemented; jurisdiction-specific source of truth must be selected",
+    systemOfRecord: "No system of record selected; jurisdiction-specific source of truth is still required",
     adminSurfaces: ["/admin/users", "/admin/settings"],
     storefrontSurfaces: [],
     apiSurfaces: [],

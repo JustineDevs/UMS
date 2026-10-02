@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 export type CollapsibleInspectorColumnProps = {
   storageKey: string;
@@ -57,15 +58,17 @@ export function CollapsibleInspectorColumn({
   if (!open) {
     return (
       <div className="flex w-full shrink-0 flex-col border-t border-outline-variant/15 pt-4 xl:min-w-[3rem] xl:max-w-[3.75rem] xl:border-l xl:border-t-0 xl:pl-3 xl:pt-0">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => persist(true)}
           title={expandLabel}
           className="flex min-h-[44px] w-full touch-manipulation items-center justify-center gap-2 rounded-lg border border-outline-variant/20 bg-white px-3 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-primary shadow-sm transition hover:bg-surface-container-low focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary xl:min-h-[8rem] xl:max-w-none xl:flex-1 xl:px-2 xl:py-4 xl:[writing-mode:vertical-rl] xl:rotate-180"
           aria-expanded="false"
         >
           {expandLabel}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -73,8 +76,10 @@ export function CollapsibleInspectorColumn({
   return (
     <div className="w-full shrink-0 border-t border-outline-variant/15 pt-6 xl:w-96 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
       <div className="mb-3 flex justify-end">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => persist(false)}
           title={collapseLabel}
           className="min-h-[44px] touch-manipulation rounded-lg px-2 text-xs font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
@@ -82,7 +87,7 @@ export function CollapsibleInspectorColumn({
           aria-controls={panelId}
         >
           {collapseLabel}
-        </button>
+        </Button>
       </div>
       <div id={panelId}>{children}</div>
     </div>

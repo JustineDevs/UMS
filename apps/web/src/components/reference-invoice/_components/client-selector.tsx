@@ -17,7 +17,7 @@ export function ClientSelector({ clients }: { clients: InvoiceToDetails[] }) {
     <section className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-medium tracking-tight">Billed To</h2>
-        <Button asChild variant="ghost" size="sm">
+        <Button asChild variant="outline" size="sm">
           <Link href="/admin/users">
           <Plus data-icon="inline-start" />
           Add New Client
@@ -32,44 +32,47 @@ export function ClientSelector({ clients }: { clients: InvoiceToDetails[] }) {
           const selectedClient = field.value;
 
           return (
-            <Field className="gap-1">
-              <FieldLabel className="text-xs">Client</FieldLabel>
-              <Select
-                value={selectedClient.id}
-                onValueChange={(clientId) => {
-                  const nextClient = clients.find((item) => item.id === clientId);
+            <Field className="gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <FieldLabel className="text-xs">Client profile</FieldLabel>
+                <Select
+                  value={selectedClient.id}
+                  onValueChange={(clientId) => {
+                    const nextClient = clients.find((item) => item.id === clientId);
 
-                  if (nextClient) {
-                    field.onChange(nextClient);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-full data-[size=default]:h-auto">
-                  <SelectValue placeholder={clients.length ? "Select client" : "No customers available"}>
-                    <div className="flex items-center gap-1.5">
-                      <Avatar className="after:rounded-md">
-                        <AvatarFallback className="rounded-md bg-card text-foreground">
-                          {getInitials(selectedClient.name).slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-
-                      <div className="text-left text-xs">
-                        <div>{selectedClient.name}</div>
-                        <div className="text-muted-foreground">{selectedClient.email}</div>
-                      </div>
-                    </div>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent position="popper">
-                  <SelectGroup>
-                    {clients.map((clientOption) => (
-                      <SelectItem key={clientOption.id} value={clientOption.id}>
-                        {clientOption.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+                    if (nextClient) field.onChange(nextClient);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-auto gap-2 border-0 px-2 text-xs shadow-none">
+                    <SelectValue>Change client</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      {clients.map((clientOption) => (
+                        <SelectItem key={clientOption.id} value={clientOption.id}>
+                          {clientOption.name} · {clientOption.email}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                <div className="flex items-start gap-3">
+                  <Avatar className="after:rounded-md">
+                    <AvatarFallback className="rounded-md bg-card text-foreground">
+                      {getInitials(selectedClient.name).slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium">{selectedClient.name || "No client selected"}</p>
+                    <p className="text-muted-foreground">{selectedClient.email || "Select a client to hydrate billing details"}</p>
+                    {selectedClient.addressLines.length > 0 ? (
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{selectedClient.addressLines.join(" · ")}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
               {!clients.length ? (
                 <p className="text-xs text-muted-foreground">
                   Create a customer in the commerce system before sending an invoice.

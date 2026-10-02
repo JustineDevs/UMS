@@ -1,4 +1,4 @@
-import { AdminBreadcrumbs, AdminPageShell, AdminSection, AuditTimeline } from "@/components/admin-console";
+import { AdminBreadcrumbs, AdminPageShell, AdminSection } from "@/components/admin-console";
 import { ChannelEventsTable } from "@/components/ChannelEventsTable";
 import { fetchRecentChannelEvents } from "@/lib/channel-events-bridge";
 import { requirePagePermission } from "@/lib/require-page-permission";
@@ -18,7 +18,6 @@ export default async function ChannelsPage() {
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Channels" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <details className="mb-8 max-w-3xl text-xs text-on-surface-variant">
           <summary className="cursor-pointer font-medium text-on-surface select-none">

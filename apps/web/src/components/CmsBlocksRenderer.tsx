@@ -60,8 +60,8 @@ function cmsLayoutStyle(layout: unknown): CSSProperties {
 
 type FaqItem = { q: string; a: string };
 
-type FeatureItem = { title: string; body: string };
-type TestimonialItem = { quote: string; name: string; role: string };
+type FeatureItem = { id: string; title: string; body: string };
+type TestimonialItem = { id: string; quote: string; name: string; role: string };
 
 function parseFaqItems(raw: unknown): FaqItem[] {
   if (!Array.isArray(raw)) return [];
@@ -80,24 +80,26 @@ function parseFaqItems(raw: unknown): FaqItem[] {
 
 function parseFeatureItems(raw: unknown): FeatureItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.slice(0, 12).flatMap((value) => {
+  return raw.slice(0, 12).flatMap((value, index) => {
     if (!value || typeof value !== "object") return [];
     const item = value as Record<string, unknown>;
     const title = String(item.title ?? "").trim();
     const body = String(item.body ?? "").trim();
-    return title || body ? [{ title, body }] : [];
+    const id = String(item.id ?? `feature-${index}-${title}-${body}`);
+    return title || body ? [{ id, title, body }] : [];
   });
 }
 
 function parseTestimonialItems(raw: unknown): TestimonialItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.slice(0, 12).flatMap((value) => {
+  return raw.slice(0, 12).flatMap((value, index) => {
     if (!value || typeof value !== "object") return [];
     const item = value as Record<string, unknown>;
     const quote = String(item.quote ?? "").trim();
     const name = String(item.name ?? "").trim();
     const role = String(item.role ?? "").trim();
-    return quote || name ? [{ quote, name, role }] : [];
+    const id = String(item.id ?? `testimonial-${index}-${name}-${quote}`);
+    return quote || name ? [{ id, quote, name, role }] : [];
   });
 }
 
@@ -177,6 +179,7 @@ async function renderCmsBlocks(
         props: rawBlock.props,
       }),
     };
+    const props = b.props;
     switch (b.type) {
       case "visual_primitive": {
         const sourceType = String(b.props.sourceType ?? "visual");
@@ -191,6 +194,7 @@ async function renderCmsBlocks(
           : sourceMarkup, domOverrides);
         const style = visualRootStyle(rootOverrides);
         nodes.push(
+          // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- content is sanitized and DOM overrides are allowlisted.
           <div
             key={b.id}
             data-cms-id={b.id}
@@ -199,19 +203,20 @@ async function renderCmsBlocks(
             data-cms-block-type="visual_primitive"
             data-cms-source-type={sourceType}
             style={Object.keys(style).length ? style : undefined}
+            /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- content is sanitized and DOM overrides are allowlisted. */
             dangerouslySetInnerHTML={{ __html: content }}
           />,
         );
         break;
       }
       case "hero": {
-        const title = String(b.props.title ?? "");
-        const subtitle = String(b.props.subtitle ?? "");
-        const rawImageUrl = b.props.imageUrl;
-        const rawHref = b.props.href;
+        const title = String(props.title ?? "");
+        const subtitle = String(props.subtitle ?? "");
+        const rawImageUrl = props.imageUrl;
+        const rawHref = props.href;
         const imageUrl = typeof rawImageUrl === "string" ? rawImageUrl : "";
         const href = typeof rawHref === "string" ? rawHref : "";
-        const cta = String(b.props.ctaLabel ?? "Learn more");
+        const cta = String(props.ctaLabel ?? "Learn more");
         const actions = await renderSlot(b.slots?.actions);
         nodes.push(
           <section
@@ -232,6 +237,7 @@ async function renderCmsBlocks(
                   className="object-cover"
                   sizes="(max-width: 1200px) 100vw, 1200px"
                   unoptimized={shouldUnoptimizeImage(imageUrl)}
+                  priority
                 />
               </div>
             ) : null}
@@ -268,6 +274,7 @@ async function renderCmsBlocks(
         const html = sanitizeCmsHtml(String(b.props.html ?? ""));
         if (!html.trim()) break;
         nodes.push(
+          // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- content is sanitized by sanitizeCmsHtml.
           <div
             key={b.id}
             data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id}
@@ -275,6 +282,7 @@ async function renderCmsBlocks(
             data-cms-prop="html"
             data-cms-value-kind="html"
             className="prose prose-sm max-w-none font-body text-on-surface-variant"
+            /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- content is sanitized by sanitizeCmsHtml. */
             dangerouslySetInnerHTML={{ __html: html }}
           />,
         );
@@ -313,8 +321,8 @@ async function renderCmsBlocks(
         break;
       }
       case "cta_row": {
-        const label = String(b.props.label ?? "");
-        const href = String(b.props.href ?? "");
+        const label = String(props.label ?? "");
+        const href = String(props.href ?? "");
         if (!href) break;
         nodes.push(
           <div
@@ -389,7 +397,7 @@ async function renderCmsBlocks(
                 data-cms-label="Text content"
             className="prose prose-sm max-w-none font-body text-on-surface-variant"
           >
-            <div data-cms-id={`${b.id}::content`} data-cms-label="Text content" data-cms-prop="html" data-cms-value-kind="html" dangerouslySetInnerHTML={{ __html: html }} />
+            <div data-cms-id={`${b.id}::content`} data-cms-label="Text content" data-cms-prop="html" data-cms-value-kind="html" /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- content is sanitized by sanitizeCmsHtml. */ dangerouslySetInnerHTML={{ __html: html }} />
             </div>
             ) : null)}
           </section>,
@@ -397,7 +405,7 @@ async function renderCmsBlocks(
         break;
       }
       case "faq": {
-        const items = parseFaqItems(b.props.items);
+        const items = parseFaqItems(props.items);
         if (!items.length) break;
         nodes.push(
           <section
@@ -531,9 +539,9 @@ async function renderCmsBlocks(
         break;
       }
       case "newsletter": {
-        const heading = String(b.props.heading ?? "Newsletter");
-        const sub = String(b.props.subtitle ?? "");
-        const actionUrl = String(b.props.actionUrl ?? "");
+        const heading = String(props.heading ?? "Newsletter");
+        const sub = String(props.subtitle ?? "");
+        const actionUrl = String(props.actionUrl ?? "");
         const formSlot = await renderSlot(b.slots?.form);
         nodes.push(
           <section
@@ -616,15 +624,15 @@ async function renderCmsBlocks(
         break;
       }
       case "feature_grid": {
-        const heading = String(b.props.heading ?? "").trim();
-        const items = parseFeatureItems(b.props.items);
+        const heading = String(props.heading ?? "").trim();
+        const items = parseFeatureItems(props.items);
         if (!items.length) break;
         nodes.push(
           <section key={b.id} data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id} data-cms-block-type="feature_grid" className="space-y-5">
             {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((item, index) => (
-                <article key={`${item.title}-${index}`} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
+                <article key={item.id} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
                   {item.title ? <h3 data-cms-id={`${b.id}::item-${index}-title`} data-cms-label={`Feature ${index + 1} title`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="title" className="font-semibold text-primary">{item.title}</h3> : null}
                   {item.body ? <p data-cms-id={`${b.id}::item-${index}-body`} data-cms-label={`Feature ${index + 1} body`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="body" className="mt-2 text-sm leading-relaxed text-on-surface-variant">{item.body}</p> : null}
                 </article>
@@ -643,7 +651,7 @@ async function renderCmsBlocks(
             {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {items.map((item, index) => (
-                <figure key={`${item.name}-${index}`} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
+                <figure key={item.id} className="rounded-xl border border-outline-variant/20 bg-surface-container-low/40 p-5">
                   {item.quote ? <blockquote data-cms-id={`${b.id}::item-${index}-quote`} data-cms-label={`Testimonial ${index + 1}`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="quote" className="text-sm leading-relaxed text-on-surface-variant">“{item.quote}”</blockquote> : null}
                   {item.name ? <figcaption data-cms-id={`${b.id}::item-${index}-name`} data-cms-label={`Testimonial ${index + 1} name`} data-cms-prop="items" data-cms-array-index={index} data-cms-array-field="name" className="mt-4 font-semibold text-primary">{item.name}{item.role ? <span className="ml-2 font-normal text-on-surface-variant">{item.role}</span> : null}</figcaption> : null}
                 </figure>
@@ -668,7 +676,7 @@ async function renderCmsBlocks(
           <section key={b.id} data-cms-id={b.id} data-cms-label={b.type} data-cms-block-id={b.id} data-cms-block-type="product_grid" className="space-y-5">
             {heading ? <h2 data-cms-id={`${b.id}::heading`} data-cms-label="Heading" data-cms-prop="heading" className="font-headline text-2xl font-bold text-primary">{heading}</h2> : null}
             <div data-cms-id={`${b.id}::grid`} data-cms-label="Product grid" data-cms-prop="slugs" className={`grid gap-8 ${gridClass}`}>
-              {products.map((product) => <CatalogProductCard key={product.id} product={product} />)}
+              {products.map((product, index) => <CatalogProductCard key={product.id} product={product} priority={index === 0} />)}
             </div>
           </section>,
         );
@@ -695,8 +703,8 @@ async function renderCmsBlocks(
             className="space-y-6"
           >
             <div data-cms-id={`${b.id}::grid`} data-cms-label="Product grid" data-cms-prop="slugs" className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              {products.map((p) => (
-                <CatalogProductCard key={p.id} product={p} />
+              {products.map((p, index) => (
+                <CatalogProductCard key={p.id} product={p} priority={index === 0} />
               ))}
             </div>
           </section>,
@@ -778,12 +786,14 @@ async function renderCmsBlocks(
           ),
         );
         const visualStyles = Object.fromEntries(
-          Object.entries(styleOverrides)
-            .filter(([key]) => key.startsWith("style."))
-            .map(([key, value]) => [
+          Object.entries(styleOverrides).reduce<[string, string][]>((entries, [key, value]) => {
+            if (!key.startsWith("style.")) return entries;
+            entries.push([
               key.slice(6).replace(/-([a-z])/g, (_, character: string) => character.toUpperCase()),
               value,
-            ]),
+            ]);
+            return entries;
+          }, []),
         );
         const themeStyles = Object.fromEntries(
           Object.entries(styleOverrides).filter(([key]) => key.startsWith("--cms-")),

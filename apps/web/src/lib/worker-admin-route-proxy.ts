@@ -28,13 +28,22 @@ export async function proxyWorkerAdminRoute(
     if (value) headers.set(name, value);
   }
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.arrayBuffer();
-  const response = await fetch(target, {
-    method: request.method,
-    headers,
-    body,
-    cache: "no-store",
-    redirect: "manual",
-  });
+  let response: Response;
+  try {
+    response = await fetch(target, {
+      method: request.method,
+      headers,
+      body,
+      cache: "no-store",
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return Response.json(
+      { error: "worker_unavailable", code: "WORKER_UNAVAILABLE" },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } },
+    );
+  }
   const responseHeaders = new Headers();
   for (const name of ["content-type", "cache-control", "retry-after", "x-request-id", "referrer-policy"] as const) {
     const value = response.headers.get(name);

@@ -9,7 +9,11 @@ import { CmsAnnouncementStack } from "./CmsAnnouncementBar";
 import { CmsExperimentAssigner } from "./CmsExperimentAssigner";
 import { GlobalRouteMotion } from "./GlobalRouteMotion";
 import { StorefrontFooter } from "./StorefrontFooter";
-import { StorefrontHeader, type StorefrontHeaderSections } from "./StorefrontHeader";
+import {
+  StorefrontHeader,
+  type StorefrontHeaderSections,
+  type StorefrontNavigationSource,
+} from "./StorefrontHeader";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
 const PUBLIC_READ_DEADLINE_MS = 1_500;
@@ -62,6 +66,13 @@ export async function StorefrontPublicChrome({
     linkLabel: ann.linkLabel,
     dismissible: ann.dismissible,
   }));
+  const navigationSource: StorefrontNavigationSource =
+    nav.headerLinks.length > 0 || nav.headerLinksMobile.length > 0 ? "cms" : "empty";
+  const hasSecondaryNavigation =
+    nav.headerLinks.length > 0 || nav.headerLinksMobile.length > 0;
+  const mainContentSpacing = hasSecondaryNavigation
+    ? "pt-[7.375rem] xs:pt-[7.375rem] sm:pt-[6.75rem] md:pt-[6.25rem]"
+    : "pt-[7.375rem] xs:pt-[7.375rem] sm:pt-[5.25rem] md:pt-[5.25rem]";
 
   return (
     <>
@@ -76,13 +87,14 @@ export async function StorefrontPublicChrome({
           announcementBars.length > 0 ? <CmsAnnouncementStack bars={announcementBars} /> : undefined
         }
         navigation={nav}
+        navigationSource={navigationSource}
         sections={sections?.header}
       />
       <CmsExperimentAssigner experiments={experiments} />
       <div
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.875rem] outline-none xs:pt-24 sm:pt-[6.125rem] md:pt-[6.25rem]"
+        className={`mx-auto w-full min-w-0 max-w-[100vw] ${mainContentSpacing} outline-none`}
       >
         <GlobalRouteMotion>{children}</GlobalRouteMotion>
       </div>

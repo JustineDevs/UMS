@@ -12,10 +12,11 @@ export default async function AccountProfilePage() {
   const email = session?.user.email?.trim() ?? "";
   const result = email ? await loadCustomerProfileResult(email) : { profile: null, unavailable: false };
   return (
-    <AccountRouteFrame title="My Profile" description="Manage and protect your account information.">
+    <AccountRouteFrame title="Account settings" description="Manage your profile details and account preferences.">
       {!session ? <AccountSignInState /> : (
         <AccountProfilePanel
           initial={{
+            email,
             displayName: result.profile?.displayName ?? session.user.name ?? null,
             phone: result.profile?.phone ?? null,
             avatarUrl: result.profile?.avatarUrl ?? session.user.image ?? null,

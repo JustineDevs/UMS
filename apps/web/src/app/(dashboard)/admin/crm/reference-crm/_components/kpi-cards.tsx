@@ -48,7 +48,7 @@ export function KpiCards({ data }: { data: CrmKpiData }) {
 
               <Badge
                 variant="outline"
-                className="border-green-200 bg-green-500/10 text-green-700 dark:border-green-900/40 dark:bg-green-500/15 dark:text-green-300"
+                className="border-0 bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300"
               >
                 <Trend />
                 {detail}

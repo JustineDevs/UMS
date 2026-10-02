@@ -1,0 +1,580 @@
+[2m[WebServer] [22m(node:455130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m
+[2m[WebServer] [22m ⛅️ wrangler 4.131.0
+[2m[WebServer] [22m[93m────────────────────[39m
+[2m[WebServer] [22mFound a non-empty CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_MEDUSA_HYPERDRIVE variable for binding. Hyperdrive will connect to this database during local development.
+[2m[WebServer] [22mFound a non-empty CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_APP_HYPERDRIVE variable for binding. Hyperdrive will connect to this database during local development.
+[2m[WebServer] [22mUsing secrets defined in .env.local
+[2m[WebServer] [22mYour Worker has access to the following bindings:
+[2m[WebServer] [22m[2mBinding[22m                                                                                        [2mResource[22m                  [2mMode[22m
+[2m[WebServer] [22m[37menv.COMMERCE_QUEUE[39m ([2muvs-commerce-dev[22m)                                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COMMERCE_DEAD_LETTER_QUEUE[39m ([2muvs-commerce-dev-dlq[22m)                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_HYPERDRIVE[39m ([2m0dca18c059c348afac213abe2f7103af[22m)                                       [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_HYPERDRIVE[39m ([2m670f984853514e0ea8f61aa4956d2155[22m)                                          [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ALLOWED_ORIGINS[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_SITE_URL[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_WORKER_URL[39m ([2m"https://ums-backend-preview.pcg0255.w..."[22m)                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CMS_ORGANIZATION_ID[39m ([2m"local-admin@example.com"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DEFAULT_ORGANIZATION_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NODE_ENV[39m ([2m"(hidden)"[22m)                                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SITE_URL[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MAINTENANCE_MODE[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_NAME[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPPORT_EMAIL[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_ANON_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_ALLOWED_EMAILS[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UVS_E2E_REAL_SESSION[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INTERNAL_API_KEY[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHANNEL_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.JWT_SECRET[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COOKIE_SECRET[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CRON_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DATA_RETENTION_DAYS[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_DB_URL[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DB_URL[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DB_NAME[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.REDIS_URL[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REDIS_URL[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_TOKEN[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.WORKER_MEDUSA_DATABASE_HOST[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.API_URL[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_BACKEND_URL[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_ORIGIN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PUBLIC_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_CORS[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CORS_ORIGIN[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_IMAGE_HOSTNAMES[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_PUBLISHABLE_API_KEY[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SECRET_API_KEY[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STAFF_RBAC_STRICT[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_FALLBACK_CURRENCY[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_WEBHOOK_ID[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_ENVIRONMENT[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_RETURN_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS[39m ([2m"(hidden)"[22m)                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_SECRET_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_PUBLIC_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_WEBHOOK_TOKEN[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_STRICT_PAYMENT_LEDGER[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PAYMENT_CRON_SECRET[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_INTERNAL_RECONCILE_SECRET[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_URL[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_SHOP_ID[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_NAME[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PHONE[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PROVINCE[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_CITY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_AREA[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_ADDRESS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.FEATURE_FLAG_PANCAKE_POS[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TERMINAL_AGENT_CORS_ORIGINS[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_FROM_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_BRAND_NAME[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_API_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_SENDER_NAME[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHAT_INTAKE_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_KEY_VERSION[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_LOW_STOCK_THRESHOLD[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_API_KEY[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_PAYMENT_INTEGRATIONS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_WEBHOOK_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_EVENT_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_ORG[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_PROJECT[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_AUTH_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_KEY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_API_KEY[39m ([2m"(hidden)"[22m)                                                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_SITE_KEY[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_PROVIDER[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_PROJECT_ID[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_ENTERPRISE_API_KEY[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_MIN_SCORE[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_HEALTH_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_WAIT_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_POLL_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.VERCEL_OIDC_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_EMAIL[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_PASSWORD[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_EMAIL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_PASSWORD[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[2m⎔ Starting local server...[22m
+[2m[WebServer] [22mWrangler detected this dev session is running in an AI agent.
+[2m[WebServer] [22mThe Local Explorer API is available at http://127.0.0.1:8788/cdn-cgi/local/explorer/api
+[2m[WebServer] [22mUseful routes:
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/d1/database - D1 databases
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api/workflows - Workflows
+[2m[WebServer] [22m  POST http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+[2m[WebServer] [22m    curl -X POST http://127.0.0.1:8788/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{"sql":"SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20"}'
+[2m[WebServer] [22mIf the routes above don't cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+[2m[WebServer] [22m  GET http://127.0.0.1:8788/cdn-cgi/local/explorer/api - OpenAPI schema
+[2m[WebServer] [22m[2m⎔ Connection status updated[22m
+[2m[WebServer] [22mYour Worker has access to the following bindings:
+[2m[WebServer] [22m[2mBinding[22m                                                                                        [2mResource[22m                  [2mMode[22m
+[2m[WebServer] [22m[37menv.COMMERCE_QUEUE[39m ([2muvs-commerce-dev[22m)                                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COMMERCE_DEAD_LETTER_QUEUE[39m ([2muvs-commerce-dev-dlq[22m)                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_HYPERDRIVE[39m ([2m0dca18c059c348afac213abe2f7103af[22m)                                       [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_HYPERDRIVE[39m ([2m670f984853514e0ea8f61aa4956d2155[22m)                                          [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ALLOWED_ORIGINS[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_SITE_URL[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_WORKER_URL[39m ([2m"https://ums-backend-preview.pcg0255.w..."[22m)                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CMS_ORGANIZATION_ID[39m ([2m"local-admin@example.com"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DEFAULT_ORGANIZATION_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NODE_ENV[39m ([2m"(hidden)"[22m)                                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SITE_URL[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MAINTENANCE_MODE[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_NAME[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPPORT_EMAIL[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_ANON_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_ALLOWED_EMAILS[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UVS_E2E_REAL_SESSION[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INTERNAL_API_KEY[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHANNEL_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.JWT_SECRET[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COOKIE_SECRET[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CRON_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DATA_RETENTION_DAYS[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_DB_URL[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DB_URL[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DB_NAME[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.REDIS_URL[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REDIS_URL[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_TOKEN[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.WORKER_MEDUSA_DATABASE_HOST[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.API_URL[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_BACKEND_URL[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_ORIGIN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PUBLIC_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_CORS[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CORS_ORIGIN[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_IMAGE_HOSTNAMES[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_PUBLISHABLE_API_KEY[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SECRET_API_KEY[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STAFF_RBAC_STRICT[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_FALLBACK_CURRENCY[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_WEBHOOK_ID[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_ENVIRONMENT[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_RETURN_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS[39m ([2m"(hidden)"[22m)                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_SECRET_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_PUBLIC_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_WEBHOOK_TOKEN[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_STRICT_PAYMENT_LEDGER[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PAYMENT_CRON_SECRET[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_INTERNAL_RECONCILE_SECRET[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_URL[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_SHOP_ID[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_NAME[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PHONE[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PROVINCE[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_CITY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_AREA[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_ADDRESS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.FEATURE_FLAG_PANCAKE_POS[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TERMINAL_AGENT_CORS_ORIGINS[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_FROM_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_BRAND_NAME[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_API_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_SENDER_NAME[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHAT_INTAKE_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_KEY_VERSION[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_LOW_STOCK_THRESHOLD[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_API_KEY[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_PAYMENT_INTEGRATIONS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_WEBHOOK_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_EVENT_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_ORG[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_PROJECT[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_AUTH_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_KEY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_API_KEY[39m ([2m"(hidden)"[22m)                                                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_SITE_KEY[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_PROVIDER[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_PROJECT_ID[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_ENTERPRISE_API_KEY[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_MIN_SCORE[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_HEALTH_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_WAIT_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_POLL_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.VERCEL_OIDC_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_EMAIL[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_PASSWORD[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_EMAIL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_PASSWORD[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[wrangler:info] Ready on http://127.0.0.1:8788
+[2m[WebServer] [22m[wrangler:info] GET /healthz 200 OK (9ms)
+[2m[WebServer] [22m(node:455234) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m
+[2m[WebServer] [22m> @universal-music-store/web@1.0.0 predev /home/justine/Downloads/UVS/apps/web
+[2m[WebServer] [22m> node ../../scripts/ensure-workspace-builds.cjs
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m> @universal-music-store/web@1.0.0 dev /home/justine/Downloads/UVS/apps/web
+[2m[WebServer] [22m> node ../../scripts/run-next-dev.cjs apps/web 3000
+[2m[WebServer] [22m
+[2m[WebServer] [22m(node:455288) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m(node:455304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m   ▲ Next.js 15.5.24 (Turbopack)
+[2m[WebServer] [22m   - Local:        http://127.0.0.1:3100
+[2m[WebServer] [22m   - Network:      http://127.0.0.1:3100
+[2m[WebServer] [22m   - Experiments (use with caution):
+[2m[WebServer] [22m     · cpus: 2
+[2m[WebServer] [22m     ✓ webpackBuildWorker
+[2m[WebServer] [22m     · optimizePackageImports
+[2m[WebServer] [22m     · ...
+[2m[WebServer] [22m
+[2m[WebServer] [22m ✓ Starting...
+[2m[WebServer] [22m ✓ Compiled instrumentation Node.js in 47ms
+[2m[WebServer] [22m ✓ Compiled instrumentation Edge in 21ms
+[2m[WebServer] [22m ✓ Compiled middleware in 254ms
+[2m[WebServer] [22m ✓ Ready in 1322ms
+[2m[WebServer] [22m ○ Compiling /_not-found/page ...
+[2m[WebServer] [22m ✓ Compiled /_not-found/page in 5.2s
+[2m[WebServer] [22m GET /api/health 404 in 5747ms
+[2m[WebServer] [22m ✓ Compiled /api/health in 353ms
+[2m[WebServer] [22m GET /api/health 200 in 734ms
+
+Running 2 tests using 1 worker
+
+(node:455506) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:455506) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m ○ Compiling /shop ...
+[2m[WebServer] [22m ✓ Compiled /shop in 926ms
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (641ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (648ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/catalog/categories 200 OK (653ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/catalog/facets 200 OK (667ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (682ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/products 200 OK (772ms)
+[2m[WebServer] [22m GET /shop 200 in 2503ms
+[2m[WebServer] [22m ○ Compiling /api/cart/resume ...
+[2m[WebServer] [22m ✓ Compiled /api/cart/resume in 523ms
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (628ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (631ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (649ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/catalog/categories 200 OK (660ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/catalog/facets 200 OK (672ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/products 200 OK (761ms)
+[2m[WebServer] [22m GET /shop 200 in 1175ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 372ms
+[2m[WebServer] [22m POST /api/cart/attach-customer 200 in 412ms
+[2m[WebServer] [22m ✓ Compiled /shop/[slug] in 479ms
+[2m[WebServer] [22m(node:455748) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m[wrangler:info] GET /store/products 200 OK (755ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (638ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (650ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (748ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/products/e2e-native-guitar 200 OK (820ms)
+[2m[WebServer] [22m GET /api/cart/resume 200 in 379ms
+[2m[WebServer] [22m POST /api/cart/attach-customer 200 in 385ms
+[2m[WebServer] [22m[wrangler:info] GET /store/products 200 OK (648ms)
+[2m[WebServer] [22m GET /shop/e2e-native-guitar 200 in 3608ms
+[2m[WebServer] [22m ✓ Compiled /api/checkout/verify-stock in 168ms
+[2m[WebServer] [22m GET /api/reviews/csrf 200 in 579ms
+[2m[WebServer] [22m ✓ Compiled /cart in 448ms
+[2m[WebServer] [22m GET /cart 200 in 548ms
+[2m[WebServer] [22m POST /api/checkout/verify-stock 200 in 859ms
+[2m[WebServer] [22m[Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException: [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException:  [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ○ Compiling /api/cart/reconcile ...
+[2m[WebServer] [22m[wrangler:info] GET /store/inventory/7643f3bb-6ebd-4a91-9d09-542ccfd20738 200 OK (643ms)
+[2m[WebServer] [22m ✓ Compiled /api/cart/reconcile in 951ms
+[2m[WebServer] [22m POST /api/cart/reconcile 200 in 1102ms
+[2m[WebServer] [22m[wrangler:info] POST /store/cart/reconcile 200 OK (644ms)
+[2m[WebServer] [22m ✓ Compiled /api/cart/abandonment in 191ms
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (645ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (648ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (650ms)
+[2m[WebServer] [22m GET /checkout 200 in 1747ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 335ms
+[2m[WebServer] [22m[wrangler:info] POST /store/cart/abandonment 200 OK (653ms)
+[2m[WebServer] [22m POST /api/cart/abandonment 200 in 1204ms
+[2m[WebServer] [22m POST /api/cart/merge 400 in 546ms
+[2m[WebServer] [22m ○ Compiling /api/cart/merge ...
+[2m[WebServer] [22m ✓ Compiled /api/cart/merge in 565ms
+[2m[WebServer] [22m GET /onboarding?next=%2Fcheckout 200 in 529ms
+  ✓  1 [chromium] › scripts/stress-test/e2e/flows/psp-checkout-cod.spec.ts:123:7 › @checkout @cod COD checkout flow › incomplete delivery profile is rendered as an actionable checkout gate (13.5s)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (634ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (664ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (681ms)
+[2m[WebServer] [22m GET /shop 200 in 900ms
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (633ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (687ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (783ms)
+[2m[WebServer] [22m GET /shop 200 in 1022ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 443ms
+[2m[WebServer] [22m POST /api/cart/attach-customer 200 in 376ms
+[2m[WebServer] [22m(node:455874) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (628ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (637ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (642ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/products/e2e-native-guitar 200 OK (664ms)
+[2m[WebServer] [22m GET /shop/e2e-native-guitar 200 in 1298ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 373ms
+[2m[WebServer] [22m[wrangler:info] GET /store/products 200 OK (813ms)
+[2m[WebServer] [22m[Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException: [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException:  [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m POST /api/cart/attach-customer 200 in 401ms
+[2m[WebServer] [22m GET /cart 200 in 79ms
+[2m[WebServer] [22m GET /api/reviews/csrf 200 in 347ms
+[2m[WebServer] [22m[Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException: [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m ⨯ uncaughtException:  [Error: aborted] { code: [32m'ECONNRESET'[39m }
+[2m[WebServer] [22m POST /api/checkout/verify-stock 200 in 353ms
+[2m[WebServer] [22m POST /api/cart/reconcile 200 in 266ms
+[2m[WebServer] [22m[wrangler:info] GET /store/navigation 200 OK (632ms)
+[2m[WebServer] [22m[wrangler:info] GET /store/announcements 200 OK (691ms)
+[2m[WebServer] [22m[wrangler:info] GET /storefront/public-metadata 200 OK (695ms)
+[2m[WebServer] [22m GET /checkout?guest=1 200 in 846ms
+[2m[WebServer] [22m[wrangler:info] POST /store/cart/abandonment 200 OK (657ms)
+[2m[WebServer] [22m POST /api/cart/abandonment 200 in 1032ms
+[2m[WebServer] [22m ✓ Compiled /api/checkout/available-payment-methods in 183ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 411ms
+[2m[WebServer] [22m POST /api/cart/merge 400 in 384ms
+[2m[WebServer] [22m GET /api/checkout/loyalty-balance 200 in 541ms
+[2m[WebServer] [22m GET /api/cart/resume 200 in 355ms
+[2m[WebServer] [22m ✓ Compiled /api/checkout/preview in 88ms
+[2m[WebServer] [22m[wrangler:info] GET /store/payment-methods 200 OK (632ms)
+[2m[WebServer] [22m GET /api/checkout/available-payment-methods 200 in 1958ms
+[2m[WebServer] [22m[wrangler:info] POST /store/checkout/preview 200 OK (669ms)
+[2m[WebServer] [22m POST /api/checkout/preview 200 in 1111ms
+[2m[WebServer] [22m[2m⎔ Connection status updated[22m
+[2m[WebServer] [22mYour Worker has access to the following bindings:
+[2m[WebServer] [22m[2mBinding[22m                                                                                        [2mResource[22m                  [2mMode[22m
+[2m[WebServer] [22m[37menv.COMMERCE_QUEUE[39m ([2muvs-commerce-dev[22m)                                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COMMERCE_DEAD_LETTER_QUEUE[39m ([2muvs-commerce-dev-dlq[22m)                                          [31mQueue               [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_HYPERDRIVE[39m ([2m0dca18c059c348afac213abe2f7103af[22m)                                       [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_HYPERDRIVE[39m ([2m670f984853514e0ea8f61aa4956d2155[22m)                                          [31mHyperdrive Config   [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ALLOWED_ORIGINS[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_SITE_URL[39m ([2m"https://universalmusic-preview.vercel..."[22m)                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_WORKER_URL[39m ([2m"https://ums-backend-preview.pcg0255.w..."[22m)                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CMS_ORGANIZATION_ID[39m ([2m"local-admin@example.com"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DEFAULT_ORGANIZATION_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NODE_ENV[39m ([2m"(hidden)"[22m)                                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SITE_URL[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STOREFRONT_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MAINTENANCE_MODE[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_NAME[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPPORT_EMAIL[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_ANON_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_URL[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_ALLOWED_EMAILS[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UVS_E2E_REAL_SESSION[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INTERNAL_API_KEY[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHANNEL_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.JWT_SECRET[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COOKIE_SECRET[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CRON_SECRET[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DATA_RETENTION_DAYS[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.APP_DB_URL[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DB_URL[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DB_NAME[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.REDIS_URL[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REDIS_URL[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.UPSTASH_REDIS_REST_TOKEN[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.WORKER_MEDUSA_DATABASE_HOST[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.API_URL[39m ([2m"(hidden)"[22m)                                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_BACKEND_URL[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_URL[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_ORIGIN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PUBLIC_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STORE_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_CORS[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.AUTH_CORS[39m ([2m"(hidden)"[22m)                                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CORS_ORIGIN[39m ([2m"(hidden)"[22m)                                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_IMAGE_HOSTNAMES[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_PUBLISHABLE_API_KEY[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SECRET_API_KEY[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_REGION_ID[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_SALES_CHANNEL_ID[39m ([2m"(hidden)"[22m)                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_MEDUSA_PAYMENT_PROVIDER_ID[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_CHECKOUT_PAYMENT_PROVIDERS[39m ([2m"(hidden)"[22m)                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_STAFF_RBAC_STRICT[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_WEBHOOK_SECRET[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STRIPE_CHECKOUT_FALLBACK_CURRENCY[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_ID[39m ([2m"(hidden)"[22m)                                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CLIENT_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_WEBHOOK_ID[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_ENVIRONMENT[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_RETURN_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_ALLOW_UNVERIFIED_PAYPAL_WEBHOOKS[39m ([2m"(hidden)"[22m)                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_SECRET_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_PUBLIC_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_WEBHOOK_TOKEN[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_SUCCESS_URL[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.XENDIT_CHECKOUT_CANCEL_URL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_STRICT_PAYMENT_LEDGER[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_PAYMENT_CRON_SECRET[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.STOREFRONT_INTERNAL_RECONCILE_SECRET[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_URL[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_API_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_SHOP_ID[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_NAME[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PHONE[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_PROVINCE[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_CITY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_AREA[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PANCAKE_POS_PICKUP_ADDRESS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.FEATURE_FLAG_PANCAKE_POS[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POS_SALE_REQUIRES_OPEN_SHIFT[39m ([2m"(hidden)"[22m)                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TERMINAL_AGENT_CORS_ORIGINS[39m ([2m"(hidden)"[22m)                                                   [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_API_KEY[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_FROM_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_BRAND_NAME[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_API_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SEMAPHORE_SENDER_NAME[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CHAT_INTAKE_EMAIL[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_SECRET[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TRACKING_HMAC_KEY_VERSION[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ADMIN_LOW_STOCK_THRESHOLD[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_API_KEY[39m ([2m"(hidden)"[22m)                                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_PAYMENT_INTEGRATIONS[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NANGO_WEBHOOK_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                     [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_EVENT_KEY[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                        [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_DSN[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_ORG[39m ([2m"(hidden)"[22m)                                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_PROJECT[39m ([2m"(hidden)"[22m)                                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_AUTH_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_KEY[39m ([2m"(hidden)"[22m)                                                       [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                      [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_API_KEY[39m ([2m"(hidden)"[22m)                                                               [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_PROJECT_TOKEN[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.POSTHOG_HOST[39m ([2m"(hidden)"[22m)                                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_SITE_KEY[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.NEXT_PUBLIC_RECAPTCHA_PROVIDER[39m ([2m"(hidden)"[22m)                                                [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_PROJECT_ID[39m ([2m"(hidden)"[22m)                                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_ENTERPRISE_API_KEY[39m ([2m"(hidden)"[22m)                                                  [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RECAPTCHA_MIN_SCORE[39m ([2m"(hidden)"[22m)                                                           [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_HEALTH_URL[39m ([2m"(hidden)"[22m)                                                         [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_WAIT_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.MEDUSA_DEV_POLL_MS[39m ([2m"(hidden)"[22m)                                                            [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.VERCEL_OIDC_TOKEN[39m ([2m"(hidden)"[22m)                                                             [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_EMAIL[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUSINESS_PASSWORD[39m ([2m"(hidden)"[22m)                                              [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_EMAIL[39m ([2m"(hidden)"[22m)                                                    [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.PAYPAL_SANDBOX_BUYER_PASSWORD[39m ([2m"(hidden)"[22m)                                                 [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SUPABASE_SERVICE_ROLE_KEY_ROTATED_AT[39m ([2m"(hidden)"[22m)                                          [31mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m ✓ Compiled /api/checkout/cod-cart-payload in 123ms
+[2m[WebServer] [22m POST /api/checkout/cod-cart-payload 200 in 791ms
+[2m[WebServer] [22m[wrangler:info] POST /store/checkout/preview 200 OK (645ms)
+[2m[WebServer] [22m POST /api/checkout/preview 200 in 953ms
+[2m[WebServer] [22m ✓ Compiled /api/checkout/start in 118ms
+[2m[WebServer] [22m[wrangler:info] POST /store/carts 201 Created (887ms)
+[2m[WebServer] [22m[wrangler:info] POST /store/carts/cart_d87f885e-94de-4d12-95b5-df9d62ef2169/line-items 200 OK (1288ms)
+[2m[WebServer] [22m POST /api/checkout/start 200 in 2671ms
+  ✓  2 [chromium] › scripts/stress-test/e2e/flows/psp-checkout-cod.spec.ts:161:7 › @checkout @cod COD checkout flow › stale COD quote is surfaced without placing an order (30.9s)
+
+  2 passed (57.7s)

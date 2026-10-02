@@ -6,7 +6,7 @@ export function youtubeEmbedUrl(url: string): string | null {
       const id = u.pathname.replace(/^\//, "").split("/")[0];
       if (id) return `https://www.youtube.com/embed/${id}`;
     }
-    if (u.hostname.includes("youtube.com")) {
+    if (u.hostname === "youtube.com" || u.hostname === "www.youtube.com") {
       const v = u.searchParams.get("v");
       if (v) return `https://www.youtube.com/embed/${v}`;
       const embed = u.pathname.match(/\/embed\/([^/?]+)/);
@@ -62,7 +62,7 @@ function youtubeVideoId(url: string): string | null {
       const id = u.pathname.replace(/^\//, "").split("/")[0];
       return id || null;
     }
-    if (u.hostname.includes("youtube.com")) {
+    if (u.hostname === "youtube.com" || u.hostname === "www.youtube.com") {
       const v = u.searchParams.get("v");
       if (v) return v;
       const embed = u.pathname.match(/\/embed\/([^/?]+)/);

@@ -46,6 +46,7 @@ export function validateWorkerConfig(config) {
   const requiredVars = [
     "ALLOWED_ORIGINS",
     "PUBLIC_SITE_URL",
+    "PUBLIC_WORKER_URL",
     "CMS_ORGANIZATION_ID",
     "DEFAULT_ORGANIZATION_ID",
   ];
@@ -67,10 +68,12 @@ export function validateWorkerConfig(config) {
   const productionSite = /"PUBLIC_SITE_URL"\s*:\s*"https:\/\/universalmusic\.vercel\.app"/.test(production);
   const devOrigins = /"ALLOWED_ORIGINS"\s*:\s*"[^"]*universalmusic-preview\.vercel\.app/.test(dev);
   const productionOrigins = /"ALLOWED_ORIGINS"\s*:\s*"[^"]*universalmusic\.vercel\.app/.test(production);
-  if (!devSite || !productionSite || !devOrigins || !productionOrigins) {
+  const devWorker = /"PUBLIC_WORKER_URL"\s*:\s*"https:\/\/ums-backend-preview\.[^"]+\.workers\.dev"/.test(dev);
+  const productionWorker = /"PUBLIC_WORKER_URL"\s*:\s*"https:\/\/ums-backend-production\.[^"]+\.workers\.dev"/.test(production);
+  if (!devSite || !productionSite || !devOrigins || !productionOrigins || !devWorker || !productionWorker) {
     return {
       ok: false,
-      message: "Worker environment origins are misaligned: dev must use the preview site and production must use the stable site.",
+      message: "Worker environment origins are misaligned: dev must use the preview site and preview Worker; production must use the stable site and production Worker.",
     };
   }
 

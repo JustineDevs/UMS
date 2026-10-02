@@ -20,6 +20,18 @@ import dynamic from "next/dynamic";
 import { formatCheckoutMoney } from "./checkout-utils";
 import { useCheckoutClient } from "./use-checkout-client";
 import { shouldUnoptimizeImage } from "@/lib/image-helpers";
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Separator,
+} from "@universal-music-store/ui";
+import {
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+  StorefrontCard,
+} from "@/components/storefront/StorefrontPagePrimitives";
 
 const PayPalEmbeddedCheckout = dynamic(
   () =>
@@ -35,6 +47,13 @@ const XenditComponentsCheckout = dynamic(
     ),
   { ssr: false },
 );
+
+const PAYMENT_PROVIDER_HELP: Record<PaymentProviderKey, string> = {
+  STRIPE: "Secure hosted card checkout opens in this tab.",
+  PAYPAL: "Approve in PayPal's secure checkout window.",
+  XENDIT: "Use hosted checkout or choose GCash and bank transfer when available.",
+  COD: "Place the order now and pay the rider in Philippine pesos.",
+};
 
 export function CheckoutClient({
   initialResumeCartId,
@@ -123,7 +142,7 @@ export function CheckoutClient({
 
   if (authStatus === "loading" && !isGuestCheckout) {
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -134,7 +153,7 @@ export function CheckoutClient({
 
   if ((authStatus !== "authenticated" || !session?.user) && !isGuestCheckout) {
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -168,7 +187,7 @@ export function CheckoutClient({
 
   if (profileGate === "loading" || profileGate === "idle") {
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -179,7 +198,7 @@ export function CheckoutClient({
 
   if (profileGate === "error") {
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -206,7 +225,7 @@ export function CheckoutClient({
   if (profileGate === "incomplete") {
     const onboardingHref = `/onboarding?next=${encodeURIComponent("/checkout")}`;
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -234,7 +253,7 @@ export function CheckoutClient({
 
   if (checkoutAvailabilityStatus === "loading") {
     return (
-      <main className="storefront-page-shell motion-surface max-w-7xl">
+      <main className="storefront-page-shell motion-surface max-w-none">
         <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
           Checkout
         </h1>
@@ -263,16 +282,16 @@ export function CheckoutClient({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-3">
-            <button
+            <Button
               type="button"
+              size="lg"
               data-testid="checkout-unavailable-retry"
-              className="inline-flex min-h-11 items-center rounded bg-primary px-5 py-2.5 text-sm font-bold text-on-primary hover:opacity-90"
               onClick={() => {
                 void retryCheckoutAvailability();
               }}
             >
               Try again
-            </button>
+            </Button>
             <Link
               href="/cart"
               className="inline-flex min-h-11 items-center rounded border border-outline px-5 py-2.5 text-sm font-semibold text-primary hover:bg-surface-container"
@@ -292,29 +311,15 @@ export function CheckoutClient({
   }
 
   return (
-    <main className="storefront-page-shell motion-surface max-w-6xl">
-      <header className="mb-10 border-b border-outline-variant/20 pb-8">
-        <div className="flex items-start gap-3">
-          <Image
-            src="/brand/uvs-logo-mark.png"
-            alt=""
-            width={38}
-            height={38}
-            className="mt-1 size-9 object-contain"
-          />
-          <div>
-            <p className="font-headline text-xs font-bold uppercase tracking-[0.18em] text-on-surface-variant">
-              Universal Music Store
-            </p>
-            <h1 className="mt-3 font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">
-              Checkout
-            </h1>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Complete your purchase securely.
-            </p>
-          </div>
-        </div>
-      </header>
+    <StorefrontPageFrame
+      width="wide"
+      className="motion-surface bg-surface-container-low px-4 py-8 sm:px-8 sm:py-12 lg:px-12 xl:px-16"
+    >
+      <StorefrontPageHeader
+        title="Checkout"
+        description="Complete your purchase securely."
+        className="mx-auto mb-8 max-w-7xl"
+      />
 
       {isGuestCheckout && (
         <div className="mb-6 flex items-start gap-3 rounded-lg border border-outline-variant/20 bg-surface-container-low px-4 py-3 max-w-lg">
@@ -347,24 +352,6 @@ export function CheckoutClient({
         </div>
       )}
 
-      <p className="mb-4 max-w-2xl font-body text-on-surface-variant">
-        Review your bag and choose how to pay. The total on the right includes
-        shipping and taxes so you know exactly what you pay before clicking the
-        place-order button.
-      </p>
-      <p className="mb-10 max-w-2xl rounded-xl border border-outline-variant/15 bg-surface-container-low/40 px-4 py-3 font-body text-sm text-on-surface-variant">
-        <span className="font-headline text-[10px] font-bold uppercase tracking-widest text-primary">
-          How it works
-        </span>
-        <span className="mt-2 block leading-relaxed">
-          Your bag total loads with shipping and taxes included. Card payments
-          continue to hosted Stripe Checkout. PayPal opens its secure approval
-          window, while Xendit may use hosted checkout or an embedded payment
-          component. Cash on delivery places your order with no card step. Your
-          saved delivery address is used for fulfillment.
-        </span>
-      </p>
-
       {foreignCheckoutActive ? (
         <CommerceStateBanner
           variant="amber"
@@ -375,12 +362,12 @@ export function CheckoutClient({
         </CommerceStateBanner>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.72fr)] xl:items-start xl:gap-10">
-        <div className="space-y-5">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.8fr)] lg:items-start xl:gap-8">
+        <div className="flex flex-col gap-5">
           {useMedusaBagTotals &&
           medusaPricePreview &&
           medusaPricePreview.shippingOptions.length > 0 ? (
-            <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+            <StorefrontCard className="order-3 rounded-xl p-5 sm:p-6">
               <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
                 Shipping method
               </h2>
@@ -419,9 +406,9 @@ export function CheckoutClient({
                   );
                 })}
               </div>
-            </section>
+            </StorefrontCard>
           ) : null}
-          <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+          <StorefrontCard className="order-4 rounded-xl p-5 sm:p-6">
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               How you will pay
             </h2>
@@ -430,60 +417,72 @@ export function CheckoutClient({
               role="radiogroup"
               aria-label="How you will pay"
             >
-              {(Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[])
-                .flatMap((key) => {
-                  const ok = providerAvailable[key];
-                  if (!ok) return [];
-                  const selected = paymentMethod === key;
-                  return [(
-                    <button
-                      key={key}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      aria-disabled={!ok}
-                      data-testid={`payment-${key.toLowerCase()}`}
-                      disabled={!ok || foreignCheckoutActive}
-                      onClick={() =>
-                        ok && !foreignCheckoutActive && setPaymentMethod(key)
-                      }
-                      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                        ok
-                          ? "cursor-pointer border-outline-variant/20 hover:border-primary/25 hover:bg-surface-container-low/60"
-                          : "cursor-not-allowed border-outline-variant/10 opacity-60"
-                      } ${selected && ok ? "border-primary/40 bg-surface-container-low/40 ring-1 ring-primary/15" : ""}`}
+              {(
+                Object.keys(PAYMENT_PROVIDER_IDS) as PaymentProviderKey[]
+              ).flatMap((key) => {
+                const ok = providerAvailable[key];
+                const selected = paymentMethod === key;
+                return [
+                  <button
+                    key={key}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    aria-disabled={!ok}
+                    data-testid={`payment-${key.toLowerCase()}`}
+                    disabled={!ok || foreignCheckoutActive}
+                    onClick={() =>
+                      ok && !foreignCheckoutActive && setPaymentMethod(key)
+                    }
+                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                      ok
+                        ? "cursor-pointer border-outline-variant/20 hover:border-primary/25 hover:bg-surface-container-low/60"
+                        : "cursor-not-allowed border-outline-variant/10 opacity-60"
+                    } ${selected && ok ? "border-primary/40 bg-surface-container-low/40 ring-1 ring-primary/15" : ""}`}
+                  >
+                    <PaymentProviderLogo
+                      providerKey={key}
+                      label={PAYMENT_PROVIDER_LABELS[key]}
+                    />
+                    <span className="min-w-0 flex-1 text-sm leading-snug">
+                      {PAYMENT_PROVIDER_LABELS[key]}
+                      {ok ? (
+                        <span className="mt-0.5 block text-xs text-on-surface-variant">
+                          {PAYMENT_PROVIDER_HELP[key]}
+                        </span>
+                      ) : null}
+                      {!ok ? (
+                        <span className="mt-0.5 block text-xs text-on-surface-variant">
+                          Not available for your area or store setup right now.
+                        </span>
+                      ) : null}
+                    </span>
+                    <span
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+                        selected && ok ? "bg-primary" : "bg-outline-variant/35"
+                      }`}
+                      aria-hidden
                     >
-                      <PaymentProviderLogo
-                        providerKey={key}
-                        label={PAYMENT_PROVIDER_LABELS[key]}
-                      />
-                      <span className="min-w-0 flex-1 text-sm leading-snug">
-                        {PAYMENT_PROVIDER_LABELS[key]}
-                        {!ok ? (
-                          <span className="mt-0.5 block text-xs text-on-surface-variant">
-                            Not available for your area or store setup right
-                            now.
-                          </span>
-                        ) : null}
-                      </span>
                       <span
-                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
-                          selected && ok
-                            ? "bg-primary"
-                            : "bg-outline-variant/35"
+                        className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${
+                          selected && ok ? "translate-x-6" : "translate-x-1"
                         }`}
-                        aria-hidden
-                      >
-                        <span
-                          className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ease-out ${
-                            selected && ok ? "translate-x-6" : "translate-x-1"
-                          }`}
-                        />
-                      </span>
-                    </button>
-                  )];
-                })}
+                      />
+                    </span>
+                  </button>,
+                ];
+              })}
             </div>
+            {!Object.values(providerAvailable).some(Boolean) ? (
+              <p
+                className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-xs leading-relaxed text-amber-950 dark:text-amber-100"
+                role="status"
+              >
+                No payment methods are available for this order right now.
+                Your bag is saved; try again shortly or contact support if the
+                problem continues.
+              </p>
+            ) : null}
             {paymentMethod === "COD" ? (
               <div
                 className="mt-3 space-y-2 rounded-lg border border-outline-variant/15 bg-surface-container-low/40 px-3 py-3 text-xs leading-relaxed text-on-surface-variant"
@@ -516,19 +515,19 @@ export function CheckoutClient({
                 </ol>
               </div>
             ) : null}
-          </section>
+          </StorefrontCard>
 
-          <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+          <StorefrontCard className="order-1 rounded-xl p-5 sm:p-6">
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Contact Information
             </h2>
-            <label
+            <Label
               htmlFor="checkout-email"
-              className="block text-xs font-medium text-on-surface-variant mb-2"
+              className="mb-2 block text-xs font-medium text-on-surface-variant"
             >
-              Email for your receipt
-            </label>
-            <input
+              Email
+            </Label>
+            <Input
               id="checkout-email"
               type="email"
               value={email}
@@ -540,7 +539,7 @@ export function CheckoutClient({
                 paymentMethod === "COD" ||
                 foreignCheckoutActive
               }
-              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 rounded-lg px-4"
             />
             <label className="mt-4 flex items-center gap-2 text-sm text-on-surface-variant">
               <input type="checkbox" className="size-4 accent-primary" />
@@ -561,7 +560,10 @@ export function CheckoutClient({
                 </>
               )}
             </p>
-            <label htmlFor="checkout-loyalty-points" className="block text-xs font-medium text-on-surface-variant mt-4 mb-2">
+            <label
+              htmlFor="checkout-loyalty-points"
+              className="block text-xs font-medium text-on-surface-variant mt-4 mb-2"
+            >
               Loyalty points to use (optional)
             </label>
             <div className="flex items-center justify-between mb-1">
@@ -569,7 +571,7 @@ export function CheckoutClient({
                 Your balance: <strong>{loyaltyBalance} points</strong>
               </span>
             </div>
-            <input
+            <Input
               id="checkout-loyalty-points"
               type="number"
               min={0}
@@ -579,7 +581,7 @@ export function CheckoutClient({
               onChange={(e) => setLoyaltyPoints(e.target.value)}
               placeholder="0"
               disabled={foreignCheckoutActive}
-              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-3 font-body text-sm outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 rounded-lg px-4"
             />
             {Number(loyaltyPoints) > loyaltyBalance && (
               <p className="text-xs text-error mt-1">
@@ -590,8 +592,12 @@ export function CheckoutClient({
               Each point lowers your total by 1.00 in the shop currency.
             </p>
 
-            <div className="mt-6 border-t border-outline-variant/15 pt-5">
-              <label htmlFor="checkout-promo-code" className="block text-xs font-medium text-on-surface-variant mb-2">
+            <Separator className="my-6" />
+            <div className="pt-0">
+              <label
+                htmlFor="checkout-promo-code"
+                className="block text-xs font-medium text-on-surface-variant mb-2"
+              >
                 Promotion code (optional)
               </label>
               {promoApplied ? (
@@ -616,20 +622,21 @@ export function CheckoutClient({
                       ? ` (-${formatCheckoutMoney(promoApplied.discountAmount, displayCurrency)})`
                       : ""}
                   </span>
-                  <button
+                  <Button
                     type="button"
                     onClick={() =>
                       void removePromoCode(medusaPricePreview?.cartId ?? "")
                     }
                     disabled={promoLoading}
-                    className="inline-flex min-h-11 items-center text-xs text-on-surface-variant underline hover:text-error disabled:opacity-50"
+                    variant="link"
+                    size="sm"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     id="checkout-promo-code"
                     type="text"
                     value={promoCode}
@@ -640,10 +647,10 @@ export function CheckoutClient({
                     }}
                     placeholder="Enter code"
                     disabled={foreignCheckoutActive || promoLoading}
-                    className="flex-1 bg-surface-container-lowest border border-outline-variant/30 rounded px-4 py-2.5 font-body text-sm uppercase tracking-widest outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                    className="h-11 flex-1 rounded-lg uppercase tracking-widest"
                     maxLength={50}
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() =>
                       void applyPromoCode(medusaPricePreview?.cartId ?? "")
@@ -654,10 +661,10 @@ export function CheckoutClient({
                       foreignCheckoutActive ||
                       !medusaPricePreview?.cartId
                     }
-                    className="min-h-11 rounded bg-primary px-4 py-2.5 text-xs font-bold text-on-primary hover:opacity-90 disabled:opacity-50"
+                    size="default"
                   >
                     {promoLoading ? "Applying…" : "Apply"}
-                  </button>
+                  </Button>
                 </div>
               )}
               {promoError && (
@@ -667,60 +674,112 @@ export function CheckoutClient({
               )}
               {!medusaPricePreview?.cartId && !promoApplied && (
                 <p className="mt-1 text-xs text-on-surface-variant">
-                  Your live cart totals must finish loading before a code can
-                  be applied. The code field is active once your bag totals are ready.
+                  Your live cart totals must finish loading before a code can be
+                  applied. The code field is active once your bag totals are
+                  ready.
                 </p>
               )}
             </div>
-          </section>
+          </StorefrontCard>
 
-          <section className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:p-6">
+          <StorefrontCard className="order-2 rounded-xl p-5 sm:p-6">
             <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-4">
               Shipping Address
             </h2>
-            {profileSummary?.shippingAddresses[0] ? (() => {
-              const address = profileSummary.shippingAddresses[0];
-              const addressLine = [address.line1, address.line2, address.barangay]
-                .filter(Boolean)
-                .join(", ");
-              return (
-                <div className="space-y-4">
-                  <label className="block text-xs font-medium text-on-surface-variant">
-                    Country
-                    <input readOnly value={address.country === "PH" ? "Philippines" : address.country ?? ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
-                  </label>
-                  <div className="grid gap-4 sm:grid-cols-2">
+            {profileSummary?.shippingAddresses[0] ? (
+              (() => {
+                const address = profileSummary.shippingAddresses[0];
+                const addressLine = [
+                  address.line1,
+                  address.line2,
+                  address.barangay,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+                const nameParts = address.fullName.trim().split(/\s+/);
+                const firstName = nameParts.shift() ?? "";
+                const lastName = nameParts.join(" ");
+                return (
+                  <div className="space-y-4">
                     <label className="block text-xs font-medium text-on-surface-variant">
-                      Full Name
-                      <input readOnly value={address.fullName} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                      Country
+                      <Input
+                        readOnly
+                        value={
+                          address.country === "PH"
+                            ? "Philippines"
+                            : (address.country ?? "")
+                        }
+                        className="mt-2 bg-surface-container-low"
+                      />
                     </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-xs font-medium text-on-surface-variant">
+                        First Name
+                        <Input
+                          readOnly
+                          value={firstName}
+                          className="mt-2 bg-surface-container-low"
+                        />
+                      </label>
+                      <label className="block text-xs font-medium text-on-surface-variant">
+                        Last Name
+                        <Input
+                          readOnly
+                          value={lastName}
+                          className="mt-2 bg-surface-container-low"
+                        />
+                      </label>
+                    </div>
                     <label className="block text-xs font-medium text-on-surface-variant">
                       Phone
-                      <input readOnly value={address.phone || profileSummary.phone || ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
-                    </label>
-                  </div>
-                  <label className="block text-xs font-medium text-on-surface-variant">
-                    Address
-                    <input readOnly value={addressLine} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
-                  </label>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="block text-xs font-medium text-on-surface-variant">
-                      Postal Code
-                      <input readOnly value={address.postalCode ?? ""} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                      <Input
+                        readOnly
+                        value={address.phone || profileSummary.phone || ""}
+                        className="mt-2 bg-surface-container-low"
+                      />
                     </label>
                     <label className="block text-xs font-medium text-on-surface-variant">
-                      City / Province
-                      <input readOnly value={[address.city, address.province].filter(Boolean).join(", ")} className="mt-2 w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 text-sm text-on-surface" />
+                      Address
+                      <Input
+                        readOnly
+                        value={addressLine}
+                        className="mt-2 bg-surface-container-low"
+                      />
                     </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-xs font-medium text-on-surface-variant">
+                        Postal Code
+                        <Input
+                          readOnly
+                          value={address.postalCode ?? ""}
+                          className="mt-2 bg-surface-container-low"
+                        />
+                      </label>
+                      <label className="block text-xs font-medium text-on-surface-variant">
+                        City / Province
+                        <Input
+                          readOnly
+                          value={[address.city, address.province]
+                            .filter(Boolean)
+                            .join(", ")}
+                          className="mt-2 bg-surface-container-low"
+                        />
+                      </label>
+                    </div>
+                    <Link
+                      href="/account/profile"
+                      className="inline-flex text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline"
+                    >
+                      Edit delivery details
+                    </Link>
                   </div>
-                  <Link href="/account/profile" className="inline-flex text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline">
-                    Edit delivery details
-                  </Link>
-                </div>
-              );
-            })() : (
+                );
+              })()
+            ) : (
               <p className="text-sm text-on-surface-variant">
-                Your primary saved address from onboarding is on file. Update it under Account if anything is wrong.
+                Your primary saved address from onboarding is on file. Update it
+                under Account if anything is wrong.
               </p>
             )}
             <p className="mt-4 text-sm leading-relaxed text-on-surface-variant">
@@ -728,17 +787,20 @@ export function CheckoutClient({
                 ? "Cash on delivery ships to this saved address."
                 : "Some payment methods may ask you to confirm shipping or contact details before you pay."}
             </p>
-          </section>
+          </StorefrontCard>
         </div>
 
         <div>
-          <div className="rounded-2xl border border-outline-variant/25 bg-surface-container-lowest p-5 shadow-sm sm:sticky sm:top-6 sm:p-6">
+          <StorefrontCard className="rounded-xl p-5 shadow-sm lg:sticky lg:top-8 sm:p-8">
             <h2 className="mb-1 font-headline text-lg font-bold text-primary">
               Order Summary
             </h2>
             <p className="mb-6 text-sm text-on-surface-variant">
               Review the items in your bag before paying.
             </p>
+            <Badge variant="outline" className="mb-5">
+              {PAYMENT_PROVIDER_LABELS[paymentMethod]}
+            </Badge>
 
             {!hydrated ? (
               <p className="text-on-surface-variant text-sm py-8 text-center">
@@ -1285,9 +1347,9 @@ export function CheckoutClient({
             </p>
 
             <CheckoutTrustBadges />
-          </div>
+          </StorefrontCard>
         </div>
       </div>
-    </main>
+    </StorefrontPageFrame>
   );
 }

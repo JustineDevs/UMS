@@ -212,24 +212,3 @@ export function stepUpRequired(action: string, request: Request): boolean {
   if (process.env.ADMIN_STEP_UP_REQUIRED !== "true") return true;
   return verifyAdminStepUp(action, request.headers.get("x-admin-step-up"));
 }
-
-export async function verifyDeviceBinding(
-  client: SupabaseClient,
-  request: Request,
-  deviceId: string,
-): Promise<boolean> {
-  const token = request.headers.get("x-device-token")?.trim();
-  if (!token) return false;
-  const tokenHash = createHash("sha256").update(token).digest("hex");
-  const { data, error } = await client
-    .from("pos_device_bindings")
-    .select("id, bound_ip")
-    .eq("device_id", deviceId)
-    .eq("token_hash", tokenHash)
-    .eq("is_active", true)
-    .is("revoked_at", null)
-    .maybeSingle();
-  if (error || !data) return false;
-  const sourceIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return !data.bound_ip || data.bound_ip === sourceIp;
-}

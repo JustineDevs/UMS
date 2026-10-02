@@ -3,10 +3,6 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
 
-export const CardAction = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("col-start-2 row-span-2 row-start-1 self-start justify-self-end", className)} {...props} />
-);
-
 export const AvatarBadge = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span data-slot="avatar-badge" className={cn("absolute right-0 bottom-0 size-2.5 rounded-full border-2 border-background bg-green-500", className)} {...props} />
 );
@@ -41,7 +37,7 @@ InputGroupTextarea.displayName = "InputGroupTextarea";
 export const InputGroupAddon = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("flex items-center gap-1 p-1.5", className)} {...props} />;
 export const InputGroupButton = ({ className, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button type="button" className={cn("inline-flex size-7 items-center justify-center rounded-md text-sm hover:bg-muted", className)} {...props} />;
 
-export const Progress = ({ value = 0, className, ...props }: React.HTMLAttributes<HTMLDivElement> & { value?: number }) => <div role="progressbar" aria-valuenow={value} className={cn("h-2 overflow-hidden rounded-full bg-muted", className)} {...props}><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>;
+export const Progress = ({ value = 0, className, ...props }: React.HTMLAttributes<HTMLDivElement> & { value?: number }) => <div role="progressbar" aria-valuenow={value} className={cn("h-2 overflow-hidden rounded-full bg-muted", className)} {...props}><div className="h-full rounded-full bg-primary transition-[width] duration-200" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></div>;
 export const Empty = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("flex min-h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground", className)} {...props}>{children ?? "Nothing to display"}</div>;
 export const EmptyTitle = ({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => <h3 className={cn("font-medium text-foreground", className)} {...props} />;
 export const EmptyDescription = ({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => <p className={className} {...props} />;

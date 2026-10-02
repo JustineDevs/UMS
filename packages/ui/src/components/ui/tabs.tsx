@@ -85,8 +85,12 @@ const Tabs = ({
 };
 Tabs.displayName = "Tabs";
 
-const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, onKeyDown, ...props }, ref) => {
+type TabsListProps = React.HTMLAttributes<HTMLDivElement> & {
+  variant?: "default" | "line";
+};
+
+const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(
+  ({ className, onKeyDown, variant = "default", ...props }, ref) => {
     const { orientation, triggerRefs, triggerValues, value, setValue } = useTabsContext();
 
     return (
@@ -95,9 +99,12 @@ const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         role="tablist"
         aria-orientation={orientation}
         className={cn(
-          "inline-flex h-10 items-center justify-center rounded-md bg-surface-container-high p-1 text-on-surface-variant",
+          variant === "line"
+            ? "inline-flex items-center justify-center gap-1 bg-transparent text-on-surface-variant"
+            : "inline-flex h-10 items-center justify-center rounded-md bg-surface-container-high p-1 text-on-surface-variant",
           className,
         )}
+        data-variant={variant}
         onKeyDown={(event) => {
           onKeyDown?.(event);
           if (event.defaultPrevented) return;
@@ -177,7 +184,7 @@ const TabsTrigger = React.forwardRef<
       disabled={disabled}
       data-state={isActive ? "active" : "inactive"}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-surface-container-lowest data-[state=active]:text-primary data-[state=active]:shadow-sm",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ring-offset-background transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-surface-container-lowest data-[state=active]:text-primary data-[state=active]:shadow-sm",
         className,
       )}
       onClick={(event) => {

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { X } from "lucide-react";
 import type { Product } from "@universal-music-store/types";
 import {
-  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -38,6 +38,9 @@ export function ProductQuickViewModal({
     }
 
     const controller = new AbortController();
+    let disposed = false;
+    setProduct(null);
+    setError(null);
     void (async () => {
       try {
         const res = await fetch(
@@ -48,26 +51,22 @@ export function ProductQuickViewModal({
           product?: Product;
           error?: string;
         };
-        if (controller.signal.aborted) return;
+        if (disposed || controller.signal.aborted) return;
         if (!res.ok) {
           setError(data.error ?? "Unable to load");
           return;
         }
         if (data.product) setProduct(data.product);
       } catch {
-        if (!controller.signal.aborted) setError("Network error");
+        if (!disposed && !controller.signal.aborted) setError("Network error");
       }
     })();
 
-    return () => controller.abort();
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
   }, [slug, open]);
-
-  useEffect(() => {
-    if (!open) {
-      setError(null);
-      setProduct(null);
-    }
-  }, [open]);
 
   useEffect(() => {
     function esc(e: KeyboardEvent) {
@@ -85,17 +84,27 @@ export function ProductQuickViewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[min(96vw,72rem)] overflow-hidden border-outline-variant/20 p-0">
-        <DialogHeader className="border-b border-outline-variant/10 px-6 py-5 text-left">
+      <DialogContent className="!max-w-4xl max-h-[calc(100dvh_-_2rem)] w-[min(96vw,64rem)] overflow-hidden border-outline-variant/20 p-0">
+        <DialogHeader className="relative border-b border-outline-variant/10 px-6 py-5 pr-14 text-left">
           <DialogTitle className="font-headline text-xl font-bold uppercase tracking-wide text-primary">
             {product?.name ?? "Loading…"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-on-surface-variant">
-            Quick look at price, imagery, and add-to-cart actions without leaving the catalog.
+          <DialogDescription className="sr-only">
+            Product quick view
           </DialogDescription>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4"
+            aria-label="Close quick view"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="size-5" aria-hidden="true" />
+          </Button>
         </DialogHeader>
 
-        <div className="max-h-[calc(90vh-88px)] overflow-y-auto px-6 py-6">
+        <div className="max-h-[calc(90vh_-_88px)] overflow-y-auto px-6 py-6">
           {error ? (
             <div className="rounded-lg border border-error/20 bg-error/5 p-4 text-sm text-error">
               {error}
@@ -112,6 +121,7 @@ export function ProductQuickViewModal({
                       fill
                       className="object-cover"
                       sizes="(max-width: 768px) 100vw, 50vw"
+                      priority
                       unoptimized={shouldUnoptimizeImage(product.images[0].imageUrl)}
                     />
                   ) : (
@@ -119,16 +129,6 @@ export function ProductQuickViewModal({
                       Image unavailable
                     </div>
                   )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {product.brand ? (
-                    <Badge variant="outline" className="border-outline-variant/30 bg-surface/80">
-                      {product.brand}
-                    </Badge>
-                  ) : null}
-                  <Badge variant="outline" className="border-outline-variant/30 bg-surface/80">
-                    Quick view
-                  </Badge>
                 </div>
               </div>
 
@@ -142,25 +142,16 @@ export function ProductQuickViewModal({
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/60 p-4">
-                  <p className="text-sm font-medium text-on-surface-variant">
-                    Add the current instrument directly to cart from the modal, then continue browsing.
-                  </p>
-                </div>
-
                 <ProductVariantProvider product={product}>
-                  <AddToCartSection product={product} testId="quick-view-add-to-bag" />
+                  <AddToCartSection
+                    product={product}
+                    testId="quick-view-add-to-bag"
+                    compact
+                    onAdded={(destination) => {
+                      if (destination === "/cart") onOpenChange(false);
+                    }}
+                  />
                 </ProductVariantProvider>
-
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    Close modal
-                  </Button>
-                </div>
               </div>
             </div>
           ) : (

@@ -18,7 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     env:
-      BACKEND_WORKER_URL: ${{ vars.BACKEND_WORKER_URL }}
+      # Keep the production target explicit and environment-scoped. A missing
+      # optional repository variable must not silently disable all scheduled
+      # reconciliation jobs.
+      BACKEND_WORKER_URL: ${{ vars.BACKEND_WORKER_URL || 'https://ums-backend-production.pcg0255.workers.dev' }}
       CRON_SECRET: ${{ secrets.STOREFRONT_CRON_SECRET }}
     steps:
       - name: Invoke protected Worker jobs
@@ -39,6 +42,7 @@ jobs:
             /internal/cron/media-storage-cleanup \
             /internal/cron/inventory-reservations \
             /internal/cron/back-in-stock; do
+            echo "Invoking ${path} on ${BACKEND_WORKER_URL}"
             curl --fail-with-body --silent --show-error --max-time 30 \
               -H "Authorization: Bearer $CRON_SECRET" \
               "$BACKEND_WORKER_URL$path"

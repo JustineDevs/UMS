@@ -2,6 +2,8 @@
 
 import type { Product, ProductVariant } from "@universal-music-store/types";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { isVariantSellable } from "./product-variant-rules";
+export { findSellableVariantForOptions, isVariantSellable } from "./product-variant-rules";
 
 type ProductVariantContextValue = {
   variant: ProductVariant | undefined;
@@ -11,21 +13,6 @@ type ProductVariantContextValue = {
 
 const ProductVariantContext = createContext<ProductVariantContextValue | null>(null);
 
-export function isVariantSellable(variant: ProductVariant | undefined): boolean {
-  if (!variant || !variant.isActive) return false;
-  return !variant.manageInventory || variant.inventoryQuantity === null || variant.inventoryQuantity > 0;
-}
-
-export function findSellableVariantForOptions(
-  product: Product,
-  options: { type?: string; finish?: string },
-): ProductVariant | undefined {
-  return product.variants.find((candidate) =>
-    isVariantSellable(candidate) &&
-    (options.type === undefined || candidate.type === options.type) &&
-    (options.finish === undefined || candidate.finish === options.finish),
-  );
-}
 
 export function ProductVariantProvider({
   product,
@@ -49,6 +36,7 @@ export function ProductVariantProvider({
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const refresh = async () => {
       try {
         const response = await fetch("/api/checkout/verify-stock", {
@@ -57,6 +45,7 @@ export function ProductVariantProvider({
           body: JSON.stringify({ lines: [{ variantId, quantity: 1 }] }),
           credentials: "include",
           cache: "no-store",
+          signal: controller.signal,
         });
         if (!response.ok) return;
         const payload = (await response.json().catch(() => null)) as {
@@ -81,6 +70,7 @@ export function ProductVariantProvider({
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
+      controller.abort();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [variantId]);

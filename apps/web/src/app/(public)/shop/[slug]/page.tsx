@@ -184,15 +184,21 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <>
+      {/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */}
       <script
         type="application/ld+json"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
         dangerouslySetInnerHTML={{
+          /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
           __html: serializeJsonLd(productJsonLd),
         }}
       />
+      {/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */}
       <script
         type="application/ld+json"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
         dangerouslySetInnerHTML={{
+          /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
           __html: serializeJsonLd(breadcrumbJsonLd),
         }}
       />
@@ -201,14 +207,6 @@ export default async function ProductPage({ params }: Props) {
           <Link href="/" className="hover:text-primary">Home</Link>
           <span aria-hidden="true" className="select-none">/</span>
           <Link href="/shop" className="hover:text-primary">Shop</Link>
-          {product.category && (
-            <>
-              <span aria-hidden="true" className="select-none">/</span>
-              <Link href={`/shop?category=${encodeURIComponent(product.category)}`} className="hover:text-primary">
-                {product.category}
-              </Link>
-            </>
-          )}
           <span aria-hidden="true" className="select-none">/</span>
           <span className="text-primary font-medium" aria-current="page">{product.name}</span>
         </nav>

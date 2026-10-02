@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountRouteNav } from "./AccountRouteNav";
+import { AccountSignOutButton } from "./AccountSignOutButton";
 
 export function AccountRouteFrame({
   eyebrow = "My Account",
@@ -32,7 +33,12 @@ export function AccountRouteFrame({
           <header className="mb-6 border-b border-outline-variant/15 pb-6">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
             <h1 className="mt-2 font-headline text-3xl font-bold tracking-tight text-primary sm:text-4xl">{title}</h1>
-            {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">{description}</p> : null}
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                {description ? <p className="mt-2 max-w-2xl text-sm leading-6 text-on-surface-variant">{description}</p> : null}
+              </div>
+              <AccountSignOutButton />
+            </div>
           </header>
           {children}
         </div>
@@ -43,7 +49,7 @@ export function AccountRouteFrame({
 
 export function AccountSignInState({ message = "Sign in to manage this part of your account." }: { message?: string }) {
   return (
-    <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+    <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-7">
       <h2 className="font-headline text-xl font-bold text-primary">Sign in required</h2>
       <p className="mt-2 text-sm leading-6 text-on-surface-variant">{message}</p>
       <Link href="/login?callbackUrl=%2Faccount%2Fprofile" className="mt-5 inline-flex min-h-11 items-center rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-on-primary hover:opacity-90">
@@ -55,7 +61,7 @@ export function AccountSignInState({ message = "Sign in to manage this part of y
 
 export function AccountUnavailableState({ title, message, actionHref, actionLabel }: { title: string; message: string; actionHref?: string; actionLabel?: string }) {
   return (
-    <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm sm:p-8">
+    <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-7">
       <h2 className="font-headline text-xl font-bold text-primary">{title}</h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-on-surface-variant">{message}</p>
       {actionHref && actionLabel ? <Link href={actionHref} className="mt-5 inline-flex min-h-11 items-center rounded-xl border border-outline-variant/30 px-5 py-3 text-sm font-semibold text-primary hover:bg-surface-container-low">{actionLabel}</Link> : null}

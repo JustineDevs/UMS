@@ -34,6 +34,7 @@ test("payment health scopes connected providers to the authenticated organizatio
     STRIPE_WEBHOOK_SECRET: "whsec_test",
     XENDIT_WEBHOOK_TOKEN: "xnd_token",
     PAYPAL_ENVIRONMENT: "sandbox",
+    PUBLIC_WORKER_URL: "https://ums-backend-production.example.workers.dev/",
   });
   assert.equal(response.status, 200);
   assert.deepEqual(values, ["org_1"]);
@@ -42,4 +43,6 @@ test("payment health scopes connected providers to the authenticated organizatio
   assert.equal(body.providers.xendit.enabled, true);
   assert.equal(body.providers.paypal.enabled, false);
   assert.equal(body.ok, true);
+  const xendit = body.providers.xendit as { expectedWebhookEndpoint?: string };
+  assert.equal(xendit.expectedWebhookEndpoint, "https://ums-backend-production.example.workers.dev/webhooks/xendit");
 });

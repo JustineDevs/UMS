@@ -61,7 +61,7 @@ type ConfirmPayload = {
 };
 
 function confirmationPayload(data: TrackPayload): ConfirmPayload {
-  const source = data.confirmationOrder ?? data.order;
+  const source = data.confirmationOrder!;
   const order = Object.fromEntries(
     Object.entries(source).filter(([key]) => key !== "id"),
   ) as ConfirmOrder;
@@ -82,7 +82,7 @@ async function fetchOrderData(
       ok: r.ok,
       status: r.status,
       ...(r.correlationId ? { correlationId: r.correlationId } : {}),
-      data: r.data ? confirmationPayload(r.data) : null,
+      data: r.data?.confirmationOrder ? confirmationPayload(r.data) : null,
     };
   }
   if (capability.id.startsWith("order_")) {

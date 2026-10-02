@@ -46,3 +46,19 @@ test("bounded JSON parser rejects prototype-pollution keys", async () => {
     { value: null, tooLarge: false, valid: false },
   );
 });
+
+test("bounded readers convert an aborted request stream into invalid input", async () => {
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.error(new Error("aborted"));
+    },
+  });
+  const request = new Request("https://storefront.test", {
+    body,
+    method: "POST",
+    ...( { duplex: "half" } as RequestInit & { duplex: "half" } ),
+  });
+
+  assert.deepEqual(await readBoundedRequestBody(request.clone(), 64), { body: "", tooLarge: false });
+  assert.deepEqual(await parseBoundedJson(request, 64), { value: null, tooLarge: false, valid: false });
+});

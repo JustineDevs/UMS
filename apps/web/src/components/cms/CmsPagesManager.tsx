@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { createPortal } from "react-dom";
 import { useSession } from "@/lib/auth-client";
 import { useSearchParams } from "next/navigation";
 import {
@@ -15,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { readResponseJson } from "@/lib/read-response-json";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { cmsPagePreviewUrl } from "@/lib/cms-preview-url";
+import { Button } from "@universal-music-store/ui";
 
 const CmsPageBuilder = dynamic(
   () => import("./CmsPageBuilder").then((module) => module.CmsPageBuilder),
@@ -71,6 +73,10 @@ function cmsPreviewOrigin(): string {
   return getStorefrontPublicOrigin();
 }
 
+function sanitizePreviewToken(value: string): string {
+  return value.replace(/[^A-Za-z0-9._~-]/g, "");
+}
+
 function emptyPage(): CmsPageRow {
   return {
     id: "",
@@ -114,7 +120,7 @@ export function CmsPagesManager({
   const [loadingRows, setLoadingRows] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [mutations, setMutations] = useState<CmsMutationRecord[]>([]);
+  const mutationsRef = useRef<CmsMutationRecord[]>([]);
   const [blocksJson, setBlocksJson] = useState("[]");
   const [showBlocksAdvancedJson, setShowBlocksAdvancedJson] = useState(false);
   const [jsonLdText, setJsonLdText] = useState("");
@@ -128,16 +134,17 @@ export function CmsPagesManager({
   const [newPageSlug, setNewPageSlug] = useState("new-page");
   const [newPageTemplate, setNewPageTemplate] = useState("");
   const latestBlocksRef = useRef<CmsBlock[] | null>(null);
+  const saveRequestRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const load = useCallback((signal?: AbortSignal) => {
     setLoadingRows(true);
     setLoadError(null);
     void fetch("/api/admin/cms/pages", { signal })
       .then(async (response) => {
-        const json = (await response.json()) as {
+        const json = await readResponseJson<{
           data?: CmsPageRow[];
           error?: string;
-        };
+        }>(response, {});
         if (!response.ok) throw new Error(json.error ?? response.statusText);
         setRows(json.data ?? []);
       })
@@ -169,7 +176,8 @@ export function CmsPagesManager({
   }, [editing]);
 
   const openPage = (page: CmsPageRow) => {
-    setMutations([]);
+    saveRequestRef.current = null;
+    mutationsRef.current = [];
     setSlugWhenOpened(page.slug);
     setRedirectMessage(null);
     setSaveError(null);
@@ -220,11 +228,16 @@ export function CmsPagesManager({
             : template.blocks,
         }
       : { ...base, title, slug };
-    setMutations([]);
+    const draftBlocks = Array.isArray(draft.blocks)
+      ? (draft.blocks as CmsBlock[])
+      : [];
+    saveRequestRef.current = null;
+    latestBlocksRef.current = draftBlocks;
+    mutationsRef.current = [];
     setSlugWhenOpened(null);
     setRedirectMessage(null);
     setSaveError(null);
-    setEditing(draft);
+    setEditing({ ...draft, blocks: draftBlocks });
     setNewPageDialogOpen(false);
   };
 
@@ -235,7 +248,12 @@ export function CmsPagesManager({
     const sourceBlocks = Array.isArray(source.tree) && source.tree.length
       ? cmsTreeToBlocks(source.tree as CmsNode[])
       : source.blocks;
-    setMutations([]);
+    const duplicateBlocks = Array.isArray(sourceBlocks)
+      ? (sourceBlocks as CmsBlock[])
+      : [];
+    saveRequestRef.current = null;
+    latestBlocksRef.current = duplicateBlocks;
+    mutationsRef.current = [];
     setSlugWhenOpened(null);
     setRedirectMessage(null);
     setSaveError(null);
@@ -244,7 +262,7 @@ export function CmsPagesManager({
       id: "",
       title: `${source.title || source.slug} copy`,
       slug: `${source.slug.replace(/^\/+|\/+$/g, "")}-copy`,
-      blocks: sourceBlocks,
+      blocks: duplicateBlocks,
       status: "draft",
       published_at: null,
       scheduled_publish_at: null,
@@ -256,7 +274,11 @@ export function CmsPagesManager({
   const previewPage = (id: string) => {
     const page = rows.find((item) => item.id === id);
     if (!page) return;
-    const pageUrl = `${cmsPreviewOrigin()}/p/${page.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
+    const normalizedSlug = page.slug.trim().toLowerCase();
+    const isHomepage = normalizedSlug === "home" || normalizedSlug === "/";
+    const pageUrl = isHomepage
+      ? `${cmsPreviewOrigin()}/`
+      : `${cmsPreviewOrigin()}/p/${page.slug.replace(/^\/+/, "").replace(/^p\//, "")}`;
     const previewUrl = cmsPagePreviewUrl(pageUrl, page.preview_token);
     window.open(previewUrl, "_blank", "noopener,noreferrer");
   };
@@ -276,15 +298,15 @@ export function CmsPagesManager({
     load();
   };
 
-  const newPageDialog = newPageDialogOpen ? (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/35 p-4" role="presentation">
-      <div role="dialog" aria-modal="true" aria-labelledby="new-page-dialog-title" className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-5 shadow-2xl">
+  const newPageDialog = newPageDialogOpen && typeof document !== "undefined" ? createPortal(
+    <dialog open aria-labelledby="new-page-dialog-title" className="pointer-events-auto fixed inset-0 z-[100] m-0 grid h-dvh w-dvw max-w-none place-items-center overflow-y-auto border-0 bg-slate-950/35 p-4">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="new-page-dialog-title" className="text-sm font-semibold text-slate-900">New page</h2>
             <p className="mt-1 text-xs text-slate-500">Create a page from a blank template or an existing page.</p>
           </div>
-          <button type="button" className="text-xs text-slate-500 hover:text-slate-900" onClick={() => setNewPageDialogOpen(false)}>Close</button>
+          <Button type="button" variant="ghost" size="sm" className="text-xs text-slate-500 hover:text-slate-900" onClick={() => setNewPageDialogOpen(false)}>Close</Button>
         </div>
         <div className="mt-5 space-y-3">
           <label className="block text-xs text-slate-600">Page title<input autoFocus value={newPageTitle} onChange={(event) => setNewPageTitle(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 px-2 text-sm text-slate-800" /></label>
@@ -292,11 +314,12 @@ export function CmsPagesManager({
           <label className="block text-xs text-slate-600">Start from template<select value={newPageTemplate} onChange={(event) => setNewPageTemplate(event.target.value)} className="mt-1 h-9 w-full rounded border border-slate-200 bg-white px-2 text-sm text-slate-800"><option value="">Blank page</option>{rows.map((page) => <option key={page.id} value={page.id}>{page.title || page.slug}</option>)}</select></label>
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" className="h-9 rounded border border-slate-200 px-3 text-xs text-slate-600 hover:bg-slate-50" onClick={() => setNewPageDialogOpen(false)}>Cancel</button>
-          <button type="button" className="h-9 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground" onClick={createNewPageDraft}>Create page</button>
+          <Button type="button" variant="outline" size="sm" className="text-xs text-slate-600" onClick={() => setNewPageDialogOpen(false)}>Cancel</Button>
+          <Button type="button" size="sm" className="text-xs font-semibold" onClick={createNewPageDraft}>Create page</Button>
         </div>
       </div>
-    </div>
+    </dialog>,
+    document.body,
   ) : null;
 
   const save = async (currentBlocks?: CmsBlock[]) => {
@@ -327,6 +350,10 @@ export function CmsPagesManager({
         return;
       }
     }
+    if (editing.status === "scheduled" && !editing.scheduled_publish_at) {
+      setSaveError("Choose a scheduled publish date before saving.");
+      return;
+    }
     const payload: Record<string, unknown> = {
       slug: editing.slug,
       locale: editing.locale,
@@ -335,7 +362,7 @@ export function CmsPagesManager({
       body: editing.body,
       blocks,
       tree: cmsBlocksToTree(blocks),
-      mutations,
+      mutations: mutationsRef.current,
       status: editing.status,
       published_at: editing.published_at,
       scheduled_publish_at: editing.scheduled_publish_at,
@@ -350,6 +377,11 @@ export function CmsPagesManager({
       ...(editing.id && editing.version ? { expectedVersion: editing.version } : {}),
     };
     if (editing.id) payload.id = editing.id;
+    const saveFingerprint = JSON.stringify(payload);
+    const saveRequestKey = saveRequestRef.current?.fingerprint === saveFingerprint
+      ? saveRequestRef.current.key
+      : idempotencyKey(editing.id ? `cms-page-${editing.id}` : "cms-page-new");
+    saveRequestRef.current = { fingerprint: saveFingerprint, key: saveRequestKey };
     try {
       const endpoint = editing.id
         ? `/api/admin/cms/pages/${encodeURIComponent(editing.id)}`
@@ -359,7 +391,7 @@ export function CmsPagesManager({
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey(editing.id ? `cms-page-${editing.id}` : "cms-page-new"),
+          "Idempotency-Key": saveRequestKey,
           ...(editing.id ? { "If-Match": String(editing.version ?? 1) } : {}),
         },
         body: JSON.stringify(payload),
@@ -373,7 +405,8 @@ export function CmsPagesManager({
           : blocks;
         setEditing(saved.data as CmsPageRow);
         setSlugWhenOpened(saved.data.slug);
-        setMutations([]);
+        mutationsRef.current = [];
+        saveRequestRef.current = null;
       }
       load();
     } catch (error: unknown) {
@@ -431,6 +464,20 @@ export function CmsPagesManager({
   if (status === "loading")
     return <p className="text-sm text-slate-600">Loading session...</p>;
 
+  // The dedicated Build route must never flash the legacy page-list workspace
+  // while its initial page selection is being resolved. Keep the route in its
+  // immersive shell until the homepage/page editor is ready.
+  if (
+    startInBuilder &&
+    (loadingRows || (!editing && !showStorefrontHome && !newPageDialogOpen))
+  ) {
+    return (
+      <div className="flex min-h-full min-w-full items-center justify-center bg-slate-100 text-sm text-slate-500">
+        Loading visual builder…
+      </div>
+    );
+  }
+
   if (showStorefrontHome) {
     const homeEditor = (
       <StorefrontHomeVisualEditor
@@ -441,7 +488,14 @@ export function CmsPagesManager({
         onNewPage={openNewPage}
       />
     );
-    if (startInBuilder) return homeEditor;
+    if (startInBuilder) {
+      return (
+        <>
+          {homeEditor}
+          {newPageDialog}
+        </>
+      );
+    }
 
     return (
       <div className="space-y-6">
@@ -452,7 +506,7 @@ export function CmsPagesManager({
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               The public homepage is managed here as the first page in the
-              same CMS workspace as every other page.
+              same Build workspace as every other page.
             </p>
           </div>
           <button
@@ -465,6 +519,7 @@ export function CmsPagesManager({
         </div>
         <StorefrontPublicMetadataEditor />
         {homeEditor}
+        {newPageDialog}
       </div>
     );
   }
@@ -591,10 +646,30 @@ export function CmsPagesManager({
               onChange={(e) =>
                 setEditing({
                   ...editing,
-                  preview_token: e.target.value || null,
+                  preview_token: sanitizePreviewToken(e.target.value) || null,
                 })
               }
             />
+          </label>
+          <label className="mt-3 block text-slate-500">
+            Scheduled publish date
+            <input
+              type="datetime-local"
+              className="mt-1 h-8 w-full rounded border border-slate-200 bg-white px-2 text-xs text-slate-700"
+              value={editing.scheduled_publish_at ? editing.scheduled_publish_at.slice(0, 16) : ""}
+              disabled={editing.status !== "scheduled"}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  scheduled_publish_at: e.target.value
+                    ? new Date(e.target.value).toISOString()
+                    : null,
+                })
+              }
+            />
+            <span className="mt-1 block text-[10px] text-slate-400">
+              Required when status is scheduled.
+            </span>
           </label>
           <a
             className="mt-3 inline-flex text-xs text-primary underline"
@@ -759,7 +834,9 @@ export function CmsPagesManager({
         onChange={(next: CmsBlock[]) =>
           (latestBlocksRef.current = next, setEditing((current) => current ? { ...current, blocks: next } : current))
         }
-        onMutation={(mutation) => setMutations((current) => [...current, mutation])}
+        onMutation={(mutation) => {
+          mutationsRef.current = [...mutationsRef.current, mutation];
+        }}
       />
       </>
     );
@@ -791,7 +868,7 @@ export function CmsPagesManager({
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Homepage sections, navigation-aware preview, SEO metadata, and
-            publish settings live in this unified CMS workspace.
+            publish settings live in this unified Build workspace.
           </p>
         </div>
         <button
@@ -808,7 +885,7 @@ export function CmsPagesManager({
       ) : null}
       {!loadingRows && !rows.length ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-          No CMS pages exist yet. Create a page to open the editor.
+          No pages exist yet. Create a page to open the Build workspace.
         </div>
       ) : null}
       {rows.length ? (

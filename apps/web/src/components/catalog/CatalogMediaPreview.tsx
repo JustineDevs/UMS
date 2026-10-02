@@ -1,7 +1,9 @@
 "use client";
 
 import { normalizeCatalogAssetUrl } from "@/lib/catalog-asset-url";
+import Image from "next/image";
 import { useState } from "react";
+import { inferCatalogMediaMimeType } from "./catalog-media-mime";
 
 type Props = {
   publicUrl: string;
@@ -10,17 +12,6 @@ type Props = {
   /** Shown when preview fails or type is unknown */
   fallbackLabel?: string;
 };
-
-function guessKindFromPath(url: string): "image" | "video" | null {
-  try {
-    const path = new URL(url).pathname.toLowerCase();
-    if (/\.(png|jpe?g|gif|webp|avif|svg|bmp)(\?|$)/i.test(path)) return "image";
-    if (/\.(mp4|webm|mov|m4v|ogv|ogg)(\?|$)/i.test(path)) return "video";
-  } catch {
-    return null;
-  }
-  return null;
-}
 
 /**
  * Renders an image or video preview for catalog / CMS media URLs (not raw text).
@@ -33,7 +24,7 @@ export function CatalogMediaPreview({
 }: Props) {
   const [broken, setBroken] = useState(false);
   const src = normalizeCatalogAssetUrl(publicUrl);
-  const mime = mimeType?.toLowerCase() ?? "";
+  const mime = inferCatalogMediaMimeType(src, mimeType) ?? "";
 
   if (!src || broken) {
     return (
@@ -47,12 +38,12 @@ export function CatalogMediaPreview({
 
   if (mime.startsWith("image/")) {
     return (
-      // External catalog URLs are user-supplied and not safely enumerable in next.config.js.
-      // Keep the native element so previews work with any approved storage/CDN host.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={src}
         alt=""
+        width={1}
+        height={1}
+        unoptimized
         className={className}
         loading="lazy"
         decoding="async"
@@ -73,14 +64,15 @@ export function CatalogMediaPreview({
     );
   }
 
-  const guessed = guessKindFromPath(src);
+  const guessed = mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : null;
   if (guessed === "image") {
     return (
-      // Guessed media can come from arbitrary approved catalog/CDN hosts.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={src}
         alt=""
+        width={1}
+        height={1}
+        unoptimized
         className={className}
         loading="lazy"
         decoding="async"

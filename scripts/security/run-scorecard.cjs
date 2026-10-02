@@ -1,13 +1,37 @@
 #!/usr/bin/env node
 
+const { homedir } = require("node:os");
+const { existsSync, accessSync, constants } = require("node:fs");
 const { spawnSync } = require("node:child_process");
 
-const target = process.argv[2] ?? "github.com/JustineDevs/UMS";
-const scorecard = process.env.SCORECARD_BIN ?? "scorecard";
+// pnpm forwards the conventional separator as a literal argument when this
+// script is invoked as `pnpm security:scorecard -- --local .`.
+const cliArgs = process.argv.slice(2);
+if (cliArgs[0] === "--") cliArgs.shift();
+const target = cliArgs[0] ?? "github.com/JustineDevs/UMS";
+const configuredScorecard = process.env.SCORECARD_BIN?.trim();
+const localScorecard = `${homedir()}/go/bin/scorecard`;
+const scorecard = configuredScorecard ||
+  (existsSync(localScorecard) && (() => {
+    try {
+      accessSync(localScorecard, constants.X_OK);
+      return localScorecard;
+    } catch {
+      return undefined;
+    }
+  })()) ||
+  "scorecard";
 const args =
   target === "--local"
-    ? ["--local", process.argv[3] ?? ".", "--show-details"]
+    ? ["--local", cliArgs[1] ?? ".", "--show-details"]
     : ["--repo", target, "--show-details"];
+
+if (target !== "--local" && !process.env.GITHUB_AUTH_TOKEN && !process.env.GH_TOKEN) {
+  console.error(
+    "Scorecard remote scans require GITHUB_AUTH_TOKEN or GH_TOKEN; run `node scripts/security/run-scorecard.cjs --local .` for an unauthenticated checkout scan.",
+  );
+  process.exit(2);
+}
 
 const result = spawnSync(scorecard, args, {
   stdio: "inherit",

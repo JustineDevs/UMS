@@ -11,11 +11,28 @@ type PublicTrackOrder = {
 
 export type TrackPayload = {
   order: PublicTrackOrder;
+  orderSummary?: {
+    total?: number;
+    currency?: string;
+    items?: Array<{
+      id: string;
+      title?: string;
+      quantity?: number;
+      unit_price?: number;
+      thumbnail?: string | null;
+    }>;
+    shipping_address?: {
+      city?: string;
+      province?: string;
+      postal_code?: string;
+    } | null;
+  };
   confirmationOrder?: ConfirmationOrder;
   shipments: Array<{
     id: string;
     tracking_number?: string;
     status?: string;
+    status_quality?: "known" | "unknown";
     carrier_slug?: string;
     source?: string;
     updated_at?: string;
@@ -50,30 +67,79 @@ export async function fetchWorkerTrackByToken(
   const base = process.env.API_URL?.trim().replace(/\/$/, "");
   if (!base || !token.trim()) return trackReadFailure(503);
   try {
-    const response = await fetch(`${base}/store/tracking/${encodeURIComponent(token)}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${base}/store/tracking/${encodeURIComponent(token)}`,
+      {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      },
+    );
     if (!response.ok) return trackReadFailure(response.status);
     const body = await readResponseJson<{
-      order?: { order_number?: unknown; status?: unknown; updated_at?: unknown };
+      order?: {
+        order_number?: unknown;
+        status?: unknown;
+        updated_at?: unknown;
+      };
       shipments?: unknown;
       capabilityScope?: TrackPayload["capabilityScope"];
       confirmationOrder?: ConfirmationOrder;
-    }> (response, {});
-    if (!body.order || typeof body.order !== "object") return trackReadFailure(502);
+      orderSummary?: TrackPayload["orderSummary"];
+    }>(response, {});
+    if (!body.order || typeof body.order !== "object")
+      return trackReadFailure(502);
+    const order = body.order;
     const shipments = Array.isArray(body.shipments)
       ? body.shipments.flatMap((value): TrackPayload["shipments"] => {
           if (!value || typeof value !== "object") return [];
           const row = value as Record<string, unknown>;
           if (typeof row.id !== "string") return [];
-          return [{
-            id: row.id,
-            ...(typeof row.tracking_number === "string" ? { tracking_number: formatTrackingNumber(row.tracking_number) } : {}),
-            ...(typeof row.status === "string" ? { status: row.status } : {}),
-            ...(typeof row.carrier_slug === "string" ? { carrier_slug: row.carrier_slug } : {}),
-            ...(typeof row.updated_at === "string" ? { updated_at: row.updated_at } : {}),
-          }];
+          const projectedStatus =
+            typeof row.status === "string"
+              ? publicShipmentStatus(
+                  row.status,
+                  typeof order.status === "string" ? order.status : "paid",
+                )
+              : null;
+          return [
+            {
+              id: row.id,
+              ...(typeof row.tracking_number === "string"
+                ? { tracking_number: formatTrackingNumber(row.tracking_number) }
+                : {}),
+              ...(projectedStatus ? { status: projectedStatus.status } : {}),
+              ...(projectedStatus?.quality === "unknown"
+                ? { status_quality: "unknown" as const }
+                : {}),
+              ...(typeof row.carrier_slug === "string"
+                ? { carrier_slug: row.carrier_slug }
+                : {}),
+              ...(typeof row.updated_at === "string"
+                ? { updated_at: row.updated_at }
+                : {}),
+              ...(typeof row.source === "string"
+                ? { source: publicShipmentSource(row.source) }
+                : {}),
+              ...(typeof row.expected_delivery === "string"
+                ? { expected_delivery: row.expected_delivery }
+                : {}),
+              ...(() => {
+                const carrierSlug =
+                  typeof row.carrier_slug === "string"
+                    ? row.carrier_slug
+                    : undefined;
+                const trackingNumber =
+                  typeof row.tracking_number === "string"
+                    ? formatTrackingNumber(row.tracking_number)
+                    : undefined;
+                const trackingUrl = buildCarrierTrackingUrl(
+                  carrierSlug,
+                  trackingNumber,
+                );
+                return trackingUrl ? { tracking_url: trackingUrl } : {};
+              })(),
+            },
+          ];
         })
       : [];
     return {
@@ -81,15 +147,24 @@ export async function fetchWorkerTrackByToken(
       status: response.status,
       data: {
         order: {
-          ...(typeof body.order.order_number === "string" ? { order_number: body.order.order_number } : {}),
-          ...(typeof body.order.status === "string" ? { status: body.order.status } : {}),
-          ...(typeof body.order.updated_at === "string" ? { updated_at: body.order.updated_at } : {}),
+          ...(typeof body.order.order_number === "string"
+            ? { order_number: body.order.order_number }
+            : {}),
+          ...(typeof body.order.status === "string"
+            ? { status: body.order.status }
+            : {}),
+          ...(typeof body.order.updated_at === "string"
+            ? { updated_at: body.order.updated_at }
+            : {}),
         },
         shipments,
+        ...(body.orderSummary ? { orderSummary: body.orderSummary } : {}),
         ...(options.includeConfirmation && body.confirmationOrder
           ? { confirmationOrder: body.confirmationOrder }
           : {}),
-        ...(body.capabilityScope ? { capabilityScope: body.capabilityScope } : {}),
+        ...(body.capabilityScope
+          ? { capabilityScope: body.capabilityScope }
+          : {}),
       },
     };
   } catch {
@@ -169,15 +244,24 @@ function shipmentUpdatedAt(
 
 function recordArray(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value)
-    ? value.filter(
-        (row): row is Record<string, unknown> =>
-          Boolean(row && typeof row === "object" && !Array.isArray(row)),
+    ? value.filter((row): row is Record<string, unknown> =>
+        Boolean(row && typeof row === "object" && !Array.isArray(row)),
       )
     : [];
 }
 
-function publicShipmentStatus(value: unknown, fallback: string): string {
-  return normalizeShipmentEventStatus(value) ?? fallback;
+function publicShipmentStatus(
+  value: unknown,
+  fallback: string,
+): { status: string; quality: "known" | "unknown" } {
+  const normalized = normalizeShipmentEventStatus(value);
+  if (normalized) return { status: normalized, quality: "known" };
+  // Never allow an opaque provider status to inherit a terminal delivered
+  // projection. The provider must reconcile before delivery is customer-visible.
+  return {
+    status: fallback === "delivered" ? "shipped" : fallback,
+    quality: "unknown",
+  };
 }
 
 export type ConfirmationOrder = PublicTrackOrder & {
@@ -453,9 +537,7 @@ export function mapMedusaOrderToTrack(
         ? orderMeta.jnt_expected_delivery
         : null;
 
-  const primaryMetadataShipments = recordArray(
-    orderMeta.pancake_pos_shipments,
-  );
+  const primaryMetadataShipments = recordArray(orderMeta.pancake_pos_shipments);
   const metadataShipments =
     primaryMetadataShipments.length > 0
       ? primaryMetadataShipments
@@ -468,13 +550,17 @@ export function mapMedusaOrderToTrack(
         typeof shipment.carrier_slug === "string"
           ? shipment.carrier_slug
           : undefined;
+      const projectedStatus = publicShipmentStatus(
+        shipment.status,
+        orderTrackStatusFromMedusa(order),
+      );
       addShipment({
         id: String(shipment.id ?? `shipment-${shipmentIndex}`),
         tracking_number: trackingNumber,
-        status: publicShipmentStatus(
-          shipment.status,
-          orderTrackStatusFromMedusa(order),
-        ),
+        status: projectedStatus.status,
+        ...(projectedStatus.quality === "unknown"
+          ? { status_quality: "unknown" as const }
+          : {}),
         carrier_slug: carrierSlug,
         source: publicShipmentSource(shipment.source, carrierSlug),
         updated_at: shipmentUpdatedAt(

@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   AdminBreadcrumbs,
   AdminPageShell,
-  AuditTimeline,
 } from "@/components/admin-console";
 import {
   FulfillmentPanel,
@@ -67,7 +66,6 @@ export default async function OrderDetailPage({
           </Link>
         </div>
       }
-      inspector={<AuditTimeline title="Activity" />}
       footNote={
         <span className="text-on-surface-variant">
           Created {new Date(order.created_at).toLocaleString("en-PH")}

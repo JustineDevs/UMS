@@ -1,8 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { createPortal } from "react-dom";
+import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@universal-music-store/ui";
+import { AlertTriangle, Monitor, PackagePlus, Printer, ScanLine, Store } from "lucide-react";
 
 type Device = {
   id: string;
@@ -42,12 +46,16 @@ const ADAPTER_OPTIONS_BASE = [
 
 const ADAPTER_OPTIONS = ADAPTER_OPTIONS_BASE;
 
-const TYPE_ICONS: Record<string, string> = {
-  terminal: "dock",
-  printer: "print",
-  kds: "monitor",
-  scanner: "qr_code_scanner",
+const TYPE_ICONS = {
+  terminal: Store,
+  printer: Printer,
+  kds: Monitor,
+  scanner: ScanLine,
 };
+
+function ModalPortal({ children }: { children: React.ReactNode }) {
+  return typeof document === "undefined" ? null : createPortal(children, document.body);
+}
 
 function configToEditForm(d: Device): EditForm {
   const c = d.config ?? {};
@@ -93,6 +101,34 @@ function buildConfigPatch(form: EditForm): Record<string, unknown> {
   return out;
 }
 
+function DeviceWorkspaceSkeleton() {
+  return (
+    <section className="space-y-4" aria-label="Loading registered hardware" aria-busy="true">
+      <div className="flex items-center justify-between border-b border-border/60 pb-4">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-3 w-full max-w-72" />
+        </div>
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <Card key={index} className="border-border/70 shadow-none">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-10 rounded-lg" />
+                <div className="space-y-2"><Skeleton className="h-4 w-28" /><Skeleton className="h-3 w-16" /></div>
+              </div>
+              <Skeleton className="h-3 w-36" />
+              <Skeleton className="h-8 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function DevicesPageClient() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,15 +139,21 @@ export function DevicesPageClient() {
   const [saving, setSaving] = useState(false);
   const creatingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const fetchDevices = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/devices");
       if (res.ok) {
         const { data } = await res.json();
         setDevices(data ?? []);
+      } else {
+        setError("Device data could not be loaded. Retry to refresh the hardware workspace.");
       }
+    } catch {
+      setError("Device data could not be loaded. Retry to refresh the hardware workspace.");
     } finally {
       setLoading(false);
     }
@@ -121,11 +163,42 @@ export function DevicesPageClient() {
     void fetchDevices();
   }, [fetchDevices]);
 
+  useEffect(() => {
+    if (!showForm && !editing) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (editing) {
+        setEditing(null);
+        setEditForm(null);
+      } else {
+        setShowForm(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [editing, showForm]);
+
+  useEffect(() => {
+    if (!showForm && !editing) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [editing, showForm]);
+
+  function openCreate() {
+    setCreateError(null);
+    setForm({ name: "", type: "terminal", ip_address: "" });
+    setShowForm(true);
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (creatingRef.current) return;
     creatingRef.current = true;
     setError(null);
+    setCreateError(null);
     try {
       const response = await fetch("/api/admin/devices", {
         method: "POST",
@@ -134,10 +207,11 @@ export function DevicesPageClient() {
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Device could not be registered.");
+        setCreateError(body.error ?? "Device could not be registered.");
         return;
       }
       setShowForm(false);
+      setCreateError(null);
       setForm({ name: "", type: "terminal", ip_address: "" });
       void fetchDevices();
     } finally {
@@ -181,37 +255,42 @@ export function DevicesPageClient() {
   return (
     <AdminPageShell
       title="Devices"
-      subtitle="Register and manage POS terminals, printers, and kitchen displays. Printer and adapter settings sync when the device name matches your terminal profile."
+      subtitle={loading ? "Manage active POS terminals, printers, and displays." : `${devices.length} registered hardware ${devices.length === 1 ? "device" : "devices"}`}
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Devices" }]}
         />
       }
       actions={
-        <Button type="button" onClick={() => setShowForm(true)}>
-          <span className="material-symbols-outlined text-base">add</span>
-          Add Device
-        </Button>
+        devices.length > 0 ? (
+          <Button type="button" onClick={openCreate}>
+            <PackagePlus className="size-4" aria-hidden="true" />
+            Add Device
+          </Button>
+        ) : null
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       {error && (
         <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="alert">
           {error}
         </p>
       )}
-      {loading ? (
-        <div className="text-center py-20 text-on-surface-variant text-sm">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {devices.map((d) => (
-            <div key={d.id} className="bg-surface-container-lowest rounded-xl p-6 shadow-sm">
+      {loading ? <DeviceWorkspaceSkeleton /> : (
+        <section aria-labelledby="registered-hardware-title" className="space-y-4 rounded-xl border border-border/70 bg-card p-5 shadow-none sm:p-6">
+          <div className="flex flex-col gap-3 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 id="registered-hardware-title" className="text-sm font-semibold uppercase tracking-[0.14em] text-foreground">Registered hardware</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Monitor POS terminals, receipt printers, and kitchen displays.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {devices.map((d) => (
+            <Card key={d.id} className="border-border/70 shadow-none">
+              <CardContent className="space-y-4 p-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-surface-container-high rounded-lg flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-on-surface-variant">
-                      {TYPE_ICONS[d.type] ?? "devices"}
-                    </span>
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    {(() => { const DeviceIcon = TYPE_ICONS[d.type as keyof typeof TYPE_ICONS] ?? Monitor; return <DeviceIcon className="size-5 text-on-surface-variant" aria-hidden="true" />; })()}
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-bold font-headline text-sm truncate">{d.name}</h3>
@@ -225,7 +304,7 @@ export function DevicesPageClient() {
                   </Button>
                 </div>
               </div>
-              {d.ip_address && <p className="text-xs text-on-surface-variant mt-3">IP: {d.ip_address}</p>}
+              {d.ip_address && <p className="mt-3 text-xs text-on-surface-variant">IP: {d.ip_address}</p>}
               {d.last_seen_at && (
                 <p className="text-[10px] text-on-surface-variant mt-1">
                   Last seen: {new Date(d.last_seen_at).toLocaleString()}
@@ -233,46 +312,78 @@ export function DevicesPageClient() {
               )}
               {isStaleDevice(d.last_seen_at) && (
                 <div className="mt-2 flex items-center gap-1.5 rounded bg-amber-50 border border-amber-200 px-2.5 py-1">
-                  <span className="material-symbols-outlined text-xs text-amber-600">warning</span>
+                  <AlertTriangle className="size-3 text-amber-600" aria-hidden="true" />
                   <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
                     Device inactive ({">"}15 min)
                   </p>
                 </div>
               )}
-            </div>
+              </CardContent>
+            </Card>
           ))}
           {devices.length === 0 && (
-            <div className="col-span-full text-center py-20 text-sm text-on-surface-variant">
-              No devices registered. Add your first device above.
+            <div className="col-span-full flex min-h-64 flex-col items-center justify-center px-6 py-10 text-center">
+              <div className="mb-4 grid size-12 place-items-center rounded-full bg-muted text-muted-foreground"><Monitor className="size-6" aria-hidden="true" /></div>
+              <h3 className="text-base font-semibold text-foreground">No registered devices</h3>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">Connect your first POS terminal or printer to start monitoring your hardware.</p>
+              <Button type="button" size="sm" className="mt-5 gap-2" onClick={openCreate}><PackagePlus className="size-4" aria-hidden="true" />Link first device</Button>
             </div>
           )}
-        </div>
+          </div>
+        </section>
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Add Device</h2>
-            <input aria-label="Device name" required placeholder="Device name (e.g. Terminal 01)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <select aria-label="Device type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
-              <option value="terminal">Terminal</option>
-              <option value="printer">Printer</option>
-              <option value="kds">Kitchen Display</option>
-              <option value="scanner">Scanner</option>
-            </select>
-            <input aria-label="IP address" placeholder="IP Address (optional)" value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <div className="flex gap-3 justify-end">
+        <ModalPortal>
+        <dialog
+          open
+          tabIndex={-1}
+          className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/50 p-4 sm:p-6"
+          aria-labelledby="add-device-title"
+          aria-describedby="add-device-description"
+          onMouseDown={(event) => {
+            if (!creatingRef.current && event.target === event.currentTarget) setShowForm(false);
+          }}
+          onCancel={(event) => { event.preventDefault(); setShowForm(false); }}
+          onKeyDown={(event) => { if (event.key === "Escape") setShowForm(false); }}
+        >
+          <form onSubmit={handleCreate} className="my-auto flex max-h-[calc(100dvh_-_2rem)] w-full max-w-sm flex-col gap-5 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-2xl sm:p-7">
+            <div className="space-y-1">
+              <h2 id="add-device-title" className="text-xl font-bold font-headline">Add Device</h2>
+              <p id="add-device-description" className="text-sm text-muted-foreground">Register a POS terminal, printer, display, or scanner.</p>
+            </div>
+            {createError ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{createError}</p> : null}
+            <div className="space-y-2">
+              <label htmlFor="add-device-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Device name</label>
+              <input id="add-device-name" autoFocus required placeholder="e.g. Terminal 01" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="add-device-type" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Device type</label>
+              <select id="add-device-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30">
+                <option value="terminal">Terminal</option>
+                <option value="printer">Printer</option>
+                <option value="kds">Kitchen Display</option>
+                <option value="scanner">Scanner</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="add-device-ip" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">IP address <span className="font-normal normal-case tracking-normal">(optional)</span></label>
+              <input id="add-device-ip" inputMode="decimal" placeholder="192.168.1.100" value={form.ip_address} onChange={(e) => setForm({ ...form, ip_address: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button type="submit">Add</Button>
+              <Button type="submit" className="sm:min-w-20">Add</Button>
             </div>
           </form>
-        </div>
+        </dialog>
+        </ModalPortal>
       )}
 
       {editing && editForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <form onSubmit={handleSaveEdit} className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-4 my-8">
-            <h2 className="text-lg font-bold font-headline">Edit device: {editing.name}</h2>
+        <ModalPortal>
+        <dialog open tabIndex={-1} aria-labelledby="edit-device-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6" onCancel={(event) => { event.preventDefault(); setEditing(null); }}>
+          <form onSubmit={handleSaveEdit} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="edit-device-title" className="text-lg font-bold font-headline">Edit device: {editing.name}</h2>
             <label htmlFor="device-edit-ip-address" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">IP address</label>
             <input
               id="device-edit-ip-address"
@@ -353,7 +464,8 @@ export function DevicesPageClient() {
               </Button>
             </div>
           </form>
-        </div>
+        </dialog>
+        </ModalPortal>
       )}
     </AdminPageShell>
   );

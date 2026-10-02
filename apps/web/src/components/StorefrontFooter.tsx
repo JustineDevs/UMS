@@ -9,7 +9,7 @@ import { StorefrontFooterClient } from "./StorefrontFooterClient";
 const defaultColumns = [
   { title: "SHOP", links: [{ label: "All products", href: "/shop" }, { label: "Search", href: "/search" }, { label: "Saved items", href: "/wishlist" }] },
   { title: "SUPPORT", links: [{ label: "Help center", href: "/help" }, { label: "FAQ", href: "/faq" }, { label: "Contact", href: "/contact" }, { label: "Track order", href: "/track" }] },
-  { title: "ACCOUNT", links: [{ label: "Sign in", href: "/login" }, { label: "Register", href: "/register" }, { label: "My account", href: "/account" }] },
+  { title: "ACCOUNT", links: [{ label: "Sign in", href: "/login" }, { label: "Register", href: "/register" }, { label: "My account", href: "/account/profile" }] },
   { title: "POLICIES", links: [{ label: "Shipping", href: "/shipping" }, { label: "Returns", href: "/returns" }, { label: "Terms", href: "/terms" }, { label: "Privacy", href: "/privacy" }, { label: "Cookies", href: "/cookies" }, { label: "Accessibility", href: "/accessibility" }, { label: "Local preferences", href: "/preferences" }, { label: "Site map", href: "/site-map" }] },
 ];
 
@@ -27,9 +27,13 @@ export function StorefrontFooter({
   const columns = cmsFooterColumns?.length
     ? cmsFooterColumns.map((column) => ({
         title: column.title,
-        links: column.links
-          .filter((link) => link.href !== "/collections")
-          .map((link) => ({ label: link.label, href: link.href })),
+        links: column.links.reduce<Array<{ label: string; href: string }>>(
+          (links, link) => {
+            if (link.href !== "/collections") links.push({ label: link.label, href: link.href });
+            return links;
+          },
+          [],
+        ),
       }))
     : defaultColumns;
   const socialLinks: Array<{ label: string; href: string }> = [];

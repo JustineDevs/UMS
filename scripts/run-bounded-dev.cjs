@@ -12,9 +12,9 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const entry = path.join(root, "scripts/dev-worker-first.mjs");
-const memoryMaxMb = integerEnv("UVS_DEV_MEMORY_MAX_MB", 6144, 2048, 32 * 1024);
+const memoryMaxMb = integerEnv("UVS_DEV_MEMORY_MAX_MB", 4096, 2048, 32 * 1024);
 const minAvailableMb = integerEnv("UVS_DEV_MIN_AVAILABLE_MB", 4096, 1024, 32 * 1024);
-const cpuQuota = integerEnv("UVS_DEV_CPU_QUOTA_PERCENT", 200, 100, 800);
+const cpuQuota = integerEnv("UVS_DEV_CPU_QUOTA_PERCENT", 180, 100, 800);
 
 function integerEnv(name, fallback, min, max) {
   const value = Number(process.env[name]);

@@ -19,8 +19,7 @@ export default async function AdminReviewsPage() {
       }
     >
       <p className="mb-6 text-sm text-on-surface-variant">
-        Pending reviews need approval. Only approved reviews are visible publicly. Actions require the{" "}
-        <code className="rounded bg-slate-100 px-1 text-xs">content:write</code> permission.
+        Pending reviews need approval. Only approved reviews are visible publicly.
       </p>
       <ReviewsModerationClient />
     </AdminPageShell>

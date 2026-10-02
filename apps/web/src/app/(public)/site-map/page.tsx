@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 import { fetchProductSlugsForSitemap } from "@/lib/catalog-fetch";
+import {
+  StorefrontCard,
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+} from "@/components/storefront/StorefrontPagePrimitives";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Site map",
@@ -18,7 +23,7 @@ const links: { href: string; label: string }[] = [
   { href: "/checkout", label: "Checkout / bag" },
   { href: "/wishlist", label: "Saved items" },
   { href: "/track", label: "Track order" },
-  { href: "/account", label: "My account" },
+  { href: "/account/profile", label: "My account" },
   { href: "/login", label: "Login" },
   { href: "/register", label: "Register" },
   { href: "/help", label: "Help center" },
@@ -38,19 +43,55 @@ const links: { href: string; label: string }[] = [
 
 export default async function SitemapPage() {
   const productSlugs = await fetchProductSlugsForSitemap(1000);
-  const productLinks = productSlugs.map((slug) => ({ href: `/shop/${encodeURIComponent(slug)}`, label: slug }));
+  const productLinks = productSlugs.map((slug) => ({
+    href: `/shop/${encodeURIComponent(slug)}`,
+    label: slug,
+  }));
   return (
-    <main className="storefront-page-shell max-w-2xl">
-      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">Site map</h1>
-      <p className="mt-3 text-sm text-on-surface-variant">Structured list of main storefront pages.</p>
-      <ul className="mt-8 grid list-none grid-cols-1 gap-2 sm:grid-cols-2">
-        {[...links, ...productLinks].map((l) => (
-          <li key={l.href}>
-            <Link href={l.href} className="text-sm text-primary underline hover:opacity-80">{l.label}</Link>
-            <span className="ml-2 text-xs text-on-surface-variant">{l.href}</span>
-          </li>
-        ))}
-      </ul>
-    </main>
+    <StorefrontPageFrame width="standard">
+      <StorefrontPageHeader
+        title="Site map"
+        description="Browse the storefront by purpose, then open the product catalog when you know what you want."
+      />
+      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+        <StorefrontCard as="div" className="p-5 sm:p-6">
+          <h2 className="font-headline text-lg font-bold text-primary">
+            Storefront pages
+          </h2>
+          <ul className="mt-4 space-y-3">
+            {links.map((l) => (
+              <li key={l.href}>
+                <Link
+                  href={l.href}
+                  className="text-sm font-medium text-primary underline underline-offset-4"
+                >
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </StorefrontCard>
+        <StorefrontCard as="div" className="p-5 sm:p-6">
+          <h2 className="font-headline text-lg font-bold text-primary">
+            Products
+          </h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Browse the current catalog by product page.
+          </p>
+          <ul className="mt-4 space-y-3">
+            {productLinks.map((l) => (
+              <li key={l.href}>
+                <Link
+                  href={l.href}
+                  className="text-sm font-medium text-primary underline underline-offset-4"
+                >
+                  {l.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </StorefrontCard>
+      </div>
+    </StorefrontPageFrame>
   );
 }

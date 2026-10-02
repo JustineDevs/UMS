@@ -46,7 +46,7 @@ packages/
 ├── ui/           # Shared UI primitives
 └── validation/   # Shared validation schemas
 docs/             # Specs, runbooks, ADRs, privacy/terms
-stress-test/      # E2E, release-gate, runtime helpers, and dev orchestration scripts
+scripts/stress-test/      # E2E, release-gate, runtime helpers, and dev orchestration scripts
 ```
 
 ## Development

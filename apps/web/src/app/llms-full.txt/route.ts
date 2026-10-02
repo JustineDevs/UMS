@@ -38,7 +38,7 @@ export async function GET() {
     "## Category index",
     ...((categories.kind === "ok" ? categories.summaries : []).slice(0, 20).flatMap((category) => [
       `### ${category.category}`,
-      `- URL: ${canonicalUrl(`/shop?category=${encodeURIComponent(category.category)}`)}`,
+      `- URL: ${canonicalUrl("/shop")}`,
       `- Active products: ${category.count}`,
       "",
     ])),

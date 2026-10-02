@@ -5,7 +5,8 @@ import {
   isDirectVideoFileUrl,
   normalizeCatalogAssetUrl,
 } from "@/lib/catalog-asset-url";
-import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useMemo, useState } from "react";
 
 type Props = {
   items: string[];
@@ -32,11 +33,12 @@ function MediaThumb({ address }: { address: string }) {
   const kind = inferCatalogGalleryMediaKind(normalized);
   if (kind === "image") {
     return (
-      // Catalog media may be hosted on customer-configured storage/CDN origins.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={normalized}
         alt=""
+        width={56}
+        height={56}
+        unoptimized
         className="h-14 w-14 shrink-0 rounded-md border border-outline-variant/20 object-cover"
       />
     );
@@ -67,16 +69,10 @@ export function CatalogUnifiedMediaList({
   disabled,
 }: Props) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    setSelected((prev) => {
-      const next = new Set<number>();
-      for (const i of prev) {
-        if (i < items.length) next.add(i);
-      }
-      return next;
-    });
-  }, [items.length]);
+  const selectedForItems = useMemo(
+    () => new Set([...selected].filter((index) => index >= 0 && index < items.length)),
+    [selected, items.length],
+  );
 
   const toggle = useCallback((index: number) => {
     setSelected((prev) => {
@@ -88,12 +84,12 @@ export function CatalogUnifiedMediaList({
   }, []);
 
   const selectAll = useCallback(() => {
-    if (selected.size === items.length) {
+    if (selectedForItems.size === items.length) {
       setSelected(new Set());
     } else {
       setSelected(new Set(items.map((_, i) => i)));
     }
-  }, [selected.size, items]);
+  }, [items, selectedForItems.size]);
 
   const move = useCallback(
     (from: number, to: number) => {
@@ -133,8 +129,8 @@ export function CatalogUnifiedMediaList({
   );
 
   const removeSelected = useCallback(() => {
-    if (selected.size === 0) return;
-    const drop = [...selected].sort((a, b) => b - a);
+    if (selectedForItems.size === 0) return;
+    const drop = [...selectedForItems].sort((a, b) => b - a);
     let next = [...items];
     let mc = mainImageCount;
     for (const i of drop) {
@@ -145,7 +141,7 @@ export function CatalogUnifiedMediaList({
     onMainCountChange(mc);
     onItemsChange(next);
     setSelected(new Set());
-  }, [selected, items, mainImageCount, onItemsChange, onMainCountChange]);
+  }, [selectedForItems, items, mainImageCount, onItemsChange, onMainCountChange]);
 
   const moveOneToGallery = useCallback(
     (index: number) => {
@@ -177,8 +173,8 @@ export function CatalogUnifiedMediaList({
     onItemsChange([...items, ""]);
   }, [items, onItemsChange]);
 
-  const selectedCount = selected.size;
-  const allSelected = items.length > 0 && selected.size === items.length;
+  const selectedCount = selectedForItems.size;
+  const allSelected = items.length > 0 && selectedForItems.size === items.length;
 
   const rowRegion = useCallback(
     (index: number): "main" | "gallery" =>
@@ -236,7 +232,7 @@ export function CatalogUnifiedMediaList({
                   <input
                     type="checkbox"
                     className="mt-1 h-4 w-4 rounded border-outline-variant"
-                    checked={selected.has(index)}
+                    checked={selectedForItems.has(index)}
                     onChange={() => toggle(index)}
                     disabled={disabled}
                     aria-label={`Select item ${index + 1}`}
@@ -254,7 +250,7 @@ export function CatalogUnifiedMediaList({
                       </span>
                     ) : null}
                     {region === "gallery" && index === mainImageCount ? (
-                      <span className="rounded bg-secondary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary">
+                      <span className="rounded bg-surface-container-low px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                         First in gallery
                       </span>
                     ) : null}
@@ -301,7 +297,7 @@ export function CatalogUnifiedMediaList({
                     {region === "main" ? (
                       <button
                         type="button"
-                        className="text-[11px] font-semibold text-secondary hover:underline disabled:opacity-50"
+                        className="text-[11px] font-semibold text-primary hover:underline disabled:opacity-50"
                         disabled={disabled || mainImageCount <= 1}
                         onClick={() => moveOneToGallery(index)}
                       >

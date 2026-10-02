@@ -8,7 +8,7 @@ import { verifyWorkerBearerToken } from "./auth.ts";
 export type WishlistEnv = WorkerDatabaseEnv & {
   JWT_SECRET?: string;
   SUPABASE_URL?: string;
-  databaseFactory?: (role: "app" | "medusa") => WorkerDatabaseClient;
+  databaseFactory?: (_role: "app" | "medusa") => WorkerDatabaseClient;
 };
 
 type Row = Record<string, unknown>;
@@ -26,7 +26,7 @@ function json(body: Record<string, unknown>, status = 200): Response {
 async function withDb<T>(
   env: WishlistEnv,
   role: "app" | "medusa",
-  operation: (db: WorkerDatabaseClient) => Promise<T>,
+  operation: (_db: WorkerDatabaseClient) => Promise<T>,
 ): Promise<T> {
   if (!env.databaseFactory) return withWorkerDatabase(env, operation, role);
   const db = env.databaseFactory(role);
@@ -162,7 +162,12 @@ export async function handleWishlistRequest(
       requested.length !== (input.items as unknown[]).length)
   )
     return json({ error: "invalid_wishlist_item" }, 400);
-  const productIds = Array.isArray(requested) ? requested : [requested];
+  // A replayed sync can contain the same local item more than once. Resolve
+  // each canonical identity once and keep the write payload deterministic;
+  // the database conflict clause remains the final concurrent-write guard.
+  const productIds = [
+    ...new Set(Array.isArray(requested) ? requested : [requested]),
+  ];
   return withDb(env, "medusa", async (medusa) => {
     const id = await customerId(medusa, email);
     if (!id) return json({ error: "not_found" }, 404);
@@ -175,8 +180,8 @@ export async function handleWishlistRequest(
       (value) => !products.some((product) => product.id === value),
     );
     return withDb(env, "app", async (app) => {
-      if (request.method === "POST" && products.length) {
-        if (sync) {
+      if (request.method === "POST" && sync) {
+        if (products.length) {
           await app.query(
             `INSERT INTO public.wishlists (medusa_customer_id, product_slug, product_name, medusa_product_id) SELECT x.customer_id, x.product_slug, x.product_name, x.product_id FROM jsonb_to_recordset($1::jsonb) AS x(customer_id text, product_slug text, product_name text, product_id text) ON CONFLICT (medusa_customer_id, medusa_product_id) WHERE medusa_product_id IS NOT NULL DO NOTHING`,
             [
@@ -190,22 +195,20 @@ export async function handleWishlistRequest(
               ),
             ],
           );
-        } else {
-          const product = products[0];
-          await app.query(
-            `INSERT INTO public.wishlists (medusa_customer_id, product_slug, product_name, medusa_product_id) VALUES ($1, $2, $3, $4) ON CONFLICT (medusa_customer_id, medusa_product_id) WHERE medusa_product_id IS NOT NULL DO UPDATE SET product_slug = EXCLUDED.product_slug, product_name = EXCLUDED.product_name, added_at = now()`,
-            [id, product.handle, product.title, product.id],
-          );
         }
-        return json(
-          sync
-            ? {
-                ok: true,
-                items: await canonicalItems(app, medusa, id),
-                skippedProductIds,
-              }
-            : { ok: true },
+        return json({
+          ok: true,
+          items: await canonicalItems(app, medusa, id),
+          skippedProductIds,
+        });
+      }
+      if (request.method === "POST" && products.length) {
+        const product = products[0];
+        await app.query(
+          `INSERT INTO public.wishlists (medusa_customer_id, product_slug, product_name, medusa_product_id) VALUES ($1, $2, $3, $4) ON CONFLICT (medusa_customer_id, medusa_product_id) WHERE medusa_product_id IS NOT NULL DO UPDATE SET product_slug = EXCLUDED.product_slug, product_name = EXCLUDED.product_name`,
+          [id, product.handle, product.title, product.id],
         );
+        return json({ ok: true });
       }
       if (request.method === "DELETE") {
         if (Array.isArray(requested))

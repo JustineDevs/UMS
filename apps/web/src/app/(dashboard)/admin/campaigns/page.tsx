@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { AdminBreadcrumbs, AdminEmptyState, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { createPortal } from "react-dom";
+import { AdminBreadcrumbs, AdminEmptyState, AdminPageShell } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@universal-music-store/ui";
 
 type Campaign = {
   id: string;
@@ -14,6 +16,7 @@ type Campaign = {
   channel: string;
   is_active: boolean;
   last_run_at: string | null;
+  schedule_cron: string | null;
   created_at: string;
 };
 
@@ -30,6 +33,54 @@ const TYPE_LABELS: Record<string, string> = {
   upsell: "Upsell",
   custom: "Custom",
 };
+
+function CampaignMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <Card className="border border-border/70 shadow-none">
+      <CardContent className="space-y-3 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+        <p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+        <p className="text-xs text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CampaignWorkspaceSkeleton() {
+  return (
+    <div className="space-y-6" aria-label="Loading campaign workspace" aria-busy="true">
+      <section aria-label="Campaign overview metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Card key={index} className="border border-border/70 shadow-none">
+            <CardContent className="space-y-3 pt-4">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-3 w-32" />
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+      <Card className="border border-border/70 shadow-none">
+        <CardContent className="space-y-5 pt-5">
+          <div className="flex items-center justify-between border-b border-border/60 pb-4">
+            <Skeleton className="h-5 w-56" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="flex items-center gap-4 border-b border-border/50 pb-5 last:border-0 last:pb-0">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-3 w-3/5" />
+              </div>
+              <Skeleton className="h-8 w-20" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function CampaignsPage() {
   const creatingRef = useRef(false);
@@ -50,6 +101,7 @@ export default function CampaignsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [campRes, segRes] = await Promise.all([
         fetch("/api/admin/campaigns"),
@@ -63,12 +115,26 @@ export default function CampaignsPage() {
         const { data } = await segRes.json();
         setSegments(data ?? []);
       }
+      if (!campRes.ok || !segRes.ok) {
+        setError("Campaign data could not be fully loaded. Retry to refresh the workspace.");
+      }
+    } catch {
+      setError("Campaign data could not be loaded. Retry to refresh the workspace.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowForm(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showForm]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +145,10 @@ export default function CampaignsPage() {
     try {
       const response = await fetch("/api/admin/campaigns", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": `campaign-create-${crypto.randomUUID()}`,
+        },
         body: JSON.stringify({ ...form, segment_id: form.segment_id || null }),
       });
       if (!response.ok) {
@@ -124,7 +193,10 @@ export default function CampaignsPage() {
     setError(null);
     const response = await fetch(`/api/admin/campaigns/${campaign.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `campaign-toggle-${crypto.randomUUID()}`,
+      },
       body: JSON.stringify({ is_active: !campaign.is_active }),
     });
     if (!response.ok) {
@@ -135,16 +207,25 @@ export default function CampaignsPage() {
     await fetchData();
   }
 
+  const activeCampaigns = campaigns.filter((campaign) => campaign.is_active).length;
+  const scheduledCampaigns = campaigns.filter((campaign) => campaign.schedule_cron).length;
+  const latestRun = campaigns
+    .map((campaign) => campaign.last_run_at)
+    .filter((date): date is string => Boolean(date))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  const subtitle = loading
+    ? "Monitor active, scheduled, and recent campaign delivery."
+    : `${activeCampaigns} active · ${scheduledCampaigns} scheduled · ${campaigns.length} total campaigns`;
+
   return (
     <AdminPageShell
       title="Campaigns"
-      subtitle="Automated and manual email campaigns with segment targeting."
+      subtitle={subtitle}
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Campaigns" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
       actions={
         <Button
           size="sm"
@@ -160,60 +241,101 @@ export default function CampaignsPage() {
           {error}
         </p>
       )}
-      {loading ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading...</div>
-      ) : (
-        <div className="grid gap-4">
-          {campaigns.map((c) => {
-            const seg = segments.find((s) => s.id === c.segment_id);
-            return (
-              <Card key={c.id}>
-                <CardContent className="flex items-center gap-6 pt-(--card-spacing)">
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex items-center gap-3">
-                    <h3 className="truncate text-sm font-medium">{c.name}</h3>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
-                      {TYPE_LABELS[c.type] ?? c.type}
-                    </span>
-                    <span className={`h-2 w-2 rounded-full ${c.is_active ? "bg-emerald-500" : "bg-muted-foreground/30"}`} />
+      {loading ? <CampaignWorkspaceSkeleton /> : (
+        <div className="space-y-6">
+          <section aria-labelledby="campaign-overview-title">
+            <div className="mb-3 flex items-baseline justify-between gap-4">
+              <h2 id="campaign-overview-title" className="text-sm font-semibold text-foreground">Campaign overview</h2>
+              <p className="text-xs text-muted-foreground">{latestRun ? `Last activity ${new Date(latestRun).toLocaleDateString()}` : "No sends recorded yet"}</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <CampaignMetric label="Total campaigns" value={String(campaigns.length)} detail="Across all campaign types" />
+              <CampaignMetric label="Active" value={String(activeCampaigns)} detail="Eligible for scheduled runs" />
+              <CampaignMetric label="Scheduled" value={String(scheduledCampaigns)} detail="Configured with a schedule" />
+              <CampaignMetric label="Segments" value={String(segments.length)} detail="Available audience groups" />
+            </div>
+          </section>
+
+          <section aria-labelledby="campaign-list-title">
+            <Card className="border border-border/70 shadow-none">
+              <CardContent className="space-y-5 pt-5">
+                <div className="flex flex-col gap-1 border-b border-border/60 pb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div>
+                    <h2 id="campaign-list-title" className="text-sm font-semibold text-foreground">Campaigns</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">Review audience, delivery state, and manual send actions.</p>
                   </div>
-                  {c.subject && <p className="text-xs text-muted-foreground">Subject: {c.subject}</p>}
-                  {seg && <p className="mt-1 text-xs text-muted-foreground">Segment: {seg.name} ({seg.member_count} members)</p>}
-                  {c.last_run_at && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Last sent: {new Date(c.last_run_at).toLocaleDateString()}
-                    </p>
+                  <span className="text-xs text-muted-foreground">{campaigns.length} {campaigns.length === 1 ? "campaign" : "campaigns"}</span>
+                </div>
+                <div className="space-y-3">
+                  {campaigns.map((campaign) => {
+                    const segment = segments.find((item) => item.id === campaign.segment_id);
+                    return (
+                      <div key={campaign.id} className="flex flex-col gap-4 rounded-lg border border-border/60 p-4 sm:flex-row sm:items-center sm:gap-6">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex items-center gap-3">
+                            <h3 className="truncate text-sm font-medium">{campaign.name}</h3>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
+                              {TYPE_LABELS[campaign.type] ?? campaign.type}
+                            </span>
+                            <span
+                              className={`h-2 w-2 rounded-full ${campaign.is_active ? "bg-emerald-500" : "bg-muted-foreground/30"}`}
+                              aria-label={campaign.is_active ? "Active" : "Paused"}
+                              title={campaign.is_active ? "Active" : "Paused"}
+                            />
+                          </div>
+                          {campaign.subject && <p className="text-xs text-muted-foreground">Subject: {campaign.subject}</p>}
+                          {segment && <p className="mt-1 text-xs text-muted-foreground">Segment: {segment.name} ({segment.member_count} members)</p>}
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {campaign.schedule_cron ? "Scheduled delivery" : "Manual delivery"}
+                            {campaign.last_run_at ? ` · Last sent ${new Date(campaign.last_run_at).toLocaleDateString()}` : " · No sends yet"}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            size="sm"
+                            type="button"
+                            onClick={() => handleExecute(campaign.id)}
+                            disabled={executing === campaign.id || !campaign.segment_id || !campaign.is_active}
+                          >
+                            {executing === campaign.id ? "Sending..." : "Send Now"}
+                          </Button>
+                          <Button size="sm" type="button" variant="outline" onClick={() => void handleToggle(campaign)}>
+                            {campaign.is_active ? "Pause" : "Activate"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {campaigns.length === 0 && (
+                    <AdminEmptyState title="No campaigns yet" description="Create your first campaign to start engaging a customer segment." action={<Button size="sm" onClick={() => setShowForm(true)}>New campaign</Button>} />
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  type="button"
-                  onClick={() => handleExecute(c.id)}
-                  disabled={executing === c.id || !c.segment_id || !c.is_active}
-                >
-                  {executing === c.id ? "Sending..." : "Send Now"}
-                </Button>
-                <Button size="sm" type="button" variant="outline" onClick={() => void handleToggle(c)}>
-                  {c.is_active ? "Pause" : "Activate"}
-                </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-          {campaigns.length === 0 && (
-            <AdminEmptyState title="No campaigns yet" description="Create your first campaign to start engaging a customer segment." action={<Button size="sm" onClick={() => setShowForm(true)}>New campaign</Button>} />
-          )}
+              </CardContent>
+            </Card>
+          </section>
         </div>
       )}
 
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCreate} className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Create Campaign</h2>
+      {showForm && typeof document !== "undefined" ? createPortal(
+        <dialog
+          open
+          className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6"
+          aria-labelledby="create-campaign-title"
+          onCancel={(event) => {
+            event.preventDefault();
+            setShowForm(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setShowForm(false);
+          }}
+          tabIndex={-1}
+        >
+          <form onSubmit={handleCreate} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="create-campaign-title" className="text-lg font-bold font-headline">Create Campaign</h2>
             <label className="block text-xs font-semibold text-on-surface-variant" htmlFor="campaign-name">Campaign name
               <input id="campaign-name" required placeholder="Campaign name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block text-xs font-semibold text-on-surface-variant" htmlFor="campaign-type">Type
               <select id="campaign-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mt-1 w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
                 <option value="custom">Custom</option>
@@ -243,8 +365,9 @@ export default function CampaignsPage() {
               <Button type="submit" disabled={creating}>{creating ? "Creating..." : "Create"}</Button>
             </div>
           </form>
-        </div>
-      )}
+        </dialog>,
+        document.body,
+      ) : null}
     </AdminPageShell>
   );
 }

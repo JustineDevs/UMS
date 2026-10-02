@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import {
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+} from "@/components/storefront/StorefrontPagePrimitives";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Help center",
-  description: "Support links for orders, shipping, returns, accessibility, privacy, and contact.",
+  description:
+    "Support links for orders, shipping, returns, accessibility, privacy, and contact.",
   path: "/help",
   keywords: [...SEO_KEYWORDS.help],
 });
@@ -52,26 +57,25 @@ const cards: { title: string; description: string; href: string }[] = [
   },
   {
     title: "Local preferences",
-    description: "Device-local language, layout, measurement, and motion settings.",
+    description:
+      "Device-local language, layout, measurement, and motion settings.",
     href: "/preferences",
   },
 ];
 
 export default function HelpPage() {
   return (
-    <main className="storefront-page-shell max-w-4xl">
-      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
-        Help center
-      </h1>
-      <p className="mt-3 max-w-prose text-sm leading-relaxed text-on-surface-variant">
-        Links to orders, policies, and account help for this storefront.
-      </p>
-      <ul className="mt-10 grid list-none grid-cols-1 gap-4 sm:grid-cols-2">
+    <StorefrontPageFrame width="standard">
+      <StorefrontPageHeader
+        title="Help center"
+        description="Find quick answers for orders, delivery, returns, account access, and storefront preferences."
+      />
+      <ul className="mt-8 grid list-none grid-cols-1 gap-4 sm:grid-cols-2">
         {cards.map((c) => (
           <li key={c.href}>
             <Link
               href={c.href}
-              className="block h-full rounded-lg border border-outline-variant/25 bg-surface-container-lowest p-6 transition-colors hover:border-primary/40 hover:bg-surface-container-low"
+              className="block h-full rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 shadow-sm transition-colors hover:border-primary/40 hover:bg-surface-container-low"
             >
               <h2 className="font-headline text-lg font-bold text-primary">
                 {c.title}
@@ -79,13 +83,16 @@ export default function HelpPage() {
               <p className="mt-2 text-sm text-on-surface-variant">
                 {c.description}
               </p>
-              <span className="mt-4 inline-block text-xs font-bold uppercase tracking-widest text-primary">
-                Open →
+              <span className="mt-5 inline-flex text-sm font-semibold text-primary">
+                Open{" "}
+                <span aria-hidden="true" className="ml-1">
+                  →
+                </span>
               </span>
             </Link>
           </li>
         ))}
       </ul>
-    </main>
+    </StorefrontPageFrame>
   );
 }

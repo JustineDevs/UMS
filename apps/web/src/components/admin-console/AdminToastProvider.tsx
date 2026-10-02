@@ -40,7 +40,7 @@ export function AdminToastProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed bottom-0 left-72 right-0 z-[60] flex flex-col items-end gap-2 p-4 pb-20 lg:pb-6"
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[60] flex flex-col items-end gap-2 p-4 pb-20 lg:left-72 lg:pb-6"
         aria-live="polite"
       >
         {toasts.map((t) => (

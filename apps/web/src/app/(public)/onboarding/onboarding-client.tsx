@@ -44,6 +44,7 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
   useEffect(() => {
     if (status !== "authenticated") return;
     const controller = new AbortController();
+    let disposed = false;
     void fetch("/api/account/profile/status", {
       credentials: "same-origin",
       cache: "no-store",
@@ -59,7 +60,7 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
             shippingAddresses: StorefrontShippingAddress[];
           };
         };
-        if (controller.signal.aborted) return;
+        if (disposed || controller.signal.aborted) return;
         if (j.complete) {
           router.replace(nextPath);
           return;
@@ -83,9 +84,12 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
         setHydrated(true);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setHydrated(true);
+        if (!disposed && !controller.signal.aborted) setHydrated(true);
       });
-    return () => controller.abort();
+    return () => {
+      disposed = true;
+      controller.abort();
+    };
   }, [status, router, nextPath, session?.user?.name]);
 
   async function submit(e: React.FormEvent) {
@@ -218,7 +222,7 @@ export function OnboardingClient({ nextPath }: { nextPath: string }) {
         </button>
         <p className="text-center text-xs text-on-surface-variant">
           You can update these anytime under{" "}
-          <Link href="/account" className="text-primary underline">
+          <Link href="/account/profile" className="text-primary underline">
             Account
           </Link>
           .

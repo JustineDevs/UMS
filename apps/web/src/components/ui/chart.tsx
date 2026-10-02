@@ -191,14 +191,13 @@ function ChartTooltipContent({
     >
       {!nestLabel ? tooltipLabel : null}
       <div className="grid gap-1.5">
-        {payload
-          .filter((item) => item.type !== "none")
-          .map((item, index) => {
+        {payload.reduce<React.ReactNode[]>((items, item, index) => {
+          if (item.type === "none") return items
             const key = `${nameKey ?? item.name ?? item.dataKey ?? "value"}`
             const itemConfig = getPayloadConfigFromPayload(config, item, key)
             const indicatorColor = color ?? item.payload?.fill ?? item.color
 
-            return (
+            items.push(
               <div
                 key={key}
                 className={cn(
@@ -258,7 +257,8 @@ function ChartTooltipContent({
                 )}
               </div>
             )
-          })}
+            return items
+          }, [])}
       </div>
     </div>
   )

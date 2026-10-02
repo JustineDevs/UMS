@@ -1,10 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Menu, Search } from "lucide-react";
 import { AdminCommandPalette } from "@/components/AdminCommandPalette";
 import { AdminPreferenceSync } from "@/components/AdminPreferenceSync";
 import { AdminToastProvider } from "@/components/admin-console";
 import { AdminSidebar } from "@/components/AdminSidebar";
+
+function cn(...parts: Array<string | false | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
 
 export function AdminDashboardChrome({
   children,
@@ -17,6 +22,7 @@ export function AdminDashboardChrome({
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const closeNav = useCallback(() => setMobileNavOpen(false), []);
 
@@ -39,6 +45,16 @@ export function AdminDashboardChrome({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileNavOpen, closeNav]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1023px)");
+    const resetForMobile = () => {
+      if (media.matches) setSidebarCollapsed(false);
+    };
+    resetForMobile();
+    media.addEventListener("change", resetForMobile);
+    return () => media.removeEventListener("change", resetForMobile);
+  }, []);
 
   useEffect(() => {
     if (mobileNavOpen) {
@@ -70,7 +86,7 @@ export function AdminDashboardChrome({
             aria-controls="admin-sidebar-nav"
             aria-label="Open navigation menu"
           >
-            <span className="material-symbols-outlined text-2xl">menu</span>
+            <Menu aria-hidden="true" className="size-5" />
           </button>
           <span className="ml-3 truncate text-sm font-semibold text-primary">Back office</span>
         </div>
@@ -81,7 +97,7 @@ export function AdminDashboardChrome({
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-200"
           aria-label="Open search"
         >
-          <span className="material-symbols-outlined text-2xl">search</span>
+          <Search aria-hidden="true" className="size-5" />
         </button>
       </header>
 
@@ -99,9 +115,11 @@ export function AdminDashboardChrome({
         onNavigate={closeNav}
         onOpenSearch={() => setCommandOpen(true)}
         localAuthBypass={localAuthBypass}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
       />
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden pt-14 lg:ml-72 lg:pt-0">
+      <div data-admin-content className={cn("flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden pt-14 transition-[margin] duration-200 lg:pt-0", sidebarCollapsed ? "lg:ml-[4.5rem]" : "lg:ml-80")}>
         <AdminToastProvider>{children}</AdminToastProvider>
       </div>
     </div>

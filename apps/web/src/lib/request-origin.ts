@@ -44,7 +44,7 @@ function isConfiguredPublicOrigin(origin: URL): boolean {
   }
 }
 
-export function forwardedRequestOrigin(req: Request): string | null {
+function forwardedRequestOrigin(req: Request): string | null {
   if (process.env.NODE_ENV !== "production" && process.env.VERCEL !== "1") {
     return null;
   }

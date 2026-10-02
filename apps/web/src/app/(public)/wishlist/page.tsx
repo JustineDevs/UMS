@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { WishlistPageClient } from "@/components/WishlistPageClient";
+import {
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+} from "@/components/storefront/StorefrontPagePrimitives";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -12,14 +16,15 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function WishlistPage() {
   return (
-    <main className="storefront-page-shell max-w-5xl">
-      <div className="flex flex-col justify-between gap-4 border-b border-outline-variant/25 pb-8 sm:flex-row sm:items-end">
-        <div><h1 className="font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">Saved items</h1><p className="mt-2 text-sm text-on-surface-variant">Keep products you want close.</p></div>
-        <p className="max-w-sm text-sm leading-6 text-on-surface-variant">{`Save products, share your list, and add available items to your bag.`}</p>
-      </div>
-      <div className="mt-10">
+    <StorefrontPageFrame>
+      <StorefrontPageHeader
+        title="Saved items"
+        description="Keep products you want close."
+        aside="Save products, share your list, and add available items to your bag."
+      />
+      <div className="mt-8">
         <WishlistPageClient />
       </div>
-    </main>
+    </StorefrontPageFrame>
   );
 }

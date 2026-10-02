@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Button } from "@universal-music-store/ui";
 
 export type AdminEmptyStateProps = {
   title: string;
@@ -38,13 +39,13 @@ export function AdminErrorState({ title, detail, onRetry }: AdminErrorStateProps
       <p className="font-semibold">{title}</p>
       {detail ? <p className="mt-2 text-muted-foreground">{detail}</p> : null}
       {onRetry ? (
-        <button
+        <Button
           type="button"
           onClick={onRetry}
-          className="mt-4 rounded-md bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          className="mt-4 text-xs font-medium"
         >
           Retry
-        </button>
+        </Button>
       ) : null}
     </div>
   );

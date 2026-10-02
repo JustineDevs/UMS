@@ -1,4 +1,4 @@
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import { AdminPreferencesForm } from "@/components/AdminPreferencesForm";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
@@ -10,7 +10,7 @@ export default async function AdminPreferencesPage() {
   return (
     <AdminPageShell
       title="Workspace UI"
-      subtitle="Layout density and default table sizes for this browser. Account name and email are under the profile menu (Preferences) in the sidebar."
+      subtitle="Tune display density, inventory defaults, and accessibility behavior for this browser. These settings apply only to your local admin workspace."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[
@@ -20,7 +20,6 @@ export default async function AdminPreferencesPage() {
           ]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <AdminPreferencesForm />
     </AdminPageShell>

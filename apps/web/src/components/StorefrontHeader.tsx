@@ -1,25 +1,27 @@
 import type { CmsNavigationPayload } from "@universal-music-store/platform-data";
 import { StorefrontNav } from "./StorefrontNav";
-import { StorefrontUtilityBar } from "./StorefrontUtilityBar";
 
 export type StorefrontHeaderSections = {
   announcement?: boolean;
-  utilityBar?: boolean;
   primaryNav?: boolean;
 };
 
+export type StorefrontNavigationSource = "cms" | "empty";
+
 export function StorefrontHeader({
   announcement,
-  navigation: _navigation,
+  navigation,
+  navigationSource = "empty",
   sections,
 }: {
   announcement?: React.ReactNode;
   /** Full CMS navigation (mega menu, mobile links, footer bar). */
   navigation?: CmsNavigationPayload;
-  /** Independently compose the utility and primary navigation sections. */
+  /** Identifies whether visible navigation comes from CMS or safe defaults. */
+  navigationSource?: StorefrontNavigationSource;
+  /** Independently compose the announcement and primary navigation sections. */
   sections?: StorefrontHeaderSections;
 }) {
-  const showUtilityBar = sections?.utilityBar !== false;
   const showPrimaryNav = sections?.primaryNav !== false;
   const showAnnouncement = sections?.announcement !== false;
 
@@ -30,8 +32,9 @@ export function StorefrontHeader({
       data-cms-label="Storefront navbar"
     >
       {showAnnouncement ? announcement : null}
-      {showUtilityBar ? <StorefrontUtilityBar /> : null}
-      {showPrimaryNav ? <StorefrontNav /> : null}
+      {showPrimaryNav ? (
+        <StorefrontNav navigation={navigation} navigationSource={navigationSource} />
+      ) : null}
     </header>
   );
 }

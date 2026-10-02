@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { readResponseJson } from "@/lib/read-response-json";
 
 type Channel =
   | "email"
@@ -14,38 +15,16 @@ type Preference = {
   consent_status?: "subscribed" | "unsubscribed";
 };
 
-const channels: Array<{ id: Channel; title: string; description: string }> = [
-  {
-    id: "email",
-    title: "Newsletter",
-    description: "New releases, restocks, and store updates.",
-  },
-  {
-    id: "order_updates",
-    title: "Order updates",
-    description: "Order confirmation, delivery, and status messages.",
-  },
-  {
-    id: "back_in_stock",
-    title: "Back in stock",
-    description: "Alerts when a subscribed product becomes available.",
-  },
-  {
-    id: "promotions",
-    title: "Promotions",
-    description: "Sale alerts and campaign offers.",
-  },
-  {
-    id: "wallet",
-    title: "Wallet updates",
-    description: "Loyalty balance, credits, and wallet activity.",
-  },
-  {
-    id: "platform_updates",
-    title: "Store updates",
-    description: "Important service and account announcements.",
-  },
-];
+function responseErrorMessage(payload: unknown, fallback: string) {
+  const error =
+    payload && typeof payload === "object" && "error" in payload
+      ? (payload as { error?: unknown }).error
+      : undefined;
+  if (error === "invalid_worker_response" || error === "worker_unavailable") {
+    return "Communication preferences are temporarily unavailable. Please try again shortly.";
+  }
+  return typeof error === "string" && error.trim() ? error : fallback;
+}
 
 export function AccountMarketingPreferencesPanel({
   headingId = "account-marketing-preferences-heading",
@@ -67,13 +46,12 @@ export function AccountMarketingPreferencesPanel({
 
   useEffect(() => {
     const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     fetch("/api/account/marketing-preferences", { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json();
+        const payload = await readResponseJson(response, {} as Record<string, unknown>);
         if (!response.ok)
-          throw new Error(
-            payload.error || "Unable to load communication preferences.",
-          );
+          throw new Error(responseErrorMessage(payload, "Unable to load communication preferences."));
         const rows = Array.isArray(payload.preferences)
           ? payload.preferences
           : payload.preference
@@ -94,12 +72,17 @@ export function AccountMarketingPreferencesPanel({
         if (controller.signal.aborted) return;
         setMessage(
           error instanceof Error
-            ? error.message
+            ? error.name === "AbortError"
+              ? "Communication preferences are temporarily unavailable. Please try again shortly."
+              : error.message
             : "Unable to load communication preferences.",
         );
         setState("error");
       });
-    return () => controller.abort();
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
   }, []);
 
   async function update(channel: Channel, next: boolean) {
@@ -107,17 +90,18 @@ export function AccountMarketingPreferencesPanel({
     setPreferences((current) => ({ ...current, [channel]: next }));
     setState("saving");
     setMessage("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
     try {
       const response = await fetch("/api/account/marketing-preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel, subscribed: next }),
+        signal: controller.signal,
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response, {} as Record<string, unknown>);
       if (!response.ok)
-        throw new Error(
-          payload.error || "Unable to save communication preferences.",
-        );
+        throw new Error(responseErrorMessage(payload, "Unable to save communication preferences."));
       setState("ready");
       setMessage("Communication preferences saved.");
     } catch (error: unknown) {
@@ -125,56 +109,67 @@ export function AccountMarketingPreferencesPanel({
       setState("error");
       setMessage(
         error instanceof Error
-          ? error.message
+          ? error.name === "AbortError"
+            ? "Communication preferences are temporarily unavailable. Please try again shortly."
+            : error.message
           : "Unable to save communication preferences.",
       );
+    } finally {
+      clearTimeout(timeout);
     }
+  }
+
+  function preferenceRow(
+    key: string,
+    title: string,
+    description: string,
+    subscribed: boolean,
+    onToggle: () => void,
+    disabled = false,
+  ) {
+    return (
+      <div key={key} className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
+        <div>
+          <h4 className="text-sm font-semibold text-primary">{title}</h4>
+          <p className="mt-1 max-w-xl text-xs leading-5 text-on-surface-variant">{description}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-label={`${subscribed ? "Disable" : "Enable"} ${title}`}
+          aria-checked={subscribed}
+          disabled={disabled || state === "loading" || state === "saving"}
+          onClick={onToggle}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${subscribed ? "justify-end bg-emerald-500" : "justify-start bg-outline-variant/40"}`}
+        >
+          <span aria-hidden="true" className="mx-0.5 size-5 rounded-full bg-white shadow-sm" />
+        </button>
+      </div>
+    );
   }
 
   return (
     <div>
-      <div>
-        <h3 id={headingId} className="text-sm font-semibold text-primary">
-          Notifications
-        </h3>
-        <p className="mt-1 max-w-xl text-xs leading-5 text-on-surface-variant">
-          Choose the updates you want to receive. You can change these at any
-          time.
-        </p>
-      </div>
-      <div className="mt-5 divide-y divide-outline-variant/15">
-        {channels.map((channel) => {
-          const subscribed = preferences[channel.id];
-          return (
-            <div
-              key={channel.id}
-              className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0"
-            >
-              <div>
-                <h4 className="text-sm font-semibold text-primary">
-                  {channel.title}
-                </h4>
-                <p className="mt-1 max-w-xl text-xs leading-5 text-on-surface-variant">
-                  {channel.description}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-label={`${subscribed ? "Disable" : "Enable"} ${channel.title}`}
-                aria-checked={subscribed}
-                disabled={state === "loading" || state === "saving"}
-                onClick={() => void update(channel.id, !subscribed)}
-                className={`relative inline-flex min-h-11 min-w-20 shrink-0 items-center rounded-full border px-2 text-xs font-semibold transition disabled:opacity-60 ${subscribed ? "justify-end border-primary bg-primary text-on-primary" : "justify-start border-outline-variant/40 bg-surface-container-low text-on-surface-variant"}`}
-              >
-                <span
-                  aria-hidden="true"
-                  className="size-7 rounded-full bg-surface-container-lowest shadow-sm"
-                />
-              </button>
+      <div className="divide-y divide-outline-variant/15">
+        <section className="pb-5" aria-labelledby={`${headingId}-email`}>
+          <div className="flex items-start justify-between gap-4 border-b border-outline-variant/15 pb-4">
+            <div>
+              <h3 id={`${headingId}-email`} className="text-lg font-semibold text-primary">Email Notifications</h3>
+              <p className="mt-1 text-xs text-on-surface-variant">Important account notifications and reminders cannot be turned off</p>
             </div>
-          );
-        })}
+            <span className="relative inline-flex h-6 w-11 shrink-0 items-center justify-end rounded-full bg-emerald-500" aria-label="Email notifications enabled">
+              <span className="mx-0.5 size-5 rounded-full bg-white shadow-sm" />
+            </span>
+          </div>
+          <div className="mt-2 pl-5">
+            {preferenceRow("email-newsletters", "Newsletters", "New releases, restocks, and store updates", preferences.email, () => void update("email", !preferences.email))}
+            {preferenceRow("email-order-updates", "Order Updates", "Updates on shipping and delivery status of all orders", preferences.order_updates, () => void update("order_updates", !preferences.order_updates), true)}
+            {preferenceRow("email-promotions", "Promotions", "Exclusive updates on upcoming deals and campaigns", preferences.promotions, () => void update("promotions", !preferences.promotions))}
+            {preferenceRow("back-in-stock", "Back-in-stock alerts", "Get notified when a saved product becomes available again", preferences.back_in_stock, () => void update("back_in_stock", !preferences.back_in_stock))}
+            {preferenceRow("wallet-updates", "Wallet updates", "Receive updates about wallet activity and account credits", preferences.wallet, () => void update("wallet", !preferences.wallet))}
+            {preferenceRow("platform-updates", "Platform updates", "Hear about important storefront changes and service updates", preferences.platform_updates, () => void update("platform_updates", !preferences.platform_updates))}
+          </div>
+        </section>
       </div>
       <p
         className="mt-3 text-xs text-on-surface-variant"

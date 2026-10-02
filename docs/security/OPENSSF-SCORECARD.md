@@ -55,3 +55,28 @@ gh workflow run scorecard-analysis.yml --repo JustineDevs/UMS --ref main
 
 The repository must have Code Scanning available for SARIF upload. Review
 findings under **Security → Code scanning alerts** and the workflow artifact.
+
+## Current verification note (2026-10-02)
+
+The current checkout scan completed with an aggregate score of 9.6/10. It
+reported 21/21 GitHub actions and 9/9 third-party actions pinned, least-
+privilege workflow tokens, a linked `SECURITY.md`, and zero dependency
+vulnerabilities. Its only deductions are Docker/npm pin warnings inside the
+ignored `node_modules/jsbarcode` package; they are not repository-owned source
+or workflow files. Re-running the same checks from a source-only checkout
+that excludes ignored dependency artifacts produces 10.0/10.
+
+An authenticated scan of `github.com/JustineDevs/UMS` was also run against the
+remote default branch. It currently reports 0.8/10 for the focused checks and
+26 vulnerabilities because that branch still contains the older workflow
+permissions/action references and dependency graph. The full remote scan was
+5.0/10. The local hardening changes are therefore verified in this checkout
+but are not represented in GitHub's remote score until the branch is merged or
+otherwise updated. Governance controls such as branch protection, code-review
+approvals, CII registration, fuzzing, and release/publishing policy remain
+GitHub repository settings or project-governance work rather than local code
+fixes.
+
+These results must not be presented as a remote production approval. Re-run
+both the local checkout scan and the authenticated remote scan after the
+default branch is updated.

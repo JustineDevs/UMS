@@ -9,7 +9,7 @@ type Props = {
 export function ShopFilterGroup({ title, children, defaultOpen = false }: Props) {
   return (
     <details open={defaultOpen} className="group/filter">
-      <summary className="mb-6 flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-bold uppercase tracking-[0.2em] text-primary [&::-webkit-details-marker]:hidden">
+      <summary className="mb-3 flex min-h-11 cursor-pointer list-none items-center justify-between text-sm font-bold uppercase tracking-[0.2em] text-primary [&::-webkit-details-marker]:hidden lg:min-h-9">
         <h2>
           {title}
         </h2>

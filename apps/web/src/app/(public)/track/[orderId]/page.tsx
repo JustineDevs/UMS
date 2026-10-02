@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   resolveOpaqueTrackingCapabilityDetails,
-  sanitizeTrustedPublicUrl,
   type ResolvedTrackingCapability,
 } from "@universal-music-store/sdk";
 import {
@@ -16,7 +15,14 @@ import {
 import { buildCartResumeHref } from "@/lib/cart-session-boundary";
 import { decodeTrackingPathSegment } from "@/lib/tracking-link-resolve";
 import { TrackingAutoRefresh } from "@/components/TrackingAutoRefresh";
+import { PrintReceiptButton } from "@/components/PrintReceiptButton";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
+import {
+  StorefrontCard,
+  StorefrontLinkButton,
+  StorefrontPageHeader,
+  StorefrontStatus,
+} from "@/components/storefront/StorefrontPagePrimitives";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -30,7 +36,36 @@ export const metadata: Metadata = buildPageMetadata({
   referrer: "no-referrer",
 });
 
-const STATUS_STEPS = ["pending_payment", "paid", "ready_to_ship", "shipped", "delivered"];
+const STATUS_STEPS = [
+  "pending_payment",
+  "paid",
+  "ready_to_ship",
+  "shipped",
+  "delivered",
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  pending_payment: "Payment pending",
+  paid: "Paid",
+  ready_to_ship: "Ready to ship",
+  shipped: "Shipped",
+  delivered: "Delivered",
+};
+
+function formatMoney(value: number | undefined, currency = "PHP") {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value ?? 0);
+}
+
+function formatStatus(value: string | undefined) {
+  return (
+    STATUS_LABELS[value ?? ""] ?? value?.replace(/_/g, " ") ?? "Order update"
+  );
+}
 
 async function fetchPublicTrack(
   capability: ResolvedTrackingCapability,
@@ -60,7 +95,7 @@ export default async function TrackPage({
 
   if (!hasValidToken) {
     return (
-      <main className="storefront-page-shell max-w-2xl text-center">
+      <main className="storefront-page-shell max-w-3xl text-center">
         <h1 className="font-headline text-2xl font-bold text-primary mb-4">
           Tracking link incomplete
         </h1>
@@ -81,12 +116,9 @@ export default async function TrackPage({
           </Link>{" "}
           for a new tracking link.
         </p>
-        <Link
-          href="/shop"
-          className="inline-flex min-h-11 items-center bg-primary text-on-primary px-6 py-2.5 rounded font-medium hover:opacity-90"
-        >
+        <StorefrontLinkButton href="/shop" variant="primary">
           Continue shopping
-        </Link>
+        </StorefrontLinkButton>
       </main>
     );
   }
@@ -124,9 +156,9 @@ export default async function TrackPage({
             Support reference: {correlationId}
           </p>
         ) : null}
-        <Link href="/contact?topic=tracking" className="text-primary underline">
+        <StorefrontLinkButton href="/contact?topic=tracking">
           Contact support
-        </Link>
+        </StorefrontLinkButton>
       </main>
     );
   }
@@ -146,9 +178,9 @@ export default async function TrackPage({
             Support reference: {correlationId}
           </p>
         ) : null}
-        <Link href="/track" className="text-primary underline">
+        <StorefrontLinkButton href="/track">
           Back to track order
-        </Link>
+        </StorefrontLinkButton>
       </main>
     );
   }
@@ -163,22 +195,20 @@ export default async function TrackPage({
           We could not find a matching order. Check your order number, tracking
           code, and link from your confirmation email.
         </p>
-        <Link
-          href="/shop"
-          className="inline-flex min-h-11 items-center bg-primary text-on-primary px-6 py-2.5 rounded font-medium hover:opacity-90"
-        >
+        <StorefrontLinkButton href="/shop" variant="primary">
           Continue shopping
-        </Link>
+        </StorefrontLinkButton>
       </main>
     );
   }
 
-  const { order, shipments } = data;
+  const { order, shipments, orderSummary } = data;
   const cartResumeHref = orderId.startsWith("cart_")
     ? buildCartResumeHref(orderId)
     : null;
   // Never render the decrypted commerce identifier when the display reference is absent.
   const displayRef = order.order_number ?? "your order";
+  const displayNumber = displayRef.replace(/^order\s*#?/i, "").trim() || displayRef;
   const freshness = trackFreshness(order.updated_at);
 
   const currentIndex =
@@ -186,181 +216,309 @@ export default async function TrackPage({
       ? STATUS_STEPS.indexOf(String(order.status))
       : 0;
 
+  const summaryItems = orderSummary?.items ?? [];
+  const address = orderSummary?.shipping_address;
+  const statusValue = String(order.status ?? "");
+  const statusLabel = formatStatus(statusValue);
+
   return (
-    <main className="storefront-page-shell max-w-2xl">
-      <Link
-        href="/account"
-        className="text-sm text-on-surface-variant hover:text-primary mb-8 inline-block"
-      >
-        Back to account
-      </Link>
-
-      <h1 className="font-headline text-4xl font-extrabold tracking-tighter text-primary mb-2">
-        Order {displayRef}
-      </h1>
-      <p
-        className="font-body text-on-surface-variant mb-12"
-        role="status"
-        aria-live="polite"
-      >
-        Status: {(order.status as string)?.replace(/_/g, " ") ?? "Unknown"}
-        {order.updated_at ? (
-          <>
-            {" "}
-            · Updated{" "}
-            <time dateTime={order.updated_at}>
-              {new Date(order.updated_at).toLocaleString("en-PH")}
-            </time>
-          </>
-        ) : (
-          ""
-        )}
-        {freshness === "stale" ? " · Status may be out of date" : ""}
-      </p>
-      <TrackingAutoRefresh />
-
-      {String(order.status) === "pending_payment" &&
-        cartResumeHref && (
-          <div className="mb-8 rounded-lg border border-outline-variant/30 bg-surface-container-lowest p-4">
-            <p className="text-sm text-on-surface-variant mb-3">
-              Payment not completed yet. Open checkout on this device using the
-              same cart (for example after switching from another browser).
-            </p>
+    <main className="storefront-page-shell storefront-content-wide max-w-[1440px] bg-surface-container-low">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-8">
+        <StorefrontPageHeader
+          eyebrow={
             <Link
-              href={cartResumeHref}
-              className="inline-flex min-h-11 items-center justify-center bg-primary text-on-primary px-5 py-2.5 rounded font-medium text-sm hover:opacity-90"
+              href="/account/profile"
+              className="text-sm font-medium normal-case tracking-normal text-on-surface-variant hover:text-primary"
             >
-              Continue checkout
+              Back to account
             </Link>
-          </div>
-        )}
+          }
+          title={`Order #${displayNumber}`}
+          description={
+            <>
+              <p className="font-semibold text-primary">
+                Your order is saved and we’re keeping you updated.
+              </p>
+              <p role="status" aria-live="polite">
+                {statusLabel}
+                {order.updated_at ? (
+                  <>
+                    {" "}
+                    · Updated{" "}
+                    <time dateTime={order.updated_at}>
+                      {new Date(order.updated_at).toLocaleString("en-PH")}
+                    </time>
+                  </>
+                ) : null}
+                {freshness === "stale" ? " · Status may be out of date" : ""}
+              </p>
+              <TrackingAutoRefresh />
+            </>
+          }
+          aside={
+            <StorefrontLinkButton href="/shop">
+              Continue shopping
+            </StorefrontLinkButton>
+          }
+        />
 
-      <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8 mb-8">
-        <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
-          Progress
-        </h2>
-        <ol
-          className="space-y-6"
-          aria-label="Order progress"
-          aria-live="polite"
-        >
-          {STATUS_STEPS.map((step, i) => {
-            const isComplete = i <= currentIndex;
-            const isCurrent = i === currentIndex;
-            return (
-              <li
-                key={step}
-                className="flex items-center gap-4"
-                aria-current={isCurrent ? "step" : undefined}
+        {statusValue === "pending_payment" ? (
+          <StorefrontCard
+            className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+            role="status"
+          >
+            <div>
+              <h2 className="font-headline text-lg font-bold text-primary">
+                We’re still confirming your payment
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-on-surface-variant">
+                Your order is saved. The payment provider has not sent a final
+                confirmation yet, so we’ll keep checking securely.
+              </p>
+            </div>
+            {cartResumeHref ? (
+              <StorefrontLinkButton href={cartResumeHref} variant="primary">
+                Continue checkout
+              </StorefrontLinkButton>
+            ) : null}
+          </StorefrontCard>
+        ) : null}
+
+        <StorefrontCard aria-labelledby="progress-heading">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2
+                id="progress-heading"
+                className="font-headline text-xl font-bold text-primary"
               >
-                <div
-                  className={`w-4 h-4 rounded-full flex-shrink-0 ${isComplete ? "bg-primary" : "bg-surface-container-high"}`}
-                />
-                <div>
-                  <p
-                    className={`font-medium ${isComplete ? "text-primary" : "text-on-surface-variant"}`}
+                Order progress
+              </h2>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Your order moves through these stages as it is processed.
+              </p>
+            </div>
+            <StorefrontStatus
+              variant={
+                statusValue === "pending_payment" ? "warning" : "neutral"
+              }
+            >
+              {statusLabel}
+            </StorefrontStatus>
+          </div>
+          <ol
+            className="mt-8 grid gap-5 sm:grid-cols-5 sm:gap-0"
+            aria-label="Order progress"
+            aria-live="polite"
+          >
+            {STATUS_STEPS.map((step, i) => {
+              const isComplete = i <= currentIndex;
+              const isCurrent = i === currentIndex;
+              return (
+                <li
+                  key={step}
+                  className="relative flex items-start gap-3 sm:block sm:text-center"
+                  aria-current={isCurrent ? "step" : undefined}
+                >
+                  {i < STATUS_STEPS.length - 1 ? (
+                    <span
+                      aria-hidden="true"
+                      className={`absolute left-3 top-3 hidden h-px w-[calc(100% - 1.5rem)] sm:block ${i < currentIndex ? "bg-primary" : "bg-outline-variant/50"}`}
+                    />
+                  ) : null}
+                  <span
+                    className={`relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full border-2 bg-surface-container-lowest sm:mx-auto ${isComplete ? "border-primary bg-primary text-on-primary" : "border-outline-variant text-on-surface-variant"}`}
+                    aria-hidden="true"
                   >
-                    {step.replace(/_/g, " ")}
-                  </p>
-                  {isCurrent && (
-                    <p className="text-xs text-on-surface-variant mt-0.5">
+                    {isComplete && i < currentIndex ? "✓" : i + 1}
+                  </span>
+                  <span
+                    className={`mt-0.5 block text-sm font-semibold sm:mt-3 ${isComplete ? "text-primary" : "text-on-surface-variant"}`}
+                  >
+                    {STATUS_LABELS[step]}
+                  </span>
+                  {isCurrent ? (
+                    <span className="mt-1 block text-xs text-on-surface-variant sm:px-2">
                       Current step
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+        </StorefrontCard>
 
-      {shipments.length > 0 && (
-        <div className="bg-surface-container-lowest rounded shadow-[0px_20px_40px_rgba(0,0,0,0.02)] p-8">
-          <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary mb-6">
-            Shipments
-          </h2>
-          <div className="space-y-6">
-            {shipments.map((s) => (
-              <article
-                key={s.id}
-                className="border-b border-surface-container-high pb-6 last:border-0 last:pb-0"
-              >
-                {s.tracking_number ? (
-                  sanitizeTrustedPublicUrl(s.tracking_url) ? (
-                    <a
-                      href={
-                        sanitizeTrustedPublicUrl(s.tracking_url) ?? undefined
-                      }
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center font-medium text-primary underline hover:opacity-80"
-                    >
-                      {s.tracking_number}
-                    </a>
-                  ) : (
-                    <p
-                      className="font-medium text-primary"
-                      aria-label={`Tracking number ${s.tracking_number}`}
-                    >
-                      {s.tracking_number}
-                    </p>
-                  )
-                ) : (
-                  <p className="font-medium text-on-surface-variant">
-                    Awaiting tracking
-                  </p>
-                )}
-                <p className="text-sm text-on-surface-variant mt-1">
-                  {s.carrier_slug
-                    ? s.carrier_slug.replace(/-/g, " ").toUpperCase()
-                    : "Carrier"}{" "}
-                  · {s.status?.replace(/_/g, " ") ?? "Pending"}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.8fr)]">
+          <StorefrontCard aria-labelledby="summary-heading">
+            <div className="flex items-end justify-between gap-4 border-b border-outline-variant/40 pb-5">
+              <div>
+                <h2
+                  id="summary-heading"
+                  className="font-headline text-xl font-bold text-primary"
+                >
+                  Order summary
+                </h2>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  The items included in this order.
                 </p>
-                {s.updated_at && (
-                  <p
-                    className="text-xs text-on-surface-variant mt-1"
-                    role="status"
+              </div>
+              <p className="text-right text-sm font-semibold text-primary">
+                {summaryItems.length} item{summaryItems.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            {summaryItems.length ? (
+              <ul
+                className="divide-y divide-outline-variant/30"
+                aria-label="Items in this order"
+              >
+                {summaryItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex gap-4 py-5 first:pt-6 last:pb-2"
                   >
-                    Updated{" "}
-                    <time dateTime={s.updated_at}>
-                      {new Date(s.updated_at).toLocaleString("en-PH")}
-                    </time>
-                    {s.source ? ` · Source: ${s.source}` : ""}
-                    {trackFreshness(s.updated_at) === "stale"
-                      ? " · Status may be out of date"
-                      : ""}
-                  </p>
-                )}
-                {s.expected_delivery && (
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    Estimated delivery:{" "}
-                    <time
-                      dateTime={s.expected_delivery}
-                      className="font-medium text-primary"
+                    <div
+                      className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container-low text-primary"
+                      role={item.thumbnail ? "img" : undefined}
+                      aria-label={item.thumbnail ? item.title || "Order item" : undefined}
+                      style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
                     >
-                      {new Date(s.expected_delivery).toLocaleDateString(
-                        "en-PH",
-                        {
-                          weekday: "short",
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        },
+                      {!item.thumbnail ? <span className="material-symbols-outlined" aria-hidden="true">music_note</span> : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-primary">
+                        {item.title || "Music item"}
+                      </p>
+                      <p className="mt-1 text-sm text-on-surface-variant">
+                        Qty {item.quantity ?? 0}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold tabular-nums text-primary">
+                      {formatMoney(
+                        (item.unit_price ?? 0) * (item.quantity ?? 0),
+                        orderSummary?.currency,
                       )}
-                    </time>
-                  </p>
-                )}
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-8 text-sm text-on-surface-variant">
+                Item details will appear here once the order summary is
+                available.
+              </p>
+            )}
+            <div className="mt-5 flex items-center justify-between border-t border-outline-variant/40 pt-5">
+              <span className="text-sm text-on-surface-variant">Total</span>
+              <strong className="text-xl tabular-nums text-primary">
+                {formatMoney(orderSummary?.total, orderSummary?.currency)}
+              </strong>
+            </div>
+          </StorefrontCard>
 
-      {shipments.length === 0 && order.status !== "pending_payment" && (
-        <p className="text-on-surface-variant text-sm" role="status">
-          No shipment records yet. Tracking will appear when your order ships.
-        </p>
-      )}
+          <StorefrontCard aria-labelledby="delivery-heading">
+            <h2
+              id="delivery-heading"
+              className="font-headline text-xl font-bold text-primary"
+            >
+              Delivery details
+            </h2>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Your delivery information will update as the order moves forward.
+            </p>
+            <dl className="mt-7 flex flex-col gap-5 text-sm">
+              <div>
+                <dt className="font-semibold text-primary">
+                  Shipping destination
+                </dt>
+                <dd className="mt-1 leading-6 text-on-surface-variant">
+                  {address?.city || address?.province
+                    ? [address.city, address.province]
+                        .filter(Boolean)
+                        .join(", ")
+                    : "Address details are being prepared."}
+                  {address?.postal_code ? ` ${address.postal_code}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-primary">Shipment status</dt>
+                <dd className="mt-1 text-on-surface-variant">
+                  {shipments.length
+                    ? `${shipments.length} shipment${shipments.length === 1 ? "" : "s"} created`
+                    : statusValue === "pending_payment"
+                      ? "Waiting for payment confirmation"
+                      : "Preparing your shipment"}
+                </dd>
+              </div>
+            </dl>
+            {shipments.length > 0 ? (
+              <div className="mt-7 border-t border-outline-variant/40 pt-5">
+                <h3 className="text-sm font-semibold text-primary">Tracking</h3>
+                <div className="mt-3 flex flex-col gap-4">
+                  {shipments.map((s) => (
+                    <article key={s.id} className="text-sm">
+                      {s.tracking_number ? (
+                        <p className="font-semibold text-primary">
+                          {s.tracking_number}
+                        </p>
+                      ) : (
+                        <p className="font-medium text-on-surface-variant">
+                          Awaiting tracking number
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {s.carrier_slug
+                          ? s.carrier_slug.replace(/-/g, " ").toUpperCase()
+                          : "Carrier"}{" "}
+                        · {s.status_quality === "unknown"
+                          ? "Status syncing"
+                          : s.status?.replace(/_/g, " ") ?? "Pending"}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+                        {s.status_quality === "unknown" ? (
+                          <span className="font-semibold text-amber-700 dark:text-amber-300">
+                            Carrier status is being reconciled
+                          </span>
+                        ) : null}
+                        {s.source ? <span>Source: {s.source}</span> : null}
+                        {s.expected_delivery ? (
+                          <span>
+                            Expected by <time dateTime={s.expected_delivery}>{s.expected_delivery}</time>
+                          </span>
+                        ) : null}
+                        {trackFreshness(s.updated_at) === "stale" ? (
+                          <span className="font-semibold text-amber-700 dark:text-amber-300">
+                            Update may be out of date
+                          </span>
+                        ) : null}
+                      </div>
+                      {s.tracking_url ? (
+                        <a
+                          href={s.tracking_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-4 hover:opacity-80"
+                        >
+                          Track live shipment
+                          <span className="material-symbols-outlined ml-1 text-base" aria-hidden="true">open_in_new</span>
+                        </a>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </StorefrontCard>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-outline-variant/40 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <Link
+            href="/contact?topic=tracking"
+            className="text-sm font-semibold text-primary underline underline-offset-4 hover:opacity-80"
+          >
+            Need help with this order?
+          </Link>
+          <PrintReceiptButton />
+        </div>
+      </div>
     </main>
   );
 }

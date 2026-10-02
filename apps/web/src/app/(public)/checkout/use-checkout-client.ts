@@ -190,7 +190,7 @@ export function useCheckoutClient({
   );
   const [checkoutAvailabilityStatus, setCheckoutAvailabilityStatus] = useState<
     "loading" | "ready" | "unavailable"
-  >("ready");
+  >("loading");
   const [checkoutUnavailableCode, setCheckoutUnavailableCode] = useState<
     string | null
   >(null);
@@ -199,7 +199,13 @@ export function useCheckoutClient({
   >(null);
 
   const loadCheckoutPaymentMethods = useCallback(async () => {
+    setCheckoutAvailabilityStatus("loading");
     setCheckoutUnavailableCode(null);
+    const markUnavailable = (code: string | null) => {
+      setPayAvailability(resolveCheckoutPaymentAvailability([]));
+      setCheckoutUnavailableCode(code);
+      setCheckoutAvailabilityStatus("unavailable");
+    };
     try {
       const res = await fetch("/api/checkout/available-payment-methods", {
         cache: "no-store",
@@ -210,24 +216,13 @@ export function useCheckoutClient({
           const failure = (await res.json()) as { code?: unknown };
           if (typeof failure.code === "string") failureCode = failure.code;
         } catch {
-          // Preserve the generic fallback when the upstream body is unavailable.
+          // Keep the client-safe generic code when the upstream body is unavailable.
         }
         if (failureCode && isCheckoutHardUnavailableCode(failureCode)) {
-          setPayAvailability(resolveCheckoutPaymentAvailability([]));
-          setCheckoutUnavailableCode(failureCode);
-          setCheckoutAvailabilityStatus("unavailable");
+          markUnavailable(failureCode);
           return;
         }
-        const fallback = resolveCheckoutPaymentAvailability(undefined);
-        setPayAvailability(fallback);
-        setCheckoutAvailabilityStatus(
-          Object.values(fallback.available).some(Boolean)
-            ? "ready"
-            : "unavailable",
-        );
-        setCheckoutUnavailableCode(
-          CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED,
-        );
+        markUnavailable(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
         return;
       }
       const j = (await res.json()) as {
@@ -249,33 +244,13 @@ export function useCheckoutClient({
       }
 
       if (isCheckoutHardUnavailableCode(j.code)) {
-        setPayAvailability(resolveCheckoutPaymentAvailability([]));
-        setCheckoutUnavailableCode(j.code ?? null);
-        setCheckoutAvailabilityStatus("unavailable");
+        markUnavailable(j.code ?? null);
         return;
       }
 
-      const fallback = resolveCheckoutPaymentAvailability(undefined);
-      setPayAvailability(fallback);
-      setCheckoutAvailabilityStatus(
-        Object.values(fallback.available).some(Boolean)
-          ? "ready"
-          : "unavailable",
-      );
-      setCheckoutUnavailableCode(
-        CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED,
-      );
+      markUnavailable(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
     } catch {
-      const fallback = resolveCheckoutPaymentAvailability(undefined);
-      setPayAvailability(fallback);
-      setCheckoutAvailabilityStatus(
-        Object.values(fallback.available).some(Boolean)
-          ? "ready"
-          : "unavailable",
-      );
-      setCheckoutUnavailableCode(
-        CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED,
-      );
+      markUnavailable(CHECKOUT_AVAILABILITY.PAYMENT_METHODS_LOAD_FAILED);
     }
   }, []);
 
@@ -504,6 +479,7 @@ export function useCheckoutClient({
   }, [
     profileGate,
     hydrated,
+    lines,
     checkoutLinesSignature,
     loyaltyPoints,
     email,
@@ -1040,11 +1016,14 @@ export function useCheckoutClient({
         return;
       }
     } catch (e) {
+      if (payAttemptRef.current !== payAttemptId) return;
       setCheckoutPhase("error");
       setError(e instanceof Error ? e.message : "Checkout failed");
     } finally {
-      setLoading(false);
-      payInFlightRef.current = false;
+      if (payAttemptRef.current === payAttemptId) {
+        setLoading(false);
+        payInFlightRef.current = false;
+      }
     }
   }
 

@@ -10,7 +10,7 @@ if (!matrixId || !command || !runtime || !runner || exitCodeRaw === undefined ||
   process.exit(2);
 }
 const exitCode = Number(exitCodeRaw);
-if (!Number.isInteger(exitCode) || exitCode !== 0) throw new Error(`exit-code must be 0, got ${exitCodeRaw}`);
+if (!Number.isInteger(exitCode) || (exitCode !== 0 && result !== "blocked")) throw new Error(`exit-code must be 0, got ${exitCodeRaw}`);
 const parseArray = (value, label) => {
   const parsed = JSON.parse(value);
   if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((item) => typeof item !== "string" || !item.trim())) throw new Error(`${label} must be a non-empty string array`);
@@ -22,7 +22,7 @@ const record = {
   runtime,
   runner,
   exitCode,
-  prerequisites: ["fresh targeted run completed without skip"],
+  prerequisites: [result === "blocked" ? "fresh targeted run attempted; failure recorded as blocked" : "fresh targeted run completed without skip"],
   result,
   observed: parseArray(observedJson, "observed"),
   artifacts: parseArray(artifactsJson, "artifacts"),

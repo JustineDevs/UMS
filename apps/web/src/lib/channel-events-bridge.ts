@@ -37,6 +37,7 @@ export async function fetchRecentChannelEvents(limit = 50): Promise<ChannelEvent
     const response = await fetch(`${base}/api/admin/channels/events?limit=${boundedLimit}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",
+      signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) return [];
     return parseChannelEvents(await readResponseJson(response, {}));

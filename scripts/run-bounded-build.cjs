@@ -1,6 +1,17 @@
 "use strict";
 
 const { spawnSync } = require("node:child_process");
+const { acquire, release } = require("./uvs-runtime-lock.cjs");
+
+try {
+  acquire("build");
+} catch (error) {
+  console.error(`[build] ${error.message}`);
+  process.exit(1);
+}
+process.on("exit", release);
+process.on("SIGINT", () => process.exit(130));
+process.on("SIGTERM", () => process.exit(143));
 
 // Keep production builds below the host's failure point when the desktop,
 // browser, or emulator is already using several gigabytes. Override this

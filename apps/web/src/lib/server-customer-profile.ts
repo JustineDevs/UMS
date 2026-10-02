@@ -1,8 +1,6 @@
 import type { StorefrontShippingAddress } from "@universal-music-store/validation";
-import { createHmac } from "node:crypto";
-import { getStorefrontSession } from "@/lib/auth";
 import { readResponseJson } from "@/lib/read-response-json";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getStorefrontWorkerAuth } from "@/lib/storefront-worker-auth";
 
 export type ServerCustomerProfile = {
   displayName: string | null;
@@ -81,45 +79,6 @@ function workerBaseUrl() {
   return process.env.API_URL?.trim().replace(/\/$/, "") || null;
 }
 
-function internalStorefrontToken(userId: string, email: string): string | null {
-  if (!isLocalE2eProfileEnabled() || process.env.UVS_E2E_REAL_SESSION !== "1")
-    return null;
-  const secret = process.env.JWT_SECRET?.trim();
-  if (!secret) return null;
-  const header = Buffer.from(
-    JSON.stringify({ alg: "HS256", typ: "JWT" }),
-  ).toString("base64url");
-  const now = Math.floor(Date.now() / 1000);
-  const payload = Buffer.from(
-    JSON.stringify({
-      sub: userId,
-      email,
-      scope: "storefront:profile",
-      iss: "uvs.internal",
-      aud: "uvs-worker",
-      iat: now,
-      exp: now + 60,
-    }),
-  ).toString("base64url");
-  const input = `${header}.${payload}`;
-  const signature = createHmac("sha256", secret)
-    .update(input)
-    .digest("base64url");
-  return signature ? `${input}.${signature}` : null;
-}
-
-async function localE2eWorkerToken(email: string): Promise<string | null> {
-  if (!isLocalE2eProfileEnabled() || process.env.UVS_E2E_REAL_SESSION !== "1")
-    return null;
-  const session = await getStorefrontSession();
-  const sessionEmail = session?.user?.email?.trim().toLowerCase();
-  if (!sessionEmail || sessionEmail !== email.trim().toLowerCase()) return null;
-  return internalStorefrontToken(
-    session?.user?.id?.trim() || sessionEmail,
-    sessionEmail,
-  );
-}
-
 function mapProfile(value: unknown): ServerCustomerProfile | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
@@ -154,13 +113,15 @@ export async function loadCustomerProfileResult(
   const baseUrl = workerBaseUrl();
   if (!baseUrl) return { profile: null, unavailable: true };
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.auth.getSession();
-    const token =
-      (await localE2eWorkerToken(email)) || data.session?.access_token?.trim();
-    if (!token) return { profile: null, unavailable: false };
+    const workerAuth = await getStorefrontWorkerAuth();
+    if (!workerAuth || workerAuth.email !== email.trim().toLowerCase()) {
+      return { profile: null, unavailable: false };
+    }
     const response = await fetch(`${baseUrl}/store/customers/me`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      headers: {
+        Authorization: `Bearer ${workerAuth.token}`,
+        Accept: "application/json",
+      },
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });

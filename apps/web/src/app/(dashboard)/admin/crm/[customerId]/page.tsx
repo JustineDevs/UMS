@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   AdminBreadcrumbs,
   AdminPageShell,
-  AuditTimeline,
 } from "@/components/admin-console";
 import {
   fetchCustomerById,
@@ -61,7 +60,6 @@ export default async function CrmCustomerDetailPage({
           ]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <div className="grid gap-4 md:grid-cols-3">
         <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-5 shadow-sm">
@@ -110,7 +108,7 @@ export default async function CrmCustomerDetailPage({
             Linked account rows, contact sync, and deal sync live in the CRM bridge tables.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/admin/segments" className="text-sm font-semibold text-primary hover:underline">
+            <Link href="/admin/crm#segments" className="text-sm font-semibold text-primary hover:underline">
               Segments
             </Link>
             <Link href="/admin/campaigns" className="text-sm font-semibold text-primary hover:underline">
@@ -190,11 +188,11 @@ export default async function CrmCustomerDetailPage({
             <div className="mt-4 grid gap-2 text-sm">
               {[
                 ["/admin/crm", "CRM hub"],
-                ["/admin/segments", "Segments"],
+                ["/admin/crm#segments", "Segments"],
                 ["/admin/campaigns", "Campaigns"],
                 ["/admin/loyalty", "Loyalty"],
                 ["/admin/analytics", "Analytics"],
-                ["/admin/cms/forms", "Lead capture forms"],
+                ["/admin/build", "Lead capture forms"],
               ].map(([href, label]) => (
                 <Link
                   key={href}

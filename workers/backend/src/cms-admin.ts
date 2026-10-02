@@ -65,6 +65,10 @@ function boundedString(value: unknown, max: number): string | null {
   return typeof value === "string" && value.length <= max ? value : null;
 }
 
+function validTimestamp(value: unknown): value is string {
+  return typeof value === "string" && value.length <= 64 && !Number.isNaN(Date.parse(value));
+}
+
 function parseNode(value: unknown): CmsNode | null {
   if (!isRecord(value)) return null;
   const id = boundedString(value.id, 160);
@@ -246,6 +250,10 @@ async function readBody(request: Request): Promise<{ body: CmsPageInput | null; 
     const expectedVersion = parsed.expectedVersion;
     if (expectedVersion !== undefined && (typeof expectedVersion !== "number" || !Number.isSafeInteger(expectedVersion) || expectedVersion < 1)) return { body: null, raw };
     if (parsed.status !== undefined && !["draft", "published", "scheduled"].includes(String(parsed.status))) return { body: null, raw };
+    for (const field of ["published_at", "scheduled_publish_at"] as const) {
+      if (parsed[field] !== undefined && parsed[field] !== null && !validTimestamp(parsed[field])) return { body: null, raw };
+    }
+    if (parsed.status === "scheduled" && !validTimestamp(parsed.scheduled_publish_at)) return { body: null, raw };
     if (parsed.tree !== undefined && (!Array.isArray(parsed.tree) || parsed.tree.length > 200)) return { body: null, raw };
     if (parsed.blocks !== undefined && (!Array.isArray(parsed.blocks) || parsed.blocks.length > 200)) return { body: null, raw };
     if (parsed.mutations !== undefined && (!Array.isArray(parsed.mutations) || parsed.mutations.some((item) => !isRecord(item)))) return { body: null, raw };
@@ -289,6 +297,10 @@ async function savePage(
     const canonicalBlocks = tree.length
       ? treeToBlocks(tree)
       : input.blocks ?? existing?.blocks ?? [];
+    const status = input.status ?? String(existing?.status ?? "draft");
+    const publishedAt = input.published_at !== undefined ? input.published_at : existing?.published_at ?? null;
+    const scheduledPublishAt = input.scheduled_publish_at !== undefined ? input.scheduled_publish_at : existing?.scheduled_publish_at ?? null;
+    if (status === "scheduled" && !validTimestamp(scheduledPublishAt)) return json({ error: "scheduled_publish_at_required" }, 400);
     const values = [
       organizationId,
       input.slug,
@@ -298,9 +310,9 @@ async function savePage(
       input.body ?? String(existing?.body ?? ""),
       JSON.stringify(canonicalBlocks),
       JSON.stringify(tree),
-      input.status ?? String(existing?.status ?? "draft"),
-      input.published_at !== undefined ? input.published_at : existing?.published_at ?? null,
-      input.scheduled_publish_at !== undefined ? input.scheduled_publish_at : existing?.scheduled_publish_at ?? null,
+      status,
+      status === "published" ? publishedAt : null,
+      status === "scheduled" ? scheduledPublishAt : null,
       input.preview_token !== undefined ? input.preview_token : existing?.preview_token ?? null,
       input.meta_title !== undefined ? input.meta_title : existing?.meta_title ?? null,
       input.meta_description !== undefined ? input.meta_description : existing?.meta_description ?? null,

@@ -31,7 +31,7 @@ export function SalesOverviewChart({
   maxOrders: number;
 }) {
   return (
-    <ChartContainer config={config} className="h-74 w-full">
+    <ChartContainer config={config} className="h-72 w-full aspect-auto sm:h-80">
       <ComposedChart id="sales-overview-chart" accessibilityLayer data={data} margin={{ bottom: 0, left: 0, right: 0, top: 0 }}>
         <defs>
           <filter id="sales-line-glow" x="-20%" y="-20%" width="140%" height="140%">

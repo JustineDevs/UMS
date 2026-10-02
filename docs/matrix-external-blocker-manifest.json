@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-21T11:00:35.614Z",
+  "generatedAt": "2026-09-27T22:05:59.055Z",
   "purpose": "External acceptance proof blockers; not verification",
   "rows": [
     {
@@ -293,54 +293,6 @@
       "recoveryCondition": "Run the row-specific safe database/integration probe against the intended environment and retain query/transition evidence."
     },
     {
-      "matrixId": "C4-29",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider"
-      ],
-      "blockedBy": "External provider evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-30",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Deliver a signed provider callback to the mapped deployed endpoint and retain callback, deduplication, and ledger artifacts."
-    },
-    {
-      "matrixId": "C4-31",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider"
-      ],
-      "blockedBy": "External provider evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-32",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider"
-      ],
-      "blockedBy": "External provider evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-33",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "deployed",
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External deployed, live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
       "matrixId": "C4-34",
       "matrix": ".omx/context/full-task(4).md",
       "markers": [
@@ -380,96 +332,6 @@
         "provider"
       ],
       "blockedBy": "External provider evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-40",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-42",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "medusa",
-        "webhook"
-      ],
-      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-43",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "medusa"
-      ],
-      "blockedBy": "External provider, medusa evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-44",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "production",
-        "provider",
-        "load"
-      ],
-      "blockedBy": "External production, provider, load evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
-    },
-    {
-      "matrixId": "C4-45",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-46",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "load",
-        "browser proof"
-      ],
-      "blockedBy": "External provider, load, browser proof evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-47",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "deployed",
-        "webhook",
-        "evidence remains pending"
-      ],
-      "blockedBy": "External deployed, webhook, evidence remains pending evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
-      "matrixId": "C4-48",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "medusa",
-        "webhook",
-        "evidence remains pending"
-      ],
-      "blockedBy": "External provider, live, medusa, webhook evidence is unavailable in this checkout",
       "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
     },
     {
@@ -536,16 +398,6 @@
         "medusa"
       ],
       "blockedBy": "External deployed, provider, live, medusa evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
-      "matrixId": "C4-56",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "deployed",
-        "proof remains pending"
-      ],
-      "blockedBy": "External deployed, proof remains pending evidence is unavailable in this checkout",
       "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
     },
     {
@@ -749,28 +601,6 @@
       ],
       "blockedBy": "External production, webhook, migration evidence is unavailable in this checkout",
       "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
-    },
-    {
-      "matrixId": "C4-76",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
-    },
-    {
-      "matrixId": "C4-77",
-      "matrix": ".omx/context/full-task(4).md",
-      "markers": [
-        "provider",
-        "live",
-        "webhook"
-      ],
-      "blockedBy": "External provider, live, webhook evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific provider sandbox/production-safe flow with configured credentials and retain provider plus ledger evidence."
     },
     {
       "matrixId": "C4-78",
@@ -1531,18 +1361,6 @@
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
-      "matrixId": "C5-85",
-      "matrix": ".omx/context/full-task(5).md",
-      "markers": [
-        "deployed",
-        "production",
-        "provider",
-        "load"
-      ],
-      "blockedBy": "External deployed, production, provider, load evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
       "matrixId": "C5-86",
       "matrix": ".omx/context/full-task(5).md",
       "markers": [
@@ -1761,17 +1579,6 @@
       "recoveryCondition": "Run the browser history/referrer/access-log inspection against the deployed tracking flow with real response headers and retain the trace artifact."
     },
     {
-      "matrixId": "C6-01",
-      "matrix": ".omx/context/full-task(6).md",
-      "markers": [
-        "authenticated",
-        "browser proof",
-        "proof remains pending"
-      ],
-      "blockedBy": "External authenticated, browser proof, proof remains pending evidence is unavailable in this checkout",
-      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
-    },
-    {
       "matrixId": "C6-02",
       "matrix": ".omx/context/full-task(6).md",
       "markers": [
@@ -1779,15 +1586,6 @@
         "proof remains pending"
       ],
       "blockedBy": "External browser proof, proof remains pending evidence is unavailable in this checkout",
-      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
-    },
-    {
-      "matrixId": "C6-03",
-      "matrix": ".omx/context/full-task(6).md",
-      "markers": [
-        "proof remains pending"
-      ],
-      "blockedBy": "External proof remains pending evidence is unavailable in this checkout",
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
@@ -2158,15 +1956,6 @@
       ],
       "blockedBy": "External live, load evidence is unavailable in this checkout",
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
-    },
-    {
-      "matrixId": "C6-40",
-      "matrix": ".omx/context/full-task(6).md",
-      "markers": [
-        "authenticated account session"
-      ],
-      "blockedBy": "External authenticated account session evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the account navigation matrix with a real authenticated session at desktop and mobile widths, retaining keyboard/focus evidence."
     },
     {
       "matrixId": "C6-41",
@@ -2557,15 +2346,6 @@
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
-      "matrixId": "S7-24",
-      "matrix": ".omx/context/full-task(7).md",
-      "markers": [
-        "browser proof"
-      ],
-      "blockedBy": "External browser proof evidence is unavailable in this checkout",
-      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
-    },
-    {
       "matrixId": "S7-25",
       "matrix": ".omx/context/full-task(7).md",
       "markers": [
@@ -2617,34 +2397,6 @@
       ],
       "blockedBy": "External production evidence is unavailable in this checkout",
       "recoveryCondition": "Run the row-specific production-safe verification after source-root and deployment mapping is reconciled."
-    },
-    {
-      "matrixId": "C7-03",
-      "matrix": ".omx/context/full-task(7).md",
-      "markers": [
-        "deployed"
-      ],
-      "blockedBy": "External deployed evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
-      "matrixId": "C7-04",
-      "matrix": ".omx/context/full-task(7).md",
-      "markers": [
-        "deployed"
-      ],
-      "blockedBy": "External deployed evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
-      "matrixId": "C7-05",
-      "matrix": ".omx/context/full-task(7).md",
-      "markers": [
-        "live",
-        "proof remains pending"
-      ],
-      "blockedBy": "External live, proof remains pending evidence is unavailable in this checkout",
-      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
       "matrixId": "C7-06",
@@ -3053,15 +2805,6 @@
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
-      "matrixId": "C7-49",
-      "matrix": ".omx/context/full-task(7).md",
-      "markers": [
-        "deployed"
-      ],
-      "blockedBy": "External deployed evidence is unavailable in this checkout",
-      "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
-    },
-    {
       "matrixId": "C7-50",
       "matrix": ".omx/context/full-task(7).md",
       "markers": [
@@ -3253,15 +2996,6 @@
         "evidence remains pending"
       ],
       "blockedBy": "External load, evidence remains pending evidence is unavailable in this checkout",
-      "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
-    },
-    {
-      "matrixId": "C8-05",
-      "matrix": ".omx/context/full-task(8).md",
-      "markers": [
-        "medusa"
-      ],
-      "blockedBy": "External medusa evidence is unavailable in this checkout",
       "recoveryCondition": "Execute the row-specific external verification and retain a fresh evidence artifact."
     },
     {
@@ -3696,221 +3430,5 @@
       "recoveryCondition": "Run the row-specific authenticated test against the mapped deployed source root and retain the response/log artifact."
     }
   ],
-  "manualRows": [
-    {
-      "matrixId": "C4-20",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-20 | Checkout telemetry must never be financial authority | Client telemetry now uses a shared allowlist that excludes order/payment completion authority events; the route only logs/captures observability and does not mutate quote, payment, order, or fulfillment state | `commerce-observability.test.ts` rejects `order_created` and `payment_captured`; storefront full suite passes 181/181 on 2026-08-22 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C4-26",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-26 | Finalizer must handle stale quote | Expire attempt and route customer back to review | `finalizeCheckoutIntentRouteLogic.test.ts` covers stale quote mismatch and legacy rows without fingerprints; storefront suite passes 194/194 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C4-37",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-37 | PayPal cancellation handling is incomplete | Wire `onCancel`, keep attempt resumable, show retry state | PayPal sandbox cancellation browser test passed on 2026-08-22; no order | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C4-41",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-41 | PayPal declined/failure behavior is unproven | Verify no order, clear error, and retry path | PayPal sandbox declined-return browser test passed on 2026-08-22; no order | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C4-50",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-50 | COD success browser flow is not fully proven | Complete profile, quote, order, tracking, and inventory flow | Fresh real-session browser run completed COD checkout, reached /track/:orderId, and verified the same pending order in admin. Evidence: artifacts/verification/C4-50.json. | VERIFIED |"
-    },
-    {
-      "matrixId": "C4-74",
-      "matrix": ".omx/context/full-task(4).md",
-      "row": "| C4-74 | Storefront integration tests | Cart reconciliation, intent registration, finalization, recovery, tracking, receipt, and status-boundary coverage; storefront suite 241/241 passed on 2026-08-23 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-02",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-02 | Existing local variant increments by requested add quantity | `addCartLine` adds quantities for duplicate variant IDs | `cart.test.ts` proves two requested quantity-1 adds produce quantity 2, never stock maximum; storefront suite 162/162 passes on 2026-08-22 | Low | Add caller coverage and concurrency-safe browser test | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-03",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-03 | Wishlist add-to-bag independently increments existing local quantity | `WishlistPageClient.tsx` now delegates to shared `addCartLine` with `quantity: 1`; `cart.test.ts` proves the second wishlist-style add increments one and refreshes catalog metadata; storefront suite 170/170 passes on 2026-08-22 | Shared cart primitive prevents quantity/merge-key drift across PDP and wishlist callers | P1 | Reconcile behavior and test PDP/wishlist parity | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-05",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-05 | Quantity input has no explicit `max` from available stock | `cart-client.tsx` binds `max` to `availableQuantity`, preserves over-limit drafts, and renders the stock conflict warning; browser regression verifies 12 remains visible against availability 5 | Native constraint and explicit recovery guidance are present; server remains final authority | P1 | Keep requested quantity visible but add stock-aware guidance and server rejection | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-07",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-07 | Quantity commits only on blur | `onBlur` invokes commit | Enter and blur both commit in `cart-client.tsx`; browser regression proves Enter commit on 2026-08-22 | P2 | Commit on Enter and blur; announce update | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-10",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-10 | Cart displays local price while reconciliation is unavailable | `authoritativeTotal ?? local calculation` remains explicitly marked with `data-total-source=local-cache`; a visible reconciliation error and disabled checkout button prevent payment handoff; cart regression proves the outage state | Fixed and browser-verified | P1 | Show stale warning and disable checkout until refreshed | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-12",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-12 | Unavailable lines are preserved with `availableQuantity: 0` | `mergeReconciledCartLines` preserves the line with `availableQuantity: 0`; the cart renders “This item is no longer available. Remove it before checkout.” and disables checkout | Fresh Chromium regression passed on 2026-08-29 | Low | Make status explicit and prevent checkout | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-13",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-13 | Reconcile error does not expose which line failed | Reconcile 503 responses include only `variantId` and safe `status`; `cart-client.tsx` renders a per-line retry message without backend details; the cart regression covers the response in the running browser | Fixed and browser-verified | P2 | Return safe per-line error state without leaking internals | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-23",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-23 | Duplicate variants are merged by variant ID | `normalizeCartLines` merges duplicate IDs; `cart.test.ts` proves quantity aggregation and latest normalized metadata wins; storefront suite 170/170 passes on 2026-08-22 | Duplicate local rows cannot create a second variant line | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-33",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-33 | Shipping fallback silently picks first option | `resolveShippingOptionId` accepts the requested option, auto-selects only a sole option, and rejects ambiguous multi-option state | `shipping-option-resolution.test.ts` proves requested selection and refusal to silently choose among multiple options; storefront suite 165/165 and TypeScript pass on 2026-08-22 | P1 | Require explicit user-selected shipping or disclose fallback | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-36",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-36 | Cart total may display PHP regardless of response currency | Cart UI formats the reconciled response currency and each line's normalized currency code | `cart-client.tsx` uses `currencyCode` from `/api/cart/reconcile` for the total; `cart.test.ts` proves currency normalization survives reconciliation; storefront suite 163/163 on 2026-08-22 | P1 | Use authoritative currency code end-to-end | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-37",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-37 | Abandonment subtotal is calculated from client price | `buildCartAbandonmentRecord` persists only normalized email, line count, bounded context, and timestamp; `cart-abandonment.test.ts` proves client price/subtotal fields are absent; storefront suite 171/171 passes on 2026-08-22 | Recovery telemetry has no client price authority | P1 | Do not use subtotal for recovery or revenue metrics | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-38",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-38 | Cart recovery email contains no item price authority | Recovery email sends count only and now includes an expiring HMAC capability scoped to the server cart when configured; `/api/cart/resume` validates the token against the requested cart before hydration; `cart-recovery-email.test.ts` and `cart-session-boundary.test.ts` prove URL scoping and foreign/malformed token rejection; storefront suite 173/173 passes on 2026-08-22 | Recovery click rehydrates current server cart without trusting client prices or a raw cart ID | P2 | Rehydrate current server-side cart at click time | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-50",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-50 | Quantity limit differs across surfaces | Reconcile/merge use max 999 while checkout/start previously used max 99 | `checkout/start` now uses the shared cart maximum of 999; cart input and reconciliation preserve requested quantity, and storefront suite 163/163 on 2026-08-22 | P1 | Define product/business maximum and enforce consistently | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-53",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-53 | Wishlist add | `WishlistPageClient.tsx` delegates existing/new wishlist variants to `addCartLine({ quantity: 1 })`; `cart.test.ts` proves quantity 2 after two one-unit adds; fresh local Chromium real-session run passed 1/1 on 2026-09-25 with live Worker wishlist/cart routes, reload persistence, and add-to-bag verification | One-unit behavior is shared with PDP/cart insertion and the authenticated browser flow now proves the complete mutation path | P1 | Fresh real-session evidence is attached in C5-53.json and wishlist-real-session-local-20260925T214500Z.log | VERIFIED |"
-    },
-    {
-      "matrixId": "C5-55",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-55 | Inline keyboard quantity | `cart-client.tsx` commits validated whole numbers on Enter and blur; `cart-quantity-regression.spec.ts` proves `1 -> 12` on Enter and retains the value; single-worker storefront UX smoke passed 7/7 on 2026-08-22 | Keyboard editing is explicit and accessible | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-56",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-56 | Zero removal | `updateLineQuantity` removes at zero; `cart-quantity-regression.spec.ts` proves Enter `0` removes the line and renders the empty state; single-worker storefront UX smoke passed 7/7 on 2026-08-22 | Zero is a supported removal operation | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-58",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-58 | Cross-tab persistence | `cart-client.tsx` listens for the cart storage key and reconciles on cross-tab updates; Playwright two-tab regression passed 3/3 on 2026-08-22 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-60",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-60 | Reconciliation outage | UI marks the total source as `local-cache`, shows the reconciliation error, exposes safe per-line errors when supplied, and disables checkout; cart regression passed 4/4 on 2026-08-22 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-61",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-61 | Stale price | Cart browser regression seeds a stale local price, returns a different server price, and verifies the fresh item and total replace the local snapshot | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C5-62",
-      "matrix": ".omx/context/full-task(5).md",
-      "row": "| C5-62 | Stale stock | Running cart browser regression keeps requested quantity `12`, displays availability `5`, and disables checkout instead of silently clamping | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "C6-36",
-      "matrix": ".omx/context/full-task(6).md",
-      "row": "| C6-36 | Tracking projection | Public response excludes email/address/payment/order metadata not needed | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C6-38",
-      "matrix": ".omx/context/full-task(6).md",
-      "row": "| C6-38 | Carrier URL safety | Only allowlisted HTTPS carrier URLs render | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "S7-01",
-      "matrix": ".omx/context/full-task(7).md",
-      "row": "| S7-01 | Critical | No dedicated About route; navigation labels homepage as About | Dedicated `/about` route has owned content and metadata, and the shared nav points to `/about` | Implement `/about` with owned content, metadata, organization/contact data, and explicit nav route; or rename label to Home | `storefront.spec.ts` dedicated About browser test passes on 2026-08-22 | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "S7-13",
-      "matrix": ".omx/context/full-task(7).md",
-      "row": "| S7-13 | Low | Collection pages lack visible breadcrumb/count/sort context | `NEEDS-VERIFICATION` | Collection detail now exposes a semantic breadcrumb, authoritative result count, explicit newest-first sort context, and existing pagination | `stress-test/e2e/smoke/storefront-ux.spec.ts` collection test passed 1/1 against local storefront on 2026-08-22 |"
-    },
-    {
-      "matrixId": "C7-01",
-      "matrix": ".omx/context/full-task(7).md",
-      "row": "| C7-01 | `/about` route decision | Dedicated About page exists and the primary navigation links to it | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C7-36",
-      "matrix": ".omx/context/full-task(7).md",
-      "row": "| C7-36 | Mobile filters | Filter drawer, focus trap, clear-all and result refresh work on mobile | Chromium `storefront-ux.spec.ts` mobile filter test passed in the corrected 16/17 suite on 2026-08-23; one environment-dependent test was skipped and the mobile filter scoped axe test passes independently | NEEDS-VERIFICATION |"
-    },
-    {
-      "matrixId": "T8-05",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| T8-05 | High | Token is placed in query string | `NEEDS-VERIFICATION` | Public tracking and confirmation now accept only opaque `cap_` path capabilities; legacy `?t=` access is rejected, and token pages use no-store/no-referrer | Chromium raw/forged capability tests 3/3; route source/typecheck |"
-    },
-    {
-      "matrixId": "C8-04",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-04 | Missing capability | No order existence/data disclosed | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-06",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-06 | Wrong-ID capability | `verifyTrackingCapability` binds the HMAC to the order/cart ID; SDK scope test passes 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-08",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-08 | Expired capability | Capability expiry is rejected in the SDK scope test; SDK 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-09",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-09 | Rotated key | Previous key version and legacy v1 compatibility are tested; SDK 69/69 on 2026-08-22 | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-11",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-11 | Purpose separation | Purpose and audience tampering are rejected before route data access; confirmation routes now require a distinct `confirmation` capability purpose, and SDK purpose-separation coverage passes on 2026-08-23 | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-14",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-14 | PII minimization | Email/address/items/totals are masked or withheld from public view | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-37",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-37 | Carrier URL allowlist | `buildCarrierTrackingUrl` emits only fixed HTTPS J&T/LBC/2GO hosts and encodes tracking numbers; known-carrier fixtures pass | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-38",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-38 | Malicious carrier URL | Unknown carrier slugs and empty tracking numbers return null, so untrusted metadata cannot create an external link | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-47",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-47 | Security headers | No-store/referrer/content/security headers are verified on token pages | `curl http://localhost:3000/track/order_missing` returned 200 with Cache-Control: no-store, must-revalidate and Referrer-Policy: no-referrer on 2026-08-22 | `NEEDS-VERIFICATION` |"
-    },
-    {
-      "matrixId": "C8-49",
-      "matrix": ".omx/context/full-task(8).md",
-      "row": "| C8-49 | Robots/crawl | `robots.ts` disallows `/track` and `/order-confirmation`, and `sitemap.ts` only emits public static/catalog/CMS/blog routes; the robots regression test passes in the storefront suite | `NEEDS-VERIFICATION` |"
-    }
-  ]
+  "manualRows": []
 }

@@ -64,7 +64,7 @@ export function AdminPageShell({
         </div>
       ) : null}
 
-      <div className="flex flex-1 flex-col px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+      <div className="admin-content-width flex flex-1 flex-col px-[var(--admin-page-px)] py-[var(--admin-page-py)]">
         {breadcrumbs ? (
           <div className="mb-4 space-y-3 text-sm text-muted-foreground">
             {breadcrumbs}
@@ -80,7 +80,7 @@ export function AdminPageShell({
                 {title ? <AdminPageTitleWithHelp title={title} /> : null}
                 {subtitle ? <p className="max-w-2xl text-sm leading-5 text-muted-foreground">{subtitle}</p> : null}
               </div>
-              {actions ? <div className="flex min-w-0 max-w-full shrink flex-wrap items-center justify-end gap-2">{actions}</div> : null}
+              {actions ? <div className="flex min-w-0 max-w-full shrink flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">{actions}</div> : null}
             </div>
           </div>
         ) : null}
@@ -99,7 +99,7 @@ export function AdminPageShell({
                 {inspector}
               </CollapsibleInspectorColumn>
             ) : (
-              <div className="w-full shrink-0 border-t border-border/60 pt-6 xl:w-96 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+              <div className="w-full shrink-0 border-t border-border/60 pt-6 xl:w-96 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0 3xl:w-[28rem]">
                 {inspector}
               </div>
             )

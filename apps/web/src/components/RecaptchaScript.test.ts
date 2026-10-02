@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getRecaptchaToken } from "./RecaptchaScript";
+import { getRecaptchaToken } from "../lib/recaptcha-client";
 
 test("getRecaptchaToken fails closed when the browser API rejects during ready", async () => {
   const env = process.env;

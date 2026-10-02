@@ -14,7 +14,13 @@ import { createHmac } from "node:crypto";
 export const dynamic = "force-dynamic";
 
 function internalStorefrontToken(userId: string, email: string): string | null {
-  if (process.env.NODE_ENV === "production") return null;
+  // The production-mode local E2E harness intentionally uses the same
+  // security boundaries as production. Keep this escape hatch limited to an
+  // explicitly opted-in local run and never permit it on Vercel.
+  if (
+    process.env.VERCEL === "1" ||
+    (process.env.NODE_ENV === "production" && process.env.UVS_E2E_LOCAL !== "1")
+  ) return null;
   const secret = process.env.JWT_SECRET?.trim();
   if (!secret) return null;
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -60,7 +66,7 @@ async function patchWorkerProfile(req: Request): Promise<Response> {
       {
         error: "Please sign in again before changing your profile or addresses.",
         code: "RECENT_AUTH_REQUIRED",
-        reauthUrl: "/login?callbackUrl=%2Faccount&reauth=1",
+        reauthUrl: "/login?callbackUrl=%2Faccount%2Fprofile&reauth=1",
       },
       { status: 401 },
     );

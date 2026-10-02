@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer } from "react";
 
 type VariantLine = {
   variantId: string;
@@ -16,30 +16,85 @@ type CartLine = {
   quantity: number;
 };
 
+type FormState = {
+  source: string;
+  rawText: string;
+  phone: string;
+  address: string;
+  lines: CartLine[];
+  msg: string | null;
+  err: string | null;
+  loading: boolean;
+  searchQ: string;
+  searchOpen: boolean;
+  searchHits: VariantLine[];
+  searchLoading: boolean;
+};
+
+type FormAction =
+  | { type: "field"; field: "source" | "rawText" | "phone" | "address"; value: string }
+  | { type: "lines"; update: (_lines: CartLine[]) => CartLine[] }
+  | { type: "search"; field: "searchQ" | "searchOpen"; value: string | boolean }
+  | { type: "searchHits"; value: VariantLine[] }
+  | { type: "searchLoading"; value: boolean }
+  | { type: "message"; value: string | null }
+  | { type: "error"; value: string | null }
+  | { type: "loading"; value: boolean }
+  | { type: "resetAfterSubmit" };
+
+const initialFormState: FormState = {
+  source: "manual",
+  rawText: "",
+  phone: "",
+  address: "",
+  lines: [],
+  msg: null,
+  err: null,
+  loading: false,
+  searchQ: "",
+  searchOpen: false,
+  searchHits: [],
+  searchLoading: false,
+};
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "field":
+      return { ...state, [action.field]: action.value };
+    case "lines":
+      return { ...state, lines: action.update(state.lines) };
+    case "search":
+      return { ...state, [action.field]: action.value } as FormState;
+    case "searchHits":
+      return { ...state, searchHits: action.value };
+    case "searchLoading":
+      return { ...state, searchLoading: action.value };
+    case "message":
+      return { ...state, msg: action.value };
+    case "error":
+      return { ...state, err: action.value };
+    case "loading":
+      return { ...state, loading: action.value };
+    case "resetAfterSubmit":
+      return { ...state, rawText: "", address: "", lines: [] };
+    default:
+      return state;
+  }
+}
+
 export function ChatIntakeForm() {
   const router = useRouter();
-  const [source, setSource] = useState("manual");
-  const [rawText, setRawText] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [lines, setLines] = useState<CartLine[]>([]);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const [searchQ, setSearchQ] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchHits, setSearchHits] = useState<VariantLine[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [state, dispatch] = useReducer(formReducer, initialFormState);
+  const { source, rawText, phone, address, lines, msg, err, loading, searchQ, searchOpen, searchHits, searchLoading } = state;
 
   useEffect(() => {
     if (!searchOpen || searchQ.trim().length < 2) {
-      setSearchHits([]);
+      dispatch({ type: "searchHits", value: [] });
       return;
     }
     const controller = new AbortController();
     const t = window.setTimeout(() => {
-      setSearchLoading(true);
+      dispatch({ type: "searchLoading", value: true });
       fetch(
         `/api/admin/chat-orders/variant-suggestions?q=${encodeURIComponent(searchQ.trim())}`,
         { signal: controller.signal },
@@ -49,14 +104,14 @@ export function ChatIntakeForm() {
           return r.json();
         })
         .then((body: { lines?: VariantLine[] }) => {
-          setSearchHits(Array.isArray(body.lines) ? body.lines : []);
+          dispatch({ type: "searchHits", value: Array.isArray(body.lines) ? body.lines : [] });
         })
         .catch((error: unknown) => {
           if (!(error instanceof DOMException && error.name === "AbortError")) {
-            setSearchHits([]);
+            dispatch({ type: "searchHits", value: [] });
           }
         })
-        .finally(() => setSearchLoading(false));
+        .finally(() => dispatch({ type: "searchLoading", value: false }));
     }, 220);
     return () => {
       window.clearTimeout(t);
@@ -65,7 +120,7 @@ export function ChatIntakeForm() {
   }, [searchOpen, searchQ]);
 
   const addVariant = useCallback((hit: VariantLine) => {
-    setLines((prev) => {
+    dispatch({ type: "lines", update: (prev) => {
       const existing = prev.find((l) => l.variantId === hit.variantId);
       if (existing) {
         return prev.map((l) =>
@@ -78,29 +133,29 @@ export function ChatIntakeForm() {
         ...prev,
         { variantId: hit.variantId, label: hit.label, quantity: 1 },
       ];
-    });
-    setSearchQ("");
-    setSearchHits([]);
-    setSearchOpen(false);
+    } });
+    dispatch({ type: "search", field: "searchQ", value: "" });
+    dispatch({ type: "searchHits", value: [] });
+    dispatch({ type: "search", field: "searchOpen", value: false });
   }, []);
 
   const removeLine = useCallback((variantId: string) => {
-    setLines((prev) => prev.filter((l) => l.variantId !== variantId));
+    dispatch({ type: "lines", update: (prev) => prev.filter((l) => l.variantId !== variantId) });
   }, []);
 
   const setQty = useCallback((variantId: string, quantity: number) => {
     const q = Math.max(1, Math.floor(quantity) || 1);
-    setLines((prev) =>
+    dispatch({ type: "lines", update: (prev) =>
       prev.map((l) => (l.variantId === variantId ? { ...l, quantity: q } : l)),
-    );
+    });
   }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
-    setErr(null);
-    setMsg(null);
-    setLoading(true);
+    dispatch({ type: "error", value: null });
+    dispatch({ type: "message", value: null });
+    dispatch({ type: "loading", value: true });
 
     const items = lines.map((l) => ({
       variantId: l.variantId,
@@ -124,7 +179,7 @@ export function ChatIntakeForm() {
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setErr(data.error ?? `Failed (${res.status})`);
+        dispatch({ type: "error", value: data.error ?? `Failed (${res.status})` });
         return;
       }
       const data = (await res.json().catch(() => ({}))) as {
@@ -138,26 +193,22 @@ export function ChatIntakeForm() {
           "No draft order was created (check store connection or line items).",
         );
       }
-      setMsg(parts.join(" "));
-      setRawText("");
-      setAddress("");
-      setLines([]);
+      dispatch({ type: "message", value: parts.join(" ") });
+      dispatch({ type: "resetAfterSubmit" });
       router.refresh();
     } catch {
-      setErr("Unable to save the intake right now. Try again.");
+      dispatch({ type: "error", value: "Unable to save the intake right now. Try again." });
     } finally {
-      setLoading(false);
+      dispatch({ type: "loading", value: false });
     }
   }
 
   return (
     <form
       onSubmit={(e) => void submit(e)}
-      className="rounded border border-outline-variant/20 bg-surface-container-lowest p-6 space-y-4"
+      className="space-y-5"
     >
-      <h3 className="text-sm font-bold uppercase tracking-widest text-primary">
-        New intake
-      </h3>
+      <h3 className="text-sm font-semibold text-foreground">Order details</h3>
       {err ? (
         <p className="text-sm text-red-600" role="alert">
           {err}
@@ -175,8 +226,8 @@ export function ChatIntakeForm() {
         <input
           id="chat-intake-source"
           value={source}
-          onChange={(e) => setSource(e.target.value)}
-          className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
+          onChange={(e) => dispatch({ type: "field", field: "source", value: e.target.value })}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/40"
           placeholder="e.g. Messenger, Viber, phone"
         />
       </div>
@@ -187,8 +238,8 @@ export function ChatIntakeForm() {
         <textarea
           id="chat-intake-message"
           value={rawText}
-          onChange={(e) => setRawText(e.target.value)}
-          className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm min-h-[96px]"
+          onChange={(e) => dispatch({ type: "field", field: "rawText", value: e.target.value })}
+          className="min-h-[96px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/40"
           placeholder="What they asked for, delivery notes, etc."
         />
       </div>
@@ -199,8 +250,8 @@ export function ChatIntakeForm() {
         <input
           id="chat-intake-phone"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
+          onChange={(e) => dispatch({ type: "field", field: "phone", value: e.target.value })}
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/40"
           placeholder="Contact number"
         />
       </div>
@@ -211,8 +262,8 @@ export function ChatIntakeForm() {
         <textarea
           id="chat-intake-address"
           value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm min-h-[72px]"
+          onChange={(e) => dispatch({ type: "field", field: "address", value: e.target.value })}
+          className="min-h-[72px] w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/40"
           placeholder="Shipping or pickup details"
         />
       </div>
@@ -229,12 +280,12 @@ export function ChatIntakeForm() {
           <input
             id="chat-intake-product-search"
             type="search"
-            className="w-full rounded border border-outline-variant/30 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-ring/40"
             placeholder="Type at least 2 characters…"
             value={searchQ}
-            onChange={(e) => setSearchQ(e.target.value)}
-            onFocus={() => setSearchOpen(true)}
-            onBlur={() => window.setTimeout(() => setSearchOpen(false), 150)}
+            onChange={(e) => dispatch({ type: "search", field: "searchQ", value: e.target.value })}
+            onFocus={() => dispatch({ type: "search", field: "searchOpen", value: true })}
+            onBlur={() => window.setTimeout(() => dispatch({ type: "search", field: "searchOpen", value: false }), 150)}
           />
           {searchOpen && searchQ.trim().length >= 2 ? (
             <ul className="absolute z-10 mt-1 max-h-52 w-full overflow-y-auto rounded border border-outline-variant/30 bg-white py-1 text-sm shadow-md">
@@ -252,11 +303,6 @@ export function ChatIntakeForm() {
                       onClick={() => addVariant(h)}
                     >
                       <span className="font-medium">{h.label}</span>
-                      {h.sku ? (
-                        <span className="ml-2 font-mono text-xs text-on-surface-variant">
-                          {h.sku}
-                        </span>
-                      ) : null}
                     </button>
                   </li>
                 ))
@@ -303,9 +349,9 @@ export function ChatIntakeForm() {
       <button
         type="submit"
         disabled={loading || lines.length === 0}
-        className="rounded bg-primary px-4 py-2 text-xs font-bold uppercase tracking-widest text-on-primary disabled:opacity-50"
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/80 disabled:opacity-50"
       >
-        {loading ? "Saving…" : "Submit intake"}
+        {loading ? "Saving…" : "Create intake"}
       </button>
     </form>
   );

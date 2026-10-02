@@ -14,7 +14,7 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; error?: string; reauth?: string }> }) {
   const sp = await searchParams;
-  const callback = typeof sp.callbackUrl === "string" && sp.callbackUrl.startsWith("/") ? sp.callbackUrl : "/account";
+  const callback = typeof sp.callbackUrl === "string" && sp.callbackUrl.startsWith("/") ? sp.callbackUrl : "/account/profile";
   const authErr = describeAuthSignInError(sp.error);
   return (
     <>

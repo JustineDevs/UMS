@@ -64,6 +64,7 @@ function useFloatingStyle(
 ) {
   const { sideOffset = 4, side = "bottom", align = "start" } = options;
   const [style, setStyle] = React.useState<React.CSSProperties>({});
+  const [resolvedSide, setResolvedSide] = React.useState(side);
 
   React.useEffect(() => {
     if (!open || typeof window === "undefined") return;
@@ -77,15 +78,20 @@ function useFloatingStyle(
       const contentWidth = Math.max(rect.width, 176);
       const contentHeight = content.getBoundingClientRect().height || 0;
 
+      const viewportPadding = 8;
+      const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+      const availableAbove = rect.top - viewportPadding;
+      const resolvedSide = side === "bottom" && contentHeight > availableBelow && availableAbove > availableBelow ? "top" : side;
+      setResolvedSide(resolvedSide);
       let top = rect.bottom + sideOffset;
       let left = rect.left;
 
-      if (side === "top") {
+      if (resolvedSide === "top") {
         top = rect.top - sideOffset - contentHeight;
-      } else if (side === "left") {
+      } else if (resolvedSide === "left") {
         left = rect.left - contentWidth - sideOffset;
         top = rect.top;
-      } else if (side === "right") {
+      } else if (resolvedSide === "right") {
         left = rect.right + sideOffset;
         top = rect.top;
       }
@@ -98,8 +104,8 @@ function useFloatingStyle(
 
       setStyle({
         position: "fixed",
-        top: Math.max(8, Math.min(top, window.innerHeight - Math.max(contentHeight, 48) - 8)),
-        left: Math.max(8, Math.min(left, window.innerWidth - contentWidth - 8)),
+        top: Math.max(viewportPadding, Math.min(top, window.innerHeight - Math.max(contentHeight, 48) - viewportPadding)),
+        left: Math.max(viewportPadding, Math.min(left, window.innerWidth - contentWidth - viewportPadding)),
         minWidth: contentWidth,
       });
     };
@@ -115,7 +121,7 @@ function useFloatingStyle(
     };
   }, [align, contentRef, open, side, sideOffset, triggerRef]);
 
-  return style;
+  return { style, resolvedSide };
 }
 
 type DropdownMenuContextValue = {
@@ -197,6 +203,10 @@ const DropdownMenuTrigger = React.forwardRef<
   if (asChild && React.isValidElement(children)) {
     return React.cloneElement(children as React.ReactElement, {
       ...props,
+      ref: (node: HTMLButtonElement | null) => {
+        triggerRef.current = node;
+        assignRef(ref, node);
+      },
       onClick: handleClick,
       "aria-expanded": open,
       "aria-haspopup": "menu",
@@ -279,7 +289,7 @@ const DropdownMenuContent = React.forwardRef<
   const { open, setOpen, triggerRef, contentId } = useDropdownMenuContext();
   const contentRef = React.useRef<HTMLDivElement | null>(null);
   const mounted = useMounted();
-  const style = useFloatingStyle(open, triggerRef, contentRef, { sideOffset, side, align });
+  const { style, resolvedSide } = useFloatingStyle(open, triggerRef, contentRef, { sideOffset, side, align });
 
   useDismissableLayer(open, [triggerRef, contentRef], () => setOpen(false));
 
@@ -295,6 +305,8 @@ const DropdownMenuContent = React.forwardRef<
         id={contentId}
         role="menu"
         aria-orientation="vertical"
+        data-side={resolvedSide}
+        data-align={align}
         style={style}
         className={cn(
           "z-50 min-w-[8rem] overflow-hidden rounded-md border border-outline-variant/25 bg-surface-container-lowest p-1 text-on-surface shadow-md",
@@ -352,7 +364,7 @@ const DropdownMenuSubContent = React.forwardRef<
   const { open, setOpen, triggerRef } = useSubContext();
   const contentRef = React.useRef<HTMLDivElement | null>(null);
   const mounted = useMounted();
-  const style = useFloatingStyle(open, triggerRef, contentRef, { side: "right", align: "start" });
+  const { style, resolvedSide } = useFloatingStyle(open, triggerRef, contentRef, { side: "right", align: "start" });
 
   useDismissableLayer(open, [triggerRef, contentRef], () => setOpen(false));
 
@@ -367,6 +379,8 @@ const DropdownMenuSubContent = React.forwardRef<
         }}
         role="menu"
         aria-orientation="vertical"
+        data-side={resolvedSide}
+        data-align="start"
         style={style}
         className={cn(
           "z-50 min-w-[8rem] overflow-hidden rounded-md border border-outline-variant/25 bg-surface-container-lowest p-1 text-on-surface shadow-lg",
@@ -383,9 +397,28 @@ DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 
 const DropdownMenuItem = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & { inset?: boolean; onSelect?: (event: Event) => void }
->(({ className, inset, onSelect, onClick, children, disabled, ...props }, ref) => {
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { inset?: boolean; variant?: "default" | "destructive"; asChild?: boolean; onSelect?: (event: Event) => void }
+>(({ className, inset, variant = "default", asChild = false, onSelect, onClick, children, disabled, ...props }, ref) => {
   const { setOpen } = useDropdownMenuContext();
+  if (asChild && React.isValidElement(children)) {
+    const child = children as React.ReactElement<{
+      className?: string;
+      onClick?: (event: React.MouseEvent<HTMLElement>) => void;
+    }>;
+    return React.cloneElement(child as React.ReactElement<any>, {
+      ...props,
+      ref,
+      className: cn("relative flex w-full cursor-default select-none items-center rounded px-2 py-1.5 text-left text-sm", variant === "destructive" && "text-error", className, child.props.className),
+      onClick: (event: React.MouseEvent<HTMLElement>) => {
+        child.props.onClick?.(event);
+        if (event.defaultPrevented) return;
+        onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>);
+        if (event.defaultPrevented) return;
+        onSelect?.(event.nativeEvent);
+        if (!disabled) setOpen(false);
+      },
+    });
+  }
   return (
     <button
       ref={ref}
@@ -395,6 +428,7 @@ const DropdownMenuItem = React.forwardRef<
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded px-2 py-1.5 text-left text-sm outline-none transition-colors focus:bg-surface-container-high data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         inset && "pl-8",
+        variant === "destructive" && "text-error",
         className,
       )}
       onClick={(event) => {
@@ -410,6 +444,40 @@ const DropdownMenuItem = React.forwardRef<
   );
 });
 DropdownMenuItem.displayName = "DropdownMenuItem";
+
+type DropdownMenuRadioGroupValue = {
+  value?: string;
+  onValueChange?: (value: string) => void;
+};
+
+const DropdownMenuRadioGroupContext = React.createContext<DropdownMenuRadioGroupValue | null>(null);
+
+const DropdownMenuRadioItem = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    value: string;
+    inset?: boolean;
+    variant?: "default" | "destructive";
+    asChild?: boolean;
+    onSelect?: (event: Event) => void;
+  }
+>(({ value, onClick, ...props }, ref) => {
+  const group = React.useContext(DropdownMenuRadioGroupContext);
+
+  return (
+    <DropdownMenuItem
+      ref={ref}
+      role="menuitemradio"
+      aria-checked={group?.value === value}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) group?.onValueChange?.(value);
+      }}
+      {...props}
+    />
+  );
+});
+DropdownMenuRadioItem.displayName = "DropdownMenuRadioItem";
 
 const DropdownMenuSeparator = React.forwardRef<HTMLHRElement, React.HTMLAttributes<HTMLHRElement>>(
   ({ className, ...props }, ref) => <hr ref={ref} className={cn("-mx-1 my-1 h-px border-0 bg-outline-variant/30", className)} {...props} />,
@@ -431,15 +499,19 @@ DropdownMenuLabel.displayName = "DropdownMenuLabel";
 
 const DropdownMenuRadioGroup = ({
   children,
+  value,
+  onValueChange,
   ...props
 }: React.PropsWithChildren<{
   value?: string;
   onValueChange?: (value: string) => void;
 }> & React.HTMLAttributes<HTMLDivElement>) => {
   return (
-    <div role="group" aria-label="radio group" {...props}>
-      {children}
-    </div>
+    <DropdownMenuRadioGroupContext.Provider value={{ value, onValueChange }}>
+      <div role="group" aria-label="radio group" {...props}>
+        {children}
+      </div>
+    </DropdownMenuRadioGroupContext.Provider>
   );
 };
 DropdownMenuRadioGroup.displayName = "DropdownMenuRadioGroup";
@@ -449,6 +521,7 @@ export {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuGroup,

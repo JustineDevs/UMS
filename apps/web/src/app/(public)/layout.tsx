@@ -8,7 +8,6 @@ import { StorefrontRuntimeProviders } from "../../components/StorefrontRuntimePr
 const STOREFRONT_SECTIONS: StorefrontChromeSections = {
   header: {
     announcement: true,
-    utilityBar: true,
     primaryNav: true,
   },
   footer: true,

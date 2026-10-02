@@ -207,42 +207,67 @@ export function CmsMediaManager() {
     return <p className="text-sm text-slate-600">Loading…</p>;
 
   return (
-    <div className="space-y-6">
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+    <div className="min-w-0 space-y-4">
+      <div className="border-b border-slate-200 px-3 pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900">Media library</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Upload and reuse images, videos, and documents in your storefront.
+            </p>
+          </div>
+          <span className="shrink-0 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-400">
+            {rows.length} {rows.length === 1 ? "asset" : "assets"}
+          </span>
+        </div>
+      </div>
+      {error ? (
+        <p className="break-words border-l-2 border-red-500 px-3 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
 
-      <div className="flex flex-wrap gap-3 text-sm">
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">Search URL</span>
+      <div className="space-y-3 px-3 text-sm">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+          Find media
+        </p>
+        <label className="flex min-w-0 flex-col items-stretch gap-1">
+          <span className="text-xs font-medium text-slate-700">Search media</span>
           <input
-            className="rounded border border-slate-200 px-2 py-1 text-sm"
+            className="h-8 w-full min-w-0 rounded border border-slate-200 px-2 py-1 text-sm"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="fragment"
+            placeholder="Name, URL, or alt text"
+            aria-label="Search media by name, URL, or alt text"
           />
         </label>
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">MIME prefix</span>
+        <label className="flex min-w-0 flex-col items-stretch gap-1">
+          <span className="text-xs font-medium text-slate-700">MIME type</span>
           <input
-            className="w-28 rounded border border-slate-200 px-2 py-1 text-sm"
+            className="h-8 w-full min-w-0 rounded border border-slate-200 px-2 py-1 text-sm"
             value={mime}
             onChange={(e) => setMime(e.target.value)}
             placeholder="image/"
+            aria-label="Filter by MIME type"
           />
         </label>
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">Tag</span>
+        <label className="flex min-w-0 flex-col items-stretch gap-1">
+          <span className="text-xs font-medium text-slate-700">Tag</span>
           <input
-            className="w-32 rounded border border-slate-200 px-2 py-1 text-sm"
+            className="h-8 w-full min-w-0 rounded border border-slate-200 px-2 py-1 text-sm"
             value={tag}
             onChange={(e) => setTag(e.target.value)}
+            placeholder="Optional tag"
+            aria-label="Filter by tag"
           />
         </label>
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">Sort</span>
+        <label className="flex min-w-0 flex-col items-stretch gap-1">
+          <span className="text-xs font-medium text-slate-700">Sort by</span>
           <select
-            className="rounded border border-slate-200 px-2 py-1 text-sm"
+            className="h-8 w-full min-w-0 rounded border border-slate-200 px-2 py-1 text-sm"
             value={sort}
             onChange={(e) => setSort(e.target.value as typeof sort)}
+            aria-label="Sort media"
           >
             <option value="created_desc">Newest</option>
             <option value="created_asc">Oldest</option>
@@ -257,7 +282,7 @@ export function CmsMediaManager() {
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         className={[
-          "rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+          "mx-3 block min-w-0 rounded border-2 border-dashed px-3 py-5 text-center transition-colors",
           dragOver
             ? "border-primary bg-primary/5"
             : "border-slate-300 bg-slate-50/80",
@@ -266,15 +291,15 @@ export function CmsMediaManager() {
             : "opacity-60",
         ].join(" ")}
       >
-        <p className="text-sm font-medium text-slate-800">
+        <p className="text-sm font-semibold text-slate-800">
           {uploading
             ? `Uploading${uploadPct != null ? ` ${uploadPct}%` : "…"}`
-            : "Drop files or click"}
+            : "Upload media"}
         </p>
-        <p className="mt-2 text-xs text-slate-600">
-          Max {Math.round(MAX_BYTES / (1024 * 1024))} MB per file. Types:
-          images, video, PDF, docs, zip.
+        <p className="mt-1 text-xs text-slate-600">
+          Drop files here or click to browse. Up to {Math.round(MAX_BYTES / (1024 * 1024))} MB per file.
         </p>
+        <p className="mt-1 text-[11px] text-slate-400">Images · video · PDF · documents · ZIP</p>
         <input
           ref={inputRef}
           type="file"
@@ -295,7 +320,7 @@ export function CmsMediaManager() {
           No media assets match the current filters.
         </p>
       ) : null}
-      <ul className="grid gap-4 sm:grid-cols-2" aria-label="Media assets">
+      <ul className="grid min-w-0 grid-cols-1 gap-4" aria-label="Media assets">
         {rows.map((m) => (
           <li
             key={m.id}

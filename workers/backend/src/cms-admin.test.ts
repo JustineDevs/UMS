@@ -200,3 +200,24 @@ test("CMS admin update is tenant scoped and records revision mutations", async (
   assert.ok(queries.some((query) => query.text.includes("cms_page_versions")));
   assert.ok(queries.some((query) => query.text.includes("cms_page_mutations")));
 });
+
+test("CMS admin requires a valid schedule when publishing status is scheduled", async () => {
+  const database: WorkerDatabaseClient = {
+    async query() {
+      throw new Error("invalid scheduled payload must not access the database");
+    },
+    async end() {},
+  };
+  const bearer = await token({ organization_id: "org_1", role: "admin" });
+  const response = await handleCmsAdminPageRequest(
+    new Request("https://api.example/api/admin/cms/pages", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${bearer}`, "Idempotency-Key": "cms-schedule-invalid", "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: "scheduled", status: "scheduled" }),
+    }),
+    database,
+    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_page_payload" });
+});

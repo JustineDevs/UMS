@@ -9,6 +9,7 @@ const validConfig = `
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic-preview.vercel.app,http://localhost:3000",
         "PUBLIC_SITE_URL": "https://universalmusic-preview.vercel.app",
+        "PUBLIC_WORKER_URL": "https://ums-backend-preview.pcg0255.workers.dev",
         "CMS_ORGANIZATION_ID": "dev-tenant",
         "DEFAULT_ORGANIZATION_ID": "dev-tenant"
       }
@@ -18,6 +19,7 @@ const validConfig = `
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic.vercel.app",
         "PUBLIC_SITE_URL": "https://universalmusic.vercel.app",
+        "PUBLIC_WORKER_URL": "https://ums-backend-production.pcg0255.workers.dev",
         "CMS_ORGANIZATION_ID": "prod-tenant",
         "DEFAULT_ORGANIZATION_ID": "prod-tenant"
       }

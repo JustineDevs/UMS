@@ -66,12 +66,12 @@ export type StorefrontHomePayload = {
 
 export const DEFAULT_STOREFRONT_HOME_PAYLOAD: StorefrontHomePayload = {
   hero: {
-    line1: "UNIVERSAL",
-    line2: "MUSIC STORE",
+    line1: "The guitar you’ll keep reaching for.",
+    line2: "",
     lead:
-      "Universal Music Store is an online store for guitars, bass, drums, pianos, and accessories & gear. Browse, order, and track shipments.",
-    showPrivacyLink: true,
-    ctaLabel: "Shop Now",
+      "Electric, acoustic, and bass guitars, plus amps, pedals, strings, and the essentials to build your sound.",
+    showPrivacyLink: false,
+    ctaLabel: "Explore guitars",
     ctaHref: "/shop",
     imageUrl: "",
     mediaType: "image",
@@ -85,7 +85,7 @@ export const DEFAULT_STOREFRONT_HOME_PAYLOAD: StorefrontHomePayload = {
   },
   tiles: [
     {
-      href: "/shop?category=Guitars",
+      href: "/collections/guitars",
       title: "Guitars",
       subtitle: "Electric, acoustic, and bass models",
       linkLabel: "Explore collection",
@@ -93,7 +93,7 @@ export const DEFAULT_STOREFRONT_HOME_PAYLOAD: StorefrontHomePayload = {
       variant: "large",
     },
     {
-      href: "/shop?category=Drums",
+      href: "/collections/drums",
       title: "Drums",
       subtitle: "Kits, cymbals, and percussion",
       linkLabel: "Shop drums",
@@ -101,7 +101,7 @@ export const DEFAULT_STOREFRONT_HOME_PAYLOAD: StorefrontHomePayload = {
       variant: "small",
     },
     {
-      href: "/shop?category=Accessories%20%26%20Gear",
+      href: "/collections/accessories-%26-gear",
       title: "Accessories & Gear",
       subtitle: "Cables, pedals, and studio essentials",
       linkLabel: "",
@@ -138,7 +138,7 @@ function sanitizeHomeImageUrl(value: string): string {
     const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
     const hostname = url.hostname.toLowerCase();
     if (hostname === "medusa-public-images.s3.eu-west-1.amazonaws.com") return "";
-    if (hostname.endsWith("fbcdn.net")) return "";
+    if (hostname === "fbcdn.net" || hostname.endsWith(".fbcdn.net")) return "";
     return trimmed;
   } catch {
     return trimmed;
@@ -179,13 +179,27 @@ function mergeHero(partial: unknown): StorefrontHomePayload["hero"] {
   const d = DEFAULT_STOREFRONT_HOME_PAYLOAD.hero;
   if (!isRecord(partial)) return { ...d };
   const style = isRecord(partial.style) ? partial.style : {};
+  const storedLine1 = pickString(partial, "line1", d.line1);
+  const storedLine2 = pickString(partial, "line2", d.line2);
+  const isLegacyBrandTitle =
+    [
+      "UNIVERSAL",
+      "GEAR FOR EVERY SOUND.",
+      "YOUR NEXT GUITAR STARTS HERE.",
+      "YOUR SOUND HAS A SHAPE.",
+    ].includes(storedLine1.trim().toUpperCase()) ||
+    storedLine2.trim().toUpperCase() === "MUSIC STORE";
   return {
-    line1: pickString(partial, "line1", d.line1),
-    line2: pickString(partial, "line2", d.line2),
-    lead: pickString(partial, "lead", d.lead),
+    line1: isLegacyBrandTitle ? d.line1 : storedLine1,
+    line2: isLegacyBrandTitle ? d.line2 : storedLine2,
+    lead: (isLegacyBrandTitle ? d.lead : pickString(partial, "lead", d.lead))
+      .replace(/Universal Music Store is an online store for guitars, bass, drums, pianos, and accessories & gear\. Browse, order, and track shipments\.?/i, d.lead)
+      .replace(/Premium guitars, amplifiers, and accessories curated for musicians\. Shipped safely nationwide\.?/i, d.lead)
+      .replace(/Discover guitars for every kind of player, then add the amps and essentials that bring your sound to life\. Shipped safely across the Philippines\.?/i, d.lead)
+      .replace(/\bplanos\b/gi, "pianos"),
     showPrivacyLink: pickBool(partial, "showPrivacyLink", d.showPrivacyLink),
-    ctaLabel: pickString(partial, "ctaLabel", d.ctaLabel),
-    ctaHref: pickString(partial, "ctaHref", d.ctaHref),
+    ctaLabel: isLegacyBrandTitle ? d.ctaLabel : pickString(partial, "ctaLabel", d.ctaLabel),
+    ctaHref: isLegacyBrandTitle ? d.ctaHref : pickString(partial, "ctaHref", d.ctaHref),
     imageUrl: sanitizeHomeImageUrl(pickString(partial, "imageUrl", d.imageUrl)),
     mediaType: pickEnum(partial, "mediaType", d.mediaType, ["image", "video"]),
     videoUrl: sanitizeHomeImageUrl(pickString(partial, "videoUrl", d.videoUrl)),
@@ -273,6 +287,43 @@ export function mergeStorefrontHomePayload(raw: unknown): StorefrontHomePayload 
   if (!isRecord(raw)) {
     return cloneDefaultPayload();
   }
+  const domOverrides = isRecord(raw.domOverrides)
+    ? Object.fromEntries(
+        Object.entries(raw.domOverrides)
+          .filter(([, value]) => isRecord(value))
+          .map(([id, value]) => {
+            if (id !== "home-hero-title" && id !== "home-hero-lead") {
+              return [id, value as Record<string, string>];
+            }
+            const cleaned = { ...(value as Record<string, string>) };
+            const textContent = cleaned.textContent?.trim();
+            if (id === "home-hero-title") {
+              const normalizedTitle = textContent?.toUpperCase();
+              if (
+                normalizedTitle &&
+                [
+                  "UNIVERSAL",
+                  "GEAR FOR EVERY SOUND.",
+                  "YOUR NEXT GUITAR STARTS HERE.",
+                  "YOUR SOUND HAS A SHAPE.",
+                ].includes(normalizedTitle)
+              ) {
+                delete cleaned.textContent;
+              }
+              delete cleaned["style.color"];
+              delete cleaned["style.backgroundColor"];
+            }
+            if (
+              id === "home-hero-lead" &&
+              textContent?.toLowerCase().startsWith("universal music store is an online store")
+            ) {
+              delete cleaned.textContent;
+            }
+            return [id, cleaned];
+          })
+          .filter(([, value]) => Object.keys(value as Record<string, string>).length > 0),
+      )
+    : undefined;
   return {
     visualBlocks: Array.isArray(raw.visualBlocks)
       ? raw.visualBlocks.filter(
@@ -283,9 +334,7 @@ export function mergeStorefrontHomePayload(raw: unknown): StorefrontHomePayload 
             isRecord(block.props),
         )
       : undefined,
-    domOverrides: isRecord(raw.domOverrides)
-      ? Object.fromEntries(Object.entries(raw.domOverrides).filter(([, value]) => isRecord(value)).map(([id, value]) => [id, value as Record<string, string>]))
-      : undefined,
+    domOverrides,
     sectionLayout: isRecord(raw.sectionLayout)
       ? {
           hero: mergeLayout(raw.sectionLayout.hero),
@@ -385,7 +434,7 @@ export async function loadStorefrontHomeContentForPublic(): Promise<StorefrontHo
 }
 
 /** The published page tree is authoritative; legacy home content is only a migration fallback. */
-export function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
+function mergeCanonicalHomeTree(tree: CmsNode[]): StorefrontHomePayload {
   const blocks = cmsTreeToBlocks(tree);
   const raw: Record<string, unknown> = {};
   const hero = blocks.find((block) => block.id === "home-hero")?.props;

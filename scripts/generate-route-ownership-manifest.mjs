@@ -17,7 +17,7 @@ async function routeFiles(dir) {
 }
 
 function apiPath(file) {
-  return `/${path.relative(apiRoot, path.dirname(file)).split(path.sep).join("/").replace(/\[([^\]]+)\]/g, "{$1}")}`;
+  return `/${path.relative(apiRoot, path.dirname(file)).split(path.sep).join("/").replace(/\[([A-Za-z0-9_-]+)\]/g, "{$1}")}`;
 }
 
 function methods(source) {

@@ -123,7 +123,7 @@ export function StorefrontHomePreviewBridge({
     // The iframe may be served without a referrer, so its parent origin cannot
     // be derived reliably. The admin receiver validates the iframe origin and
     // the message source before accepting this handshake.
-    window.parent.postMessage({ source: "cms-preview-ready" }, "*");
+    window.parent.postMessage({ source: "cms-preview-ready" }, parentOrigin || window.location.origin);
     return () => {
       window.removeEventListener("message", onMessage);
     };

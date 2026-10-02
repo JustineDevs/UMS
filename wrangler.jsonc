@@ -5,6 +5,11 @@
   "compatibility_date": "2026-09-10",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "dev": {
+    "ip": "127.0.0.1",
+    "port": 8787,
+    "inspector_port": 0
+  },
   "env": {
     "dev": {
       "name": "ums-backend-preview",
@@ -25,6 +30,7 @@
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic-preview.vercel.app,http://localhost:3000,http://localhost:3001",
         "PUBLIC_SITE_URL": "https://universalmusic-preview.vercel.app",
+        "PUBLIC_WORKER_URL": "https://ums-backend-preview.pcg0255.workers.dev",
         "CMS_ORGANIZATION_ID": "local-admin@example.com",
         "DEFAULT_ORGANIZATION_ID": "local-admin@example.com"
       },
@@ -55,6 +61,7 @@
       "vars": {
         "ALLOWED_ORIGINS": "https://universalmusic.vercel.app,https://universalmusic-preview.vercel.app",
         "PUBLIC_SITE_URL": "https://universalmusic.vercel.app",
+        "PUBLIC_WORKER_URL": "https://ums-backend-production.pcg0255.workers.dev",
         "CMS_ORGANIZATION_ID": "e2e-admin",
         "DEFAULT_ORGANIZATION_ID": "e2e-admin"
       },

@@ -11,7 +11,6 @@ export type AdminErr = {
   httpStatus: number;
 };
 
-export type AdminOperationResult<T> = AdminOk<T> | AdminErr;
 
 export function adminOk<T>(data: T): AdminOk<T> {
   return { ok: true, data };

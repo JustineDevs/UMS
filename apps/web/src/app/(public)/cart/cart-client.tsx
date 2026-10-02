@@ -212,7 +212,7 @@ export function CartPageClient() {
       }
       unsubscribe();
     };
-  }, [isHydrating, reconcile]);
+  }, [isHydrating, reconcile, refresh]);
 
   function commitQuantity(
     variantId: string,
@@ -380,6 +380,9 @@ export function CartPageClient() {
   if (lines.length === 0) {
     return (
       <div className="space-y-6 py-8 text-center">
+        <p className="sr-only" role="status" aria-live="polite">
+          {quantityStatus}
+        </p>
         <p className="text-on-surface-variant text-sm">Your bag is empty.</p>
         <Link
           href="/shop"

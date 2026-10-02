@@ -111,8 +111,8 @@ function imageRemotePatterns() {
   return [
     ...fromEnv,
     { protocol: "https", hostname: "images.stripeassets.com", pathname: "/**" },
+    { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
     { protocol: "https", hostname: "www.paypalobjects.com", pathname: "/**" },
-    { protocol: "https", hostname: "www.xendit.co", pathname: "/**" },
     {
       protocol: "https",
       hostname: "lh3.googleusercontent.com",
@@ -302,13 +302,13 @@ const nextConfig = {
   distDir:
     process.env.VERCEL === "1"
       ? ".next"
-      : isNextDevCommand ||
+      : process.env.NODE_ENV === "production"
+        ? ".next-production"
+        : isNextDevCommand ||
           process.env.NEXT_PHASE === "phase-development-server" ||
           process.env.UVS_E2E_LOCAL === "1"
         ? ".next-dev"
-        : process.env.NODE_ENV === "production"
-          ? ".next-production"
-          : ".next",
+        : ".next",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
     "@universal-music-store/types",
@@ -372,13 +372,6 @@ const nextConfig = {
         source: "/api/shop/search-suggest",
         headers: [
           { key: "Cache-Control", value: "public, max-age=5, s-maxage=60, stale-while-revalidate=300" },
-        ],
-      },
-      {
-        // The feed route exports GET only; review submission remains no-store.
-        source: "/api/reviews/feed",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
         ],
       },
       {

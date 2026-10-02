@@ -1,8 +1,13 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import {
+  isLocalBrowserHost,
+  recaptchaProvider,
+} from "@/lib/recaptcha-client";
 import { isLocalRecaptchaBypassEnabled } from "@/lib/recaptcha-enterprise";
+import { useHydrated } from "@/lib/use-hydrated";
 
 /* eslint-disable no-unused-vars */
 declare global {
@@ -19,76 +24,13 @@ declare global {
 }
 /* eslint-enable no-unused-vars */
 
-type RecaptchaProvider = "enterprise" | "standard";
-
-function recaptchaProvider(): RecaptchaProvider {
-  return process.env.NEXT_PUBLIC_RECAPTCHA_PROVIDER?.trim().toLowerCase() === "standard"
-    ? "standard"
-    : "enterprise";
-}
-
-function isLocalBrowserHost(): boolean {
-  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-}
-
-function isLocalBrowserBypass(): boolean {
-  // A loopback browser cannot be a production origin. Keep local QA from
-  // loading a production site key even when `next start` sets NODE_ENV=production.
-  return isLocalBrowserHost();
-}
-
-export async function getRecaptchaToken(action: string): Promise<string | null> {
-  if (isLocalRecaptchaBypassEnabled() || isLocalBrowserBypass()) return "local-development-bypass";
-  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim();
-  if (!siteKey) return null;
-  const provider = recaptchaProvider();
-  const deadline = Date.now() + 5_000;
-  while (!(provider === "enterprise" ? window.grecaptcha?.enterprise : window.grecaptcha) && Date.now() < deadline) {
-    await new Promise((resolve) => window.setTimeout(resolve, 50));
-  }
-  if (provider === "enterprise" && !window.grecaptcha?.enterprise) return null;
-  if (provider === "standard" && !window.grecaptcha?.ready) return null;
-  return new Promise((resolve) => {
-    const api = provider === "enterprise" ? window.grecaptcha?.enterprise : window.grecaptcha;
-    if (!api?.ready) {
-      resolve(null);
-      return;
-    }
-    const timeout = window.setTimeout(() => resolve(null), 5_000);
-    const finish = (token: string | null) => {
-      window.clearTimeout(timeout);
-      resolve(token);
-    };
-    try {
-      api.ready(() => {
-        try {
-          const execution = provider === "enterprise"
-            ? window.grecaptcha?.enterprise?.execute(siteKey, { action })
-            : window.grecaptcha?.execute?.(siteKey, { action });
-          if (!execution) {
-            finish(null);
-            return;
-          }
-          void execution.then(finish).catch(() => finish(null));
-        } catch {
-          finish(null);
-        }
-      });
-    } catch {
-      finish(null);
-    }
-  });
-}
 
 export function RecaptchaScript() {
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY?.trim();
-  const [browserBypass, setBrowserBypass] = useState<boolean | null>(null);
-  useEffect(() => {
-    setBrowserBypass(isLocalBrowserHost());
-  }, []);
+  const hydrated = useHydrated();
   // Keep the server and hydration output identical; load the script only after
   // the browser hostname has been checked.
-  const localBypass = isLocalRecaptchaBypassEnabled() || browserBypass !== false;
+  const localBypass = isLocalRecaptchaBypassEnabled() || !hydrated || isLocalBrowserHost();
   useEffect(() => {
     if (!siteKey || localBypass) return;
     const markBadge = () => {

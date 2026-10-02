@@ -68,12 +68,15 @@ export function parseCartQuantityInput(value: string): number | null {
 // v5 intentionally invalidates v3/v4 quantities created by the old stock-max bug.
 export const CART_STORAGE_KEY = "ums-commerce-cart-v5";
 const LEGACY_CART_STORAGE_KEYS = ["ums-commerce-cart-v3", "ums-commerce-cart-v4"];
-export const CART_UPDATED_EVENT = "ums-cart-updated";
-export const CART_BROADCAST_CHANNEL = "ums-cart-updated-v5";
-const CART_BROADCAST_SOURCE =
-  typeof globalThis.crypto?.randomUUID === "function"
+const CART_UPDATED_EVENT = "ums-cart-updated";
+const CART_BROADCAST_CHANNEL = "ums-cart-updated-v5";
+let cartBroadcastSource: string | undefined;
+function getCartBroadcastSource(): string {
+  cartBroadcastSource ??= typeof globalThis.crypto?.randomUUID === "function"
     ? globalThis.crypto.randomUUID()
     : Math.random().toString(36).slice(2);
+  return cartBroadcastSource;
+}
 const CART_MERGE_KEY = "ums-commerce-cart-merge-v1";
 const CART_STORAGE_VERSION = 1;
 
@@ -94,7 +97,7 @@ function notifyCartUpdated(options: { sameTab?: boolean } = {}): void {
   }
   if (typeof window.BroadcastChannel !== "function") return;
   const channel = new window.BroadcastChannel(CART_BROADCAST_CHANNEL);
-  channel.postMessage({ type: "cart-updated", source: CART_BROADCAST_SOURCE });
+  channel.postMessage({ type: "cart-updated", source: getCartBroadcastSource() });
   channel.close();
 }
 
@@ -115,7 +118,7 @@ export function subscribeToCartUpdates(onUpdate: () => void): () => void {
       ? new window.BroadcastChannel(CART_BROADCAST_CHANNEL)
       : null;
   const onBroadcast = (event: MessageEvent<{ source?: string }>) => {
-    if (event.data?.source !== CART_BROADCAST_SOURCE) onUpdate();
+    if (event.data?.source !== getCartBroadcastSource()) onUpdate();
   };
   channel?.addEventListener("message", onBroadcast);
   return () => {

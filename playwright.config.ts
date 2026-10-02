@@ -56,6 +56,11 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     ),
     NEXT_PUBLIC_SITE_URL:
       baseURL,
+    // Keep provider hosted-return URLs on the exact same host as the browser.
+    // run-next-dev.cjs otherwise defaults development callbacks to localhost,
+    // which drops the host-only checkout capability cookies when Playwright
+    // is bound to 127.0.0.1.
+    UVS_DEV_PUBLIC_ORIGIN: baseURL,
     // Keep the embedded CMS preview on the exact same host as the parent
     // page. CSP frame-src is intentionally same-origin in local E2E runs.
     NEXT_PUBLIC_STOREFRONT_URL: baseURL,
@@ -77,6 +82,13 @@ function storefrontServerEnv(): Record<string, string | undefined> {
     E2E_ADMIN_AUTH: process.env.E2E_ADMIN_AUTH,
     E2E_ADMIN_PASSWORD: process.env.E2E_ADMIN_PASSWORD,
     UVS_E2E_REAL_SESSION: process.env.UVS_E2E_REAL_SESSION,
+    // Client checkout guards read the public aliases. Mirror the explicit
+    // local auth-disabled switch into those aliases so auth-disabled E2E runs
+    // exercise checkout instead of rendering the sign-in gate.
+    NEXT_PUBLIC_AUTH_DISABLED:
+      process.env.NEXT_PUBLIC_AUTH_DISABLED ?? process.env.AUTH_DISABLED,
+    NEXT_PUBLIC_AUTH_DISABLE:
+      process.env.NEXT_PUBLIC_AUTH_DISABLE ?? process.env.AUTH_DISABLE,
     ADMIN_ALLOWED_EMAILS: process.env.ADMIN_ALLOWED_EMAILS,
     ...(localE2eOrganizationId
       ? {
@@ -117,6 +129,9 @@ const storefrontWebServerUrl =
   process.env.PLAYWRIGHT_STOREFRONT_WEBSERVER_URL ??
   new URL("/api/health", baseURL).toString();
 const workerPort = process.env.CLOUDFLARE_DEV_PORT ?? "8787";
+const workerBaseUrl =
+  process.env.PLAYWRIGHT_WORKER_URL ?? `http://127.0.0.1:${workerPort}`;
+const workerHealthUrl = new URL("/healthz", workerBaseUrl).toString();
 
 /**
  * Real-session local proofs use the staff identity's organization. Keep this
@@ -133,7 +148,10 @@ const localE2eWorkerVars = localE2eOrganizationId
   ? ` --var DEFAULT_ORGANIZATION_ID:${localE2eOrganizationId} --var CMS_ORGANIZATION_ID:${localE2eOrganizationId}`
   : "";
 
-const reuseDevServer = !process.env.CI && !useProductionWebServer;
+// A Playwright run owns its own isolated stack. Reusing a manually started
+// dev server makes the test and dev lifecycles indistinguishable and can leave
+// Next/Wrangler children behind after an interrupted run.
+const reuseDevServer = false;
 const configuredWorkers = Number(
   process.env.PLAYWRIGHT_WORKERS || (process.env.CI ? 2 : 1),
 );
@@ -152,17 +170,17 @@ const e2eTrace =
       : ("retain-on-failure" as const);
 
 export default defineConfig({
-  testDir: "./stress-test/e2e",
-  outputDir: "./stress-test/test-results",
+  testDir: "./scripts/stress-test/e2e",
+  outputDir: "./scripts/stress-test/test-results",
   fullyParallel: process.env.PLAYWRIGHT_FULLY_PARALLEL === "1",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: configuredWorkers,
   reporter: [
-    ["html", { open: "never", outputFolder: "stress-test/playwright-report" }],
+    ["html", { open: "never", outputFolder: "scripts/stress-test/playwright-report" }],
     ["list"],
     [
-      "./stress-test/e2e/reporters/test-artifact-reporter.ts",
+      "./scripts/stress-test/e2e/reporters/test-artifact-reporter.ts",
       { outputBase: process.env.E2E_RUNTIME_LOG_DIR },
     ],
   ],
@@ -197,7 +215,7 @@ export default defineConfig({
         {
           command:
             `pnpm exec wrangler dev --config wrangler.jsonc --env dev --local --show-interactive-dev-session=false --port ${workerPort}${localE2eWorkerVars}`,
-          url: process.env.PLAYWRIGHT_WORKER_URL ?? `http://127.0.0.1:${workerPort}/healthz`,
+          url: workerHealthUrl,
           reuseExistingServer: reuseDevServer,
           timeout: 180_000,
           stdout: "pipe",
@@ -232,6 +250,6 @@ export default defineConfig({
           env: storefrontServerEnv(),
         },
       ],
-  /** Per-test ceiling must exceed PDP / shop waits (see stress-test/e2e/helpers/storefront.ts). */
+  /** Per-test ceiling must exceed PDP / shop waits (see scripts/stress-test/e2e/helpers/storefront.ts). */
   timeout: 180_000,
 });

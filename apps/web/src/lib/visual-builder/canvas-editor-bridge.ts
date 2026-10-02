@@ -1,5 +1,6 @@
 import { serializeHtml } from "./builder-actions";
 import { readResponseJson } from "../read-response-json";
+import { sanitizeCmsHtml } from "@universal-music-store/validation";
 
 export type CanvasDocument = { body: { innerHTML: string }; head: { innerHTML: string } };
 export type CanvasFrame = { addEventListener(type: "load" | "beforeunload" | "unload", listener: () => void): void; removeEventListener?(type: "load" | "beforeunload" | "unload", listener: () => void): void; contentDocument: CanvasDocument | null };
@@ -30,7 +31,7 @@ export class CanvasController {
     this.document = null;
     this.loaded = false;
   }
-  setHtml(html: string): void { if (!this.document) throw new Error("Canvas is not loaded"); this.document.body.innerHTML = html; }
+  setHtml(html: string): void { if (!this.document) throw new Error("Canvas is not loaded"); this.document.body.innerHTML = sanitizeCmsHtml(html); }
   getHtml(): string {
     if (!this.document) throw new Error("Canvas is not loaded");
     // Sanitize the editable payloads without passing the document shell through

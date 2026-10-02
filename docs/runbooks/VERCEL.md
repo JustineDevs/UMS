@@ -2,6 +2,12 @@
 
 This runbook covers the unified Next.js web application on Vercel. It serves both customer-facing storefront routes and protected admin routes. Production also requires the reachable **Cloudflare Worker backend** configured by `API_URL`, **Supabase** (for the payment ledger, staff RBAC, and related platform data), and scheduled calls to the payment recovery cron route when using hosted checkout. See `docs/runbooks/PAYMENT-INTEGRATION.md` for the full payment lifecycle. The backend deployment contract is in `wrangler.jsonc`.
 
+The canonical Worker origins are the named environment-specific `workers.dev`
+URLs declared as `PUBLIC_WORKER_URL` in `wrangler.jsonc`. `workers_dev: true`
+is intentional for this deployment topology: Vercel and provider callbacks use
+those stable Worker origins. Do not substitute a preview origin for production,
+or register the storefront/Vercel origin as a backend callback.
+
 Run the read-only backend smoke matrix after a Worker deployment:
 
 ```bash
@@ -19,13 +25,17 @@ manual GitHub Actions `worker-smoke` workflow against the promoted Worker URL.
 It is intentionally manual and does not add Vercel Cron or mutate production
 data.
 
+Use `/healthz` only for process liveness and `/readyz` for dependency-aware
+readiness. The storefront `/api/health` endpoint is also liveness-only; use
+`/api/health/sop` when the monitor must validate the Worker readiness contract.
+
 ## Required Environment Variables
 
 Set these in Vercel → Project → Settings → Environment Variables. Without them, customer-facing catalog routes show "Catalog service unavailable" or "Invalid URL".
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `API_URL` | Deployed Cloudflare Worker API origin | `https://<worker>.<account>.workers.dev` |
+| `API_URL` | Deployed Cloudflare Worker API origin; must equal the environment's `PUBLIC_WORKER_URL` | `https://ums-backend-production.<account>.workers.dev` |
 
 Do not set legacy `MEDUSA_*` storefront variables. The web application talks to
 the Cloudflare Worker through `API_URL`; the Worker reaches the commerce database

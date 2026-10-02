@@ -1,4 +1,4 @@
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import { requirePagePermission } from "@/lib/require-page-permission";
 import { WorkflowQueueExplorer } from "./WorkflowQueueExplorer";
 
@@ -16,7 +16,6 @@ export default async function WorkflowCompliancePage() {
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Workflow" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <WorkflowQueueExplorer />
     </AdminPageShell>
