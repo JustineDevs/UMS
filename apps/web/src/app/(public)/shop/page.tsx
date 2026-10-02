@@ -102,7 +102,8 @@ export default async function ShopPage({
   const sp = normalizeShopPageSearchParams(await searchParams);
   const cmsLocale = (sp.locale ?? "en").trim() || "en";
   const diagnostics = parseShopPageQueryDiagnostics(sp);
-  if (diagnostics.invalidKeys.length > 0) {
+  const q = diagnostics.query;
+  if (diagnostics.invalidKeys.length > 0 || q.category) {
     const allowedQueryKeys = new Set([
       "category",
       "type",
@@ -124,6 +125,7 @@ export default async function ShopPage({
     for (const [key, value] of Object.entries(sp)) {
       if (
         key === "locale" ||
+        (key === "category" && q.category) ||
         !allowedQueryKeys.has(key) ||
         invalidKeys.has(key)
       ) continue;
@@ -131,20 +133,6 @@ export default async function ShopPage({
     }
     redirect(canonical.toString() ? `/shop?${canonical}` : "/shop");
   }
-  const q = diagnostics.query;
-
-  // Category landing pages have their own canonical route. Keep legacy
-  // /shop?category=... links from recreating the old duplicate heading and
-  // preserve any other active shop filters while removing the category key.
-  if (q.category) {
-    const canonical = new URLSearchParams();
-    for (const [key, value] of Object.entries(sp)) {
-      if (key === "category" || key === "locale") continue;
-      if (typeof value === "string" && value.trim()) canonical.set(key, value);
-    }
-    redirect(canonical.toString() ? `/shop?${canonical}` : "/shop");
-  }
-
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
   const finish = q.finish?.trim() || undefined;

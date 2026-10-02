@@ -4371,7 +4371,7 @@
         "methods": [],
         "controls": [
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:353:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:341:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4379,10 +4379,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 353
+            "line": 341
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:389:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:377:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4390,10 +4390,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 389
+            "line": 377
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:430:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:418:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4401,10 +4401,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 430
+            "line": 418
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:484:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:472:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4412,10 +4412,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 484
+            "line": 472
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:515:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:503:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4423,10 +4423,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 515
+            "line": 503
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:546:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:534:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4434,10 +4434,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 546
+            "line": 534
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:577:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:565:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4445,10 +4445,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 577
+            "line": 565
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:608:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:596:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4456,10 +4456,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 608
+            "line": 596
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:639:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:627:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4467,10 +4467,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 639
+            "line": 627
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:657:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:645:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -4478,10 +4478,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 657
+            "line": 645
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:687:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:675:link",
             "element": "link",
             "role": "link",
             "label": "Previous shop page",
@@ -4489,10 +4489,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 687
+            "line": 675
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:697:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:685:link",
             "element": "link",
             "role": "link",
             "label": "Next shop page",
@@ -4500,7 +4500,7 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 697
+            "line": 685
           }
         ]
       },
@@ -9605,7 +9605,7 @@
         "methods": [],
         "controls": [
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:353:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:341:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9613,10 +9613,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 353
+            "line": 341
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:389:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:377:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9624,10 +9624,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 389
+            "line": 377
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:430:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:418:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9635,10 +9635,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 430
+            "line": 418
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:484:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:472:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9646,10 +9646,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 484
+            "line": 472
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:515:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:503:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9657,10 +9657,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 515
+            "line": 503
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:546:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:534:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9668,10 +9668,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 546
+            "line": 534
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:577:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:565:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9679,10 +9679,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 577
+            "line": 565
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:608:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:596:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9690,10 +9690,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 608
+            "line": 596
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:639:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:627:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9701,10 +9701,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 639
+            "line": 627
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:657:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:645:link",
             "element": "link",
             "role": "link",
             "label": null,
@@ -9712,10 +9712,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 657
+            "line": 645
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:687:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:675:link",
             "element": "link",
             "role": "link",
             "label": "Previous shop page",
@@ -9723,10 +9723,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 687
+            "line": 675
           },
           {
-            "id": "apps/web/src/app/(public)/shop/page.tsx:697:link",
+            "id": "apps/web/src/app/(public)/shop/page.tsx:685:link",
             "element": "link",
             "role": "link",
             "label": "Next shop page",
@@ -9734,7 +9734,7 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/app/(public)/shop/page.tsx",
-            "line": 697
+            "line": 685
           }
         ]
       },
@@ -25608,7 +25608,7 @@
         "line": 329
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:353:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:341:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25616,10 +25616,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 353
+        "line": 341
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:389:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:377:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25627,10 +25627,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 389
+        "line": 377
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:430:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:418:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25638,10 +25638,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 430
+        "line": 418
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:484:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:472:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25649,10 +25649,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 484
+        "line": 472
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:515:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:503:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25660,10 +25660,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 515
+        "line": 503
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:546:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:534:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25671,10 +25671,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 546
+        "line": 534
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:577:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:565:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25682,10 +25682,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 577
+        "line": 565
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:608:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:596:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25693,10 +25693,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 608
+        "line": 596
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:639:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:627:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25704,10 +25704,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 639
+        "line": 627
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:657:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:645:link",
         "element": "link",
         "role": "link",
         "label": null,
@@ -25715,10 +25715,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 657
+        "line": 645
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:687:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:675:link",
         "element": "link",
         "role": "link",
         "label": "Previous shop page",
@@ -25726,10 +25726,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 687
+        "line": 675
       },
       {
-        "id": "apps/web/src/app/(public)/shop/page.tsx:697:link",
+        "id": "apps/web/src/app/(public)/shop/page.tsx:685:link",
         "element": "link",
         "role": "link",
         "label": "Next shop page",
@@ -25737,7 +25737,7 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/app/(public)/shop/page.tsx",
-        "line": 697
+        "line": 685
       },
       {
         "id": "apps/web/src/app/(public)/site-map/page.tsx:64:link",
