@@ -22,6 +22,28 @@ test("coalesces concurrent public reads without sharing a consumed response body
   assert.deepEqual(await responses[1].json(), { ok: true });
 });
 
+test("gives concurrent callers independent response headers and status", async () => {
+  const operation = async () =>
+    new Response("unavailable", {
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: { "X-Request-ID": "producer-request" },
+    });
+
+  const [first, second] = await Promise.all([
+    coalescePublicRead("status", operation),
+    coalescePublicRead("status", operation),
+  ]);
+
+  assert.equal(first.status, 503);
+  assert.equal(second.statusText, "Service Unavailable");
+  assert.equal(first.headers.get("X-Request-ID"), "producer-request");
+  assert.equal(second.headers.get("X-Request-ID"), "producer-request");
+
+  first.headers.set("X-Request-ID", "first-only");
+  assert.equal(second.headers.get("X-Request-ID"), "producer-request");
+});
+
 test("does not retain a completed public response", async () => {
   let calls = 0;
   const operation = async () => {

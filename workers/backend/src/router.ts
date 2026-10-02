@@ -277,19 +277,42 @@ const HOP_BY_HOP_HEADERS = new Set([
 // Public CMS reads are requested by several page loaders at the same time.
 // Coalesce only the in-flight request so a route sweep cannot stampede the
 // database; completed responses are never retained in Worker memory.
-const publicReadInFlight = new Map<string, Promise<Response>>();
+type PublicReadSnapshot = {
+  body: ArrayBuffer;
+  headers: Headers;
+  status: number;
+  statusText: string;
+};
+
+const publicReadInFlight = new Map<string, Promise<PublicReadSnapshot>>();
+
+function responseFromPublicReadSnapshot(snapshot: PublicReadSnapshot): Response {
+  // Build a new response for every caller. A Response body may be tied to the
+  // request that produced it in the Worker runtime and must not be shared
+  // across requests, even when the body has already been read.
+  return new Response(snapshot.body.slice(0), {
+    headers: new Headers(snapshot.headers),
+    status: snapshot.status,
+    statusText: snapshot.statusText,
+  });
+}
 
 export async function coalescePublicRead(
   key: string,
   operation: () => Promise<Response>,
 ): Promise<Response> {
   const pending = publicReadInFlight.get(key);
-  if (pending) return (await pending).clone();
+  if (pending) return responseFromPublicReadSnapshot(await pending);
 
-  const promise = operation();
+  const promise = operation().then(async (response) => ({
+    body: await response.arrayBuffer(),
+    headers: new Headers(response.headers),
+    status: response.status,
+    statusText: response.statusText,
+  }));
   publicReadInFlight.set(key, promise);
   try {
-    return (await promise).clone();
+    return responseFromPublicReadSnapshot(await promise);
   } finally {
     if (publicReadInFlight.get(key) === promise) publicReadInFlight.delete(key);
   }
