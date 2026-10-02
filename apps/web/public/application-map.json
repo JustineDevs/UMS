@@ -10,9 +10,9 @@
     },
     "generatedAt": null,
     "counts": {
-      "routes": 302,
+      "routes": 303,
       "endpoints": 210,
-      "applicationFiles": 385,
+      "applicationFiles": 386,
       "components": 256,
       "controls": 1034,
       "storybookStories": 1
@@ -138,6 +138,13 @@
             "line": 64
           }
         ]
+      },
+      {
+        "path": "/account",
+        "kind": "page",
+        "source": "apps/web/src/app/(public)/account/page.tsx",
+        "methods": [],
+        "controls": []
       },
       {
         "path": "/account/addresses",
@@ -8298,6 +8305,13 @@
             "line": 44
           }
         ]
+      },
+      {
+        "kind": "page",
+        "path": "/account",
+        "source": "apps/web/src/app/(public)/account/page.tsx",
+        "methods": [],
+        "controls": []
       },
       {
         "kind": "page",
@@ -17920,7 +17934,7 @@
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
         "controls": [
           {
-            "id": "apps/web/src/components/PhilippineAddressFields.tsx:213:input",
+            "id": "apps/web/src/components/PhilippineAddressFields.tsx:210:input",
             "element": "input",
             "role": "input",
             "label": "shipping-address-line1",
@@ -17928,10 +17942,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-            "line": 213
+            "line": 210
           },
           {
-            "id": "apps/web/src/components/PhilippineAddressFields.tsx:217:select",
+            "id": "apps/web/src/components/PhilippineAddressFields.tsx:214:select",
             "element": "select",
             "role": "select",
             "label": "{idPrefix}-region",
@@ -17939,10 +17953,10 @@
             "type": null,
             "disabled": false,
             "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-            "line": 217
+            "line": 214
           },
           {
-            "id": "apps/web/src/components/PhilippineAddressFields.tsx:224:select",
+            "id": "apps/web/src/components/PhilippineAddressFields.tsx:221:select",
             "element": "select",
             "role": "select",
             "label": "{idPrefix}-province",
@@ -17950,10 +17964,10 @@
             "type": null,
             "disabled": true,
             "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-            "line": 224
+            "line": 221
           },
           {
-            "id": "apps/web/src/components/PhilippineAddressFields.tsx:232:select",
+            "id": "apps/web/src/components/PhilippineAddressFields.tsx:229:select",
             "element": "select",
             "role": "select",
             "label": "{idPrefix}-city",
@@ -17961,10 +17975,10 @@
             "type": null,
             "disabled": true,
             "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-            "line": 232
+            "line": 229
           },
           {
-            "id": "apps/web/src/components/PhilippineAddressFields.tsx:239:select",
+            "id": "apps/web/src/components/PhilippineAddressFields.tsx:236:select",
             "element": "select",
             "role": "select",
             "label": "{idPrefix}-barangay",
@@ -17972,7 +17986,7 @@
             "type": null,
             "disabled": true,
             "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-            "line": 239
+            "line": 236
           }
         ]
       },
@@ -30852,7 +30866,7 @@
         "line": 84
       },
       {
-        "id": "apps/web/src/components/PhilippineAddressFields.tsx:213:input",
+        "id": "apps/web/src/components/PhilippineAddressFields.tsx:210:input",
         "element": "input",
         "role": "input",
         "label": "shipping-address-line1",
@@ -30860,10 +30874,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-        "line": 213
+        "line": 210
       },
       {
-        "id": "apps/web/src/components/PhilippineAddressFields.tsx:217:select",
+        "id": "apps/web/src/components/PhilippineAddressFields.tsx:214:select",
         "element": "select",
         "role": "select",
         "label": "{idPrefix}-region",
@@ -30871,10 +30885,10 @@
         "type": null,
         "disabled": false,
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-        "line": 217
+        "line": 214
       },
       {
-        "id": "apps/web/src/components/PhilippineAddressFields.tsx:224:select",
+        "id": "apps/web/src/components/PhilippineAddressFields.tsx:221:select",
         "element": "select",
         "role": "select",
         "label": "{idPrefix}-province",
@@ -30882,10 +30896,10 @@
         "type": null,
         "disabled": true,
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-        "line": 224
+        "line": 221
       },
       {
-        "id": "apps/web/src/components/PhilippineAddressFields.tsx:232:select",
+        "id": "apps/web/src/components/PhilippineAddressFields.tsx:229:select",
         "element": "select",
         "role": "select",
         "label": "{idPrefix}-city",
@@ -30893,10 +30907,10 @@
         "type": null,
         "disabled": true,
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-        "line": 232
+        "line": 229
       },
       {
-        "id": "apps/web/src/components/PhilippineAddressFields.tsx:239:select",
+        "id": "apps/web/src/components/PhilippineAddressFields.tsx:236:select",
         "element": "select",
         "role": "select",
         "label": "{idPrefix}-barangay",
@@ -30904,7 +30918,7 @@
         "type": null,
         "disabled": true,
         "source": "apps/web/src/components/PhilippineAddressFields.tsx",
-        "line": 239
+        "line": 236
       },
       {
         "id": "apps/web/src/components/PlatformRuntimeSettingsEditor.tsx:17:input",
