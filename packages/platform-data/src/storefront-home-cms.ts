@@ -131,6 +131,11 @@ function pickString(r: Record<string, unknown>, key: string, fallback: string): 
   return typeof v === "string" ? v : fallback;
 }
 
+function isHostOrSubdomain(hostname: string, domain: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/\.$/, "");
+  return normalized === domain || normalized.split(".").slice(-2).join(".") === domain;
+}
+
 function sanitizeHomeImageUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -138,7 +143,7 @@ function sanitizeHomeImageUrl(value: string): string {
     const url = new URL(trimmed.startsWith("//") ? `https:${trimmed}` : trimmed);
     const hostname = url.hostname.toLowerCase();
     if (hostname === "medusa-public-images.s3.eu-west-1.amazonaws.com") return "";
-    if (hostname === "fbcdn.net" || hostname.endsWith(".fbcdn.net")) return "";
+    if (isHostOrSubdomain(hostname, "fbcdn.net")) return "";
     return trimmed;
   } catch {
     return trimmed;

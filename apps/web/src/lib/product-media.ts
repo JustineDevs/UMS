@@ -1,18 +1,27 @@
 /** Returns a YouTube embed URL, or null if the string is not a recognized YouTube link. */
+const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{6,}$/;
+
+function normalizeYoutubeId(value: string | null | undefined): string | null {
+  const id = value?.trim() ?? "";
+  return YOUTUBE_ID_PATTERN.test(id) ? id : null;
+}
+
 export function youtubeEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname === "youtu.be") {
-      const id = u.pathname.replace(/^\//, "").split("/")[0];
+      const id = normalizeYoutubeId(u.pathname.slice(1).split("/")[0]);
       if (id) return `https://www.youtube.com/embed/${id}`;
     }
     if (u.hostname === "youtube.com" || u.hostname === "www.youtube.com") {
-      const v = u.searchParams.get("v");
+      const v = normalizeYoutubeId(u.searchParams.get("v"));
       if (v) return `https://www.youtube.com/embed/${v}`;
       const embed = u.pathname.match(/\/embed\/([^/?]+)/);
-      if (embed?.[1]) return `https://www.youtube.com/embed/${embed[1]}`;
+      const embedId = normalizeYoutubeId(embed?.[1]);
+      if (embedId) return `https://www.youtube.com/embed/${embedId}`;
       const shorts = u.pathname.match(/\/shorts\/([^/?]+)/);
-      if (shorts?.[1]) return `https://www.youtube.com/embed/${shorts[1]}`;
+      const shortsId = normalizeYoutubeId(shorts?.[1]);
+      if (shortsId) return `https://www.youtube.com/embed/${shortsId}`;
     }
   } catch {
     return null;
@@ -59,16 +68,18 @@ function youtubeVideoId(url: string): string | null {
   try {
     const u = new URL(url);
     if (u.hostname === "youtu.be") {
-      const id = u.pathname.replace(/^\//, "").split("/")[0];
+      const id = normalizeYoutubeId(u.pathname.slice(1).split("/")[0]);
       return id || null;
     }
     if (u.hostname === "youtube.com" || u.hostname === "www.youtube.com") {
-      const v = u.searchParams.get("v");
+      const v = normalizeYoutubeId(u.searchParams.get("v"));
       if (v) return v;
       const embed = u.pathname.match(/\/embed\/([^/?]+)/);
-      if (embed?.[1]) return embed[1];
+      const embedId = normalizeYoutubeId(embed?.[1]);
+      if (embedId) return embedId;
       const shorts = u.pathname.match(/\/shorts\/([^/?]+)/);
-      if (shorts?.[1]) return shorts[1];
+      const shortsId = normalizeYoutubeId(shorts?.[1]);
+      if (shortsId) return shortsId;
     }
   } catch {
     return null;

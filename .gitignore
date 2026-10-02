@@ -16,6 +16,9 @@ node_modules/
 dist/
 out/
 build/
+# The admin CMS route is source code, not a build artifact.
+!apps/web/src/app/(dashboard)/admin/build/
+!apps/web/src/app/(dashboard)/admin/build/page.tsx
 *.tsbuildinfo
 *.swc
 *.eslintcache
