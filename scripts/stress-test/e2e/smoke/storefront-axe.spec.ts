@@ -32,8 +32,10 @@ for (const route of routes) {
 
 test("axe: /account auth-disabled local mode", async ({ page }) => {
   await page.goto("/account", { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL(/\/login(?:\?|$)/);
-  await expect(page.getByRole("heading", { name: "Login", exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page).toHaveURL(/\/(?:login|onboarding)(?:\?|$)/);
+  const signedOutHeading = page.getByRole("heading", { name: /^(?:Login|Welcome)$/i }).first();
+  await expect(signedOutHeading).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-testid="account-private-shell"]')).toHaveCount(0);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
