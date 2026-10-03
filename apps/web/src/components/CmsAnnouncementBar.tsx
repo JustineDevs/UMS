@@ -2,6 +2,7 @@
 
 import { Announcement4 } from "@universal-music-store/ui";
 import { useEffect, useState } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 const STORAGE_PREFIX = "cms_announcement_dismissed_";
 
@@ -70,23 +71,12 @@ function CmsAnnouncementBar({
   linkLabel: string | null;
   dismissible: boolean;
 }) {
-  const [hidden, setHidden] = useState(true);
-
-  useEffect(() => {
-    if (!body.trim()) return;
-    const storageKey = STORAGE_PREFIX + announcementId + "_" + locale;
-    if (dismissible && typeof window !== "undefined") {
-      if (window.sessionStorage.getItem(storageKey)) {
-        setHidden(true);
-        return;
-      }
-    }
-    setHidden(false);
-  }, [body, dismissible, announcementId, locale]);
+  const hydrated = useHydrated();
+  const [dismissed, setDismissed] = useState(false);
+  const storageKey = STORAGE_PREFIX + announcementId + "_" + locale;
+  const hidden = !hydrated || dismissed || (dismissible && window.sessionStorage.getItem(storageKey) !== null);
 
   if (!body.trim() || hidden) return null;
-
-  const storageKey = STORAGE_PREFIX + announcementId + "_" + locale;
 
   const plainMessage = bodyFormat === "html" ? body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : body;
 
@@ -106,7 +96,7 @@ function CmsAnnouncementBar({
       onDismiss={() => {
         track("dismiss", announcementId, locale);
         window.sessionStorage.setItem(storageKey, "1");
-        setHidden(true);
+        setDismissed(true);
       }}
     />
   );

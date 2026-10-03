@@ -6,18 +6,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
+import { ChevronDown, Menu, X } from "lucide-react";
+import { Button } from "./ui/button";
 import {
   isKnownUnavailableExternalImage,
   shouldUnoptimizeImage,
 } from "@/lib/image-helpers";
+import type { StorefrontNavigationSource } from "./StorefrontHeader";
+import {
+  DEFAULT_STOREFRONT_NAV_ITEMS,
+  flattenMobileNavItems,
+  isStorefrontNavLinkActive,
+  type FlatStorefrontNavItem,
+} from "./StorefrontNavUtils";
 
-type FlatItem = { href: string; label: string; badge?: string };
-
-const DEFAULT_ITEMS: FlatItem[] = [
-  { href: "/shop", label: "Shop" },
-  { href: "/collections", label: "Collections" },
-  { href: "/about", label: "About" },
-];
+type FlatItem = FlatStorefrontNavItem;
 
 const ICON_MAP: Record<string, string> = {
   star: "star",
@@ -26,9 +30,8 @@ const ICON_MAP: Record<string, string> = {
   local_offer: "local_offer",
 };
 
-function linkActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || (href !== "/" && pathname.startsWith(href));
+function withoutCollections<T extends { href: string }>(items: T[]): T[] {
+  return items.filter((item) => item.href !== "/collections");
 }
 
 function scrollToSamePageHash(event: MouseEvent<HTMLAnchorElement>, href: string) {
@@ -38,19 +41,19 @@ function scrollToSamePageHash(event: MouseEvent<HTMLAnchorElement>, href: string
   const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
   if (!target) return;
   event.preventDefault();
-  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+  target.scrollIntoView({ behavior, block: "start" });
   window.history.replaceState(null, "", url.hash);
 }
 
 function flatForMobile(nav: CmsNavigationPayload | undefined): FlatItem[] {
-  if (!nav) return [];
+  if (!nav) return DEFAULT_STOREFRONT_NAV_ITEMS;
   const src =
     nav.headerLinksMobile.length > 0 ? nav.headerLinksMobile : nav.headerLinks;
-  return src.map((l) => ({
-    href: l.href,
-    label: l.label,
-    badge: l.badge,
-  }));
+  const items = withoutCollections(flattenMobileNavItems(src));
+  return items.length > 0 ? items : DEFAULT_STOREFRONT_NAV_ITEMS;
 }
 
 function NavBadge({ text }: { text: string }) {
@@ -68,7 +71,7 @@ function MegaTrigger({
   link: CmsNavLink;
   pathname: string;
 }) {
-  const active = linkActive(pathname, link.href);
+  const active = isStorefrontNavLinkActive(pathname, link.href);
   const hasMega = (link.children?.length ?? 0) > 0 || link.featured;
 
   if (!hasMega) {
@@ -120,9 +123,7 @@ function MegaTrigger({
         ) : null}
         {link.label}
         {link.badge ? <NavBadge text={link.badge} /> : null}
-        <span className="material-symbols-outlined ml-0.5 text-sm opacity-60" aria-hidden>
-          expand_more
-        </span>
+        <ChevronDown className="ml-0.5 size-4 opacity-60" aria-hidden="true" />
       </Link>
       <div
         className="pointer-events-none invisible absolute left-1/2 top-full z-40 w-[min(100vw-2rem,28rem)] -translate-x-1/2 pt-2 opacity-0 transition-[transform,opacity,visibility] group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100"
@@ -182,30 +183,25 @@ function MegaTrigger({
 
 export function StorefrontMainNav({
   navigation,
+  navigationSource = "empty",
 }: {
   navigation?: CmsNavigationPayload;
+  navigationSource?: StorefrontNavigationSource;
 }) {
   const pathname = usePathname() ?? "";
   const [mobileOpen, setMobileOpen] = useState(false);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDialogElement>(null);
   const mobileTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileCloseRef = useRef<HTMLButtonElement>(null);
   const mobileWasOpenRef = useRef(false);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
 
-  const mobileItems =
-    navigation && navigation.headerLinks.length > 0
-      ? flatForMobile(navigation)
-      : DEFAULT_ITEMS;
+  const mobileItems = flatForMobile(navigation);
 
   const desktopLinks =
     navigation && navigation.headerLinks.length > 0
-      ? navigation.headerLinks
+      ? withoutCollections(navigation.headerLinks)
       : null;
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   useEffect(() => {
     if (!mobileOpen) {
@@ -250,9 +246,11 @@ export function StorefrontMainNav({
   return (
     <>
       <div className="flex min-w-0 flex-1 justify-center sm:hidden">
-        <button
+        <Button
           ref={mobileTriggerRef}
           type="button"
+          variant="ghost"
+          size="sm"
           aria-expanded={mobileOpen}
           aria-controls="mobile-site-menu"
           data-hydrated={hydrated ? "true" : "false"}
@@ -267,38 +265,41 @@ export function StorefrontMainNav({
           }}
         >
           Menu
-          <span className="material-symbols-outlined text-base" aria-hidden>menu</span>
-        </button>
+          <Menu className="size-4" aria-hidden="true" />
+        </Button>
       </div>
 
       {mobileOpen ? (
-        <div
+        <dialog
           ref={mobileMenuRef}
           id="mobile-site-menu"
-          role="dialog"
+          open
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="mobile-site-menu-title"
-          className="fixed inset-0 z-[60] bg-black/40 sm:hidden"
+          className="fixed inset-0 z-[60] m-0 h-dvh w-dvw max-w-none border-0 bg-black/40 p-0 sm:hidden"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setMobileOpen(false);
           }}
+          onKeyDown={(event) => { if (event.key === "Escape") setMobileOpen(false); }}
         >
           <div className="ml-auto flex h-full w-[min(21rem,88vw)] flex-col overflow-y-auto overscroll-contain bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-4">
               <h2 id="mobile-site-menu-title" className="font-headline text-lg font-bold text-primary">Menu</h2>
-              <button
+              <Button
                 ref={mobileCloseRef}
                 type="button"
                 aria-label="Close menu"
-                className="rounded p-2 text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                variant="ghost"
+                size="icon"
                 onClick={() => setMobileOpen(false)}
               >
-                <span className="material-symbols-outlined" aria-hidden>close</span>
-              </button>
+                <X className="size-5" aria-hidden="true" />
+              </Button>
             </div>
             <nav aria-label="Mobile site navigation" className="flex flex-col gap-1 py-5">
               {mobileItems.map((item) => {
-                const active = linkActive(pathname, item.href);
+                const active = isStorefrontNavLinkActive(pathname, item.href);
                 return (
                   <Link
                     key={`${item.href}-${item.label}`}
@@ -318,33 +319,18 @@ export function StorefrontMainNav({
               })}
             </nav>
           </div>
-        </div>
+        </dialog>
       ) : null}
 
-      <div className="hidden min-w-0 flex-1 items-center justify-center gap-6 overflow-visible sm:flex md:gap-10 lg:gap-12">
+      <div
+        className="hidden min-w-0 flex-1 items-center justify-center gap-6 overflow-visible sm:flex md:gap-10 lg:gap-12"
+        data-navigation-source={navigationSource}
+      >
         {desktopLinks
           ? desktopLinks.map((link) => (
               <MegaTrigger key={`${link.href}-${link.label}`} link={link} pathname={pathname} />
             ))
-          : DEFAULT_ITEMS.map((item) => {
-              const active = linkActive(pathname, item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={(event) => scrollToSamePageHash(event, item.href)}
-                  data-testid={item.href === "/shop" ? "nav-shop" : undefined}
-                  className={
-                    active
-                    ? "shrink-0 border-b-2 border-primary pb-0.5 text-sm font-semibold text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    : "shrink-0 text-sm font-medium text-on-surface-variant outline-none hover:text-primary focus-visible:ring-2 focus-visible:ring-primary"
-                  }
-                  aria-current={active ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
+          : null}
       </div>
     </>
   );

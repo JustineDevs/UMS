@@ -1,6 +1,6 @@
 import { fetchWorkerCatalogProductsForAdmin } from "@/lib/worker-admin-bridge";
 
-export type ChatOrderVariantLine = {
+type ChatOrderVariantLine = {
   variantId: string;
   label: string;
   productTitle: string;

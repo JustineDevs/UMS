@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { LockKeyhole } from "lucide-react";
 import {
   isPhilippinesMobilePhone,
   type StorefrontShippingAddress,
@@ -9,6 +11,7 @@ import {
 import { PhilippineAddressFields } from "./PhilippineAddressFields";
 
 type Initial = {
+  email: string;
   displayName: string | null;
   phone: string | null;
   avatarUrl: string | null;
@@ -30,17 +33,23 @@ function emptyAddress(): StorefrontShippingAddress {
   };
 }
 
-export function AccountProfilePanel({ initial }: { initial: Initial }) {
+export function AccountProfilePanel({
+  initial,
+  mode = "profile",
+}: {
+  initial: Initial;
+  mode?: "profile" | "addresses";
+}) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(initial.displayName ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(initial.avatarUrl ?? "");
+  const [avatarUrl] = useState(initial.avatarUrl ?? "");
   const [addresses, setAddresses] = useState<StorefrontShippingAddress[]>(() =>
     initial.shippingAddresses.length > 0
       ? initial.shippingAddresses
       : [],
   );
-  const [updatedAt, setUpdatedAt] = useState(initial.updatedAt);
+  const updatedAtRef = useRef(initial.updatedAt);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [reauthUrl, setReauthUrl] = useState<string | null>(null);
@@ -72,8 +81,19 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
     );
   }
 
+  function setDefaultAddress(index: number) {
+    setAddresses((prev) => prev.map((address, i) => ({ ...address, isDefault: i === index })));
+    setMsg(null);
+  }
+
   function removeAddress(i: number) {
-    setAddresses((prev) => prev.filter((_, j) => j !== i));
+    setAddresses((prev) => {
+      const wasDefault = prev[i]?.isDefault === true || (prev.every((address) => address.isDefault !== true) && i === 0);
+      const next = prev.filter((_, j) => j !== i);
+      if (!wasDefault || next.length === 0) return next;
+      return next.map((address, index) => ({ ...address, isDefault: index === 0 }));
+    });
+    setMsg(null);
   }
 
   async function save() {
@@ -120,7 +140,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          updatedAt: updatedAt ?? undefined,
+          updatedAt: updatedAtRef.current ?? undefined,
           displayName: displayName.trim() || undefined,
           phone: ph || undefined,
           avatarUrl: avatarUrl.trim() || undefined,
@@ -137,7 +157,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         setErr(j.error ?? "Save failed.");
         return;
       }
-      if (j.updatedAt) setUpdatedAt(j.updatedAt);
+      if (j.updatedAt) updatedAtRef.current = j.updatedAt;
       setMsg("Saved.");
       router.refresh();
     } catch {
@@ -148,15 +168,26 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
   }
 
   return (
-    <section className="rounded-lg border border-outline-variant/20 bg-surface-container-lowest p-6 md:col-span-2">
-      <h2 className="font-headline text-sm font-bold uppercase tracking-widest text-primary">
-        Profile &amp; saved addresses
-      </h2>
-      <p className="mt-2 text-sm text-on-surface-variant">
-        We validate Philippine mobile numbers. Saved addresses speed up checkout
-        copy-paste; the payment step may still ask you to confirm details with
-        your provider.
-      </p>
+    <section className="rounded-2xl border border-outline-variant/20 bg-surface-container-lowest p-6 sm:p-8 md:col-span-2">
+      {mode === "profile" ? (
+        <div>
+          <h2 className="font-headline text-2xl font-bold tracking-tight text-primary">
+            Profile information
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-on-surface-variant">
+            Keep your contact details current for order updates and delivery.
+          </p>
+        </div>
+      ) : (
+        <>
+          <h2 className="font-headline text-2xl font-bold tracking-tight text-primary">
+            Shipping addresses
+          </h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Save up to five delivery locations and choose a default for checkout.
+          </p>
+        </>
+      )}
 
       {err ? (
         <p
@@ -186,58 +217,71 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <div>
-          <label htmlFor="account-display-name" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-            Display name (optional)
-          </label>
-          <input
-            id="account-display-name"
-            className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            aria-describedby={feedbackId}
-            maxLength={120}
-            placeholder="How we greet you in emails"
-          />
+      {mode === "profile" ? (
+        <div className="mt-8 space-y-8">
+          <div className="flex items-center gap-4 border-b border-outline-variant/15 pb-6">
+            <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-container-low text-primary ring-1 ring-outline-variant/20">
+              {avatarUrl ? <Image src={avatarUrl} alt="" width={80} height={80} className="size-full object-cover" unoptimized /> : <span className="text-2xl font-semibold">{(displayName || initial.email || "U").slice(0, 1).toUpperCase()}</span>}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-primary">{displayName || "Your account"}</p>
+              <p className="mt-1 text-sm text-on-surface-variant">Signed in with Google</p>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <div>
+              <label htmlFor="account-email" className="block text-sm font-semibold text-primary">
+                Email address
+              </label>
+              <div className="relative mt-2">
+                <input
+                  id="account-email"
+                  className="w-full rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5 pr-10 text-sm text-on-surface-variant"
+                  value={initial.email}
+                  readOnly
+                  aria-readonly="true"
+                />
+                <LockKeyhole className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-on-surface-variant" aria-label="Managed by Google" />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="account-display-name" className="block text-sm font-semibold text-primary">
+                Display name <span className="font-normal text-on-surface-variant">(optional)</span>
+              </label>
+              <input
+                id="account-display-name"
+                className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2.5 text-sm"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                aria-describedby={feedbackId}
+                maxLength={120}
+                placeholder="How we greet you in emails"
+              />
+            </div>
+            <div>
+              <label htmlFor="account-phone" className="block text-sm font-semibold text-primary">
+                Mobile number <span className="font-normal text-on-surface-variant">(Philippines)</span>
+              </label>
+              <input
+                id="account-phone"
+                className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2.5 text-sm"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                aria-describedby={feedbackId}
+                maxLength={40}
+                placeholder="+639XXXXXXXXX or 09XXXXXXXXX"
+                inputMode="tel"
+                autoComplete="tel"
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <label htmlFor="account-avatar-url" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-            Avatar URL (optional)
-          </label>
-          <input
-            id="account-avatar-url"
-            className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            aria-describedby={feedbackId}
-            maxLength={500}
-            placeholder="https://..."
-            inputMode="url"
-          />
-        </div>
-        <div>
-          <label htmlFor="account-phone" className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-            Mobile (Philippines)
-          </label>
-          <input
-            id="account-phone"
-            className="mt-2 w-full rounded-lg border border-outline-variant/30 px-3 py-2 text-sm"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            aria-describedby={feedbackId}
-            maxLength={40}
-            placeholder="+639XXXXXXXXX or 09XXXXXXXXX"
-            inputMode="tel"
-            autoComplete="tel"
-          />
-        </div>
-      </div>
+      ) : null}
 
-      <div className="mt-10">
+      {mode === "addresses" ? <div className="mt-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-headline text-xs font-bold uppercase tracking-widest text-primary">
-            Saved addresses (max 5)
+            Saved addresses <span className="font-normal tracking-normal text-on-surface-variant">({addresses.length} of 5)</span>
           </h3>
           <button
             type="button"
@@ -248,30 +292,67 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
             Add address
           </button>
         </div>
+        <p className="mt-2 text-xs text-on-surface-variant">
+          Expand an address to edit, set it as your checkout default, or remove it. Changes apply when you save.
+        </p>
 
         {addresses.length === 0 ? (
           <p className="mt-4 text-sm text-on-surface-variant">
             No saved addresses yet. Add one for faster checkout notes.
           </p>
         ) : (
-          <ul className="mt-4 space-y-8">
+          <ul className="mt-4 space-y-4">
         {addresses.map((a, i) => (
               <li
                 key={a.id ?? `${a.line1 ?? "address"}-${a.city ?? "city"}-${a.postalCode ?? "postal"}-${a.country ?? "country"}`}
-                className="rounded-lg border border-outline-variant/15 p-4"
+                className="rounded-xl border border-outline-variant/20 bg-surface-container-lowest shadow-sm"
               >
-                <div className="mb-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => removeAddress(i)}
-                    className="text-xs text-on-surface-variant underline"
-                  >
-                    Remove
-                  </button>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <details open={i === 0}>
+                  <summary className="flex flex-wrap cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-outline-variant/25 bg-surface-container-low px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                        {a.label?.trim() || `Address ${i + 1}`}
+                      </span>
+                      {a.isDefault || (addresses.every((address) => address.isDefault !== true) && i === 0) ? (
+                        <span className="rounded-full bg-primary px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-on-primary">
+                          Default
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="text-xs font-semibold text-on-surface-variant">Edit address</span>
+                  </summary>
+                  <div className="border-t border-outline-variant/15 px-5 pb-5 pt-5">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-xs text-on-surface-variant">
+                        {a.isDefault || (addresses.every((address) => address.isDefault !== true) && i === 0)
+                          ? "Used automatically at checkout."
+                          : "Choose this address for future checkouts."}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {!a.isDefault && !(addresses.every((address) => address.isDefault !== true) && i === 0) ? (
+                          <button
+                            type="button"
+                            onClick={() => setDefaultAddress(i)}
+                            className="text-xs font-semibold text-primary underline underline-offset-2"
+                          >
+                            Set as default
+                          </button>
+                        ) : null}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm("Remove this saved address?")) removeAddress(i);
+                        }}
+                        className="text-xs font-semibold text-on-surface-variant underline underline-offset-2"
+                        aria-label={`Remove ${a.label?.trim() || `Address ${i + 1}`}`}
+                      >
+                        Remove
+                      </button>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
                   <div className="sm:col-span-2">
-                    <label htmlFor={`account-address-${i}-full-name`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-full-name`} className="text-sm font-medium text-primary">
                       Full name
                     </label>
                     <input
@@ -286,7 +367,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`account-address-${i}-phone`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-phone`} className="text-sm font-medium text-primary">
                       Phone
                     </label>
                     <input
@@ -311,7 +392,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                     Use as default delivery address
                   </label>
                   <div>
-                    <label htmlFor={`account-address-${i}-label`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-label`} className="text-sm font-medium text-primary">
                       Label (optional)
                     </label>
                     <input
@@ -326,7 +407,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                       placeholder="Home, Office…"
                     />
                   </div>
-                  <div className="sm:col-span-2 grid gap-4">
+                  <div className="sm:col-span-2">
                     <PhilippineAddressFields
                       address={a}
                       idPrefix={`account-address-${i}`}
@@ -334,7 +415,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label htmlFor={`account-address-${i}-line2`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-line2`} className="text-sm font-medium text-primary">
                       Address line 2 (optional)
                     </label>
                     <input
@@ -349,7 +430,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`account-address-${i}-postal-code`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-postal-code`} className="text-sm font-medium text-primary">
                       Postal code (optional)
                     </label>
                     <input
@@ -364,7 +445,7 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`account-address-${i}-country`} className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                    <label htmlFor={`account-address-${i}-country`} className="text-sm font-medium text-primary">
                       Country
                     </label>
                     <select
@@ -381,31 +462,22 @@ export function AccountProfilePanel({ initial }: { initial: Initial }) {
                       <option value="PH">PH</option>
                     </select>
                   </div>
-                </div>
+                    </div>
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
         )}
-      </div>
-
-      <div className="mt-10 rounded-lg border border-outline-variant/15 bg-surface-container-low/40 p-4">
-        <h3 className="font-headline text-xs font-bold uppercase tracking-widest text-primary">
-          How you pay
-        </h3>
-        <p className="mt-2 text-sm text-on-surface-variant">
-          Cards and wallets are handled on your payment partner&apos;s secure page.
-          We do not store full card numbers in your profile. Use checkout to pay
-          with the options enabled for this store.
-        </p>
-      </div>
+      </div> : null}
 
       <button
         type="button"
         disabled={saving}
         onClick={() => void save()}
-        className="mt-8 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-on-primary disabled:opacity-50"
+        className="mt-8 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {saving ? "Saving…" : "Save profile"}
+        {saving ? "Saving…" : mode === "addresses" ? "Save addresses" : "Save changes"}
       </button>
     </section>
   );

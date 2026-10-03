@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   CATALOG_COLOR_PRESETS,
   CATALOG_SIZE_PRESETS,
+  exceedsCatalogVariantLimit,
+  MAX_CATALOG_VARIANTS,
 } from "./catalog-variant-presets";
 
 type Props = {
@@ -31,6 +33,17 @@ export function VariantMatrixField({
   onColorsChange,
   disabled,
 }: Props) {
+  const allPresetColorsExceedLimit = exceedsCatalogVariantLimit(
+    sizes.length,
+    CATALOG_COLOR_PRESETS.length,
+  );
+  const allPresetSizesExceedLimit = exceedsCatalogVariantLimit(
+    CATALOG_SIZE_PRESETS.length,
+    colors.length,
+  );
+  const commonColorsExceedLimit = exceedsCatalogVariantLimit(sizes.length, 6);
+  const variantCount = sizes.length * colors.length;
+
   return (
     <div className="space-y-6 rounded-lg border border-outline-variant/25 bg-surface-container-low px-4 py-4">
       <p className="text-sm font-medium text-on-surface">Variants on create</p>
@@ -42,7 +55,7 @@ export function VariantMatrixField({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || allPresetSizesExceedLimit}
           className="rounded-md border border-outline-variant/30 bg-white px-2 py-1 text-xs font-medium text-on-surface disabled:opacity-50"
           onClick={() => onSizesChange([...CATALOG_SIZE_PRESETS])}
         >
@@ -50,7 +63,7 @@ export function VariantMatrixField({
         </button>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || allPresetColorsExceedLimit}
           className="rounded-md border border-outline-variant/30 bg-white px-2 py-1 text-xs font-medium text-on-surface disabled:opacity-50"
           onClick={() => onColorsChange([...CATALOG_COLOR_PRESETS])}
         >
@@ -58,7 +71,7 @@ export function VariantMatrixField({
         </button>
         <button
           type="button"
-          disabled={disabled}
+          disabled={disabled || commonColorsExceedLimit}
           className="rounded-md border border-outline-variant/30 bg-white px-2 py-1 text-xs font-medium text-on-surface disabled:opacity-50"
           onClick={() =>
             onColorsChange([
@@ -101,6 +114,12 @@ export function VariantMatrixField({
           Clear colors
         </button>
       </div>
+      {allPresetColorsExceedLimit || allPresetSizesExceedLimit || commonColorsExceedLimit ? (
+        <p className="text-xs leading-relaxed text-on-surface-variant" role="status">
+          Some shortcuts are disabled because they would create more than {MAX_CATALOG_VARIANTS} variants.
+          Clear or reduce one option group to use them.
+        </p>
+      ) : null}
 
       {sizes.length === 0 || colors.length === 0 ? (
         <p className="rounded-md border border-dashed border-outline-variant/40 bg-white/80 px-3 py-2 text-xs leading-relaxed text-on-surface-variant">
@@ -122,7 +141,11 @@ export function VariantMatrixField({
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  disabled={disabled}
+                  disabled={
+                    disabled ||
+                    (!sizes.includes(p) &&
+                      exceedsCatalogVariantLimit(sizes.length + 1, colors.length))
+                  }
                   checked={sizes.includes(p)}
                   onChange={(e) =>
                     onSizesChange(toggle(sizes, p, e.target.checked))
@@ -138,7 +161,7 @@ export function VariantMatrixField({
           label="Add custom size"
           onAdd={(raw) => {
             const t = raw.trim().slice(0, 100);
-            if (!t) return;
+            if (!t || exceedsCatalogVariantLimit(sizes.length + 1, colors.length)) return;
             onSizesChange(toggle(sizes, t, true));
           }}
         />
@@ -154,7 +177,11 @@ export function VariantMatrixField({
               <label className="flex cursor-pointer items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  disabled={disabled}
+                  disabled={
+                    disabled ||
+                    (!colors.includes(p) &&
+                      exceedsCatalogVariantLimit(sizes.length, colors.length + 1))
+                  }
                   checked={colors.includes(p)}
                   onChange={(e) =>
                     onColorsChange(toggle(colors, p, e.target.checked))
@@ -170,16 +197,23 @@ export function VariantMatrixField({
           label="Add custom color"
           onAdd={(raw) => {
             const t = raw.trim().slice(0, 100);
-            if (!t) return;
+            if (!t || exceedsCatalogVariantLimit(sizes.length, colors.length + 1)) return;
             onColorsChange(toggle(colors, t, true));
           }}
         />
       </div>
 
-      <p className="text-xs text-on-surface-variant">
+      <p
+        className={`text-xs ${
+          variantCount > MAX_CATALOG_VARIANTS
+            ? "font-semibold text-error"
+            : "text-on-surface-variant"
+        }`}
+      >
         {sizes.length} size{sizes.length === 1 ? "" : "s"} × {colors.length} color
-        {colors.length === 1 ? "" : "s"} = {sizes.length * colors.length} variant
-        {sizes.length * colors.length === 1 ? "" : "s"} (max 80).
+        {colors.length === 1 ? "" : "s"} = {variantCount} variant
+        {variantCount === 1 ? "" : "s"} (max {MAX_CATALOG_VARIANTS}).
+        {variantCount > MAX_CATALOG_VARIANTS ? " Reduce your selections to continue." : ""}
       </p>
     </div>
   );

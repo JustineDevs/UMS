@@ -82,12 +82,19 @@ export function OrderCancelButton({ orderId, orderDisplayId }: Props) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setConfirming(true)}
-      className="inline-flex min-h-11 items-center text-xs text-error hover:underline"
-    >
-      Cancel
-    </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <button
+        type="button"
+        onClick={() => setConfirming(true)}
+        className="inline-flex min-h-11 items-center text-xs text-error hover:underline"
+      >
+        Cancel
+      </button>
+      {error && (
+        <p className="max-w-56 text-right text-xs text-error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

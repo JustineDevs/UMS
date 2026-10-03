@@ -173,6 +173,36 @@ test("payment recovery rejects unsupported providers and bounds provider order I
   assert.equal(oversizedOrderId.status, 400);
 });
 
+test("payment recovery can re-establish the attempt cookie from the stored correlation capability", async () => {
+  const correlationId = "8f7d7c0e-3bd2-4b42-a3dc-2df16c6f62a1";
+  const database = {
+    query: async <Row extends Record<string, unknown>>() => ({
+      rows: [{
+        correlation_id: correlationId,
+        cart_id: "cart_1",
+        provider: "stripe",
+        status: "pending_payment",
+        checkout_state: "awaiting_provider",
+        medusa_order_id: null,
+      }] as Row[],
+      rowCount: 1,
+    }),
+  };
+  const response = await handlePaymentAttemptRecoveryRequest(
+    new Request(`https://api.test/store/checkout-intents/recover?provider=stripe&correlation_id=${correlationId}`),
+    database,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    found: true,
+    correlationId,
+    status: "pending_payment",
+    checkoutState: "awaiting_provider",
+    medusaOrderId: null,
+  });
+  assert.match(response.headers.get("Set-Cookie") ?? "", /checkout_attempt_id=/);
+});
+
 function checkoutDatabases() {
   const appQueries: Array<{ text: string; values: readonly unknown[] }> = [];
   const appDatabase = {

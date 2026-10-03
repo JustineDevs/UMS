@@ -22,7 +22,7 @@ export function ProductImageZoom({
   const [open, setOpen] = useState(false);
   const [scale, setScale] = useState(1);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
   const previousOverflowRef = useRef("");
@@ -105,12 +105,12 @@ export function ProductImageZoom({
       </button>
       {open && typeof document !== "undefined"
         ? createPortal((
-        <div
+        <dialog
           ref={dialogRef}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
-          role="dialog"
-          aria-modal="true"
+          open
+          className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center border-0 bg-black/85 p-4"
           aria-label="Enlarged product image"
+          onCancel={() => setOpen(false)}
         >
           <div
             className="absolute inset-0 cursor-default"
@@ -173,7 +173,7 @@ export function ProductImageZoom({
           >
             Close
           </button>
-        </div>
+        </dialog>
         ), document.body)
         : null}
     </>

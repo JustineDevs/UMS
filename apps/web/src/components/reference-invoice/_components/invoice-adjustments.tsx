@@ -14,7 +14,7 @@ export function InvoiceAdjustments() {
     <section className="flex flex-col gap-4">
       <h2 className="font-medium tracking-tight">Adjustments</h2>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_1.1fr]">
+      <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <Controller
           control={control}
           name="taxId"
@@ -39,7 +39,7 @@ export function InvoiceAdjustments() {
           )}
         />
 
-        <div className="grid grid-cols-[1fr_112px] gap-4">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_112px] gap-4">
           <Controller
             control={control}
             name="discountType"
@@ -63,13 +63,15 @@ export function InvoiceAdjustments() {
           <Field className="gap-1">
             <FieldLabel className="text-xs opacity-0">Value</FieldLabel>
             <InputGroup>
+              {discountType === "fixed" ? <InputGroupAddon align="inline-start">₱</InputGroupAddon> : null}
               <InputGroupInput
                 type="number"
                 step="0.01"
+                min="0"
                 aria-label="Discount value"
                 {...register("discountValue", { valueAsNumber: true })}
               />
-              <InputGroupAddon align="inline-end">{discountType === "fixed" ? "₱" : "%"}</InputGroupAddon>
+              {discountType === "percent" ? <InputGroupAddon align="inline-end">%</InputGroupAddon> : null}
             </InputGroup>
           </Field>
         </div>

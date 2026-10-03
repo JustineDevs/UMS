@@ -192,6 +192,22 @@ function applyDomEdit(node: HTMLElement, property: string, value: string) {
     setSafeUrl(node, value, "src");
     return node.hasAttribute("src");
   }
+  if (property.startsWith("attribute.")) {
+    const attribute = property.slice("attribute.".length);
+    const editableAttributes = new Set([
+      "id",
+      "class",
+      "title",
+      "role",
+      "aria-label",
+      "aria-description",
+      "tabindex",
+    ]);
+    if (!editableAttributes.has(attribute) || value.length > 200) return false;
+    if (value.trim()) node.setAttribute(attribute, value.trim());
+    else node.removeAttribute(attribute);
+    return true;
+  }
   const styleProperty = normalizeCmsDomStyle(property, value);
   if (styleProperty) {
     node.style.setProperty(styleProperty.slice(6), value);
@@ -384,6 +400,21 @@ export function CmsPagePreviewBridge() {
               ].reduce<Record<string, string>>((result, property) => {
                 const value = node.style.getPropertyValue(property);
                 if (value) result[property] = value;
+                return result;
+              }, {})
+            : {},
+          attributes: node
+            ? [
+                "id",
+                "class",
+                "title",
+                "role",
+                "aria-label",
+                "aria-description",
+                "tabindex",
+              ].reduce<Record<string, string>>((result, attribute) => {
+                const value = node.getAttribute(attribute);
+                if (value !== null) result[attribute] = value;
                 return result;
               }, {})
             : {},

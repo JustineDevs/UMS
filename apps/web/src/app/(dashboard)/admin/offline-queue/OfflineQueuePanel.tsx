@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AdminEmptyState,
   AdminErrorState,
-  AdminLoadingState,
   AdminSection,
 } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
@@ -57,7 +56,26 @@ export function OfflineQueuePanel() {
   }, [load]);
 
   if (items === null && !error) {
-    return <AdminLoadingState label="Loading offline queue" />;
+    return (
+      <div className="space-y-6" role="status" aria-label="Loading offline queue">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {["Cached records", "Last sync", "Sync health"].map((label) => (
+            <Card key={label}>
+              <CardContent className="space-y-3 p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+                <div className="h-7 w-24 animate-pulse rounded bg-muted" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <div className="h-5 w-48 animate-pulse rounded bg-muted" />
+            {[1, 2, 3].map((row) => <div key={row} className="h-12 animate-pulse rounded bg-muted/70" />)}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (error) {
@@ -80,10 +98,15 @@ export function OfflineQueuePanel() {
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card><CardContent className="p-5"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cached records</p><p className="mt-2 text-2xl font-semibold">{items.length}</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Queue source</p><p className="mt-2 text-sm font-medium">POS local cache</p></CardContent></Card>
+        <Card><CardContent className="p-5"><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sync health</p><p className="mt-2 inline-flex items-center gap-2 text-sm font-medium"><span className="size-2 rounded-full bg-emerald-500" /> Ready to sync</p></CardContent></Card>
+      </div>
       <AdminSection title="Queue filters" description="Filter pending sales by the device that created them.">
       <Card>
-        <CardContent className="flex flex-wrap items-end gap-4">
-        <label className="block min-w-[200px] flex-1 text-sm">
+        <CardContent className="flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="block min-w-0 flex-1 text-sm sm:min-w-[200px]">
           <span className="text-sm font-medium">Device filter</span>
           <Input
             value={device}

@@ -171,10 +171,13 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
       .filter(Boolean);
     return [...main, ...gLines];
   });
-  const [unifiedMediaIds, setUnifiedMediaIds] = useState<(string | null)[]>(() => {
+  const initialUnifiedMediaIds = useMemo(() => {
     const ids = p?.storefrontMetadata.mediaIds ?? [];
-    return (p?.imageUrls ?? []).map((_, index) => ids[index] ?? null);
-  });
+    return (p?.imageUrls ?? []).map(
+      (_, index) => ids[index] ?? null,
+    );
+  }, [p]);
+  const unifiedMediaIdsRef = useRef<(string | null)[]>(initialUnifiedMediaIds);
   const [mainImageCount, setMainImageCount] = useState(() => {
     const main =
       p?.imageUrls?.length && p.imageUrls.length > 0
@@ -261,6 +264,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
   const [uploadingCatalogVideo, setUploadingCatalogVideo] = useState(false);
   const [uploadingBulk, setUploadingBulk] = useState(false);
   const [catalogPickerOpen, setCatalogPickerOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [catalogAddPlacement, setCatalogAddPlacement] =
     useState<CatalogAddPlacement>("gallery");
   const bulkUploadInputRef = useRef<HTMLInputElement>(null);
@@ -370,17 +374,18 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
           }
           return n;
         });
-        setUnifiedMediaIds((prev) => {
-          const n = [...prev];
-          n.splice(insertionIndex, 0, ...picked.map((item) => item.id));
-          return n;
-        });
+        const nextMediaIds = [...(unifiedMediaIdsRef.current ?? [])];
+        nextMediaIds.splice(insertionIndex, 0, ...picked.map((item) => item.id));
+        unifiedMediaIdsRef.current = nextMediaIds;
         const nextMainImageCount = insertionIndex + normalized.length;
         mainImageCountRef.current = nextMainImageCount;
         setMainImageCount(nextMainImageCount);
       } else {
         setUnifiedMedia((prev) => [...prev, ...normalized]);
-        setUnifiedMediaIds((prev) => [...prev, ...picked.map((item) => item.id)]);
+        unifiedMediaIdsRef.current = [
+          ...(unifiedMediaIdsRef.current ?? []),
+          ...picked.map((item) => item.id),
+        ];
       }
       toast.push(
         "Added from catalog library. Save the product to apply it.",
@@ -435,7 +440,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
         ]),
       ),
     );
-  }, [isEdit, p?.id, stockRowsFingerprint]);
+  }, [isEdit, p, p?.variantStockRows, stockRowsFingerprint]);
 
   const stockMatrixProductIdRef = useRef<string | null>(null);
 
@@ -465,7 +470,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     });
   }, [
     isEdit,
-    p?.id,
+    p,
     showPerVariantStock,
     matrixSizes,
     matrixColors,
@@ -492,7 +497,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     );
   }, [
     isEdit,
-    p?.id,
+    p,
     showPerVariantStock,
     matrixSizes,
     matrixColors,
@@ -506,7 +511,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     );
   }, [
     isEdit,
-    p?.id,
+    p,
     showPerVariantStock,
     draftMatrixPairKeys,
     stockRowsFingerprint,
@@ -679,7 +684,9 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     const storefrontMetadata = {
       // Keep one canonical asset reference list for both the main gallery and clips.
       // `imageUrls` remains the Medusa-compatible resolved projection.
-      mediaIds: unifiedMediaIds.filter((id): id is string => Boolean(id)),
+      mediaIds: (unifiedMediaIdsRef.current ?? []).filter(
+        (id): id is string => Boolean(id),
+      ),
       brand: brand.trim() || null,
       videoUrl,
       galleryVideoUrlsText,
@@ -909,70 +916,74 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
     [catalogLayoutWidth],
   );
 
-  const catalogGridClassName = useMemo(() => {
-    switch (previewDensity) {
-      case "spacious":
-        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,480px)] lg:gap-8 lg:items-start xl:gap-10";
-      case "compact":
-        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(220px,340px)] lg:gap-6 lg:items-start";
-      default:
-        return "grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,400px)] lg:gap-7 lg:items-start xl:gap-8";
-    }
-  }, [previewDensity]);
-
   return (
-    <form onSubmit={(e) => void submit(e)} className="w-full min-w-0">
-      <div ref={catalogLayoutRef} className={catalogGridClassName}>
-        <aside className="order-1 min-w-0 w-full lg:order-2 lg:sticky lg:top-6 lg:z-[1] lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overscroll-contain lg:self-start xl:top-8">
-          <CatalogProductPreview
-            title={title}
-            handle={handle}
-            description={description}
-            status={status}
-            brand={brand}
-            currencyCode={isEdit && p ? p.currencyCode : createCurrency}
-            pricePhp={pricePhp}
-            imageUrls={previewImageUrls}
-            videoUrls={previewVideoUrls}
-            categoryLabels={selectedCategoryLabels}
-            sizes={matrixSizes}
-            colors={matrixColors}
-            layoutDensity={previewDensity}
-          />
-        </aside>
-        <div className="order-2 min-w-0 space-y-6 lg:order-1">
-          {isEdit ? (
-            <CatalogMutationImpactPanel
-              lastClassification={lastMutationClassification}
-            />
-          ) : null}
-          {isEdit ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href="/admin/catalog"
-                className="inline-flex items-center gap-2 rounded-lg border border-outline-variant/35 bg-surface-container-lowest px-4 py-2.5 text-sm font-semibold text-on-surface shadow-sm transition hover:bg-surface-container-low"
-              >
-                <span
-                  className="inline-flex h-5 w-5 items-center justify-center"
-                  aria-hidden
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-4 w-4"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M11.78 4.22a.75.75 0 0 1 0 1.06L7.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06l-5.25-5.25a.75.75 0 0 1 0-1.06l5.25-5.25a.75.75 0 0 1 1.06 0Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-                Back to products
-              </Link>
-            </div>
-          ) : null}
+    <form onSubmit={(e) => void submit(e)} className="w-full min-w-0 space-y-8">
+      <div className="flex flex-col gap-5 border-b border-border/70 pb-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <Link
+            href="/admin/catalog"
+            aria-label="Back to products"
+            className="mb-3 inline-flex size-9 items-center justify-center rounded-lg border border-input bg-background text-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <span aria-hidden>‹</span>
+          </Link>
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {isEdit ? `Edit ${title || "product"}` : "Add product"}
+          </h1>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="min-h-11 rounded-lg border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={() => router.push("/admin/catalog")}
+          >
+            Discard
+          </button>
+          <button
+            type="submit"
+            className="min-h-11 rounded-lg border border-input bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+            disabled={saving || deleting}
+            onClick={() => setStatus("draft")}
+          >
+            Save draft
+          </button>
+          <button
+            type="button"
+            className="min-h-11 rounded-lg border border-input bg-background px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            onClick={() => setPreviewOpen(true)}
+          >
+            Preview
+          </button>
+          <button
+            type="submit"
+            className="min-h-11 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+            disabled={saving || deleting}
+            onClick={() => setStatus("published")}
+          >
+            {isEdit ? "Save changes" : "Create & publish"}
+          </button>
+        </div>
+      </div>
+      <CatalogProductPreview
+        title={title}
+        handle={handle}
+        description={description}
+        status={status}
+        brand={brand}
+        currencyCode={isEdit && p ? p.currencyCode : createCurrency}
+        pricePhp={pricePhp}
+        imageUrls={previewImageUrls}
+        videoUrls={previewVideoUrls}
+        categoryLabels={selectedCategoryLabels}
+        sizes={matrixSizes}
+        colors={matrixColors}
+        layoutDensity={previewDensity}
+        previewOpen={previewOpen}
+        onPreviewOpenChange={setPreviewOpen}
+        hideLauncher
+      />
+      <div ref={catalogLayoutRef} className="space-y-6">
+        <div className="min-w-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
 
           {error ? (
             <div
@@ -1013,39 +1024,6 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </div>
           ) : null}
 
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>Shop</CardTitle>
-              <CardDescription>
-                Published items show on the public catalog. Categories drive the
-                category filter. Size and color are saved as Medusa options and
-                match storefront filters. Tick every size and color you need.
-                Each combination is a sellable variant. Editing uses the same
-                matrix as create.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          {status === "draft" ? (
-            <div
-              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
-              role="status"
-            >
-              <strong>Draft</strong> keeps the product out of the live shop.
-              Shoppers only see items that are <strong>Published</strong> and
-              included in the same selling channel as your online store.
-            </div>
-          ) : null}
-
-          {status === "published" ? (
-            <div className="rounded-lg border border-outline-variant/25 bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant">
-              The live site only lists products that belong to its selling
-              channel. Saving here adds or keeps that link when your store is
-              connected. If an item is missing online, confirm it is published
-              here and included in the channel in the full store admin.
-            </div>
-          ) : null}
-
           {isEdit && p && !p.shopVariantOptionsReady ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               This product did not use Size + Color options yet. Saving from
@@ -1055,9 +1033,9 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </div>
           ) : null}
 
-          <Card>
+          <Card className="lg:order-1">
             <CardHeader>
-              <CardTitle>Product identity</CardTitle>
+              <CardTitle>Product details</CardTitle>
               <CardDescription>
                 Set the public name, address, and description used by the
                 storefront.
@@ -1065,7 +1043,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="catalog-product-title">Title</Label>
+                <Label htmlFor="catalog-product-title">Name</Label>
                 <Input
                   id="catalog-product-title"
                   value={title}
@@ -1102,7 +1080,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="lg:order-4 lg:col-span-2">
             <CardHeader>
               <CardTitle>Public product details</CardTitle>
               <CardDescription>
@@ -1113,7 +1091,13 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="sm:col-span-2">
+                <details className="sm:col-span-2 rounded-lg border border-outline-variant/20 bg-surface-container-low/40 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                    Advanced JSON fields
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">For validated catalog extensions</span>
+                  </summary>
+                  <div className="mt-4 space-y-4">
+                <div>
                   <label htmlFor="catalog-product-brand" className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                     Brand
                   </label>
@@ -1275,11 +1259,13 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
                     maxLength={20000}
                   />
                 </div>
+                  </div>
+                </details>
               </div>
             </CardContent>
           </Card>
 
-          <Card size="sm">
+          <Card size="sm" className="lg:order-3 lg:col-start-2">
             <CardHeader>
               <CardTitle>Categories</CardTitle>
               <CardDescription>
@@ -1359,7 +1345,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="lg:order-5 lg:col-span-2">
             <CardHeader>
               <CardTitle>Variants</CardTitle>
               <CardDescription>
@@ -1377,7 +1363,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardContent>
           </Card>
 
-          <Card size="sm">
+          <Card size="sm" className="lg:order-2 lg:col-start-2">
             <CardHeader>
               <CardTitle>Sellability</CardTitle>
               <CardDescription>
@@ -1478,7 +1464,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
           </Card>
 
           {showPerVariantStock ? (
-            <Card>
+            <Card className="lg:order-6 lg:col-span-2">
               <CardHeader>
                 <CardTitle>Stock by variant</CardTitle>
                 <CardDescription>
@@ -1615,7 +1601,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </Card>
           ) : null}
 
-          <Card size="sm">
+          <Card size="sm" className="lg:order-7 lg:col-span-2">
             <CardHeader>
               <CardTitle>Identifiers</CardTitle>
               <CardDescription>
@@ -1682,7 +1668,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="lg:order-3 lg:col-start-1 lg:row-start-2">
             <CardHeader>
               <CardTitle>Product media</CardTitle>
               <CardDescription>
@@ -1751,7 +1737,36 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             </CardContent>
           </Card>
 
-          <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-background/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80 motion-reduce:transition-none">
+          {isEdit ? (
+            <div className="lg:order-9 lg:col-span-2">
+            <CatalogMutationImpactPanel
+              lastClassification={lastMutationClassification}
+            />
+            </div>
+          ) : null}
+
+          {isEdit ? (
+            <Card className="lg:order-9 lg:col-span-2 border-destructive/30 bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger zone</CardTitle>
+                <CardDescription>
+                  Permanently remove this product from the catalog and storefront.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <button
+                  type="button"
+                  disabled={deleting || saving}
+                  className="rounded-lg border border-destructive/40 bg-background px-4 py-2.5 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:opacity-50"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                >
+                  {deleting ? "Deleting…" : "Delete product"}
+                </button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-border/70 bg-background/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80 motion-reduce:transition-none lg:order-10 lg:col-span-2">
             <button
               type="submit"
               disabled={saving || deleting}
@@ -1766,27 +1781,12 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
             >
               Cancel
             </button>
-            {isEdit ? (
-              <button
-                type="button"
-                disabled={deleting || saving}
-                className="ml-auto rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive transition hover:bg-destructive/15 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-destructive/30 disabled:opacity-50 motion-reduce:transition-none"
-                onClick={() => setDeleteConfirmOpen(true)}
-              >
-                {deleting ? "Deleting…" : "Delete product"}
-              </button>
-            ) : null}
           </div>
         </div>
       </div>
       {deleteConfirmOpen && isEdit && p ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-product-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-        >
-          <div className="w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl">
+        <dialog open aria-labelledby="delete-product-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+          <div className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-md overflow-y-auto rounded-xl border border-border bg-background p-5 shadow-xl sm:p-6">
             <h2 id="delete-product-title" className="text-lg font-semibold text-foreground">
               Delete {p.title}?
             </h2>
@@ -1810,7 +1810,7 @@ export function ProductEditorForm(props: ProductEditorFormProps) {
               </button>
             </div>
           </div>
-        </div>
+        </dialog>
       ) : null}
       <CatalogMediaPickerDialog
         open={catalogPickerOpen}

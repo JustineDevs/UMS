@@ -18,7 +18,7 @@ export default async function OnboardingPage({
 }) {
   const params = await searchParams;
   const rawNext = Array.isArray(params.next) ? params.next[0] : params.next;
-  const nextPath = rawNext?.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/account";
+  const nextPath = rawNext?.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/account/profile";
   return (
     <main className="storefront-page-shell mx-auto max-w-lg py-10">
       <Suspense fallback={<p className="text-sm text-on-surface-variant">Loading…</p>}>

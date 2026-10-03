@@ -9,7 +9,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 
 const InventoryGauge = dynamic(() => import("./inventory-gauge").then((module) => module.InventoryGauge), {
-  loading: () => <div className="mx-auto h-30 w-full animate-pulse rounded-lg bg-muted/40" aria-hidden="true" />,
+  loading: () => <div className="mx-auto h-36 w-full animate-pulse rounded-lg bg-muted/40 sm:h-40" aria-hidden="true" />,
   ssr: false,
 });
 
@@ -49,7 +49,7 @@ export function Inventory({ data }: { data?: { inStock: number; lowStock: number
         <InventoryGauge availablePercent={availablePercent} gaugeSegments={gaugeSegments} />
         <Separator />
 
-        <div className="grid grid-cols-3 divide-x">
+        <div className="grid grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           {inventorySummary.map((item, _index) => (
             <div key={item.label} className="flex flex-col items-center gap-3 text-center">
               <div className="grid size-9 place-items-center rounded-full bg-muted">

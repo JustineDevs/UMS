@@ -52,7 +52,7 @@ const Newsletter3: React.FC<Newsletter3Props> = ({
         <div className="mx-auto flex w-full max-w-lg flex-col items-center">
           <form
             onSubmit={handleSubmit}
-            className="group relative mb-5 flex w-full items-center rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 shadow-sm transition-all hover:shadow-md focus-within:border-neutral-950 focus-within:ring-2 focus-within:ring-neutral-950/20 dark:border-neutral-800 dark:bg-neutral-900 dark:focus-within:border-neutral-100 dark:focus-within:ring-neutral-100/20"
+            className="group relative mb-5 flex w-full items-center rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:shadow-md focus-within:border-neutral-950 focus-within:ring-2 focus-within:ring-neutral-950/20 dark:border-neutral-800 dark:bg-neutral-900 dark:focus-within:border-neutral-100 dark:focus-within:ring-neutral-100/20"
           >
               <div className="pointer-events-none flex items-center justify-center pr-3 pl-4 text-neutral-600 transition-colors group-focus-within:text-neutral-950 dark:text-neutral-400 dark:group-focus-within:text-neutral-100">
               <MdEmail className="h-5 w-5" />

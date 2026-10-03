@@ -44,6 +44,7 @@ export function ShopPriceRangeForm({
   const [max, setMax] = useState(
     maxPrice != null ? String(maxPrice) : "",
   );
+  const [error, setError] = useState<string | null>(null);
 
   function apply(e: React.FormEvent) {
     e.preventDefault();
@@ -62,10 +63,23 @@ export function ShopPriceRangeForm({
     };
     const nMin = min.trim() === "" ? undefined : Number(min);
     const nMax = max.trim() === "" ? undefined : Number(max);
+    if (nMin != null && (!Number.isFinite(nMin) || nMin < 0)) {
+      setError("Minimum price must be zero or greater.");
+      return;
+    }
+    if (nMax != null && (!Number.isFinite(nMax) || nMax < 0)) {
+      setError("Maximum price must be zero or greater.");
+      return;
+    }
+    if (nMin != null && nMax != null && nMin > nMax) {
+      setError("Minimum price cannot be greater than maximum price.");
+      return;
+    }
+    setError(null);
     base.minPrice =
-      nMin != null && Number.isFinite(nMin) && nMin >= 0 ? nMin : undefined;
+      nMin != null ? nMin : undefined;
     base.maxPrice =
-      nMax != null && Number.isFinite(nMax) && nMax >= 0 ? nMax : undefined;
+      nMax != null ? nMax : undefined;
     startTransition(() => {
       router.push(shopHref(base));
     });
@@ -105,6 +119,11 @@ export function ShopPriceRangeForm({
           />
         </label>
       </div>
+      {error ? (
+        <p role="alert" className="text-xs text-error">
+          {error}
+        </p>
+      ) : null}
       <button
         type="submit"
         disabled={pending}

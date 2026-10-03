@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 import { PolicyMeta } from "@/lib/policy-content";
+import {
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+  StorefrontPolicySection,
+} from "@/components/storefront/StorefrontPagePrimitives";
 
 export const metadata: Metadata = buildPageMetadata({
   title: "Privacy policy",
@@ -13,14 +18,14 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function PrivacyPage() {
   return (
-    <main className="storefront-page-shell max-w-3xl">
-      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
-        Privacy policy
-      </h1>
+    <StorefrontPageFrame width="narrow">
+      <StorefrontPageHeader
+        title="Privacy policy"
+        description="How Universal Music Store collects, uses, and protects your information."
+      />
       <PolicyMeta policy="Privacy policy" />
-      <div className="mt-8 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant">
-        <section>
-          <h2 className="text-xl font-bold">Who we are</h2>
+      <div className="mt-8 space-y-7 font-body text-sm leading-relaxed text-on-surface-variant">
+        <StorefrontPolicySection title="Who we are">
           <p>
             This policy describes how <strong>Universal Music Store</strong>{" "}
             (&quot;we&quot;) collects, uses, and protects personal information
@@ -28,9 +33,8 @@ export default function PrivacyPage() {
             <strong>Philippines Data Privacy Act (PDPA)</strong> and respect
             GDPR expectations where EU visitors shop with us.
           </p>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">What we collect</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="What we collect">
           <ul className="list-disc space-y-2 pl-5">
             <li>
               <strong>Account &amp; contact:</strong> name, email, and profile
@@ -46,48 +50,43 @@ export default function PrivacyPage() {
               security logs needed to operate and protect the service.
             </li>
           </ul>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">Why we use data</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="Why we use data">
           <p>
             To fulfill orders, prevent fraud, improve the storefront, meet legal
             obligations, and communicate about your purchases. We do not sell
             your personal information.
           </p>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">Sharing</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="Sharing">
           <p>
             We share data with payment, hosting, email, and logistics providers
             strictly as needed to complete your transaction. Each processor is
             required to protect data under contract and applicable law.
           </p>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">Retention</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="Retention">
           <p>
             We keep order and accounting records as long as required for tax,
             disputes, and legitimate business needs. Marketing preferences can
             be adjusted when we offer subscribed communications.
           </p>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">Your rights</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="Your rights">
           <p>
             You may request access, correction, or deletion where applicable.
             Contact us through <Link href="/contact">Contact</Link> with the
             subject line “Privacy request” and enough detail to verify your
             identity.
           </p>
-        </section>
-        <section>
-          <h2 className="text-xl font-bold">Cookies</h2>
+        </StorefrontPolicySection>
+        <StorefrontPolicySection title="Cookies">
           <p>
             See the <Link href="/cookies">Cookies</Link> page for categories we
             use and your choices.
           </p>
-        </section>
+        </StorefrontPolicySection>
       </div>
-    </main>
+    </StorefrontPageFrame>
   );
 }

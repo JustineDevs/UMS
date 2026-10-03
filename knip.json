@@ -1,0 +1,43 @@
+{
+  "entry": [
+    "scripts/**/*.{cjs,mjs,js}",
+    "scripts/stress-test/tools/**/*.{cjs,mjs,js,ts}",
+    "scripts/stress-test/e2e/**/*.{ts,tsx}",
+    "apps/terminal-agent/src/server.ts",
+    "apps/web/src/components/StorefrontPublicMetadataEditor.tsx",
+    "apps/web/src/components/cms/CmsBuilderPageClient.tsx",
+    "apps/web/src/components/cms/CmsPagesManager.tsx",
+    "apps/web/src/components/cms/StorefrontHomeVisualEditor.tsx",
+    "apps/web/src/app/(dashboard)/admin/crm/CrmClientEnhancements.tsx",
+    "apps/web/src/app/(dashboard)/admin/crm/CrmCustomerRoster.tsx",
+    "apps/web/src/lib/admin-api-contracts.ts"
+  ],
+  "ignore": [
+    "scripts/**/*",
+    "scripts/stress-test/**/*",
+    "apps/web/public/guide-demos/**/*.js",
+    "apps/web/public/guide-demos/**/*.css",
+    "packages/config/tailwind/postcss.config.js",
+    "apps/terminal-agent/src/**/*",
+    "apps/web/src/lib/admin-api-contracts.ts",
+    "apps/web/src/components/cms/CmsPageBuilder.tsx",
+    "apps/web/src/lib/crm-nango.ts",
+    "apps/web/src/components/StorefrontPublicMetadataEditor.tsx",
+    "apps/web/src/components/cms/CmsBuilderPageClient.tsx",
+    "apps/web/src/components/cms/CmsPagesManager.tsx",
+    "apps/web/src/components/cms/StorefrontHomeVisualEditor.tsx",
+    "apps/web/src/app/(dashboard)/admin/crm/CrmClientEnhancements.tsx",
+    "apps/web/src/app/(dashboard)/admin/crm/CrmCustomerRoster.tsx"
+  ],
+  "ignoreDependencies": [
+    "@supabase/supabase-js",
+    "@swc/core-win32-x64-msvc",
+    "@typescript-eslint/parser",
+    "@universal-music-store/config-eslint",
+    "@universal-music-store/config-typescript",
+    "@node-escpos/network-adapter",
+    "@universal-music-store/printer-core",
+    "esbuild",
+    "turbo"
+  ]
+}

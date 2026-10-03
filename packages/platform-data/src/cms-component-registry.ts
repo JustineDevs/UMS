@@ -43,7 +43,7 @@ export function isSafeCmsStyleKey(key: string): boolean {
   return key.startsWith("style.") && SAFE_STYLE_PROPERTIES.has(key.slice(6));
 }
 
-const legacyDefinition = (
+const persistedDefinition = (
   id: string,
   name: string,
   description: string,
@@ -204,23 +204,23 @@ export const CMS_COMPONENT_DEFINITIONS: CmsComponentDefinition[] = [
     match: match(["article", "div"], ["rich-text"]),
     ...editorDefaults,
   },
-  legacyDefinition("header-navigation", "Header navigation", "Global storefront navigation links.", "Global", [], "nav"),
-  legacyDefinition("header-actions", "Header actions", "Global account and bag actions.", "Global", [], "div"),
-  legacyDefinition("image", "Image", "Responsive image with accessible alternative text.", "Content", [
+  persistedDefinition("header-navigation", "Header navigation", "Global storefront navigation links.", "Global", [], "nav"),
+  persistedDefinition("header-actions", "Header actions", "Global account and bag actions.", "Global", [], "div"),
+  persistedDefinition("image", "Image", "Responsive image with accessible alternative text.", "Content", [
     prop("src", "Image URL", "image", ""),
     prop("alt", "Alt text", "text", ""),
   ], "figure"),
-  legacyDefinition("divider", "Spacer", "A bounded vertical spacing section.", "Layout", [
+  persistedDefinition("divider", "Spacer", "A bounded vertical spacing section.", "Layout", [
     prop("heightPx", "Height", "range", 24),
   ]),
-  legacyDefinition("faq", "FAQ", "Frequently asked questions with safe rich-text answers.", "Content", [
+  persistedDefinition("faq", "FAQ", "Frequently asked questions with safe rich-text answers.", "Content", [
     prop("items", "Questions", "json", [{ q: "Question?", a: "<p>Answer.</p>" }]),
   ]),
-  legacyDefinition("video", "Video", "A validated video or provider embed.", "Media", [
+  persistedDefinition("video", "Video", "A validated video or provider embed.", "Media", [
     prop("url", "Video URL", "oembed", ""),
     prop("title", "Accessible title", "text", "Video"),
   ]),
-  legacyDefinition("trust-strip", "Trust strip", "Three concise trust and service benefits.", "Content", [
+  persistedDefinition("trust-strip", "Trust strip", "Three concise trust and service benefits.", "Content", [
     prop("col1Title", "Column 1 title", "text", "Secure checkout"),
     prop("col1Body", "Column 1 body", "text", ""),
     prop("col2Title", "Column 2 title", "text", "Fast shipping"),
@@ -228,48 +228,48 @@ export const CMS_COMPONENT_DEFINITIONS: CmsComponentDefinition[] = [
     prop("col3Title", "Column 3 title", "text", "Easy returns"),
     prop("col3Body", "Column 3 body", "text", ""),
   ]),
-  legacyDefinition("contact-strip", "Contact strip", "Contact details and support hours.", "Content", [
+  persistedDefinition("contact-strip", "Contact strip", "Contact details and support hours.", "Content", [
     prop("phone", "Phone", "tel", ""),
     prop("email", "Email", "email", ""),
     prop("hours", "Hours / note", "text", ""),
   ]),
-  legacyDefinition("featured-products", "Featured products", "A live product selection by handle.", "Commerce", [
+  persistedDefinition("featured-products", "Featured products", "A live product selection by handle.", "Commerce", [
     prop("slugs", "Product handles", "text", ""),
   ]),
-  legacyDefinition("product-grid", "Product grid", "A live product grid selected by product handles.", "Commerce", [
+  persistedDefinition("product-grid", "Product grid", "A live product grid selected by product handles.", "Commerce", [
     prop("heading", "Heading", "text", "Featured products"),
     prop("slugs", "Product handles", "text", ""),
     prop("columns", "Columns", "range", 4),
   ]),
-  legacyDefinition("promo-banner", "Promotion banner", "A focused promotional message and action.", "Sections", [
+  persistedDefinition("promo-banner", "Promotion banner", "A focused promotional message and action.", "Sections", [
     prop("eyebrow", "Eyebrow", "text", ""),
     prop("title", "Title", "text", "Promotion"),
     prop("body", "Supporting text", "text", ""),
     prop("href", "Action URL", "url", "/shop"),
     prop("ctaLabel", "Action label", "text", "Shop now"),
   ]),
-  legacyDefinition("feature-grid", "Feature grid", "A bounded grid of merchant-defined benefits.", "Content", [
+  persistedDefinition("feature-grid", "Feature grid", "A bounded grid of merchant-defined benefits.", "Content", [
     prop("heading", "Heading", "text", "Why shop with us"),
     prop("items", "Features", "json", [{ title: "Feature", body: "Description" }]),
   ]),
-  legacyDefinition("testimonial-grid", "Testimonials", "Customer quotes displayed as a responsive grid.", "Content", [
+  persistedDefinition("testimonial-grid", "Testimonials", "Customer quotes displayed as a responsive grid.", "Content", [
     prop("heading", "Heading", "text", "What customers say"),
     prop("items", "Testimonials", "json", [{ quote: "A great experience.", name: "Customer", role: "" }]),
   ]),
-  legacyDefinition("announcement-bar", "Announcement bar", "A concise site-wide promotional message.", "Global", [
+  persistedDefinition("announcement-bar", "Announcement bar", "A concise site-wide promotional message.", "Global", [
     prop("message", "Message", "text", ""),
     prop("href", "Link URL", "url", ""),
     prop("linkLabel", "Link label", "text", "Learn more"),
   ], "aside"),
-  legacyDefinition("home-tiles", "Homepage category tiles", "Live category tiles for the storefront home page.", "Commerce", [
+  persistedDefinition("home-tiles", "Homepage category tiles", "Live category tiles for the storefront home page.", "Commerce", [
     prop("tiles", "Tiles", "json", []),
   ], "section > tiles"),
-  legacyDefinition("latest-section", "Latest products section", "Live latest-products section.", "Commerce", [
+  persistedDefinition("latest-section", "Latest products section", "Live latest-products section.", "Commerce", [
     prop("title", "Title", "text", "THE LATEST DROPS"),
     prop("viewAllLabel", "View all label", "text", "View All Products"),
     prop("viewAllHref", "View all URL", "url", "/shop"),
   ], "section > products"),
-  legacyDefinition("footer-columns", "Footer columns", "Global footer link columns.", "Global", [], "footer > columns"),
+  persistedDefinition("footer-columns", "Footer columns", "Global footer link columns.", "Global", [], "footer > columns"),
 ];
 
 const DEFINITION_BY_ID = new Map(CMS_COMPONENT_DEFINITIONS.map((definition) => [definition.id, definition]));
@@ -284,7 +284,7 @@ function defaultPropsForDefinition(definition: CmsComponentDefinition): Record<s
 
 /**
  * Adds the runtime-safe metadata required by the canonical CMS contract.
- * The legacy definition remains unchanged so persisted organization overrides
+ * The persisted definition remains unchanged so organization overrides
  * and old API payloads continue to deserialize during migration.
  */
 export function canonicalCmsBlockDefinition(
@@ -368,14 +368,14 @@ export function getCmsComponentDefinition(id: string | undefined) {
   return DEFINITION_BY_ID.get(id) ?? DEFINITION_BY_ID.get(id.replaceAll("_", "-"));
 }
 
-/** Convert any persisted legacy block spelling to the canonical registry id. */
+/** Convert any persisted block spelling to the canonical registry id. */
 export function cmsComponentIdForType(type: string | undefined) {
   if (!type) return undefined;
   const normalized = type.trim().replaceAll("_", "-");
   return getCmsComponentDefinition(normalized)?.id ?? normalized;
 }
 
-/** Return the legacy block spelling used by the flat blocks API. */
+/** Return the flat-block spelling used by the compatibility API. */
 export function cmsBlockTypeForComponentId(componentId: string | undefined) {
   return componentId?.replaceAll("-", "_");
 }

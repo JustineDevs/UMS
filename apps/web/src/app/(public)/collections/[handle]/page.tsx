@@ -96,7 +96,7 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
 
   return (
     <main className="storefront-page-shell max-w-[1600px] pb-16">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
+      <script type="application/ld+json" /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */ dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
       {cms?.banner_url ? <div className="relative mb-10 aspect-[21/9] overflow-hidden rounded-2xl bg-surface-container-low"><Image src={cms.banner_url} alt={cms.banner_alt ?? `${categoryLabel} collection banner`} fill priority className="object-cover" sizes="100vw" unoptimized={shouldUnoptimizeImage(cms.banner_url)} /></div> : null}
       <header className="mb-10 max-w-3xl">
         <nav aria-label="Breadcrumb" className="mb-5 text-sm text-on-surface-variant">
@@ -105,7 +105,7 @@ export default async function CollectionByHandlePage({ params, searchParams }: P
           <span aria-current="page">{categoryLabel}</span>
         </nav>
         <h1 className="font-headline text-4xl font-bold tracking-tighter text-primary sm:text-6xl">{categoryLabel}</h1>
-        {cms?.intro_html?.trim() ? <div className="mt-4 leading-relaxed text-on-surface-variant" dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(String(cms.intro_html)) }} /> : <p className="mt-4 text-on-surface-variant">Browse instruments and gear in the {categoryLabel} collection.</p>}
+        {cms?.intro_html?.trim() ? <div className="mt-4 leading-relaxed text-on-surface-variant" /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering. */ dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(String(cms.intro_html)) }} /> : <p className="mt-4 text-on-surface-variant">Browse instruments and gear in the {categoryLabel} collection.</p>}
         <p className="mt-4 text-sm text-on-surface-variant" aria-live="polite">
           {page.total === 0 ? "No products currently available" : `Showing ${page.total} ${page.total === 1 ? "product" : "products"}`}
         </p>

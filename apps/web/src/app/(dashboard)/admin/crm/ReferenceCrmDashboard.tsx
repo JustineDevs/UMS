@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { AdminLoadingState } from "@/components/admin-console";
 import { KpiCards } from "./reference-crm/_components/kpi-cards";
 import { OpportunitiesSection } from "./reference-crm/_components/opportunities-section";
 import { PipelineActivity } from "./reference-crm/_components/pipeline-activity";
@@ -120,7 +121,7 @@ export function ReferenceCrmDashboard() {
   }, [operations]);
 
   if (!ready) {
-    return <div className="h-96 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" aria-label="Loading CRM" />;
+    return <AdminLoadingState label="Loading CRM workspace" />;
   }
 
   return (

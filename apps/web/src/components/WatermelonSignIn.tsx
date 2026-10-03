@@ -1,33 +1,39 @@
 "use client";
 
-import { Auth04 } from "@universal-music-store/ui";
-import { signIn } from "@/lib/auth-client";
+import { signIn } from "@/lib/auth-actions";
+import { StorefrontAuthCard } from "@/components/StorefrontAuthCard";
 
-export function WatermelonSignIn({ callbackUrl, reauth }: { callbackUrl: string; reauth: boolean }) {
+export function WatermelonSignIn({
+  callbackUrl,
+  reauth,
+}: {
+  callbackUrl: string;
+  reauth: boolean;
+}) {
   const handleGoogleLogin = async () => {
     try {
-      await signIn("google", { callbackUrl }, reauth ? { prompt: "login" } : undefined);
+      await signIn(
+        "google",
+        { callbackUrl },
+        reauth ? { prompt: "login" } : undefined,
+      );
     } catch {
-      window.location.assign(`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}&error=ClientConfiguration`);
+      window.location.assign(
+        `/login?callbackUrl=${encodeURIComponent(callbackUrl)}&error=ClientConfiguration`,
+      );
     }
   };
 
   return (
-    <Auth04
-      brandName="Universal Music Store"
-      socialOnly
-      showFooter={false}
-      termsHref="/terms"
-      privacyHref="/privacy"
+    <StorefrontAuthCard
+      heading="Login"
+      subheading="Log in to continue to your account."
+      googleLabel="Continue with Google"
       onGoogleLogin={() => void handleGoogleLogin()}
-      onCreateAccount={() => { window.location.href = "/register"; }}
-      onForgotPassword={() => { window.location.href = "/contact?topic=account"; }}
-      onLogin={() => { window.location.href = `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}&error=password_auth_unavailable`; }}
-      footerLinks={[
-        { label: "Privacy", href: "/privacy" },
-        { label: "Terms", href: "/terms" },
-        { label: "Support", href: "/contact" },
-      ]}
+      footerPrompt="Don't have an account yet?"
+      footerLabel="Sign up"
+      footerHref={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+      googleTestId="sign-in-google"
     />
   );
 }

@@ -267,6 +267,7 @@ test("records provider-confirmed payment state only for a trusted attempt correl
         assert.equal(values?.[0], "paid");
         assert.equal(values?.[4], "123e4567-e89b-12d3-a456-426614174000");
         assert.equal(values?.[5], "cs_123");
+        assert.equal(values?.[7], "pi_123");
         return {
           rows: [{ correlation_id: "123e4567-e89b-12d3-a456-426614174000" }] as unknown as T[],
           rowCount: 1,
@@ -286,6 +287,7 @@ test("records provider-confirmed payment state only for a trusted attempt correl
     data: {
       object: {
         id: "cs_123",
+        payment_intent: "pi_123",
         metadata: { correlation_id: "123e4567-e89b-12d3-a456-426614174000" },
       },
     },
@@ -411,6 +413,50 @@ test("matches Xendit payment callbacks by payment_request_id", async () => {
   const update = queries.find(({ sql }) => sql.startsWith("UPDATE public.payment_attempts"));
   assert.ok(update);
   assert.equal(update.values?.[6], "payment-request-id");
+});
+
+test("processes the documented Xendit payment session completion payload", async () => {
+  const queries: Array<{ sql: string; values?: readonly unknown[] }> = [];
+  const database = {
+    query: async <T extends Record<string, unknown>>(sql: string, values?: readonly unknown[]) => {
+      queries.push({ sql, values });
+      if (sql.startsWith("INSERT INTO public.payment_webhook_events"))
+        return { rows: [{ inserted: true }] as T[], rowCount: 1 };
+      if (sql.startsWith("UPDATE public.payment_attempts"))
+        return { rows: [{ correlation_id: "123e4567-e89b-12d3-a456-426614174000" }] as T[], rowCount: 1 };
+      if (sql.startsWith("UPDATE public.payment_webhook_events"))
+        return { rows: [], rowCount: 1 };
+      throw new Error(`unexpected query: ${sql}`);
+    },
+    end: async () => undefined,
+  };
+  const response = await handleWorkerWebhookRequest(
+    new Request("https://api.test/webhooks/xendit", {
+      method: "POST",
+      body: JSON.stringify({
+        event: "payment_session.completed",
+        created: "2026-09-30T08:00:00.000Z",
+        data: {
+          payment_session_id: "ps-test-123",
+          payment_id: "py-test-123",
+          reference_id: "123e4567-e89b-12d3-a456-426614174000",
+          updated: "2026-09-30T08:00:01.000Z",
+          status: "COMPLETED",
+        },
+      }),
+      headers: { "x-callback-token": "x-token" },
+    }),
+    database,
+    "xendit",
+    { XENDIT_WEBHOOK_TOKEN: "x-token" },
+  );
+  assert.equal(response.status, 202);
+  const update = queries.find(({ sql }) => sql.startsWith("UPDATE public.payment_attempts"));
+  assert.ok(update);
+  assert.equal(update.values?.[0], "paid");
+  assert.equal(update.values?.[5], "ps-test-123");
+  assert.equal(update.values?.[7], "py-test-123");
+  assert.equal(queries[0]?.values?.[1], "xendit:payment_session.completed:ps-test-123:2026-09-30T08:00:01.000Z");
 });
 
 test("reconciles Xendit refund callbacks into APP audit on first and duplicate delivery", async () => {

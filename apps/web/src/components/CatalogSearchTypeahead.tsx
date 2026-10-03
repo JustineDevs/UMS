@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   trackSearchSuggestionClick,
   trackSearchSuggestionRequest,
@@ -24,6 +26,7 @@ export function CatalogSearchTypeahead({
   minPrice,
   maxPrice,
   sort,
+  variant = "catalog",
 }: {
   initialQ?: string;
   category?: string;
@@ -38,8 +41,12 @@ export function CatalogSearchTypeahead({
   minPrice?: number;
   maxPrice?: number;
   sort: string;
+  variant?: "catalog" | "header";
 }) {
   const router = useRouter();
+  const instanceId = useId().replace(/:/g, "");
+  const inputId = `catalog-typeahead-${instanceId}`;
+  const resultsId = `catalog-typeahead-results-${instanceId}`;
   const [q, setQ] = useState(initialQ ?? "");
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Suggestion[]>([]);
@@ -48,7 +55,8 @@ export function CatalogSearchTypeahead({
   const [suggestionError, setSuggestionError] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestRef = useRef<AbortController | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLFormElement>(null);
+  const isHeader = variant === "header";
 
   const runSuggest = useCallback(async (term: string) => {
     const t = term.trim();
@@ -56,12 +64,13 @@ export function CatalogSearchTypeahead({
       requestRef.current?.abort();
       setItems([]);
       setSuggestionError(false);
-      setLoading(false);
       return;
     }
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
+    setItems([]);
+    setActiveIndex(-1);
     setLoading(true);
     setSuggestionError(false);
     try {
@@ -86,7 +95,9 @@ export function CatalogSearchTypeahead({
       setItems([]);
       setSuggestionError(true);
     } finally {
-      if (requestRef.current === controller) setLoading(false);
+      if (requestRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -128,17 +139,30 @@ export function CatalogSearchTypeahead({
     return s ? `/shop?${s}` : "/shop";
   }
 
+  function submitSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    router.push(buildShopUrl(q));
+    setOpen(false);
+  }
+
   return (
-    <div ref={wrapRef} className="relative w-full max-w-md">
-      <label htmlFor="catalog-typeahead" className="sr-only">
+    <form
+      ref={wrapRef}
+      onSubmit={submitSearch}
+      className={isHeader ? "relative flex min-w-0 flex-1 items-center max-[379px]:w-11 max-[379px]:flex-none" : "relative w-full max-w-md"}
+    >
+      <label htmlFor={inputId} className="sr-only">
         Search catalog
       </label>
       <input
-        id="catalog-typeahead"
+        id={inputId}
         type="search"
         aria-label="Search products"
         value={q}
         onChange={(e) => {
+          setItems([]);
+          setActiveIndex(-1);
+          setSuggestionError(false);
           setQ(e.target.value);
           setOpen(true);
         }}
@@ -148,9 +172,9 @@ export function CatalogSearchTypeahead({
         aria-autocomplete="list"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls="catalog-typeahead-results"
+        aria-controls={resultsId}
         aria-activedescendant={
-          activeIndex >= 0 ? `catalog-suggestion-${activeIndex}` : undefined
+          activeIndex >= 0 ? `${resultsId}-suggestion-${activeIndex}` : undefined
         }
         onKeyDown={(event) => {
           if (event.key === "Escape") {
@@ -184,13 +208,37 @@ export function CatalogSearchTypeahead({
         placeholder="Search products…"
         maxLength={80}
         autoComplete="off"
-        className="w-full rounded-lg border border-outline-variant/30 bg-white px-4 py-3 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/30"
+        className={isHeader
+          ? "min-h-11 min-w-0 flex-1 rounded-l-md border-0 bg-white px-3 text-sm text-primary outline-none placeholder:text-on-surface-variant/65 focus:ring-2 focus:ring-on-primary/60 sm:px-4 max-[379px]:sr-only"
+          : "w-full rounded-lg border border-outline-variant/30 bg-white px-4 py-3 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/30"}
       />
+      {isHeader ? (
+        <Button
+          type="submit"
+          variant="secondary"
+          size="icon"
+          aria-label="Search"
+          className="h-11 w-11 shrink-0 rounded-l-none rounded-r-md max-[379px]:rounded-l-md"
+        >
+          <Search className="size-5" aria-hidden="true" />
+        </Button>
+      ) : null}
       {loading ? (
-        <p className="mt-1 text-[10px] text-on-surface-variant">Searching…</p>
+        <p
+          className={isHeader
+            ? "absolute left-0 top-full z-30 mt-1 whitespace-nowrap rounded-md bg-white px-3 py-2 text-[10px] text-on-surface-variant shadow-lg"
+            : "mt-1 text-[10px] text-on-surface-variant"}
+        >
+          Searching…
+        </p>
       ) : null}
       {!loading && open && suggestionError ? (
-        <p className="mt-1 text-xs text-error" role="status">
+        <p
+          className={isHeader
+            ? "absolute left-0 top-full z-30 mt-1 max-w-[min(24rem,calc(100vw - 2rem))] rounded-md bg-white px-3 py-2 text-xs text-error shadow-lg"
+            : "mt-1 text-xs text-error"}
+          role="status"
+        >
           Search suggestions are temporarily unavailable. Press Enter to view
           catalog results.
         </p>
@@ -200,20 +248,25 @@ export function CatalogSearchTypeahead({
       !suggestionError &&
       q.trim().length >= 2 &&
       items.length === 0 ? (
-        <p className="mt-1 text-xs text-on-surface-variant" role="status">
+        <p
+          className={isHeader
+            ? "absolute left-0 top-full z-30 mt-1 max-w-[min(24rem,calc(100vw - 2rem))] rounded-md bg-white px-3 py-2 text-xs text-on-surface-variant shadow-lg"
+            : "mt-1 text-xs text-on-surface-variant"}
+          role="status"
+        >
           No matching products yet. Press Enter to view all catalog results.
         </p>
       ) : null}
       {open && items.length > 0 ? (
         <ul
-          id="catalog-typeahead-results"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-outline-variant/20 bg-white py-1 shadow-lg"
+          id={resultsId}
+          className="absolute left-0 top-full z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-outline-variant/20 bg-white py-1 shadow-lg"
           role="listbox"
         >
           {items.map((it, index) => (
             <li
               key={it.slug}
-              id={`catalog-suggestion-${index}`}
+              id={`${resultsId}-suggestion-${index}`}
               role="option"
               aria-selected={index === activeIndex}
             >
@@ -250,6 +303,6 @@ export function CatalogSearchTypeahead({
           </li>
         </ul>
       ) : null}
-    </div>
+    </form>
   );
 }

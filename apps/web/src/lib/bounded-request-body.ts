@@ -31,6 +31,11 @@ export async function readBoundedRequestBody(
       }
       chunks.push(chunk.value);
     }
+  } catch {
+    // A browser may cancel an in-flight request while its body is streaming.
+    // Treat that transport interruption as an invalid body instead of letting
+    // the rejected reader escape as an uncaught server exception.
+    return { body: "", tooLarge: false };
   } finally {
     reader.releaseLock();
   }
@@ -74,6 +79,10 @@ export async function parseBoundedJson(
       }
       chunks.push(chunk.value);
     }
+  } catch {
+    // Request disconnects are expected during rapid checkout rerenders and
+    // navigation. Keep the route's normal 400 response path in control.
+    return { value: null, tooLarge: false, valid: false };
   } finally {
     reader.releaseLock();
   }

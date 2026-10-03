@@ -187,11 +187,16 @@ async function workerAdminRequest(path: string, signal?: AbortSignal): Promise<R
   }
   const token = await createInternalWorkerAdminToken(session);
   if (!token) return null;
-  return fetchWorkerResponse(`${base}${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    cache: "no-store",
-    signal,
-  });
+  const requestSignal = signal ?? AbortSignal.timeout(10_000);
+  try {
+    return await fetchWorkerResponse(`${base}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      cache: "no-store",
+      signal: requestSignal,
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function workerAdminMutation(
@@ -212,18 +217,23 @@ async function workerAdminMutation(
   }
   const token = await createInternalWorkerAdminToken(session);
   if (!token) return null;
-  return fetchWorkerResponse(`${base}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      "Idempotency-Key": idempotencyKey,
-      ...extraHeaders,
-    },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+  try {
+    return await fetchWorkerResponse(`${base}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "Idempotency-Key": idempotencyKey,
+        ...extraHeaders,
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    return null;
+  }
 }
 
 async function workerAdminCsvMutation(path: string, body: string, idempotencyKey: string): Promise<Response | null> {
@@ -238,7 +248,11 @@ async function workerAdminCsvMutation(path: string, body: string, idempotencyKey
   }
   const token = await createInternalWorkerAdminToken(session);
   if (!token) return null;
-  return fetchWorkerResponse(`${base}${path}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "text/csv", "Idempotency-Key": idempotencyKey }, body, cache: "no-store" });
+  try {
+    return await fetchWorkerResponse(`${base}${path}`, { method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "text/csv", "Idempotency-Key": idempotencyKey }, body, cache: "no-store" });
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchWorkerPosEnterpriseForAdmin(): Promise<Response | null> { return workerAdminRequest("/api/admin/pos/enterprise"); }
@@ -424,17 +438,8 @@ export async function mutateWorkerEmployeesForAdmin(path: string, method: "POST"
 export async function createWorkerAdminEmployeeForAdmin(body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return mutateWorkerEmployeesForAdmin("/api/admin/employees", "POST", body, idempotencyKey); }
 export async function mutateWorkerEmployeePinForAdmin(path: string, method: "POST" | "PUT", body: Record<string, unknown>, idempotencyKey: string, stepUp: string | null): Promise<Response | null> { return workerAdminMutation(path, method, body, idempotencyKey, stepUp ? { "x-admin-step-up": stepUp } : undefined); }
 export async function fetchWorkerCampaignsForAdmin(query = ""): Promise<Response | null> { return workerAdminRequest(`/api/admin/campaigns${query ? `?${query}` : ""}`); }
-export async function fetchWorkerCampaignForAdmin(id: string): Promise<Response | null> { return workerAdminRequest(`/api/admin/campaigns/${encodeURIComponent(id)}`); }
-export async function fetchWorkerInventoryCycleCountsForAdmin(query = ""): Promise<Response | null> { return workerAdminRequest(`/api/admin/inventory/cycle-counts${query ? `?${query}` : ""}`); }
-export async function fetchWorkerInventoryCycleCountForAdmin(id: string): Promise<Response | null> { return workerAdminRequest(`/api/admin/inventory/cycle-counts/${encodeURIComponent(id)}`); }
-export async function mutateWorkerInventoryCycleCountForAdmin(id: string, body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation(`/api/admin/inventory/cycle-counts/${encodeURIComponent(id)}`, "POST", body, idempotencyKey); }
-export async function createWorkerInventoryCycleCountForAdmin(body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation("/api/admin/inventory/cycle-counts", "POST", body, idempotencyKey); }
 export async function mutateWorkerCampaignForAdmin(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation(path, method, body, idempotencyKey); }
 export async function saveWorkerDeviceForAdmin(path: string, method: "POST" | "PATCH", body: Record<string, unknown>, idempotencyKey: string): Promise<Response | null> { return workerAdminMutation(path, method, body, idempotencyKey); }
-
-export async function fetchWorkerCustomerLoyaltyForStorefront(): Promise<Response | null> {
-  return workerAdminRequest("/store/customers/me/loyalty");
-}
 
 export async function fetchWorkerCmsBlogDetailForAdmin(blogId: string): Promise<Response | null> {
   return workerAdminRequest(`/api/admin/cms/blog/${encodeURIComponent(blogId)}`);
@@ -503,40 +508,6 @@ export async function adjustWorkerInventoryForAdmin(input: {
   );
 }
 
-export async function fetchWorkerVariantInventoryForAdmin(input: {
-  variantId?: string;
-  inventoryItemId?: string;
-  locationId?: string;
-}): Promise<{ productId: string; variantId: string; inventoryItemId: string; locationId: string | null; stockedQuantity: number; reservedQuantity: number; availableQuantity: number } | null> {
-  try {
-    if (Boolean(input.variantId) === Boolean(input.inventoryItemId)) return null;
-    const query = new URLSearchParams(input.variantId
-      ? { variantId: input.variantId }
-      : { inventoryItemId: input.inventoryItemId! });
-    if (input.locationId) query.set("locationId", input.locationId);
-    const response = await workerAdminRequest(`/api/admin/inventory?${query.toString()}`);
-    if (!response?.ok) return null;
-    const payload = await readWorkerAdminJson<{ data?: Record<string, unknown> }>(response);
-    const data = payload.data;
-    if (!data || typeof data.productId !== "string" || typeof data.variantId !== "string" || typeof data.inventoryItemId !== "string") return null;
-    const stockedQuantity = Number(data.stockedQuantity);
-    const reservedQuantity = Number(data.reservedQuantity);
-    const availableQuantity = Number(data.availableQuantity);
-    if (![stockedQuantity, reservedQuantity, availableQuantity].every(Number.isSafeInteger)) return null;
-    return {
-      productId: data.productId,
-      variantId: data.variantId,
-      inventoryItemId: data.inventoryItemId,
-      locationId: typeof data.locationId === "string" ? data.locationId : null,
-      stockedQuantity,
-      reservedQuantity,
-      availableQuantity,
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchWorkerProductCategoriesForAdmin(): Promise<WorkerAdminProductCategory[] | null> {
   try {
     const response = await workerAdminRequest("/api/admin/catalog/categories");
@@ -550,18 +521,6 @@ export async function fetchWorkerProductCategoriesForAdmin(): Promise<WorkerAdmi
   }
 }
 
-export async function fetchWorkerPromotionCodesForAdmin(): Promise<string[] | null> {
-  try {
-    const response = await workerAdminRequest("/api/admin/promotions/codes");
-    if (!response?.ok) return null;
-    const payload = await readWorkerAdminJson<{ codes?: unknown }>(response);
-    return Array.isArray(payload.codes)
-      ? payload.codes.filter((code): code is string => typeof code === "string")
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function createWorkerProductCategoryForAdmin(input: {
   name: string;

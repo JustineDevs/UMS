@@ -18,7 +18,6 @@ export async function GET() {
     "## Start here",
     `- [Home](${canonicalUrl("/")})`,
     `- [Shop](${canonicalUrl("/shop")})`,
-    `- [Collections](${canonicalUrl("/collections")})`,
     `- [Help center](${canonicalUrl("/help")})`,
     `- [FAQ](${canonicalUrl("/faq")})`,
     "",
@@ -34,7 +33,7 @@ export async function GET() {
     "",
     "## Popular categories",
     ...(categories.kind === "ok"
-      ? categories.summaries.slice(0, 10).map((category) => `- [${category.category}](${canonicalUrl(`/shop?category=${encodeURIComponent(category.category)}`)})`)
+      ? categories.summaries.slice(0, 10).map((category) => `- [${category.category}](${canonicalUrl("/shop")})`)
       : []),
   ];
 

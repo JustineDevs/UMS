@@ -13,15 +13,6 @@ export type CatalogAdminProduct = {
   shopNotes: string[];
 };
 
-// Source-compatible names for the admin pages; all requests are Worker-native.
-export function getAdminProductsIndexUrl(): string {
-  return "/admin/catalog";
-}
-
-export function getAdminProductEditUrl(productId: string): string {
-  return `/admin/catalog/${encodeURIComponent(productId)}`;
-}
-
 export async function fetchCatalogProductsForAdmin(opts: {
   limit?: number;
   offset?: number;

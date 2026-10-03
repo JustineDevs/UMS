@@ -70,9 +70,7 @@ export function CookieConsentBanner() {
   if (!visible) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="false"
+    <aside
       aria-label="Cookie consent"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-outline-variant/20 bg-surface px-4 py-3 shadow-sm sm:px-6"
     >
@@ -106,6 +104,6 @@ export function CookieConsentBanner() {
           </button>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

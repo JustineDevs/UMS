@@ -9,7 +9,11 @@ import { CmsAnnouncementStack } from "./CmsAnnouncementBar";
 import { CmsExperimentAssigner } from "./CmsExperimentAssigner";
 import { GlobalRouteMotion } from "./GlobalRouteMotion";
 import { StorefrontFooter } from "./StorefrontFooter";
-import { StorefrontHeader } from "./StorefrontHeader";
+import {
+  StorefrontHeader,
+  type StorefrontHeaderSections,
+  type StorefrontNavigationSource,
+} from "./StorefrontHeader";
 import { getCachedPublicSiteMetadata } from "@/lib/public-site-metadata";
 
 const PUBLIC_READ_DEADLINE_MS = 1_500;
@@ -29,14 +33,22 @@ const EMPTY_NAVIGATION = {
   socialLinks: [],
 };
 
+export type StorefrontChromeSections = {
+  header?: StorefrontHeaderSections;
+  footer?: boolean;
+};
+
 /**
  * Shared storefront chrome (header, footer, motion, CMS experiments) for public routes
  * and root not-found so global 404s still match the main layout.
  */
 export async function StorefrontPublicChrome({
   children,
+  sections,
 }: {
   children: React.ReactNode;
+  /** Page-context composition options. Omitted sections keep the storefront defaults. */
+  sections?: StorefrontChromeSections;
 }) {
   const [nav, announcements, experiments, publicSite] = await Promise.all([
     withinPublicReadDeadline(loadCmsNavigationPublic(), EMPTY_NAVIGATION),
@@ -54,6 +66,13 @@ export async function StorefrontPublicChrome({
     linkLabel: ann.linkLabel,
     dismissible: ann.dismissible,
   }));
+  const navigationSource: StorefrontNavigationSource =
+    nav.headerLinks.length > 0 || nav.headerLinksMobile.length > 0 ? "cms" : "empty";
+  const hasSecondaryNavigation =
+    nav.headerLinks.length > 0 || nav.headerLinksMobile.length > 0;
+  const mainContentSpacing = hasSecondaryNavigation
+    ? "pt-[7.375rem] xs:pt-[7.375rem] sm:pt-[6.75rem] md:pt-[6.25rem]"
+    : "pt-[7.375rem] xs:pt-[7.375rem] sm:pt-[5.25rem] md:pt-[5.25rem]";
 
   return (
     <>
@@ -68,23 +87,27 @@ export async function StorefrontPublicChrome({
           announcementBars.length > 0 ? <CmsAnnouncementStack bars={announcementBars} /> : undefined
         }
         navigation={nav}
+        navigationSource={navigationSource}
+        sections={sections?.header}
       />
       <CmsExperimentAssigner experiments={experiments} />
       <div
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full min-w-0 max-w-[100vw] pt-[5.875rem] outline-none xs:pt-24 sm:pt-[6.125rem] md:pt-[6.25rem]"
+        className={`mx-auto w-full min-w-0 max-w-[100vw] ${mainContentSpacing} outline-none`}
       >
         <GlobalRouteMotion>{children}</GlobalRouteMotion>
       </div>
-      <StorefrontFooter
-        cmsFooterColumns={nav.footerColumns.length > 0 ? nav.footerColumns : undefined}
-        cmsFooterBottomLinks={
-          nav.footerBottomLinks.length > 0 ? nav.footerBottomLinks : undefined
-        }
-        cmsSocialLinks={nav.socialLinks.length > 0 ? nav.socialLinks : undefined}
-        publicSocialLinks={storefrontSocialLinks(publicSite)}
-      />
+      {sections?.footer !== false ? (
+        <StorefrontFooter
+          cmsFooterColumns={nav.footerColumns.length > 0 ? nav.footerColumns : undefined}
+          cmsFooterBottomLinks={
+            nav.footerBottomLinks.length > 0 ? nav.footerBottomLinks : undefined
+          }
+          cmsSocialLinks={nav.socialLinks.length > 0 ? nav.socialLinks : undefined}
+          publicSocialLinks={storefrontSocialLinks(publicSite)}
+        />
+      ) : null}
     </>
   );
 }

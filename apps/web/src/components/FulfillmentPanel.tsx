@@ -1,9 +1,41 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 
 type CourierOption = { slug: string; label: string };
+type FulfillmentState = {
+  status: string;
+  trackingNumber: string;
+  carrierSlug: string;
+  labelUrl: string;
+  msg: string | null;
+  err: string | null;
+  loading: string | null;
+  couriers: CourierOption[];
+};
+type FulfillmentAction =
+  | { type: "status"; value: string }
+  | { type: "field"; field: "trackingNumber" | "carrierSlug" | "labelUrl"; value: string }
+  | { type: "couriers"; value: CourierOption[] }
+  | { type: "loading"; value: string | null }
+  | { type: "message"; value: string | null }
+  | { type: "error"; value: string | null }
+  | { type: "clear-form" };
+
+function fulfillmentReducer(state: FulfillmentState, action: FulfillmentAction): FulfillmentState {
+  if (action.type === "status") return { ...state, status: action.value };
+  if (action.type === "field") return { ...state, [action.field]: action.value };
+  if (action.type === "couriers") return { ...state, couriers: action.value };
+  if (action.type === "loading") return { ...state, loading: action.value };
+  if (action.type === "message") return { ...state, msg: action.value };
+  if (action.type === "error") return { ...state, err: action.value };
+  return { ...state, trackingNumber: "", labelUrl: "" };
+}
+
+function initialFulfillmentState(status: string): FulfillmentState {
+  return { status, trackingNumber: "", carrierSlug: "jtexpress-ph", labelUrl: "", msg: null, err: null, loading: null, couriers: [] };
+}
 
 export type ShipmentRow = {
   id: string;
@@ -24,37 +56,30 @@ export function FulfillmentPanel({
   initialShipments: ShipmentRow[];
 }) {
   const router = useRouter();
-  const [status, setStatus] = useState(initialStatus);
+  const [state, dispatch] = useReducer(fulfillmentReducer, initialStatus, initialFulfillmentState);
+  const { status, trackingNumber, carrierSlug, labelUrl, msg, err, loading, couriers } = state;
 
   useEffect(() => {
-    setStatus(initialStatus);
+    dispatch({ type: "status", value: initialStatus });
   }, [initialStatus]);
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [carrierSlug, setCarrierSlug] = useState("jtexpress-ph");
-  const [labelUrl, setLabelUrl] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState<string | null>(null);
-  const [couriers, setCouriers] = useState<CourierOption[]>([]);
-
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/integrations/couriers", { credentials: "include", signal: controller.signal })
       .then((r) => (r.ok ? r.json() : { couriers: [] }))
       .then((d: { couriers?: CourierOption[] }) => {
-        setCouriers(Array.isArray(d.couriers) ? d.couriers : []);
+        dispatch({ type: "couriers", value: Array.isArray(d.couriers) ? d.couriers : [] });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setCouriers([]);
+        if (!controller.signal.aborted) dispatch({ type: "couriers", value: [] });
       });
     return () => controller.abort();
   }, []);
 
   async function addShipment(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
-    setMsg(null);
-    setLoading("shipment");
+    dispatch({ type: "error", value: null });
+    dispatch({ type: "message", value: null });
+    dispatch({ type: "loading", value: "shipment" });
     const res = await fetch("/api/admin/delivery-logistics/shipments", {
       method: "POST",
       headers: {
@@ -79,22 +104,21 @@ export function FulfillmentPanel({
     });
     if (!res.ok) {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      setLoading(null);
-      setErr(data.error ?? `Request failed (${res.status})`);
+      dispatch({ type: "loading", value: null });
+      dispatch({ type: "error", value: data.error ?? `Request failed (${res.status})` });
       return;
     }
     await res.json().catch(() => ({}));
-    setLoading(null);
-    setMsg("Shipment saved. Order may move to ready-to-ship when it was paid.");
-    setTrackingNumber("");
-    setLabelUrl("");
+    dispatch({ type: "loading", value: null });
+    dispatch({ type: "message", value: "Shipment saved. Order may move to ready-to-ship when it was paid." });
+    dispatch({ type: "clear-form" });
     router.refresh();
   }
 
   async function patchOrder(next: string) {
-    setErr(null);
-    setMsg(null);
-    setLoading(`status:${next}`);
+    dispatch({ type: "error", value: null });
+    dispatch({ type: "message", value: null });
+    dispatch({ type: "loading", value: `status:${next}` });
     const res = await fetch(
       `/api/admin/orders/${encodeURIComponent(orderId)}/status`,
       {
@@ -111,21 +135,21 @@ export function FulfillmentPanel({
         error?: string;
         status?: string;
       };
-      setLoading(null);
-      setErr(data.error ?? `Request failed (${res.status})`);
+      dispatch({ type: "loading", value: null });
+      dispatch({ type: "error", value: data.error ?? `Request failed (${res.status})` });
       return;
     }
     const data = (await res.json().catch(() => ({}))) as {
       error?: string;
       status?: string;
     };
-    setLoading(null);
+    dispatch({ type: "loading", value: null });
     if (typeof data.status === "string") {
-      setStatus(data.status);
+      dispatch({ type: "status", value: data.status });
     } else {
-      setStatus(next);
+      dispatch({ type: "status", value: next });
     }
-    setMsg(`Order status updated to ${next.replace(/_/g, " ")}.`);
+    dispatch({ type: "message", value: `Order status updated to ${next.replace(/_/g, " ")}.` });
     router.refresh();
   }
 
@@ -168,7 +192,7 @@ export function FulfillmentPanel({
               <input
                 id="fulfillment-tracking-number"
                 value={trackingNumber}
-                onChange={(e) => setTrackingNumber(e.target.value)}
+                onChange={(e) => dispatch({ type: "field", field: "trackingNumber", value: e.target.value })}
                 required
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm"
                 placeholder="J&T tracking number"
@@ -184,7 +208,7 @@ export function FulfillmentPanel({
                 onChange={(e) => {
                   const v = e.target.value;
                   if (v === "__custom") return;
-                  setCarrierSlug(v);
+                  dispatch({ type: "field", field: "carrierSlug", value: v });
                 }}
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm mb-2"
               >
@@ -198,7 +222,7 @@ export function FulfillmentPanel({
               <input
                 aria-label="Custom carrier code"
                 value={carrierSlug}
-                onChange={(e) => setCarrierSlug(e.target.value)}
+                onChange={(e) => dispatch({ type: "field", field: "carrierSlug", value: e.target.value })}
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-xs font-mono"
                 placeholder="Carrier code if not listed above"
               />
@@ -210,7 +234,7 @@ export function FulfillmentPanel({
               <input
                 id="fulfillment-label-url"
                 value={labelUrl}
-                onChange={(e) => setLabelUrl(e.target.value)}
+                onChange={(e) => dispatch({ type: "field", field: "labelUrl", value: e.target.value })}
                 className="w-full rounded border border-outline-variant/30 bg-surface-container-low px-3 py-2 text-sm"
                 placeholder="https://…"
               />

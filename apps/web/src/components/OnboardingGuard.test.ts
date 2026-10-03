@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   isExplicitGuestCheckout,
   requiresStorefrontOnboarding,
-} from "./OnboardingGuard";
+} from "./onboarding-guard-rules";
 
 test("onboarding only gates profile-dependent storefront flows", () => {
   assert.equal(requiresStorefrontOnboarding("/account"), true);

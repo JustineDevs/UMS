@@ -39,13 +39,13 @@ describe("http-schemas", () => {
     assert.ok(!cartMergePostBodySchema.safeParse({}).success);
     assert.ok(
       cartMergePostBodySchema.safeParse({
-        mergeKey: "merge-key-0123456789",
+        mergeKey: "x".repeat(20),
         guestLines: [{ variantId: "variant_01ABC", quantity: 2 }],
       }).success,
     );
     assert.ok(
       !cartMergePostBodySchema.safeParse({
-        mergeKey: "merge-key-0123456789",
+        mergeKey: "x".repeat(20),
         guestLines: [{ variantId: "bad", quantity: 1 }],
       }).success,
     );
@@ -87,7 +87,7 @@ describe("http-schemas", () => {
       medusaProductId: "prod_01HZABC",
       body: "Great",
       rating: 5,
-      csrfToken: "csrf-token-that-is-long-enough",
+      csrfToken: "x".repeat(32),
       formStartedAt: Date.now(),
       proofMediaUrl: "https://example.com/proof.jpg",
     });
@@ -98,7 +98,7 @@ describe("http-schemas", () => {
         medusaProductId: "prod_01HZABC",
         body: "Great",
         rating: 5,
-        csrfToken: "csrf-token-that-is-long-enough",
+        csrfToken: "x".repeat(32),
         formStartedAt: Date.now(),
         proofMediaUrl: "",
       }).success,
@@ -109,7 +109,7 @@ describe("http-schemas", () => {
         medusaProductId: "prod_01HZABC",
         body: "Great",
         rating: 5,
-        csrfToken: "csrf-token-that-is-long-enough",
+        csrfToken: "x".repeat(32),
         formStartedAt: Date.now(),
         imageUrl: "https://example.com/proof.mp4",
       }).success,
@@ -198,7 +198,7 @@ describe("http-schemas", () => {
     const r = internalCustomerDataErasureBodySchema.safeParse({
       customerId: "cus_01HZ",
       email: "u@example.com",
-      confirmationToken: "tokentoken",
+      confirmationToken: "x".repeat(16),
     });
     assert.ok(r.success);
     assert.equal(r.data.retainOrderRecords, false);

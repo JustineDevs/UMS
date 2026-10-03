@@ -7,9 +7,9 @@ import { E2E_SESSION_COOKIE } from "@/lib/e2e-session-constants";
 async function updateSupabaseSession(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({ request: { headers: request.headers } });
   if (
-    process.env.UVS_E2E_LOCAL === "1" &&
     process.env.UVS_E2E_REAL_SESSION === "1" &&
     process.env.VERCEL !== "1" &&
+    (process.env.UVS_E2E_LOCAL === "1" || process.env.NODE_ENV === "development") &&
     request.cookies.has(E2E_SESSION_COOKIE)
   ) return response;
   const url = process.env.SUPABASE_URL?.trim();
@@ -29,8 +29,13 @@ async function updateSupabaseSession(request: NextRequest): Promise<NextResponse
   if (request.nextUrl.pathname.startsWith("/account")) {
     if (!data.user) {
       const signIn = request.nextUrl.clone();
-      signIn.pathname = "/sign-in";
-      signIn.searchParams.set("callbackUrl", request.nextUrl.pathname);
+      signIn.pathname = "/login";
+      signIn.searchParams.set(
+        "callbackUrl",
+        request.nextUrl.pathname === "/account"
+          ? "/account/profile"
+          : request.nextUrl.pathname,
+      );
       return NextResponse.redirect(signIn);
     }
   }

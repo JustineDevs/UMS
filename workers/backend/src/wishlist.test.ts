@@ -4,7 +4,7 @@ import { createHmac } from "node:crypto";
 import { handleWishlistRequest } from "./wishlist.ts";
 import type { WorkerDatabaseClient } from "./database.ts";
 
-function env() {
+function env(products: Array<{ id: string; handle: string; title: string }> = [{ id: "prod_1", handle: "canary", title: "Canary" }]) {
   const queries: Array<{ role: string; text: string; values: readonly unknown[] }> = [];
   return {
     env: {
@@ -14,7 +14,7 @@ function env() {
           async query<T extends Record<string, unknown>>(text: string, values: readonly unknown[] = []) {
             queries.push({ role, text, values });
             if (role === "medusa" && text.includes("FROM public.customer")) return { rows: [{ id: "cus_1" }] as T[], rowCount: 1 };
-            if (role === "medusa" && text.includes("FROM public.product")) return { rows: [{ id: "prod_1", handle: "canary", title: "Canary" }] as T[], rowCount: 1 };
+            if (role === "medusa" && text.includes("FROM public.product")) return { rows: products as T[], rowCount: products.length };
             if (role === "app" && text.includes("SELECT medusa_product_id")) return { rows: [{ medusa_product_id: "prod_1", added_at: "now" }] as T[], rowCount: 1 };
             return { rows: [] as T[], rowCount: 1 };
           },
@@ -77,5 +77,56 @@ test("wishlist POST sends only canonical product fields to APP storage", async (
   assert.equal(response.status, 200);
   const write = fixture.queries.find((query) => query.text.includes("INSERT INTO public.wishlists"));
   assert.ok(write);
+  assert.ok(write?.text.includes("DO UPDATE SET product_slug = EXCLUDED.product_slug, product_name = EXCLUDED.product_name"));
+  assert.equal(write?.text.includes("added_at = now()"), false);
   assert.deepEqual(write?.values.slice(1), ["canary", "Canary", "prod_1"]);
+});
+
+test("wishlist sync safely skips deleted or unpublished product identities", async () => {
+  const fixture = env([]);
+  const response = await handleWishlistRequest(
+    new Request("https://api.example.com/store/wishlist/sync", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ items: [{ medusaProductId: "prod_deleted" }] }),
+    }),
+    fixture.env,
+    true,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    items: [],
+    skippedProductIds: ["prod_deleted"],
+  });
+  assert.equal(
+    fixture.queries.some((query) => query.text.includes("INSERT INTO public.wishlists")),
+    false,
+  );
+});
+
+test("wishlist sync deduplicates replayed product identities before writing", async () => {
+  const fixture = env();
+  const response = await handleWishlistRequest(
+    new Request("https://api.example.com/store/wishlist/sync", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: [{ medusaProductId: "prod_1" }, { medusaProductId: "prod_1" }],
+      }),
+    }),
+    fixture.env,
+    true,
+  );
+  assert.equal(response.status, 200);
+  const write = fixture.queries.find((query) => query.text.includes("INSERT INTO public.wishlists"));
+  assert.ok(write?.text.includes("ON CONFLICT (medusa_customer_id, medusa_product_id)"));
+  assert.deepEqual(JSON.parse(String(write?.values[0])), [
+    {
+      customer_id: "cus_1",
+      product_slug: "canary",
+      product_name: "Canary",
+      product_id: "prod_1",
+    },
+  ]);
 });

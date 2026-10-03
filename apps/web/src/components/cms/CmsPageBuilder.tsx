@@ -29,6 +29,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import type { PickedMedia } from "@/components/catalog/CatalogMediaPickerDialog";
 import {
+  ArrowLeft,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -62,7 +63,7 @@ import {
   MousePointer2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType, DragEvent, ReactNode } from "react";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
 import {
   createCmsHistory,
   applyCmsMutation,
@@ -325,6 +326,7 @@ type PreviewTarget = {
   href?: string;
   src?: string;
   style?: Record<string, string>;
+  attributes?: Record<string, string>;
   parentId?: string | null;
   propertyKey?: string | null;
   arrayIndex?: number | null;
@@ -555,6 +557,10 @@ function cmsMutationValue(
       : node.styleOverrides?.[mutation.key];
 }
 
+export function cmsPreviewMutationNodeId(nodeId: string): string {
+  return nodeId.split("::", 1)[0];
+}
+
 function persistedCmsMutation(
   before: CmsBlock[],
   after: CmsBlock[],
@@ -565,7 +571,7 @@ function persistedCmsMutation(
   if (next.type === "set-prop" || next.type === "set-style") {
     return {
       ...next,
-      before: next.before ?? cmsMutationValue(before, next, "after"),
+      before: next.before ?? cmsMutationValue(before, next, "before"),
       after: next.after ?? cmsMutationValue(after, next, "after"),
     };
   }
@@ -683,9 +689,6 @@ function componentChildId(block: CmsBlock, key: string) {
     if (key === "supportLinks") return "footer-support-links";
     if (key === "socialLinks") return "footer-social-links";
   }
-  if (block.id === "home-tiles" && key.startsWith("tile-")) {
-    return `home-tile-${key.slice("tile-".length)}`;
-  }
   if (block.id.startsWith("home-")) return `${block.id}-${key}`;
   return `${block.id}::${key}`;
 }
@@ -696,7 +699,7 @@ function applyPreviewMutation(
   property: string,
   value: string,
 ) {
-  const instanceId = nodeId.split("::", 1)[0];
+  const instanceId = cmsPreviewMutationNodeId(nodeId);
   let changed = false;
   const updateInstances = (
     instances: CmsComponentInstance[] | undefined,
@@ -1705,19 +1708,6 @@ function VisualPropertyFields({
   );
 }
 
-type CmsToolId =
-  | "pages"
-  | "site-map"
-  | "navigation"
-  | "announcement"
-  | "categories"
-  | "media"
-  | "blog"
-  | "forms"
-  | "redirects"
-  | "experiments"
-  | "commerce";
-
 const CatalogMediaPickerDialog = dynamic(
   () =>
     import("@/components/catalog/CatalogMediaPickerDialog").then(
@@ -1725,87 +1715,10 @@ const CatalogMediaPickerDialog = dynamic(
     ),
   { ssr: false },
 );
-const CmsPagesManager = dynamic(
-  () => import("./CmsPagesManager").then((module) => module.CmsPagesManager),
-  { ssr: false },
-);
-const CmsSiteMapPanel = dynamic(
-  () => import("./CmsSiteMapPanel").then((module) => module.CmsSiteMapPanel),
-  { ssr: false },
-);
-const CmsNavigationEditor = dynamic(
-  () =>
-    import("./CmsNavigationEditor").then(
-      (module) => module.CmsNavigationEditor,
-    ),
-  { ssr: false },
-);
-const CmsAnnouncementEditor = dynamic(
-  () =>
-    import("./CmsAnnouncementEditor").then(
-      (module) => module.CmsAnnouncementEditor,
-    ),
-  { ssr: false },
-);
-const CmsCategoryEditor = dynamic(
-  () =>
-    import("./CmsCategoryEditor").then((module) => module.CmsCategoryEditor),
-  { ssr: false },
-);
 const CmsMediaManager = dynamic(
   () => import("./CmsMediaManager").then((module) => module.CmsMediaManager),
   { ssr: false },
 );
-const CmsBlogManager = dynamic(
-  () => import("./CmsBlogManager").then((module) => module.CmsBlogManager),
-  { ssr: false },
-);
-const CmsFormsTable = dynamic(
-  () => import("./CmsFormsTable").then((module) => module.CmsFormsTable),
-  { ssr: false },
-);
-const CmsRedirectsManager = dynamic(
-  () =>
-    import("./CmsRedirectsManager").then(
-      (module) => module.CmsRedirectsManager,
-    ),
-  { ssr: false },
-);
-const CmsExperimentsManager = dynamic(
-  () =>
-    import("./CmsExperimentsManager").then(
-      (module) => module.CmsExperimentsManager,
-    ),
-  { ssr: false },
-);
-const CmsCommerceSearch = dynamic(
-  () =>
-    import("./CmsCommerceSearch").then((module) => module.CmsCommerceSearch),
-  { ssr: false },
-);
-
-const CMS_TOOL_SURFACES: Record<CmsToolId, ComponentType> = {
-  pages: CmsPagesManager,
-  "site-map": CmsSiteMapPanel,
-  navigation: CmsNavigationEditor,
-  announcement: CmsAnnouncementEditor,
-  categories: CmsCategoryEditor,
-  media: CmsMediaManager,
-  blog: CmsBlogManager,
-  forms: CmsFormsTable,
-  redirects: CmsRedirectsManager,
-  experiments: CmsExperimentsManager,
-  commerce: CmsCommerceSearch,
-};
-
-function CmsToolSurface({ tool }: { tool: CmsToolId }) {
-  const Surface = CMS_TOOL_SURFACES[tool];
-  return (
-    <div className="mx-auto w-full max-w-6xl rounded-xl bg-background p-4 shadow-xl ring-1 ring-foreground/10 sm:p-6">
-      <Surface />
-    </div>
-  );
-}
 
 export function CmsPageBuilder({
   value,
@@ -1853,6 +1766,7 @@ export function CmsPageBuilder({
   previewMode?: "home" | "page";
 }) {
   const blocks = useMemo(() => normalize(value), [value]);
+  const assistantLocked = true;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(
     null,
@@ -1862,6 +1776,11 @@ export function CmsPageBuilder({
   >("desktop");
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+  const [leftPaneWidth, setLeftPaneWidth] = useState(290);
+  const [rightPaneWidth, setRightPaneWidth] = useState(310);
+  const [resizingPane, setResizingPane] = useState<"left" | "right" | null>(
+    null,
+  );
   const [leftTab, setLeftTab] = useState<
     | "pages"
     | "components"
@@ -1871,10 +1790,8 @@ export function CmsPageBuilder({
     | "configuration"
     | "ai"
   >("pages");
-  const [activeTool, setActiveTool] = useState<CmsToolId | null>(null);
-  // Kept internally for the existing component-definition editor state; the
-  // reference workflow exposes components from the Components panel rather
-  // than adding a separate custom canvas mode to the toolbar.
+  // The reference workflow exposes components from the Components panel
+  // rather than adding a separate custom canvas mode to the toolbar.
   const [builderMode, setBuilderMode] = useState<"instance" | "canvas">(
     "instance",
   );
@@ -1949,9 +1866,6 @@ export function CmsPageBuilder({
   const [componentDefinitions, setComponentDefinitions] = useState<
     CmsComponentDefinition[]
   >(() => listCmsComponentDefinitions());
-  const [componentVersions, setComponentVersions] = useState<
-    Record<string, number>
-  >({});
   const [componentStatuses, setComponentStatuses] = useState<
     Record<string, string>
   >({});
@@ -1970,6 +1884,7 @@ export function CmsPageBuilder({
       : null;
   const rawPreviewRef = useRef<PreviewTarget | null>(null);
   const rawHoveredPreviewRef = useRef<PreviewTarget | null>(null);
+  const componentVersionsRef = useRef<Record<string, number>>({});
   const selectedMessageKeyRef = useRef("");
   const sendDraftRef = useRef<(() => void) | null>(null);
   const previewReadyRef = useRef(false);
@@ -1991,6 +1906,42 @@ export function CmsPageBuilder({
   >(null);
   const previewOriginRef = useRef("");
   const zoomRef = useRef(zoom);
+  useEffect(() => {
+    if (!resizingPane) return;
+
+    const onPointerMove = (event: PointerEvent) => {
+      const surface = surfaceRef.current;
+      if (!surface) return;
+      const bounds = surface.getBoundingClientRect();
+      const minimumCanvasWidth = 320;
+
+      if (resizingPane === "left") {
+        const nextWidth = event.clientX - bounds.left - 40;
+        const maximum = Math.max(
+          220,
+          bounds.width - rightPaneWidth - minimumCanvasWidth - 40,
+        );
+        setLeftPaneWidth(Math.min(Math.max(nextWidth, 220), Math.min(maximum, 460)));
+      } else {
+        const nextWidth = bounds.right - event.clientX;
+        const maximum = Math.max(
+          260,
+          bounds.width - leftPaneWidth - minimumCanvasWidth - 40,
+        );
+        setRightPaneWidth(Math.min(Math.max(nextWidth, 260), Math.min(maximum, 480)));
+      }
+    };
+    const stopResizing = () => setResizingPane(null);
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", stopResizing);
+    document.body.classList.add("select-none");
+    return () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", stopResizing);
+      document.body.classList.remove("select-none");
+    };
+  }, [leftPaneWidth, resizingPane, rightPaneWidth]);
   const refreshCssVariables = useCallback(() => {
     const frame = iframeRef.current;
     if (!frame) return;
@@ -2218,13 +2169,8 @@ export function CmsPageBuilder({
         } | null>(response, null);
         if (!payload?.data?.length) return;
         setComponentDefinitions(payload.data.map(canonicalCmsBlockDefinition));
-        setComponentVersions(
-          Object.fromEntries(
-            (payload.meta?.records ?? []).map((record) => [
-              record.id,
-              record.version,
-            ]),
-          ),
+        componentVersionsRef.current = Object.fromEntries(
+          (payload.meta?.records ?? []).map((record) => [record.id, record.version]),
         );
         setComponentStatuses(
           Object.fromEntries(
@@ -2369,7 +2315,7 @@ export function CmsPageBuilder({
         window.location.origin,
       ).saveComponentDefinition(
         parsed.data,
-        componentVersions[parsed.data.id],
+        componentVersionsRef.current[parsed.data.id],
         `cms-component-${parsed.data.id}-${Date.now()}`,
       );
       const saved = cmsComponentDefinitionSchema.parse(
@@ -2380,19 +2326,19 @@ export function CmsPageBuilder({
           ? current.map((item) => (item.id === saved.id ? canonicalCmsBlockDefinition(saved) : item))
           : [...current, canonicalCmsBlockDefinition(saved)],
       );
-      setComponentVersions((current) => ({
-        ...current,
-        [saved.id]: payload.version ?? (current[saved.id] ?? 0) + 1,
-      }));
+      componentVersionsRef.current = {
+        ...componentVersionsRef.current,
+        [saved.id]: payload.version ?? (componentVersionsRef.current[saved.id] ?? 0) + 1,
+      };
       setCanvasDraft(JSON.stringify(saved, null, 2));
       setMessage("Main component saved.");
     } finally {
       setCanvasSavePending(false);
     }
-  }, [canvasDraft, componentVersions]);
+  }, [canvasDraft]);
   const publishCanvasDefinition = useCallback(async () => {
     if (!canvasDefinition) return;
-    const version = componentVersions[canvasDefinition.id];
+    const version = componentVersionsRef.current[canvasDefinition.id];
     if (!version) {
       setMessage("Save the definition before publishing it.");
       return;
@@ -2419,10 +2365,10 @@ export function CmsPageBuilder({
       setComponentDefinitions((current) =>
         current.map((item) => (item.id === published.id ? canonicalCmsBlockDefinition(published) : item)),
       );
-      setComponentVersions((current) => ({
-        ...current,
+      componentVersionsRef.current = {
+        ...componentVersionsRef.current,
         [published.id]: data.version ?? version,
-      }));
+      };
       setComponentStatuses((current) => ({
         ...current,
         [published.id]: "published",
@@ -2432,7 +2378,7 @@ export function CmsPageBuilder({
     } finally {
       setCanvasSavePending(false);
     }
-  }, [canvasDefinition, componentVersions]);
+  }, [canvasDefinition]);
 
   const commit = useCallback(
     (next: CmsBlock[], select?: string, mutation?: CmsMutationShape) => {
@@ -2505,7 +2451,14 @@ export function CmsPageBuilder({
       : cmsPreviewSandbox(
           previewOrigin,
           window.location.origin,
-          process.env.NODE_ENV !== "production",
+          // Local production-mode runs (including the in-app browser and
+          // production E2E server) still need the preview to share cookies,
+          // storage, fonts, and the authenticated storefront runtime. Keep
+          // the opaque sandbox for genuinely remote production previews.
+          process.env.NODE_ENV !== "production" ||
+            /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(
+              window.location.hostname,
+            ),
         );
   useEffect(() => {
     previewOriginRef.current = previewOrigin;
@@ -2521,7 +2474,11 @@ export function CmsPageBuilder({
     // click can read the previous React render. The next draft postMessage
     // refreshes the iframe from this persisted editor state.
     commitRef.current?.(next, undefined, {
-      type: property === "textContent" ? "set-text" : "set-style",
+      type: property === "textContent"
+        ? "set-text"
+        : property.startsWith("attribute.")
+          ? "set-attribute"
+          : "set-style",
       nodeId: target.id,
       key: property,
       after: value,
@@ -2678,7 +2635,7 @@ export function CmsPageBuilder({
         if (next !== blocksRef.current) {
           commitRef.current?.(next, id.split("::", 1)[0], {
             type: "set-prop",
-            nodeId: id,
+            nodeId: cmsPreviewMutationNodeId(id),
             key: property,
             after: value,
           });
@@ -2702,10 +2659,9 @@ export function CmsPageBuilder({
           // Keep the live DOM selection; selecting the owning block here makes
           // the inspector jump away from the element that was just edited.
           commitRef.current?.(next, undefined, {
-            type: "set-style",
-            nodeId: id,
-            key: property,
-            after: value,
+            type: "set-prop",
+            nodeId: blockId,
+            key: "__props",
           });
           setMessage("Live element change recorded.");
         }
@@ -3236,36 +3192,39 @@ export function CmsPageBuilder({
     );
     setMessage("Slot order updated.");
   };
-  const updateSelected = (props: Record<string, unknown>) => {
-    if (!selected) return;
-    if (selectedInstance) {
-      const nextProps = instanceOverrides(
-        selectedDefinition,
-        selectedInstance.variantId,
-        props,
-      );
-      const slots = Object.fromEntries(
-        Object.entries(selected.slots ?? {}).map(([slot, items]) => [
-          slot,
-          updateComponentInstances(items, selectedInstance.id, (instance) => ({
-            ...instance,
-            props: nextProps,
-          })) ?? [],
-        ]),
-      );
+  const updateSelected = useCallback(
+    (props: Record<string, unknown>) => {
+      if (!selected) return;
+      if (selectedInstance) {
+        const nextProps = instanceOverrides(
+          selectedDefinition,
+          selectedInstance.variantId,
+          props,
+        );
+        const slots = Object.fromEntries(
+          Object.entries(selected.slots ?? {}).map(([slot, items]) => [
+            slot,
+            updateComponentInstances(items, selectedInstance.id, (instance) => ({
+              ...instance,
+              props: nextProps,
+            })) ?? [],
+          ]),
+        );
+        commit(
+          blocks.map((block) =>
+            block.id === selected.id ? { ...block, slots } : block,
+          ),
+        );
+        return;
+      }
       commit(
         blocks.map((block) =>
-          block.id === selected.id ? { ...block, slots } : block,
+          block.id === selected.id ? { ...block, props } : block,
         ),
       );
-      return;
-    }
-    commit(
-      blocks.map((block) =>
-        block.id === selected.id ? { ...block, props } : block,
-      ),
-    );
-  };
+    },
+    [blocks, commit, selected, selectedDefinition, selectedInstance],
+  );
 
   const pickMediaForSelected = useCallback((target: string) => {
     setMediaPickerTarget(target);
@@ -3318,7 +3277,7 @@ export function CmsPageBuilder({
       setMediaPickerTarget(null);
       setMessage("Media selected from the shared catalog library.");
     },
-    [mediaPickerTarget, selectedEditorBlock, selectedVisualDefinition],
+    [mediaPickerTarget, selectedEditorBlock, selectedVisualDefinition, updateSelected],
   );
   const updateSelectedVariant = (variantId: string) => {
     if (!selected) return;
@@ -3599,7 +3558,7 @@ export function CmsPageBuilder({
   const surface = (
     <section
       ref={surfaceRef}
-      className={`${immersive && !fullscreen ? "fixed inset-0 z-50 h-screen w-screen" : "relative min-h-[760px] rounded-xl"} relative flex flex-col overflow-hidden border border-slate-200 bg-slate-100 text-slate-700 shadow-2xl`}
+      className={`${immersive && !fullscreen ? "fixed inset-0 z-50 h-screen w-screen" : "relative min-h-[760px] rounded-xl"} flex flex-col overflow-hidden border border-slate-200 bg-slate-100 text-slate-700 shadow-2xl ${resizingPane ? "cursor-col-resize" : ""}`}
       aria-label="Visual page builder"
     >
       <header className="flex h-11 shrink-0 items-center gap-1 border-b border-slate-200 bg-white pl-12 pr-2 text-slate-500">
@@ -3886,15 +3845,10 @@ export function CmsPageBuilder({
             type="button"
             onClick={onClose}
             className="grid size-7 place-items-center rounded hover:bg-slate-100"
-            aria-label="Vvveb"
-            title="Vvveb"
+            aria-label="Back to admin"
+            title="Back to admin"
           >
-            <span
-              aria-hidden="true"
-              className="text-[10px] font-semibold leading-none tracking-[-0.12em] text-lime-500"
-            >
-              \vvveb
-            </span>
+            <ArrowLeft className="size-3.5 text-slate-600" aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -3958,7 +3912,10 @@ export function CmsPageBuilder({
           ))}
         </nav>
         {leftOpen ? (
-          <aside className="z-30 flex w-[290px] min-h-0 shrink-0 flex-col border-r border-slate-200 bg-white max-sm:absolute max-sm:left-10 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(290px,calc(100vw-40px))] max-sm:shadow-xl">
+          <aside
+            className="z-30 flex min-h-0 w-[var(--cms-pane-width)] shrink-0 flex-col border-r border-slate-200 bg-white max-sm:absolute max-sm:left-10 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(290px,max(0px,calc(100vw_-_40px)))] max-sm:shadow-xl"
+            style={{ "--cms-pane-width": `${leftPaneWidth}px` } as CSSProperties}
+          >
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
               {leftTab === "pages" ? (
                 <div className="flex min-h-0 flex-1 flex-col">
@@ -3994,18 +3951,30 @@ export function CmsPageBuilder({
                       >
                         <Plus className="size-3" />
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRightTab("settings");
+                          setRightOpen(true);
+                        }}
+                        className="grid size-7 place-items-center rounded border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                        aria-label="Page settings"
+                        title="Page settings"
+                      >
+                        <Settings2 className="size-3" />
+                      </button>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    {pages
-                      .flatMap((page) =>
-                        `${page.title} ${page.slug}`
+                    {pages.reduce<React.ReactNode[]>((matches, page) => {
+                      if (
+                        !`${page.title} ${page.slug}`
                           .toLowerCase()
                           .includes(pageQuery.trim().toLowerCase())
-                          ? [page]
-                          : [],
-                      )
-                      .map((page) => (
+                      ) {
+                        return matches;
+                      }
+                      matches.push(
                         <div
                           key={page.id}
                           className={`flex w-full items-center gap-1 rounded px-1.5 py-1.5 text-left text-xs ${page.id === currentPageId ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
@@ -4016,13 +3985,8 @@ export function CmsPageBuilder({
                             aria-pressed={page.id === currentPageId}
                             className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left hover:bg-slate-50 hover:text-slate-900"
                           >
-                            <VvvebIcon
-                              name="file"
-                              className="size-3 shrink-0"
-                            />
-                            <span className="min-w-0 truncate">
-                              {page.title || page.slug}
-                            </span>
+                            <VvvebIcon name="file" className="size-3 shrink-0" />
+                            <span className="min-w-0 truncate">{page.title || page.slug}</span>
                           </button>
                           <div className="flex shrink-0 items-center gap-0.5">
                             {onDeletePage ? (
@@ -4059,8 +4023,10 @@ export function CmsPageBuilder({
                               </button>
                             ) : null}
                           </div>
-                        </div>
-                      ))}
+                        </div>,
+                      );
+                      return matches;
+                    }, [])}
                   </div>
                   {navigatorOpen ? navigatorPanel : null}
                 </div>
@@ -4212,7 +4178,22 @@ export function CmsPageBuilder({
                 </div>
               ) : null}
               {leftTab === "ai" ? (
-                <section aria-label="Ai Assistant" className="space-y-3">
+                <section
+                  aria-label="AI assistant (temporarily unavailable)"
+                  className={`space-y-3 ${assistantLocked ? "opacity-75" : ""}`}
+                >
+                  <p className="rounded border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800">
+                    AI assistant is temporarily unavailable. This panel remains
+                    visible for the planned workflow.
+                  </p>
+                  {assistantLocked ? (
+                    <p className="rounded border border-slate-200 bg-slate-50 px-2.5 py-3 text-[11px] leading-4 text-slate-500">
+                      The assistant is not configured for this workspace yet. Use the Components and Blocks panels to edit the page.
+                    </p>
+                  ) : (
+                    <fieldset
+                      className="m-0 space-y-3 border-0 p-0 [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50 [&_textarea:disabled]:cursor-not-allowed [&_textarea:disabled]:bg-slate-100"
+                    >
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="relative">
                       <button
@@ -4229,7 +4210,6 @@ export function CmsPageBuilder({
                       </button>
                       {assistantSessionsOpen ? (
                         <div
-                          role="list"
                           className="absolute left-0 top-8 z-40 w-48 rounded border border-slate-200 bg-white p-2 shadow-xl"
                         >
                           <button
@@ -4266,8 +4246,6 @@ export function CmsPageBuilder({
                   </div>
                   {assistantOptionsOpen ? (
                     <div
-                      role="list"
-                      aria-label="Assistant options"
                       className="space-y-1 rounded border border-slate-200 bg-white p-2 shadow-sm"
                     >
                       {[
@@ -4498,6 +4476,8 @@ export function CmsPageBuilder({
                       No usage recorded in this session.
                     </p>
                   ) : null}
+                    </fieldset>
+                  )}
                 </section>
               ) : null}
               {leftTab === "components" || leftTab === "sections" ? (
@@ -4639,17 +4619,9 @@ export function CmsPageBuilder({
                             </button>
                             {!collapsedPaletteGroups.has(group) ? (
                               <div className="space-y-1.5">
-                                {definitions
-                                  .flatMap((definition) =>
-                                    `${definition.name} ${definition.category}`
-                                      .toLowerCase()
-                                      .includes(
-                                        paletteQuery.trim().toLowerCase(),
-                                      )
-                                      ? [definition]
-                                      : [],
-                                  )
-                                  .map((definition) => (
+                                {definitions.reduce<React.ReactNode[]>((matches, definition) => {
+                                  if (`${definition.name} ${definition.category}`.toLowerCase().includes(paletteQuery.trim().toLowerCase())) {
+                                    matches.push(
                                     <div
                                       key={definition.id}
                                       className="flex items-center gap-1.5 rounded border border-slate-200 bg-white px-2 py-1.5"
@@ -4701,7 +4673,10 @@ export function CmsPageBuilder({
                                         <Plus className="size-3" />
                                       </button>
                                     </div>
-                                  ))}
+                                    );
+                                  }
+                                  return matches;
+                                }, [])}
                                 {sourceDefinitions.map((definition) => (
                                   <div
                                     key={definition.type}
@@ -4775,16 +4750,9 @@ export function CmsPageBuilder({
                         </button>
                         {!collapsedPaletteGroups.has(group) ? (
                           <div className="grid grid-cols-2 gap-1.5">
-                            {items
-                              .flatMap((item) =>
-                                !FIXED_COMPONENT_TYPES.has(item.type) &&
-                                `${item.label} ${group}`
-                                  .toLowerCase()
-                                  .includes(paletteQuery.trim().toLowerCase())
-                                  ? [item]
-                                  : [],
-                              )
-                              .map((item) => (
+                            {items.reduce<React.ReactNode[]>((matches, item) => {
+                              if (!FIXED_COMPONENT_TYPES.has(item.type) && `${item.label} ${group}`.toLowerCase().includes(paletteQuery.trim().toLowerCase())) {
+                                matches.push(
                                 <button
                                   key={item.type}
                                   type="button"
@@ -4806,7 +4774,10 @@ export function CmsPageBuilder({
                                   <Plus className="mb-1 size-3 text-slate-400" />
                                   {item.label}
                                 </button>
-                              ))}
+                                );
+                              }
+                              return matches;
+                            }, [])}
                           </div>
                         ) : null}
                       </div>
@@ -4894,35 +4865,37 @@ export function CmsPageBuilder({
             </div>
           </aside>
         ) : null}
+        {leftOpen ? (
+          <button
+            type="button"
+            className="group z-20 hidden w-1.5 shrink-0 cursor-col-resize touch-none items-center justify-center border-r border-slate-200 bg-slate-100 hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none sm:flex"
+            aria-label="Resize page navigator"
+            title="Drag to resize page navigator"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              setResizingPane("left");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                setLeftPaneWidth((width) => Math.max(220, width - 16));
+              }
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                setLeftPaneWidth((width) => Math.min(460, width + 16));
+              }
+            }}
+          >
+            <span className="h-8 w-px bg-slate-300 transition-colors group-hover:bg-blue-400" />
+          </button>
+        ) : null}
         <main
           ref={canvasScrollRef}
-          className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain bg-slate-200/90 p-3 sm:p-8"
+          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto overscroll-contain bg-slate-200/90 p-3 sm:p-5"
         >
-          {activeTool ? (
-            <div className="mx-auto w-full max-w-6xl">
-              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                    CMS workspace
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-slate-800">
-                    Content tool
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="h-8 rounded border border-slate-200 px-3 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                  onClick={() => setActiveTool(null)}
-                >
-                  Back to canvas
-                </button>
-              </div>
-              <CmsToolSurface tool={activeTool} />
-            </div>
-          ) : null}
-          {!activeTool && builderMode === "canvas" ? (
+          {builderMode === "canvas" ? (
             canvasDefinition ? (
-              <div className="mx-auto max-w-5xl space-y-4">
+              <div className="w-full space-y-4">
                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -5286,7 +5259,7 @@ export function CmsPageBuilder({
                 </div>
               </div>
             ) : (
-              <div className="mx-auto max-w-xl rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
+              <div className="w-full rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center">
                 <p className="text-sm font-medium text-slate-700">
                   Choose a main component
                 </p>
@@ -5297,9 +5270,9 @@ export function CmsPageBuilder({
               </div>
             )
           ) : null}
-          {!activeTool && builderMode === "instance" ? (
+          {builderMode === "instance" ? (
             <div
-              className="mx-auto transition-[width] duration-200"
+              className="w-full transition-[width] duration-200"
               style={{
                 width: canvasWidth,
                 transform: `scale(${zoom / 100})`,
@@ -5371,16 +5344,47 @@ export function CmsPageBuilder({
             type="button"
             className="sticky bottom-0 ml-auto mt-3 flex items-center gap-1 rounded-t border border-b-0 border-slate-300 bg-white px-3 py-2 text-[10px] font-medium text-slate-500 shadow-sm hover:text-slate-900"
             onClick={() => {
+              if (rightOpen && rightTab === "code") {
+                setRightOpen(false);
+                return;
+              }
               setRightTab("code");
               setRightOpen(true);
               setMessage("Edit the page body source, then save the page.");
             }}
+            aria-expanded={rightOpen && rightTab === "code"}
           >
             <span className="font-mono">&lt;/&gt;</span> Code editor
           </button>
         </main>
         {rightOpen ? (
-          <aside className="z-30 flex min-h-0 w-[310px] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white max-sm:absolute max-sm:right-0 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(310px,calc(100vw-40px))] max-sm:shadow-xl">
+          <>
+            <button
+              type="button"
+              className="group z-20 hidden w-1.5 shrink-0 cursor-col-resize touch-none items-center justify-center border-l border-slate-200 bg-slate-100 hover:bg-blue-50 focus-visible:bg-blue-50 focus-visible:outline-none sm:flex"
+              aria-label="Resize element inspector"
+              title="Drag to resize element inspector"
+              onPointerDown={(event) => {
+                event.preventDefault();
+                setResizingPane("right");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  setRightPaneWidth((width) => Math.min(480, width + 16));
+                }
+                if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  setRightPaneWidth((width) => Math.max(260, width - 16));
+                }
+              }}
+            >
+              <span className="h-8 w-px bg-slate-300 transition-colors group-hover:bg-blue-400" />
+            </button>
+            <aside
+              className="z-30 flex min-h-0 w-[var(--cms-pane-width)] shrink-0 flex-col overflow-hidden border-l border-slate-200 bg-white max-sm:absolute max-sm:right-0 max-sm:top-11 max-sm:bottom-0 max-sm:w-[min(310px,max(0px,calc(100vw_-_40px)))] max-sm:shadow-xl"
+              style={{ "--cms-pane-width": `${rightPaneWidth}px` } as CSSProperties}
+            >
             <div
               role="tablist"
               aria-label="Element inspector"
@@ -5415,6 +5419,16 @@ export function CmsPageBuilder({
               >
                 <Settings2 className="size-3" />
                 Advanced
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightTab("settings")}
+                role="tab"
+                aria-selected={rightTab === "settings"}
+                className={`inline-flex items-center gap-1 rounded px-2.5 py-1.5 text-[11px] ${rightTab === "settings" ? "bg-slate-100 text-slate-900" : "text-slate-500"}`}
+              >
+                <Box className="size-3" />
+                Page
               </button>
               {selected ? (
                 <button
@@ -5463,25 +5477,22 @@ export function CmsPageBuilder({
                 </div>
               ) : selected ? (
                 <div className="space-y-4 p-4">
-                  {visibleSelectedPreview?.id ? (
+                  {visibleSelectedPreview?.id &&
+                  (rightTab === "content" || rightTab === "style") ? (
                     <div
                       key={visibleSelectedPreview.id}
-                      className="space-y-3 rounded border border-blue-200 bg-blue-50/60 p-3"
+                      className="space-y-3 border-b border-slate-200 pb-4"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-600">
-                            Live DOM element
-                          </p>
-                          <p className="mt-0.5 text-xs font-medium text-slate-700">
-                            {visibleSelectedPreview.tagName ?? "element"}
-                          </p>
-                        </div>
-                        <span className="text-[10px] text-slate-400">
+                      <div>
+                        <p className="text-xs font-medium text-slate-700">
+                          Properties
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-slate-400">
+                          {visibleSelectedPreview.tagName ?? "element"} ·{" "}
                           {visibleSelectedPreview.id}
-                        </span>
+                        </p>
                       </div>
-                      {visibleSelectedPreview.text ? (
+                      {rightTab === "content" && visibleSelectedPreview.text ? (
                         <label className="block text-[10px] text-slate-600">
                           Content
                           <textarea
@@ -5497,7 +5508,7 @@ export function CmsPageBuilder({
                           />
                         </label>
                       ) : null}
-                      {visibleSelectedPreview.href ? (
+                      {rightTab === "content" && visibleSelectedPreview.href ? (
                         <label className="block text-[10px] text-slate-600">
                           Link URL
                           <input
@@ -5516,7 +5527,7 @@ export function CmsPageBuilder({
                           />
                         </label>
                       ) : null}
-                      {visibleSelectedPreview.src ? (
+                      {rightTab === "content" && visibleSelectedPreview.src ? (
                         <label className="block text-[10px] text-slate-600">
                           Image URL
                           <input
@@ -5535,7 +5546,8 @@ export function CmsPageBuilder({
                           />
                         </label>
                       ) : null}
-                      <div className="grid grid-cols-2 gap-2">
+                      {rightTab === "style" ? (
+                        <div className="grid grid-cols-2 gap-2">
                         {[
                           "width",
                           "height",
@@ -5585,13 +5597,11 @@ export function CmsPageBuilder({
                             />
                           </label>
                         ))}
-                      </div>
-                      <p className="text-[10px] leading-4 text-slate-500">
-                        Changes apply to this live storefront element and are
-                        recorded in the page history.
-                      </p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
+                  <div className={rightTab === "content" ? "" : "hidden"}>
                   <label className="block text-[11px] text-slate-500">
                     Element
                     <input
@@ -5781,6 +5791,7 @@ export function CmsPageBuilder({
                       </p>
                     </div>
                   ) : null}
+                  </div>
                   {rightTab === "content" ? (
                     <>
                       {selectedVisualDefinition && selectedEditorBlock ? (
@@ -5899,7 +5910,54 @@ export function CmsPageBuilder({
                     </>
                   ) : null}
                   {rightTab === "advanced" ? (
-                    <details open className="rounded border border-slate-200">
+                    <>
+                      {visibleSelectedPreview?.id ? (
+                        <div className="space-y-2 border-b border-slate-200 pb-4">
+                          <p className="text-xs font-medium text-slate-700">
+                            Attributes
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              ["id", "ID"],
+                              ["class", "Class"],
+                              ["title", "Title"],
+                              ["role", "Role"],
+                              ["aria-label", "ARIA label"],
+                              ["aria-description", "ARIA description"],
+                              ["tabindex", "Tab index"],
+                            ].map(([attribute, label]) => (
+                              <label
+                                key={attribute}
+                                className="block text-[10px] text-slate-600"
+                              >
+                                {label}
+                                <input
+                                  defaultValue={
+                                    visibleSelectedPreview.attributes?.[
+                                      attribute
+                                    ] ?? ""
+                                  }
+                                  className="mt-1 h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-500"
+                                  disabled={disabled}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      event.currentTarget.blur();
+                                    }
+                                  }}
+                                  onBlur={(event) =>
+                                    sendDomMutation(
+                                      `attribute.${attribute}`,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <details open className="rounded border border-slate-200">
                       <summary className="cursor-pointer px-2.5 py-2 text-[11px] font-medium text-slate-600">
                         Advanced JSON
                       </summary>
@@ -5925,7 +5983,8 @@ export function CmsPageBuilder({
                         disabled={disabled}
                         aria-label="Advanced block properties JSON"
                       />
-                    </details>
+                      </details>
+                    </>
                   ) : null}
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -6000,7 +6059,8 @@ export function CmsPageBuilder({
                 </p>
               ) : null}
             </div>
-          </aside>
+            </aside>
+          </>
         ) : null}
         <CatalogMediaPickerDialog
           open={mediaPickerTarget !== null}
@@ -6008,7 +6068,7 @@ export function CmsPageBuilder({
           addPlacement="main"
           onAddPlacementChange={() => undefined}
           onPickMany={applyPickedMedia}
-          mediaScope="catalog"
+          context="builder"
         />
       </div>
     </section>

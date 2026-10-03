@@ -54,6 +54,30 @@ test("payment recovery forwards provider, provider order ID, and capability cook
   }
 });
 
+test("payment recovery forwards the stored correlation capability and renews the cookie", async () => {
+  const previousApiUrl = process.env.API_URL;
+  const originalFetch = globalThis.fetch;
+  process.env.API_URL = "https://worker.test";
+  let targetUrl = "";
+  globalThis.fetch = (async (input) => {
+    targetUrl = String(input);
+    return new Response(JSON.stringify({ found: true, correlationId: "corr-1", status: "pending_payment", checkoutState: "awaiting_provider", medusaOrderId: null }), {
+      status: 200,
+      headers: { "content-type": "application/json", "set-cookie": "checkout_attempt_id=corr-1; Path=/; Max-Age=900; HttpOnly; Secure; SameSite=Lax" },
+    });
+  }) as typeof fetch;
+  try {
+    const response = await GET(new Request("https://shop.test/api/payments/recover?provider=stripe&correlation_id=corr-1"));
+    assert.equal(response.status, 200);
+    assert.match(targetUrl, /provider=stripe&correlation_id=corr-1$/);
+    assert.match(response.headers.get("set-cookie") ?? "", /checkout_attempt_id=corr-1/);
+  } finally {
+    if (previousApiUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = previousApiUrl;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("payment recovery reports a bounded error when the Worker is unreachable", async () => {
   const previousApiUrl = process.env.API_URL;
   const originalFetch = globalThis.fetch;

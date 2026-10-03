@@ -15,10 +15,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
 import { config as loadDotenv } from "dotenv";
+import { createRequire } from "node:module";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeDir = join(root, ".uvs-dev-runtime");
 const lockPath = join(runtimeDir, "dev-supervisor.json");
+const require = createRequire(import.meta.url);
+const runtimeLock = require("./uvs-runtime-lock.cjs");
 const workerPort = Number(process.env.CLOUDFLARE_DEV_PORT || 8787);
 const workerHealthUrl = `http://127.0.0.1:${workerPort}/healthz`;
 const children = [];
@@ -41,28 +44,9 @@ function isAlive(pid) {
 }
 
 function acquireLock() {
+  runtimeLock.acquire("dev", { webPort: 3000, workerPort });
   mkdirSync(runtimeDir, { recursive: true });
-  try {
-    const existing = JSON.parse(readFileSync(lockPath, "utf8"));
-    if (Number.isInteger(existing.pid) && isAlive(existing.pid)) {
-      throw new Error(
-        `A development stack is already running (PID ${existing.pid}). Run pnpm cleanup:dev first.`,
-      );
-    }
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      !error.message.startsWith("A development stack")
-    ) {
-      rmSync(lockPath, { force: true });
-    } else if (error instanceof Error) {
-      throw error;
-    }
-  }
-  writeFileSync(
-    lockPath,
-    `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`,
-  );
+  writeFileSync(lockPath, `${JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() })}\n`);
 }
 
 function releaseLock() {
@@ -72,6 +56,7 @@ function releaseLock() {
   } catch {
     rmSync(lockPath, { force: true });
   }
+  runtimeLock.release();
 }
 
 function withHeap(env, heapMb) {
@@ -106,6 +91,12 @@ function spawnPnpm(args, env) {
     stdio: ["inherit", "pipe", "pipe"],
   });
   children.push(child);
+  runtimeLock.update({
+    children: children.filter((item) => item.pid).map((item) => item.pid),
+    childGroups: children
+      .filter((item) => item.pid)
+      .map((item) => runtimeLock.processGroupId(item.pid)),
+  });
   const prefix = `[${args.at(-1) === "dev" ? args[1] : "worker"}]`;
   for (const [stream, output] of [
     [child.stdout, process.stdout],
@@ -179,8 +170,12 @@ const worker = spawnPnpm(
     "dev",
     "--local",
     "--show-interactive-dev-session=false",
+    "--ip",
+    "127.0.0.1",
     "--port",
     String(workerPort),
+    "--inspector-port",
+    "0",
   ],
   localWorkerEnv(),
 );

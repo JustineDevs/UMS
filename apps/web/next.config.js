@@ -13,6 +13,10 @@ const {
 // Load the shared root environment for local Worker-backed development.
 loadMonorepoRootEnv(__dirname);
 
+const isNextDevCommand = process.argv.some(
+  (argument) => argument === "dev" || argument.endsWith("/dev"),
+);
+
 const allowedDevOrigins = [
   "localhost",
   "127.0.0.1",
@@ -106,11 +110,9 @@ function imageRemotePatterns() {
     }));
   return [
     ...fromEnv,
-    {
-      protocol: "https",
-      hostname: "cdn.simpleicons.org",
-      pathname: "/**",
-    },
+    { protocol: "https", hostname: "images.stripeassets.com", pathname: "/**" },
+    { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
+    { protocol: "https", hostname: "www.paypalobjects.com", pathname: "/**" },
     {
       protocol: "https",
       hostname: "lh3.googleusercontent.com",
@@ -294,12 +296,18 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Keep supervised dev servers from mutating a production build in `.next`.
+  // Keep supervised dev servers from mutating a production build. Some local
+  // E2E runs intentionally use NODE_ENV=production to match deployed behavior;
+  // the command/phase markers distinguish that dev server from `next start`.
   distDir:
     process.env.VERCEL === "1"
       ? ".next"
       : process.env.NODE_ENV === "production"
         ? ".next-production"
+        : isNextDevCommand ||
+          process.env.NEXT_PHASE === "phase-development-server" ||
+          process.env.UVS_E2E_LOCAL === "1"
+        ? ".next-dev"
         : ".next",
   outputFileTracingRoot: path.join(__dirname, "../.."),
   transpilePackages: [
@@ -364,13 +372,6 @@ const nextConfig = {
         source: "/api/shop/search-suggest",
         headers: [
           { key: "Cache-Control", value: "public, max-age=5, s-maxage=60, stale-while-revalidate=300" },
-        ],
-      },
-      {
-        // The feed route exports GET only; review submission remains no-store.
-        source: "/api/reviews/feed",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=30, s-maxage=60, stale-while-revalidate=300" },
         ],
       },
       {

@@ -210,9 +210,9 @@ export async function getCmsCategoryContentPublic(
         .eq("collection_handle", collectionHandle)
         .eq("locale", locale);
       if (organizationId) fallback = fallback.eq("organization_id", organizationId);
-      const legacy = await fallback.maybeSingle();
-      if (!legacy.error && legacy.data) {
-        data = legacy.data;
+      const compatibilityRow = await fallback.maybeSingle();
+      if (!compatibilityRow.error && compatibilityRow.data) {
+        data = compatibilityRow.data;
         error = null;
       }
     }

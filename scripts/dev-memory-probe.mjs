@@ -10,9 +10,13 @@
  * Vercel/Worker runtimes. It samples the spawned process tree and forwards the
  * child output while counting Fast Refresh/full-reload signals.
  */
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { appendFileSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
+import { promisify } from "node:util";
 import process from "node:process";
+
+const execFileAsync = promisify(execFile);
 
 const separator = process.argv.indexOf("--");
 const command = separator >= 0 ? process.argv.slice(separator + 1) : [];
@@ -40,7 +44,18 @@ function clampInteger(value, fallback, min, max) {
 }
 
 function log(record) {
-  process.stdout.write(`${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`);
+  const line = `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`;
+  process.stdout.write(line);
+  const outputFile = process.env.UVS_MEMORY_PROBE_OUTPUT_FILE?.trim();
+  if (outputFile) {
+    try {
+      appendFileSync(outputFile, line, "utf8");
+    } catch (error) {
+      process.stderr.write(
+        `[memory-probe] unable to persist ${outputFile}: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+  }
 }
 
 function trackOutput(chunk) {
@@ -82,6 +97,30 @@ async function processSnapshot(pid) {
         changed = true;
       }
     }
+  }
+  // `pnpm dev` may place the actual Next/Worker stack in the transient
+  // `uvs-dev.scope` cgroup. Those processes are intentionally not descendants
+  // of this probe process, so include the scope members or the RSS evidence
+  // would only describe the small launcher and under-report production-like
+  // development memory.
+  try {
+    const { stdout } = await execFileAsync("systemctl", [
+      "--user",
+      "show",
+      "uvs-dev.scope",
+      "--property=ControlGroup",
+      "--value",
+    ]);
+    const controlGroup = stdout.trim();
+    if (controlGroup.startsWith("/")) {
+      const cgroupProcesses = await readFile(`/sys/fs/cgroup${controlGroup}/cgroup.procs`, "utf8");
+      for (const entry of cgroupProcesses.split(/\s+/)) {
+        if (/^\d+$/.test(entry)) descendants.add(Number(entry));
+      }
+    }
+  } catch {
+    // systemd/cgroup support is optional; the ordinary process tree remains
+    // the portable fallback on non-systemd hosts and CI runners.
   }
   return Promise.all(
     [...descendants].map(async (processId) => {

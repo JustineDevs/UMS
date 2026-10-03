@@ -17,12 +17,13 @@ import {
   CommandSeparator,
 } from "@universal-music-store/ui";
 import {
-  ADMIN_COMMAND_CMS_GROUPS,
+  ADMIN_COMMAND_BUILD_GROUPS,
   ADMIN_NAV_GROUPS,
   flattenAdminNavItems,
 } from "@/config/admin-nav";
+import { NavIcon } from "@/components/AdminSidebar";
 
-const ALL_GROUPS = [...ADMIN_NAV_GROUPS, ...ADMIN_COMMAND_CMS_GROUPS];
+const ALL_GROUPS = [...ADMIN_NAV_GROUPS, ...ADMIN_COMMAND_BUILD_GROUPS];
 
 export function AdminCommandPalette({
   open,
@@ -60,13 +61,11 @@ export function AdminCommandPalette({
       <CommandGroup key={group.label} heading={group.label}>
         {items.map((item) => (
           <CommandItem
-            key={item.href}
+            key={`${group.label}:${item.label}:${item.href}`}
             value={`${item.label} ${group.label} ${item.href}`}
             onSelect={() => go(item.href)}
           >
-            <span className="material-symbols-outlined text-lg text-on-surface-variant">
-              {item.icon}
-            </span>
+            <NavIcon name={item.icon} className="size-4 text-on-surface-variant" />
             <span>{item.label}</span>
           </CommandItem>
         ))}

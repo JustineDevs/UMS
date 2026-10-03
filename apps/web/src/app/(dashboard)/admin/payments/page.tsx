@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock3, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowDownRight, ArrowUpRight, CheckCircle2, Clock3, Filter, RefreshCw, Search } from "lucide-react";
 
 import { AdminPageHeader, AdminPageShell } from "@/components/admin-console";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
 
 type AttemptRow = {
   correlationId: string;
@@ -48,6 +49,9 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [attemptView, setAttemptView] = useState<"latest" | "upcoming">("latest");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [orderQuery, setOrderQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +115,15 @@ export default function AdminPaymentsPage() {
   }, [rows]);
 
   const maxRecovery = Math.max(1, ...buckets.map((bucket) => bucket.count));
+  const visibleRows = useMemo(() => {
+    const sorted = [...rows].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    return sorted.filter((row) => {
+      const matchesStatus = statusFilter === "all" || row.status === statusFilter;
+      const matchesView = attemptView === "latest" || !["completed", "failed", "expired"].includes(row.status);
+      const matchesOrder = !orderQuery.trim() || (row.medusaOrderId ?? "").toLowerCase().includes(orderQuery.trim().toLowerCase());
+      return matchesStatus && matchesView && matchesOrder;
+    });
+  }, [attemptView, orderQuery, rows, statusFilter]);
 
   return (
     <AdminPageShell hideHeader>
@@ -170,10 +183,10 @@ export default function AdminPaymentsPage() {
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.6fr)]">
           <Card className="min-w-0">
-            <CardHeader>
+            <CardHeader className="relative pr-36">
               <CardTitle className="font-normal">Recovery activity</CardTitle>
               <CardDescription>Stale-session invalidations by UTC day</CardDescription>
-              <CardAction>
+              <CardAction className="absolute right-6 top-6">
                 <Select value={days} onValueChange={setDays}>
                   <SelectTrigger aria-label="Recovery window" className="w-28" size="sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -210,38 +223,56 @@ export default function AdminPaymentsPage() {
           </Card>
         </div>
 
-        <Card className="min-w-0 overflow-hidden">
-          <CardHeader>
-            <CardTitle className="font-normal">Payment attempts</CardTitle>
-            <CardDescription>Review and retry payment finalization events</CardDescription>
-            <CardAction><Badge variant="outline">{rows.length} records</Badge></CardAction>
-          </CardHeader>
-          <CardContent className="px-0">
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1050px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Provider</TableHead><TableHead>Status</TableHead><TableHead>Reason</TableHead><TableHead>Order</TableHead><TableHead>Attempts</TableHead><TableHead>Updated</TableHead><TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.correlationId}>
-                      <TableCell className="font-medium">{row.provider}</TableCell>
-                      <TableCell><Badge variant={statusVariant(row.status)}>{row.status}</Badge><div className="mt-1 text-muted-foreground text-xs">{row.checkoutState}</div></TableCell>
-                      <TableCell className="max-w-[270px] truncate text-muted-foreground text-sm">{row.staleReason ?? row.lastError ?? "No exception recorded"}</TableCell>
-                      <TableCell className="font-mono text-xs">{row.medusaOrderId ?? "-"}</TableCell>
-                      <TableCell className="tabular-nums">{row.finalizeAttempts}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{formatDate(row.updatedAt)}</TableCell>
-                      <TableCell><div className="flex justify-end gap-2"><Button disabled={busy !== null || row.status === "completed"} onClick={() => void mutateAttempt(row.correlationId, "retry")} size="sm" variant="outline"><ArrowUpRight data-icon="inline-start" />Retry</Button><Button disabled={busy !== null} onClick={() => void mutateAttempt(row.correlationId, "review")} size="sm" variant="ghost">Review</Button></div></TableCell>
-                    </TableRow>
-                  ))}
-                  {!loading && rows.length === 0 ? <TableRow><TableCell className="h-32 text-center text-muted-foreground" colSpan={7}>No payment attempts yet.</TableCell></TableRow> : null}
-                </TableBody>
-              </Table>
+        <section className="min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm" aria-labelledby="payment-attempts-title">
+          <div className="flex flex-col gap-4 border-b border-border/60 p-5 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <div className="flex items-center gap-2"><h2 id="payment-attempts-title" className="text-lg font-semibold tracking-tight">Transactions</h2><Badge variant="outline">{rows.length} records</Badge></div>
+              <p className="mt-1 text-sm text-muted-foreground">Review and retry payment finalization events</p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <div className="inline-flex rounded-lg bg-muted p-1" aria-label="Payment transaction view">
+                  <Button type="button" variant={attemptView === "latest" ? "secondary" : "ghost"} size="sm" aria-pressed={attemptView === "latest"} onClick={() => setAttemptView("latest")}>Latest</Button>
+                  <Button type="button" variant={attemptView === "upcoming" ? "secondary" : "ghost"} size="sm" aria-pressed={attemptView === "upcoming"} onClick={() => setAttemptView("upcoming")}>Upcoming</Button>
+                </div>
+                <label className="relative min-w-56 flex-1 sm:max-w-xs">
+                  <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input aria-label="Search payment transactions by order ID" className="h-9 pl-9" onChange={(event) => setOrderQuery(event.target.value)} placeholder="Search order ID..." value={orderQuery} />
+                </label>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger size="sm" className="w-36" aria-label="Filter payment transactions by status"><Filter className="size-3.5" /><SelectValue placeholder="Filter status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="initiated">Initiated</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="needs_review">Needs review</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="min-w-0 overflow-x-auto">
+            <Table className="w-full min-w-0 table-fixed md:min-w-[940px] md:table-auto">
+              <TableHeader><TableRow className="bg-muted/30 hover:bg-muted/30"><TableHead>Transaction</TableHead><TableHead className="w-[5.5rem] md:w-auto">Status</TableHead><TableHead className="hidden md:table-cell">Order</TableHead><TableHead className="hidden md:table-cell">Attempts</TableHead><TableHead className="hidden md:table-cell">Updated</TableHead><TableHead className="w-[6.25rem] text-right md:w-auto">Actions</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {visibleRows.map((row) => (
+                  <TableRow key={row.correlationId}>
+                    <TableCell className="min-w-0 align-top"><div className="truncate font-medium capitalize">Payment via {row.provider}</div><div className="mt-1 truncate text-xs text-muted-foreground md:max-w-[280px]">{row.staleReason ?? row.lastError ?? "No exception recorded"}</div></TableCell>
+                    <TableCell className="w-[5.5rem] align-top md:w-auto"><Badge variant={statusVariant(row.status)} className="max-w-full truncate capitalize">{row.status.replace(/[_-]/g, " ")}</Badge><div className="mt-1 truncate text-xs text-muted-foreground">{row.checkoutState.replace(/[_-]/g, " ")}</div></TableCell>
+                    <TableCell className="hidden max-w-[210px] truncate font-mono text-xs md:table-cell">{row.medusaOrderId ?? "—"}</TableCell>
+                    <TableCell className="hidden tabular-nums md:table-cell">{row.finalizeAttempts}</TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground md:table-cell">{formatDate(row.updatedAt)}</TableCell>
+                    <TableCell className="w-[6.25rem] align-top md:w-auto"><div className="flex flex-col items-stretch gap-1 md:flex-row md:justify-end md:gap-2"><Button disabled={busy !== null || row.status === "completed"} onClick={() => void mutateAttempt(row.correlationId, "retry")} size="sm" variant="outline"><ArrowUpRight data-icon="inline-start" />Retry</Button><Button disabled={busy !== null} onClick={() => void mutateAttempt(row.correlationId, "review")} size="sm" variant="ghost">Review</Button></div></TableCell>
+                  </TableRow>
+                ))}
+                {!loading && visibleRows.length === 0 ? <TableRow><TableCell className="h-32 text-center text-muted-foreground" colSpan={6}>{rows.length ? "No transactions match this view." : "No payment attempts yet."}</TableCell></TableRow> : null}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex items-center justify-between border-t border-border/60 px-5 py-3 text-xs text-muted-foreground"><span>Showing {visibleRows.length} of {rows.length} records</span><span>Latest updates first</span></div>
+        </section>
       </div>
     </AdminPageShell>
   );

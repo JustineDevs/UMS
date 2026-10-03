@@ -10,6 +10,7 @@ export {
   CardHeader,
   CardFooter,
   CardTitle,
+  CardAction,
   CardDescription,
   CardContent,
 } from "./components/ui/card";
@@ -24,7 +25,15 @@ export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "./
 export { Switch } from "./components/ui/switch";
 export { Avatar, AvatarImage, AvatarFallback } from "./components/ui/avatar";
 export { Skeleton } from "./components/ui/skeleton";
-export { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
+export { Alert, AlertTitle, AlertDescription, AlertAction } from "./components/ui/alert";
+export {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from "./components/ui/carousel";
 
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs";
 
@@ -71,6 +80,7 @@ export {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuGroup,
@@ -113,7 +123,6 @@ export {
 } from "./components/ui/select";
 
 export {
-  CardAction,
   AvatarBadge,
   Checkbox,
   Pagination,

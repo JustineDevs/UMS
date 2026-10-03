@@ -4,7 +4,7 @@
  * Sidebar groups contain task hubs. Less frequent deep routes stay available through
  * each hub's expandable children and the command palette.
  *
- * CMS deep links live in ADMIN_COMMAND_CMS_GROUPS (Cmd+K), not every item in the narrow sidebar.
+ * Storefront is the single storefront-content entry point. Internal content APIs remain private implementation details.
  */
 export type AdminNavItem = {
   href: string;
@@ -63,7 +63,7 @@ export const ADMIN_NAV_GROUPS: {
             href: "/admin/delivery-logistics",
             label: "Delivery",
             icon: "local_shipping",
-            permission: "dashboard:read",
+            permission: "content:read",
           },
           {
             href: "/admin/receipts",
@@ -88,7 +88,7 @@ export const ADMIN_NAV_GROUPS: {
       {
         href: "/admin/pos",
         label: "POS",
-        icon: "dock",
+        icon: "pos",
         permission: "pos:use",
         children: [
           {
@@ -130,9 +130,9 @@ export const ADMIN_NAV_GROUPS: {
     label: "Content",
     items: [
       {
-        href: "/admin/cms/builder",
-        label: "Storefront content",
-        icon: "article",
+        href: "/admin/build",
+        label: "Storefront",
+        icon: "storefront",
         permission: "content:read",
         children: [
           {
@@ -140,6 +140,12 @@ export const ADMIN_NAV_GROUPS: {
             label: "Campaigns",
             icon: "campaign",
             permission: "campaigns:read",
+          },
+          {
+            href: "/admin/api-reference",
+            label: "API reference",
+            icon: "code",
+            permission: "dashboard:read",
           },
         ],
       },
@@ -242,84 +248,18 @@ export function flattenAdminNavItems(
   ]);
 }
 
-/** CMS sub-routes shown in Cmd+K for faster jumps (same permissions as Content hub). */
-export const ADMIN_COMMAND_CMS_GROUPS: {
+/** Storefront content entry point shown in Cmd+K. */
+export const ADMIN_COMMAND_BUILD_GROUPS: {
   label: string;
   items: readonly AdminNavItem[];
 }[] = [
   {
-    label: "Content (website)",
+    label: "Storefront",
     items: [
       {
-        href: "/admin/cms/builder",
+        href: "/admin/build",
         label: "Storefront builder",
-        icon: "web",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/pages",
-        label: "Pages",
-        icon: "article",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/site-map",
-        label: "Content site map",
-        icon: "account_tree",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/navigation",
-        label: "Navigation and footer",
-        icon: "menu",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/announcement",
-        label: "Announcement bar",
-        icon: "campaign",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/categories",
-        label: "Category pages",
-        icon: "category",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/media",
-        label: "Media library",
-        icon: "perm_media",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/blog",
-        label: "Blog",
-        icon: "rss_feed",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/forms",
-        label: "Form submissions",
-        icon: "inbox",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/redirects",
-        label: "Redirects",
-        icon: "swap_calls",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/experiments",
-        label: "Page tests",
-        icon: "science",
-        permission: "content:read",
-      },
-      {
-        href: "/admin/cms/commerce",
-        label: "Product lookup",
-        icon: "search",
+        icon: "storefront",
         permission: "content:read",
       },
     ],

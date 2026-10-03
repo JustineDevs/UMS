@@ -42,9 +42,11 @@ export default async function BlogPreviewPage({ searchParams }: Props) {
         Preview only. This URL is not indexed.
       </p>
       {jsonLd != null ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      // nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd.
+      <script
+        type="application/ld+json"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
       ) : null}
       <header>
@@ -68,6 +70,7 @@ export default async function BlogPreviewPage({ searchParams }: Props) {
       ) : null}
       <div
         className="mt-10 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering. */
         dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(post.body) }}
       />
     </article>

@@ -17,7 +17,7 @@ export function OverviewKpis({
 }) {
   const money = { format: (value: number) => formatCurrency(value, { currency, maximumFractionDigits: 2 }) };
   return (
-    <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+    <div className="overflow-hidden rounded-xl bg-card">
       <div className="grid grid-cols-1 xl:grid-cols-8">
         <Card className="gap-5 overflow-hidden rounded-none border-0 border-foreground/10 border-b ring-0 xl:col-span-4 xl:border-r">
           <CardHeader>

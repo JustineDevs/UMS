@@ -3,12 +3,13 @@ import { cn } from "../../lib/utils";
 
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { size?: "default" | "sm" }
+>(({ className, size = "default", ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
       "rounded-xl border border-outline-variant/25 bg-surface-container-lowest text-on-surface shadow-sm",
+      size === "sm" && "rounded-lg",
       className,
     )}
     {...props}
@@ -22,7 +23,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("relative flex flex-col gap-1.5 p-6", className)}
     {...props}
   />
 ));
@@ -63,6 +64,17 @@ const CardContent = React.forwardRef<
 ));
 CardContent.displayName = "CardContent";
 
+const CardAction = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("absolute right-6 top-6 self-start", className)}
+      {...props}
+    />
+  ),
+);
+CardAction.displayName = "CardAction";
+
 const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -75,4 +87,4 @@ const CardFooter = React.forwardRef<
 ));
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export { Card, CardHeader, CardFooter, CardTitle, CardAction, CardDescription, CardContent };

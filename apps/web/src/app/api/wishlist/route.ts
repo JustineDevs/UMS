@@ -16,7 +16,7 @@ function json(value: unknown, status = 200) {
 }
 function workerBaseUrl() { return process.env.API_URL?.trim().replace(/\/$/, "") || null; }
 function internalStorefrontToken(userId: string, email: string): string | null {
-  if (process.env.NODE_ENV === "production") return null;
+  if (process.env.NODE_ENV === "production" && process.env.UVS_E2E_LOCAL !== "1") return null;
   const secret = process.env.JWT_SECRET?.trim();
   if (!secret) return null;
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");

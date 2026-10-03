@@ -24,6 +24,14 @@ type CapabilityResponse = {
 
 type PaymentCapability = NonNullable<CapabilityResponse["data"]>[number];
 
+function paymentConnectionErrorMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : "";
+  if (/worker_unavailable|invalid_worker_response|failed to fetch|networkerror|load failed/i.test(message)) {
+    return "Payment connection service is temporarily unavailable. Try again shortly.";
+  }
+  return message || fallback;
+}
+
 export function NangoPaymentConnect() {
   const [integrations, setIntegrations] = useState<PaymentNangoIntegration[]>([]);
   const [integration, setIntegration] = useState("");
@@ -53,7 +61,7 @@ export function NangoPaymentConnect() {
   }
 
   useEffect(() => {
-    void loadConnections().catch((error) => setStatus(error instanceof Error ? error.message : "Unable to load connection status"));
+    void loadConnections().catch((error) => setStatus(paymentConnectionErrorMessage(error, "Unable to load connection status")));
     void fetch("/api/admin/payments/capabilities", { credentials: "include", cache: "no-store" })
       .then(async (response) => response.ok ? await response.json() as CapabilityResponse : { data: [] })
       .then((body) => setCapabilities(body.data ?? []))
@@ -88,8 +96,8 @@ export function NangoPaymentConnect() {
             }
             await loadConnections();
             setStatus(`${integrationId} is connected and verified.`);
-          } catch (error) {
-            setStatus(error instanceof Error ? error.message : "Unable to save verified payment connection");
+    } catch (error) {
+      setStatus(paymentConnectionErrorMessage(error, "Unable to save verified payment connection"));
           } finally {
             setBusy(null);
           }
@@ -113,7 +121,7 @@ export function NangoPaymentConnect() {
       if (!body.data?.session_token) throw new Error("Unable to start secure connection");
       openConnectSession(body.data.session_token, integration, "connect");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to start secure connection");
+      setStatus(paymentConnectionErrorMessage(error, "Unable to start secure connection"));
       setBusy(null);
     }
   }
@@ -131,7 +139,7 @@ export function NangoPaymentConnect() {
       if (!body.data?.session_token) throw new Error("Unable to start reconnect");
       openConnectSession(body.data.session_token, connection.provider_config_key, "reconnect");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to start reconnect");
+      setStatus(paymentConnectionErrorMessage(error, "Unable to start reconnect"));
       setBusy(null);
     }
   }
@@ -149,7 +157,7 @@ export function NangoPaymentConnect() {
       setStatus(`${connection.provider_config_key} disconnected.`);
       await loadConnections();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unable to disconnect payment provider");
+      setStatus(paymentConnectionErrorMessage(error, "Unable to disconnect payment provider"));
     } finally {
       setBusy(null);
     }

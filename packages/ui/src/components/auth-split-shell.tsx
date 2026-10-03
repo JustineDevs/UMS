@@ -30,7 +30,7 @@ export function AuthSplitShell({
     : "Music retail for instruments and gear. Sign in to track orders, save details, and check out faster.";
 
   const mainMinH = useHeaderOffset
-    ? "min-h-[calc(100vh-5.5rem)] lg:min-h-[calc(100vh-6rem)]"
+    ? "min-h-[calc(100vh_-_5.5rem)] lg:min-h-[calc(100vh_-_6rem)]"
     : "min-h-[100dvh]";
 
   return (

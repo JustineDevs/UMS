@@ -62,7 +62,7 @@ export default function Testimonials2() {
               key={i}
               className="group border-oklch(0.205 0 0)/20 dark:border-oklch(0.205 0 0)/30 from-primary/30 to-primary/25 dark:from-primary/50 dark:to-primary/40 relative z-0 h-full overflow-hidden rounded-4xl border border-oklch(0.922 0 0) bg-gradient-to-b p-2 text-left ring-0 dark:border-oklch(0.922 0 0)/20 dark:dark:border-oklch(0.922 0 0)/30 dark:border-oklch(1 0 0 / 10%)"
             >
-              <div className="pointer-events-none absolute inset-0 opacity-0 transition-all duration-300 group-hover:opacity-100">
+              <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                 <div className="absolute inset-0 scale-[1.5] bg-[radial-gradient(circle_at_20%_20%,hsl(var(--primary)/0.15),transparent_40%),radial-gradient(circle_at_80%_30%,hsl(var(--primary)/0.1),transparent_40%),radial-gradient(circle_at_50%_80%,hsl(var(--primary)/0.12),transparent_40%)] transition-transform duration-500 group-hover:scale-100" />
               </div>
 

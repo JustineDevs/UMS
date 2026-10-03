@@ -2,9 +2,11 @@
 
 import { staffHasPermission } from "@universal-music-store/platform-data";
 import { useSession } from "@/lib/auth-client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, ExternalLink, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { Copy, ExternalLink, File as FileIcon, FileText, HardDrive, Image, Trash2, Upload, Video } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin-console";
 import { CatalogMediaPreview } from "./CatalogMediaPreview";
+import { inferCatalogMediaMimeType } from "./catalog-media-mime";
 import { sanitizeTrustedPublicUrl } from "@universal-music-store/sdk";
 import { catalogMediaEmptyState } from "@/lib/admin-receipt-media-state";
 
@@ -23,6 +25,13 @@ const ACCEPT_ATTR = "image/*,video/*,.webp,.svg,.mp4,.webm,.mov,.ogg";
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 
+const BUCKET_CONFIG: Omit<MediaBucket, "count" | "bytes">[] = [
+  { key: "documents", label: "Documents", icon: FileText, color: "bg-blue-500" },
+  { key: "images", label: "Images", icon: Image, color: "bg-emerald-500" },
+  { key: "videos", label: "Videos", icon: Video, color: "bg-violet-500" },
+  { key: "others", label: "Others", icon: FileIcon, color: "bg-amber-500" },
+];
+
 function isVideoFile(file: File) {
   return file.type.startsWith("video/") || /\.(mp4|webm|mov|ogg|m4v)$/i.test(file.name);
 }
@@ -37,18 +46,69 @@ function droppedFiles(dataTransfer: DataTransfer): File[] {
   return itemFiles.length ? itemFiles : Array.from(dataTransfer.files);
 }
 
-/** Catalog-scoped media: lists/uploads via `/api/admin/catalog/media`, metadata via CMS media API. */
+type MediaBucket = {
+  key: "documents" | "images" | "videos" | "others";
+  label: string;
+  count: number;
+  bytes: number;
+  icon: typeof FileIcon;
+  color: string;
+};
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(0, bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function mediaBucketKey(publicUrl: string, mimeType: string | null): MediaBucket["key"] {
+  const inferred = inferCatalogMediaMimeType(publicUrl, mimeType);
+  if (inferred?.startsWith("image/")) return "images";
+  if (inferred?.startsWith("video/")) return "videos";
+  if (inferred?.startsWith("text/") || inferred?.includes("pdf") || inferred?.includes("document")) return "documents";
+  return "others";
+}
+
+type MediaLoadState = {
+  rows: MediaRow[];
+  error: string | null;
+  loadingRows: boolean;
+  catalogSourceUnavailable: boolean;
+  serverCanWrite: boolean;
+};
+
+type MediaLoadAction =
+  | { type: "loading"; value: boolean }
+  | { type: "error"; value: string | null }
+  | { type: "rows"; value: MediaRow[] }
+  | { type: "permissions"; canWrite: boolean; sourceUnavailable: boolean };
+
+function mediaLoadReducer(state: MediaLoadState, action: MediaLoadAction): MediaLoadState {
+  switch (action.type) {
+    case "loading": return { ...state, loadingRows: action.value };
+    case "error": return { ...state, error: action.value };
+    case "rows": return { ...state, rows: action.value };
+    case "permissions":
+      return {
+        ...state,
+        serverCanWrite: action.canWrite,
+        catalogSourceUnavailable: action.sourceUnavailable,
+      };
+    default: return state;
+  }
+}
+
+/** Catalog-scoped media library and asset management. */
 export function CatalogMediaManager() {
   const { data: session, status } = useSession();
   const canWrite = staffHasPermission(session?.user?.permissions ?? [], "catalog:write");
-  const [rows, setRows] = useState<MediaRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingRows, setLoadingRows] = useState(true);
-  const [catalogSourceUnavailable, setCatalogSourceUnavailable] = useState(false);
+  const [{ rows, error, loadingRows, catalogSourceUnavailable, serverCanWrite }, dispatchLoad] = useReducer(
+    mediaLoadReducer,
+    { rows: [], error: null, loadingRows: true, catalogSourceUnavailable: false, serverCanWrite: false },
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [serverCanWrite, setServerCanWrite] = useState(false);
   const dragDepth = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -69,8 +129,8 @@ export function CatalogMediaManager() {
     if (q.trim()) sp.set("q", q.trim());
     if (mime.trim()) sp.set("mime", mime.trim());
     sp.set("sort", sort);
-    setLoadingRows(true);
-    setError(null);
+    dispatchLoad({ type: "loading", value: true });
+    dispatchLoad({ type: "error", value: null });
     fetch(`/api/admin/catalog/media?${sp.toString()}`)
       .then(async (r) => {
         const j = (await r.json()) as {
@@ -80,13 +140,16 @@ export function CatalogMediaManager() {
           catalogSourceUnavailable?: boolean;
         };
         if (!r.ok) throw new Error(j.error ?? r.statusText);
-        setServerCanWrite(Boolean(j.canWrite));
-        setCatalogSourceUnavailable(Boolean(j.catalogSourceUnavailable));
+        dispatchLoad({
+          type: "permissions",
+          canWrite: Boolean(j.canWrite),
+          sourceUnavailable: Boolean(j.catalogSourceUnavailable),
+        });
         return j.data ?? [];
       })
-      .then(setRows)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to load catalog media"))
-      .finally(() => setLoadingRows(false));
+      .then((value) => dispatchLoad({ type: "rows", value }))
+      .catch((e: unknown) => dispatchLoad({ type: "error", value: e instanceof Error ? e.message : "Unable to load catalog media" }))
+      .finally(() => dispatchLoad({ type: "loading", value: false }));
   }, [q, mime, sort]);
 
   useEffect(() => {
@@ -99,13 +162,13 @@ export function CatalogMediaManager() {
     for (const file of files) {
       const maxBytes = isVideoFile(file) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
       if (file.size > maxBytes) {
-        setError(`"${file.name}" exceeds ${Math.round(maxBytes / (1024 * 1024))} MB.`);
+        dispatchLoad({ type: "error", value: `"${file.name}" exceeds ${Math.round(maxBytes / (1024 * 1024))} MB.` });
         return;
       }
     }
     setUploading(true);
     setUploadPct(0);
-    setError(null);
+    dispatchLoad({ type: "error", value: null });
 
     const run = async () => {
       for (let i = 0; i < files.length; i++) {
@@ -139,7 +202,7 @@ export function CatalogMediaManager() {
     };
 
     void run().catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      dispatchLoad({ type: "error", value: e instanceof Error ? e.message : "Upload failed" });
       setUploadPct(null);
       setUploading(false);
     });
@@ -185,7 +248,7 @@ export function CatalogMediaManager() {
   };
 
   const loadRefs = (id: string) => {
-    void fetch(`/api/admin/cms/media/${id}?refs=1`)
+    void fetch(`/api/admin/catalog/media/${id}?refs=1`)
       .then(async (r) => {
         if (!r.ok) return;
         const j = (await r.json()) as { data?: { refs?: unknown } };
@@ -199,7 +262,7 @@ export function CatalogMediaManager() {
       .split(/[,]+/)
       .map((t) => t.trim())
       .filter(Boolean);
-    const r = await fetch(`/api/admin/cms/media/${id}`, {
+    const r = await fetch(`/api/admin/catalog/media/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -211,22 +274,22 @@ export function CatalogMediaManager() {
         tags,
       }),
     });
-    if (!r.ok) setError("Update failed");
+    if (!r.ok) dispatchLoad({ type: "error", value: "Update failed" });
     else {
-      setError(null);
+      dispatchLoad({ type: "error", value: null });
       load();
     }
   };
 
   const softDelete = async (id: string) => {
     if (!confirm("Archive this unused asset? Referenced assets cannot be archived.")) return;
-    const r = await fetch(`/api/admin/cms/media/${id}`, {
+    const r = await fetch(`/api/admin/catalog/media/${id}`, {
       method: "DELETE",
       headers: { "Idempotency-Key": crypto.randomUUID() },
     });
     if (!r.ok) {
       const body = (await r.json().catch(() => null)) as { error?: string } | null;
-      setError(body?.error ?? "Archive failed");
+      dispatchLoad({ type: "error", value: body?.error ?? "Archive failed" });
     }
     else {
       setOpenId(null);
@@ -237,7 +300,7 @@ export function CatalogMediaManager() {
   const copyShareLink = async (media: MediaRow) => {
     const url = sanitizeTrustedPublicUrl(media.public_url);
     if (!url || !navigator.clipboard) {
-      setError("This asset does not have a safe share URL.");
+      dispatchLoad({ type: "error", value: "This asset does not have a safe share URL." });
       return;
     }
     await navigator.clipboard.writeText(url);
@@ -247,82 +310,153 @@ export function CatalogMediaManager() {
 
   if (status === "loading") return <p className="text-sm text-slate-600">Loading…</p>;
 
+  const buckets = BUCKET_CONFIG.map((bucket) => {
+    const matching = rows.filter((row) => mediaBucketKey(row.public_url, row.mime_type) === bucket.key);
+    return { ...bucket, count: matching.length, bytes: matching.reduce((sum, row) => sum + (row.byte_size ?? 0), 0) };
+  });
+  const totalBytes = buckets.reduce((sum, bucket) => sum + bucket.bytes, 0);
+  const recentRows = [...rows].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 5);
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
+      <AdminPageHeader
+        title="Catalog media"
+        subtitle="Upload, organize, and maintain the assets used by products and storefront content."
+        actions={
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={!(canWrite || serverCanWrite) || uploading}
+              className="order-first inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3.5 text-sm font-medium text-white shadow-sm transition-[opacity,transform] hover:opacity-90 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950"
+            >
+              <Upload className="size-4" />
+              {uploading ? "Uploading…" : "Upload"}
+            </button>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <span>Search media</span>
+              <input
+                className="h-8 w-44 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="name, alt text, or URL"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <span>MIME prefix</span>
+              <input
+                className="h-8 w-24 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground"
+                value={mime}
+                onChange={(e) => setMime(e.target.value)}
+                placeholder="image/"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <span>Sort</span>
+              <select
+                className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground"
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+              >
+                <option value="created_desc">Newest</option>
+                <option value="created_asc">Oldest</option>
+                <option value="name_asc">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+              </select>
+            </label>
+          </div>
+        }
+      />
       {error ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Unable to load catalog media: {error}</p> : null}
 
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-card p-4 text-sm shadow-xs">
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">Search media</span>
+      <section aria-label="Catalog media upload" className="grid gap-4">
+        <div
+          role="button"
+          data-testid="catalog-media-dropzone"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+          onClick={() => (canWrite || serverCanWrite) && !uploading && inputRef.current?.click()}
+          onDrop={onDrop}
+          onDragEnter={onDragEnter}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          className={[
+            "flex min-h-full flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-7 text-center transition-colors",
+            dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/30",
+            canWrite || serverCanWrite ? "cursor-pointer hover:border-slate-400" : "opacity-60",
+          ].join(" ")}
+        >
+          <p className="text-sm font-medium text-foreground">
+            {uploading ? `Uploading${uploadPct != null ? ` ${uploadPct}%` : "…"}` : "Drop files or click"}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Images up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB; videos up to {Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB.
+          </p>
           <input
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="name, alt text, or URL"
+            ref={inputRef}
+            type="file"
+            className="sr-only"
+            accept={ACCEPT_ATTR}
+            multiple
+            disabled={!(canWrite || serverCanWrite) || uploading}
+            aria-label="Upload catalog media files"
+            onChange={(e) => void onFileInput(e.target.files)}
           />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">MIME prefix</span>
-          <input
-            className="h-8 w-28 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            value={mime}
-            onChange={(e) => setMime(e.target.value)}
-            placeholder="image/"
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="text-xs text-slate-600">Sort</span>
-          <select
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-          >
-            <option value="created_desc">Newest</option>
-            <option value="created_asc">Oldest</option>
-            <option value="name_asc">Name A–Z</option>
-            <option value="name_desc">Name Z–A</option>
-          </select>
-        </label>
-      </div>
+        </div>
+      </section>
 
-      <div
-        role="button"
-        data-testid="catalog-media-dropzone"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        onClick={() => (canWrite || serverCanWrite) && !uploading && inputRef.current?.click()}
-        onDrop={onDrop}
-        onDragEnter={onDragEnter}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        className={[
-          "rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
-          dragOver ? "border-primary bg-primary/5" : "border-border bg-muted/30",
-          canWrite || serverCanWrite ? "cursor-pointer hover:border-slate-400" : "opacity-60",
-        ].join(" ")}
-      >
-        <p className="text-sm font-medium text-foreground">
-          {uploading ? `Uploading${uploadPct != null ? ` ${uploadPct}%` : "…"}` : "Drop files or click"}
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Images up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB; videos up to {Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB.
-        </p>
-        <input
-          ref={inputRef}
-          type="file"
-          className="sr-only"
-          accept={ACCEPT_ATTR}
-          multiple
-          disabled={!(canWrite || serverCanWrite) || uploading}
-          aria-label="Upload catalog media files"
-          onChange={(e) => void onFileInput(e.target.files)}
-        />
-      </div>
+      <section aria-label="Catalog media overview" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {buckets.map((bucket) => {
+          const Icon = bucket.icon;
+          const percent = totalBytes ? Math.round((bucket.bytes / totalBytes) * 100) : 0;
+          return (
+            <article key={bucket.key} className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground"><Icon className="size-4 text-muted-foreground" />{bucket.label}</div>
+                <span className="text-xs text-muted-foreground">{bucket.count} {bucket.count === 1 ? "asset" : "assets"}</span>
+              </div>
+              <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{formatBytes(bucket.bytes)}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true"><div className={`h-full rounded-full ${bucket.color}`} style={{ width: `${percent}%` }} /></div>
+              <p className="mt-2 text-xs text-muted-foreground">{percent}% of loaded footprint</p>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="rounded-xl border border-border/60 bg-card p-5 shadow-sm" aria-label="Catalog storage footprint">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-3"><span className="flex size-9 items-center justify-center rounded-lg bg-muted"><HardDrive className="size-4 text-muted-foreground" /></span><div><h2 className="text-sm font-semibold">Catalog storage footprint</h2><p className="mt-1 text-xs text-muted-foreground">{formatBytes(totalBytes)} across {rows.length} loaded assets</p></div></div>
+          <span className="text-xs text-muted-foreground">Quota not configured</span>
+        </div>
+        <div className="mt-5 flex h-2 overflow-hidden rounded-full bg-muted" aria-label="Storage mix by asset type">
+          {buckets.map((bucket) => <div key={bucket.key} className={`${bucket.color} transition-[width] duration-150`} style={{ width: `${totalBytes ? (bucket.bytes / totalBytes) * 100 : 0}%` }} />)}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+          {buckets.map((bucket) => <span key={bucket.key} className="inline-flex items-center gap-2"><span className={`size-2 rounded-full ${bucket.color}`} />{bucket.label} {bucket.count}</span>)}
+        </div>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <article className="rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-sm font-semibold">Recent uploads</h2><p className="mt-1 text-xs text-muted-foreground">Latest assets in the loaded catalog view</p></div><span className="text-xs text-muted-foreground">{rows.length} total</span></div>
+          <div className="mt-4 divide-y divide-border/60">
+            {recentRows.length ? recentRows.map((row) => <button key={row.id} type="button" onClick={() => openRow(row)} className="flex w-full items-center gap-3 py-3 text-left transition-colors hover:bg-muted/40">
+              <span className="size-9 shrink-0 overflow-hidden rounded-lg bg-muted"><CatalogMediaPreview publicUrl={row.public_url} mimeType={row.mime_type} className="h-full w-full object-cover" fallbackLabel="File" /></span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{row.display_name || row.public_url.slice(-36)}</span><span className="mt-0.5 block text-xs text-muted-foreground">{inferCatalogMediaMimeType(row.public_url, row.mime_type) || "Unknown type"}</span></span>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{row.byte_size != null ? formatBytes(row.byte_size) : "—"}</span>
+            </button>) : <p className="py-8 text-center text-sm text-muted-foreground">No uploads in this view.</p>}
+          </div>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-5 shadow-sm">
+          <div><h2 className="text-sm font-semibold">Asset type distribution</h2><p className="mt-1 text-xs text-muted-foreground">A live breakdown of the current catalog media set</p></div>
+          <div className="mt-5 space-y-5">{buckets.map((bucket) => { const percent = totalBytes ? Math.round((bucket.bytes / totalBytes) * 100) : 0; return <div key={bucket.key}><div className="flex items-center justify-between text-sm"><span className="font-medium">{bucket.label}</span><span className="text-xs tabular-nums text-muted-foreground">{bucket.count} · {formatBytes(bucket.bytes)}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${bucket.color}`} style={{ width: `${percent}%` }} /></div></div>; })}</div>
+        </article>
+      </section>
 
       {loadingRows ? <p className="text-sm text-muted-foreground" aria-live="polite">Loading catalog media...</p> : null}
       {!loadingRows && !error && catalogSourceUnavailable ? (
@@ -376,7 +510,7 @@ export function CatalogMediaManager() {
                 <Trash2 className="size-3" /> Archive
               </button>
             </div>
-            {m.mime_type ? <p className="mt-1 text-[11px] text-muted-foreground">{m.mime_type}</p> : null}
+            {inferCatalogMediaMimeType(m.public_url, m.mime_type) ? <p className="mt-1 text-[11px] text-muted-foreground">{inferCatalogMediaMimeType(m.public_url, m.mime_type)}</p> : null}
             {m.byte_size != null ? (
               <p className="text-[11px] text-muted-foreground">{(m.byte_size / 1024).toFixed(1)} KB</p>
             ) : null}
@@ -462,7 +596,7 @@ export function CatalogMediaManager() {
           <p className="mt-1 text-xs text-muted-foreground">Retry after the product catalog service is available.</p>
         </div>
       ) : null}
-      {!loadingRows && !error && catalogMediaEmptyState(rows.length, Boolean(q.trim() || mime.trim()), catalogSourceUnavailable) === "none" ? (
+      {!loadingRows && !error && rows.length === 0 && catalogMediaEmptyState(rows.length, Boolean(q.trim() || mime.trim()), catalogSourceUnavailable) === "none" ? (
         <div className="rounded-xl border border-dashed px-6 py-10 text-center">
           <p className="text-sm font-medium text-foreground">No catalog media yet</p>
           <p className="mt-1 text-xs text-muted-foreground">Upload an image or video to reuse it across the catalog.</p>

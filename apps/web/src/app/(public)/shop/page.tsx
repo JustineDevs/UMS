@@ -3,10 +3,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { loadCmsCategoryContentPublic } from "@universal-music-store/platform-data";
-import {
-  sanitizeCmsHtml,
-  SHOP_PRODUCT_PAGE_SIZE,
-} from "@universal-music-store/validation";
+import { SHOP_PRODUCT_PAGE_SIZE } from "@universal-music-store/validation";
 import { CatalogProductCard } from "@/components/CatalogProductCard";
 import { CmsBlocksRenderer } from "@/components/CmsBlocksRenderer";
 import {
@@ -27,11 +24,11 @@ import {
   normalizeShopPageSearchParams,
   shopPageShouldNoIndex,
 } from "@/lib/shop-page-query";
-import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { ShopPriceRangeForm } from "@/components/ShopPriceRangeForm";
 import { ShopSortSelect } from "@/components/ShopSortSelect";
 import { ShopFilterDrawer } from "@/components/ShopFilterDrawer";
 import { ShopFilterGroup } from "@/components/ShopFilterGroup";
+import { CatalogSearchTypeahead } from "@/components/CatalogSearchTypeahead";
 import { StorefrontCommerceAlert } from "@/components/StorefrontCommerceAlert";
 import {
   buildPageMetadata,
@@ -105,7 +102,8 @@ export default async function ShopPage({
   const sp = normalizeShopPageSearchParams(await searchParams);
   const cmsLocale = (sp.locale ?? "en").trim() || "en";
   const diagnostics = parseShopPageQueryDiagnostics(sp);
-  if (diagnostics.invalidKeys.length > 0) {
+  const q = diagnostics.query;
+  if (diagnostics.invalidKeys.length > 0 || q.category) {
     const allowedQueryKeys = new Set([
       "category",
       "type",
@@ -127,6 +125,7 @@ export default async function ShopPage({
     for (const [key, value] of Object.entries(sp)) {
       if (
         key === "locale" ||
+        (key === "category" && q.category) ||
         !allowedQueryKeys.has(key) ||
         invalidKeys.has(key)
       ) continue;
@@ -134,8 +133,6 @@ export default async function ShopPage({
     }
     redirect(canonical.toString() ? `/shop?${canonical}` : "/shop");
   }
-  const q = diagnostics.query;
-
   const category = q.category?.trim() || undefined;
   const type = q.type?.trim() || undefined;
   const finish = q.finish?.trim() || undefined;
@@ -214,9 +211,6 @@ export default async function ShopPage({
 
   const sidebarWarning = secondaryCommerceFailure(catRes, facetRes);
 
-  const totalActive = categories.reduce((s, c) => s + c.count, 0);
-  const allProductsCountLabel =
-    categories.length > 0 ? totalActive : total;
   const hasMore = offset + products.length < total;
 
   const base = (): ShopQuery => ({
@@ -271,54 +265,39 @@ export default async function ShopPage({
           />
         </div>
       ) : null}
-      <header className="mb-12 grid grid-cols-1 items-end gap-8 sm:mb-16 lg:mb-20 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-8">
-          <h1 className="font-headline text-[clamp(2rem,6.5vw,4.5rem)] font-bold leading-[1.05] tracking-tighter text-primary">
-            Shop
-            <br />
-            <span className="text-[clamp(1.2rem,4vw,2.75rem)] font-bold">
-              All instruments
-            </span>
-          </h1>
-          {searchQ ? (
+      {searchQ ? (
+        <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+          <div className="min-w-0">
+            <h1 className="font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+              Search results
+            </h1>
             <p className="mt-4 font-body text-base text-on-surface-variant">
-              Search results for{" "}
-              <strong className="text-primary">{searchQ}</strong>
+              Search results for <strong className="text-primary">{searchQ}</strong>
             </p>
-          ) : null}
-          {cmsCategory?.intro_html?.trim() ? (
-            <div
-              className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg"
-              dangerouslySetInnerHTML={{
-                __html: sanitizeCmsHtml(String(cmsCategory.intro_html)),
-              }}
-            />
-          ) : (
-            <p className="mt-4 max-w-xl font-body text-base leading-relaxed text-on-surface-variant md:text-lg">
-              Browse the catalog with filters for category, instrument type,
-              finish, pickup layout, body wood, condition, skill level,
-              shipping speed, and price. Product details, stock, and checkout
-              use the live store system.
+          </div>
+        </header>
+      ) : (
+        <header className="mb-8 border-b border-outline-variant/15 pb-6 sm:mb-10">
+          <div className="min-w-0">
+            <p className="font-mono text-xs font-semibold uppercase tracking-[0.2em] text-on-surface-variant">
+              // SHOP CATALOG
             </p>
-          )}
+            <h1 className="mt-3 font-headline text-4xl font-bold leading-tight tracking-tight text-primary sm:text-5xl">
+              All categories
+            </h1>
+          </div>
+        </header>
+      )}
+
+      {cmsCategory?.blocks?.length ? (
+        <div className="mb-10">
+          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
         </div>
-        <div className="flex flex-col gap-6 justify-start lg:col-span-4 lg:items-end lg:justify-end">
-          <CatalogSearchTypeahead
-            key={searchQ ?? ""}
-            initialQ={searchQ}
-            category={category}
-            type={type}
-            finish={finish}
-            brand={brand}
-            pickupConfig={pickupConfig}
-            bodyWood={bodyWood}
-            condition={condition}
-            skillLevel={skillLevel}
-            shippingSpeed={shippingSpeed}
-            minPrice={minPrice}
-            maxPrice={maxPrice}
-            sort={sort}
-          />
+      ) : null}
+
+      <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
+        <ShopFilterDrawer activeFilterCount={activeFilterCount}>
+          <aside className="w-full space-y-6">
           <ShopSortSelect
             value={sort}
             category={category}
@@ -334,74 +313,22 @@ export default async function ShopPage({
             maxPrice={maxPrice}
             search={searchQ}
           />
-        </div>
-      </header>
-
-      {cmsCategory?.blocks?.length ? (
-        <div className="mb-10">
-          {await CmsBlocksRenderer({ blocks: cmsCategory.blocks })}
-        </div>
-      ) : null}
-
-      <div className="flex min-w-0 flex-col gap-10 lg:flex-row lg:gap-12">
-        <ShopFilterDrawer activeFilterCount={activeFilterCount}>
-          <aside className="w-full space-y-12">
-          <ShopFilterGroup title="Category">
-            <ul className="space-y-4">
-              <li>
-                <Link
-                  href={h({
-                    category: undefined,
-                    type,
-                    finish,
-                    pickupConfig,
-                    bodyWood,
-                    condition,
-                    skillLevel,
-                    shippingSpeed,
-                  })}
-                  aria-current={!category ? "page" : undefined}
-                  className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
-                    !category
-                      ? "font-medium text-primary"
-                      : "text-on-surface-variant hover:text-primary"
-                  }`}
-                >
-                  <span>All</span>
-                  <span className="text-[10px] text-on-surface-variant">
-                    ({allProductsCountLabel})
-                  </span>
-                </Link>
-              </li>
-              {categories.map((c) => (
-                <li key={c.category}>
-                  <Link
-                    href={h({
-                      category: c.category,
-                      type: undefined,
-                      finish: undefined,
-                      pickupConfig: undefined,
-                      bodyWood: undefined,
-                      condition: undefined,
-                      skillLevel: undefined,
-                      shippingSpeed: undefined,
-                    })}
-                    aria-current={category === c.category ? "page" : undefined}
-                    className={`flex min-h-11 items-center justify-between text-sm transition-colors ${
-                      category === c.category
-                        ? "font-medium text-primary"
-                        : "text-on-surface-variant hover:text-primary"
-                    }`}
-                  >
-                    <span>{c.category}</span>
-                    <span className="text-[10px]">({c.count})</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </ShopFilterGroup>
-
-          <ShopFilterGroup title="Type">
+          <CatalogSearchTypeahead
+            initialQ={searchQ}
+            category={category}
+            type={type}
+            finish={finish}
+            brand={brand}
+            pickupConfig={pickupConfig}
+            bodyWood={bodyWood}
+            condition={condition}
+            skillLevel={skillLevel}
+            shippingSpeed={shippingSpeed}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            sort={sort}
+          />
+          <ShopFilterGroup title="Type" defaultOpen>
             {facets.types.length === 0 ? (
               <p className="text-xs text-on-surface-variant">
                 No types in this view.
@@ -443,7 +370,7 @@ export default async function ShopPage({
                 No finishes in this view.
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {facets.finishes.map((col) => {
                   const active = finish === col;
                   return (
@@ -459,7 +386,7 @@ export default async function ShopPage({
                         shippingSpeed,
                         })}
                       aria-current={active ? "page" : undefined}
-                      className={`flex min-h-11 items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 ${
+                      className={`flex min-h-11 items-center gap-3 w-full group rounded px-1 py-0.5 -mx-1 lg:min-h-9 ${
                         active ? "ring-1 ring-primary" : ""
                       }`}
                     >
@@ -483,7 +410,7 @@ export default async function ShopPage({
                 Set brand on products in store metadata to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.brands.map((b) => {
                   const active = brand === b;
                   return (
@@ -498,7 +425,7 @@ export default async function ShopPage({
                           shippingSpeed,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -537,7 +464,7 @@ export default async function ShopPage({
                 Add pickup config metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.pickupConfigs.map((value) => {
                   const active = pickupConfig === value;
                   return (
@@ -547,7 +474,7 @@ export default async function ShopPage({
                           pickupConfig: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -568,7 +495,7 @@ export default async function ShopPage({
                 Add body wood metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.bodyWoods.map((value) => {
                   const active = bodyWood === value;
                   return (
@@ -578,7 +505,7 @@ export default async function ShopPage({
                           bodyWood: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -599,7 +526,7 @@ export default async function ShopPage({
                 Add condition metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.conditions.map((value) => {
                   const active = condition === value;
                   return (
@@ -609,7 +536,7 @@ export default async function ShopPage({
                           condition: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -630,7 +557,7 @@ export default async function ShopPage({
                 Add skill level metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.skillLevels.map((value) => {
                   const active = skillLevel === value;
                   return (
@@ -640,7 +567,7 @@ export default async function ShopPage({
                           skillLevel: active ? undefined : value,
                         })}
                         aria-current={active ? "page" : undefined}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -661,7 +588,7 @@ export default async function ShopPage({
                 Add shipping speed metadata to variants to filter here.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {facets.shippingSpeeds.map((value) => {
                   const active = shippingSpeed === value;
                   return (
@@ -670,7 +597,7 @@ export default async function ShopPage({
                         href={h({
                           shippingSpeed: active ? undefined : value,
                         })}
-                        className={`flex min-h-11 items-center text-sm ${
+                        className={`flex min-h-11 items-center text-sm lg:min-h-9 ${
                           active
                             ? "font-medium text-primary"
                             : "text-on-surface-variant hover:text-primary"
@@ -723,7 +650,7 @@ export default async function ShopPage({
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-x-6 gap-y-12 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-16 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
                 <CatalogProductCard
                   key={product.id}

@@ -19,7 +19,7 @@ export function AdminPageHeader({
         <AdminPageTitleWithHelp title={title} />
         {subtitle ? <p suppressHydrationWarning className="max-w-2xl text-sm leading-5 text-muted-foreground">{subtitle}</p> : null}
       </div>
-      {actions ? <div className="flex min-w-0 max-w-full shrink flex-wrap items-center justify-end gap-2">{actions}</div> : null}
+      {actions ? <div className="flex min-w-0 max-w-full shrink flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">{actions}</div> : null}
     </header>
   );
 }

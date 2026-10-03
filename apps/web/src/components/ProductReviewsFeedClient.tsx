@@ -145,7 +145,11 @@ export function ProductReviewsFeedClient({
   medusaProductId: string;
   onReviewsChange?: (_reviews: ProductReviewRow[]) => void;
 }) {
-  const [allReviews, setAllReviews] = useState(reviews);
+  const [additionalReviews, setAdditionalReviews] = useState<ProductReviewRow[]>([]);
+  const allReviews = useMemo(() => {
+    const seen = new Set(reviews.map((review) => review.id));
+    return [...reviews, ...additionalReviews.filter((review) => !seen.has(review.id))];
+  }, [additionalReviews, reviews]);
   const [nextCursor, setNextCursor] = useState(
     reviews.length >= 50
       ? (() => {
@@ -188,7 +192,7 @@ export function ProductReviewsFeedClient({
         existing.add(review.id);
         return true;
       });
-      setAllReviews((current) => [...current, ...additions]);
+      setAdditionalReviews((current) => [...current, ...additions]);
       onReviewsChange?.([...allReviews, ...additions]);
       setNextCursor(body.nextCursor ?? null);
     } catch {

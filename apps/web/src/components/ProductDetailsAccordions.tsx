@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import type { Product } from "@universal-music-store/types";
 import { useProductVariant } from "@/components/ProductVariantProvider";
 
@@ -32,9 +33,10 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
           <span className="text-sm font-bold uppercase tracking-wider">
             Instrument overview
           </span>
-          <span className="material-symbols-outlined transition-transform group-open:rotate-180">
-            expand_more
-          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="size-5 shrink-0 transition-transform group-open:rotate-180"
+          />
         </summary>
         <div className="space-y-3 pt-4 font-body text-sm leading-relaxed text-on-surface-variant">
           <p>
@@ -60,9 +62,10 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
             <span className="text-sm font-bold uppercase tracking-wider">
               Description
             </span>
-            <span className="material-symbols-outlined transition-transform group-open:rotate-180">
-              expand_more
-            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-5 shrink-0 transition-transform group-open:rotate-180"
+            />
           </summary>
           <div className="pt-4 font-body text-sm leading-relaxed text-on-surface-variant">
             {product.description}
@@ -75,9 +78,10 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
           <span className="text-sm font-bold uppercase tracking-wider">
             Build notes
           </span>
-          <span className="material-symbols-outlined transition-transform group-open:rotate-180">
-            expand_more
-          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="size-5 shrink-0 transition-transform group-open:rotate-180"
+          />
         </summary>
         <div className="space-y-3 pt-4 font-body text-sm leading-relaxed text-on-surface-variant">
           {product.material?.trim() ? (
@@ -103,9 +107,10 @@ export function ProductDetailsAccordions({ product, typeRun }: Props) {
           <span className="text-sm font-bold uppercase tracking-wider">
             Shipping &amp; returns
           </span>
-          <span className="material-symbols-outlined transition-transform group-open:rotate-180">
-            expand_more
-          </span>
+          <ChevronDown
+            aria-hidden="true"
+            className="size-5 shrink-0 transition-transform group-open:rotate-180"
+          />
         </summary>
         <div className="space-y-3 pt-4 font-body text-sm leading-relaxed text-on-surface-variant">
           <p>
@@ -168,9 +173,10 @@ export function ProductSpecifications({ product }: Pick<Props, "product">) {
     <details className="group py-5" data-pdp-section="specifications" open>
       <summary className="flex cursor-pointer list-none items-center justify-between">
         <span className="text-sm font-bold uppercase tracking-wider">Specifications</span>
-        <span className="material-symbols-outlined transition-transform group-open:rotate-180">
-          expand_more
-        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className="size-5 shrink-0 transition-transform group-open:rotate-180"
+        />
       </summary>
       <div className="pt-4">
         <div className="overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-low/30">

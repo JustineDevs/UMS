@@ -29,8 +29,10 @@ const getCachedPublicHomeContent = unstable_cache(
   { revalidate: 60, tags: ["storefront:home"] },
 );
 
-const HOME_CONTENT_DEADLINE_MS = 1_500;
-const HOME_AUXILIARY_READ_DEADLINE_MS = 1_500;
+// The hero and catalog are the critical path. Auxiliary social/metadata reads
+// must never turn a storefront request into a multi-second waterfall.
+const HOME_CONTENT_DEADLINE_MS = 750;
+const HOME_AUXILIARY_READ_DEADLINE_MS = 100;
 
 function loadHomeContentWithinDeadline() {
   return Promise.race([
@@ -50,7 +52,14 @@ function loadHomepageAuxiliaryReadWithinDeadline<T>(read: Promise<T>, fallback: 
   ]);
 }
 
-export const dynamic = "force-dynamic";
+function loadFeaturedProductsWithinDeadline() {
+  return Promise.race([
+    fetchFeaturedProducts(4),
+    new Promise<Awaited<ReturnType<typeof fetchFeaturedProducts>>>((resolve) =>
+      setTimeout(() => resolve({ kind: "ok", products: [] }), HOME_CONTENT_DEADLINE_MS),
+    ),
+  ]);
+}
 
 export const metadata = buildPageMetadata({
   title: SITE_NAME,
@@ -69,7 +78,7 @@ export default async function HomePage({
     adminPreview === "1" ||
     (Array.isArray(adminPreview) && adminPreview.includes("1"));
   const [featured, home] = await Promise.all([
-    fetchFeaturedProducts(4),
+    loadFeaturedProductsWithinDeadline(),
     loadHomeContentWithinDeadline(),
   ]);
   if (featured.kind !== "ok" && !isAdminPreview) {
@@ -121,20 +130,22 @@ export default async function HomePage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(webJsonLd) }}
       />
-      {isAdminPreview ? (
-        <StorefrontHomePreviewBridge
-          products={featured.kind === "ok" ? featured.products : []}
-          home={home}
-          socialProof={{ customerCount, reviewSummary }}
-        />
-      ) : (
-        <HomeScrollExperience
-          products={featured.kind === "ok" ? featured.products : []}
-          home={home}
-          socialProof={{ customerCount, reviewSummary }}
-          visualBlocks={home.visualBlocks}
-        />
-      )}
+      <main className="storefront-page-shell max-w-[1600px] pb-12">
+        {isAdminPreview ? (
+          <StorefrontHomePreviewBridge
+            products={featured.kind === "ok" ? featured.products : []}
+            home={home}
+            socialProof={{ customerCount, reviewSummary }}
+          />
+        ) : (
+          <HomeScrollExperience
+            products={featured.kind === "ok" ? featured.products : []}
+            home={home}
+            socialProof={{ customerCount, reviewSummary }}
+            visualBlocks={home.visualBlocks ?? []}
+          />
+        )}
+      </main>
     </>
   );
 }

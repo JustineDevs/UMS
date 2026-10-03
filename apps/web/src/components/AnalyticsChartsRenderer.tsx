@@ -122,7 +122,7 @@ function ChartCard({ title, children }: { title: string; children: ReactNode }) 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-xs font-bold uppercase tracking-widest text-secondary">{title}</CardTitle>
+        <CardTitle className="text-xs font-bold uppercase tracking-widest text-primary">{title}</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">{children}</CardContent>
     </Card>

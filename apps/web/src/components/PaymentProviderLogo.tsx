@@ -1,17 +1,16 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
+import Image from "next/image";
 import type { PaymentProviderKey } from "@/lib/checkout-worker";
 
-/** Local SVGs in /public (Shopify payment_icons, MIT). */
-const LOCAL: Partial<Record<PaymentProviderKey, string>> = {};
-
-/** Brand marks via Simple Icons CDN (https://simpleicons.org). */
-const CDN: Partial<Record<PaymentProviderKey, string>> = {
-  STRIPE: "https://cdn.simpleicons.org/stripe/635BFF",
-  PAYPAL: "https://cdn.simpleicons.org/paypal/00457C",
-  XENDIT: "https://cdn.simpleicons.org/xendit/00B3B0",
+/** Official provider-hosted assets; do not replace these with approximated marks. */
+const OFFICIAL_ASSETS: Partial<Record<PaymentProviderKey, string>> = {
+  STRIPE:
+    "https://images.stripeassets.com/fzn2n1nzq965/4M6d6BSWzlgsrJx8rdZb0I/733f37ef69b5ca1d3d33e127184f4ce4/Powered_by_Stripe.svg?q=80&w=1082",
+  PAYPAL: "https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-200px.png",
+  // Xendit's hosted logo blocks cross-origin embedding in Chromium; the
+  // existing accessible local label is safer than a failing remote image.
 };
 
 export function PaymentProviderLogo({
@@ -21,13 +20,13 @@ export function PaymentProviderLogo({
   providerKey: PaymentProviderKey;
   label: string;
 }) {
-  const src = LOCAL[providerKey] ?? CDN[providerKey];
+  const src = OFFICIAL_ASSETS[providerKey];
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
       <span
         className="inline-flex h-8 min-w-[4.5rem] items-center justify-center rounded border border-outline-variant/30 bg-surface-container-high px-2 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant"
-        aria-hidden
+        aria-label={label}
       >
         {label.slice(0, 18)}
       </span>
@@ -41,7 +40,7 @@ export function PaymentProviderLogo({
         width={88}
         height={32}
         unoptimized
-        className="h-8 w-auto max-w-[5.5rem] object-contain object-left"
+        className="h-8 w-[5.5rem] object-contain object-left"
         onError={() => setFailed(true)}
       />
       <span className="sr-only">{label}</span>

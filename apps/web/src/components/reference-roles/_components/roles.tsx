@@ -1,7 +1,7 @@
 "use client";
 "use no memo";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   type ColumnFiltersState,
@@ -66,11 +66,28 @@ function getRoleGroupFilterValue(typeFilter: string) {
 }
 
 export function Roles({ roles }: { roles: Role[] }) {
+  type RoleTab = "roles" | "permission-sets" | "access-reviews";
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 12,
   });
+  const [activeTab, setActiveTab] = useState<RoleTab>("roles");
+
+  useEffect(() => {
+    const syncTabFromHash = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === "permission-sets" || hash === "access-reviews") {
+        setActiveTab(hash);
+      } else if (!hash) {
+        setActiveTab("roles");
+      }
+    };
+
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
 
   const table = useReactTable({
     data: roles,
@@ -123,7 +140,7 @@ export function Roles({ roles }: { roles: Role[] }) {
         }
       />
 
-      <Tabs className="h-full gap-4" defaultValue="roles">
+      <Tabs className="h-full gap-4" value={activeTab} onValueChange={(value) => setActiveTab(value as RoleTab)}>
         <TabsList
           variant="line"
           className="w-full justify-start gap-2 border-b ps-0 *:data-[slot=tabs-trigger]:flex-none"
@@ -153,8 +170,9 @@ export function Roles({ roles }: { roles: Role[] }) {
 
             <div className="overflow-hidden rounded-xl border border-border/70 bg-background">
               <AdminTableToolbar
+                className="sm:flex-col sm:items-stretch sm:justify-start"
                 leading={
-                  <InputGroup className="h-7 w-full rounded-md sm:w-82">
+                  <InputGroup className="h-7 w-full rounded-md">
                     <InputGroupAddon>
                       <Search />
                     </InputGroupAddon>
@@ -172,7 +190,7 @@ export function Roles({ roles }: { roles: Role[] }) {
                   </InputGroup>
                 }
                 trailing={
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2">
                     <Select
                       value={typeFilter}
                       onValueChange={(v) => {
@@ -182,7 +200,7 @@ export function Roles({ roles }: { roles: Role[] }) {
                         table.setPageIndex(0);
                       }}
                     >
-                      <SelectTrigger size="sm">
+                      <SelectTrigger className="w-full sm:w-44" size="sm">
                         <span className="text-muted-foreground">Type:</span>
                         <SelectValue placeholder="All" />
                       </SelectTrigger>
@@ -204,7 +222,7 @@ export function Roles({ roles }: { roles: Role[] }) {
                         table.setPageIndex(0);
                       }}
                     >
-                      <SelectTrigger size="sm">
+                      <SelectTrigger className="w-full sm:w-44" size="sm">
                         <span className="text-muted-foreground">Owner:</span>
                         <SelectValue placeholder="All" />
                       </SelectTrigger>
@@ -228,7 +246,7 @@ export function Roles({ roles }: { roles: Role[] }) {
                         table.setPageIndex(0);
                       }}
                     >
-                      <SelectTrigger size="sm">
+                      <SelectTrigger className="w-full sm:w-44" size="sm">
                         <span className="text-muted-foreground">Status:</span>
                         <SelectValue placeholder="All" />
                       </SelectTrigger>
@@ -266,17 +284,19 @@ export function Roles({ roles }: { roles: Role[] }) {
         </TabsContent>
         <TabsContent value="access-reviews">
           <div className="flex flex-col gap-3">
-            {roles
-              .flatMap((role) => (role.status === "Needs review" ? [role] : []))
-              .map((role) => (
+            {roles.reduce<React.ReactNode[]>((matches, role) => {
+              if (role.status !== "Needs review") return matches;
+              matches.push(
                 <div
                   key={role.role}
                   className="flex items-center justify-between rounded-md border border-border/70 px-4 py-3 text-sm"
                 >
                   <span>{role.role}</span>
                   <span className="text-muted-foreground">Review required</span>
-                </div>
-              ))}
+                </div>,
+              );
+              return matches;
+            }, [])}
             {roles.every((role) => role.status !== "Needs review") ? (
               <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
                 No access reviews are pending.

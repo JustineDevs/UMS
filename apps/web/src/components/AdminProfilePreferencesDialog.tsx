@@ -58,7 +58,7 @@ export function AdminProfilePreferencesDialog() {
           className="mb-2 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-slate-200"
         >
           <div
-            className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-surface-container-high bg-no-repeat"
+            className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface-container-high text-xs font-bold text-slate-700 bg-no-repeat"
             role="img"
             aria-label={`${session?.user?.name || session?.user?.email || "Staff"} avatar`}
             style={{
@@ -66,7 +66,11 @@ export function AdminProfilePreferencesDialog() {
               backgroundPosition: "center",
               backgroundSize: "cover",
             }}
-          />
+          >
+            <span aria-hidden className="absolute inset-0 flex items-center justify-center bg-slate-200/70">
+              {(session?.user?.name ?? session?.user?.email ?? "S").trim().charAt(0).toUpperCase()}
+            </span>
+          </div>
           <div className="flex min-w-0 flex-col overflow-hidden">
             <span className="truncate text-xs font-bold text-primary">
               {session?.user?.email ?? "Staff"}

@@ -1,10 +1,20 @@
 # Production hardening report
 
-## Current authoritative snapshot — 2026-09-23
+## Current evidence refresh — 2026-10-01
+
+The production Worker was redeployed as `8f8f346a-1f10-4d20-b0d4-3c986751d732`. Direct readiness and the public Vercel health contract passed. The production runtime-settings API was used to preserve the organization payload and add only `XENDIT` to the enabled payment-provider allow-list, which had been the root cause of the live methods endpoint returning COD only. Worker and Vercel now return `XENDIT` and `COD`. The latest hosted Xendit run passed failed/expired return paths 2/2, but the hosted-success card-field flow failed before payment completion; the earlier success claim is superseded. The CMS production-mode repeated mutation/restore flow passed 15/15 in 5.0 minutes. A fresh direct-process 15-minute idle probe also completed for 900,008 ms with 180 samples, 1,600.1 MiB peak aggregate RSS, and zero Fast Refresh, full-reload, or error counters. These results do not certify provider webhooks/refunds/reconciliation, production p95/queue SLOs, or an interactive CMS memory soak.
+
+## Current authoritative snapshot — 2026-10-01
+
+The latest local generation produced 280 OpenAPI operations, 323 executable
+schemas, 0 heuristic schemas, 0 unresolved schemas, and 603 matching
+source hashes. The checked admin subset reports 196 route operations. Older
+numeric snapshots below remain historical evidence.
 
 This section supersedes older numeric snapshots below while preserving them as
 historical evidence. The current checkout is on `dev` and remains intentionally
-uncommitted; no deployment claim is made from these local changes.
+uncommitted; linked Vercel deployment `dpl_5LVno3rqv48wDBzDjegU2jWCgHZr` reached
+READY, and the production health contract passes against the live alias.
 
 Fresh repository gates:
 
@@ -15,34 +25,78 @@ markup or executable URLs that the published renderer would later remove.
 Focused CMS coverage proves script/event-handler and `javascript:`/`data:` URL
 rejection while preserving safe formatting and relative links.
 
-- OpenAPI regenerated successfully with 193 operations, 320 executable schemas,
-  and 598 matching route source hashes. The previous two stale hashes were
-  removed from `internal/reference/admin-open-api.yaml` and its PDF companion.
+- OpenAPI parity is current at 280 total operations, 323 executable schemas,
+  0 unresolved schemas, and 603 matching route source hashes. The
+  checked admin subset reports 196 route operations; generated artifacts remain
+  governed by the source-drift check.
 - `pnpm quality:contracts` passes: admin guard, OpenAPI parity, source-drift,
   webhook boundary, route ownership, route-state inventory, storefront client
   boundary, migration boundary, and audit triage.
-- Route ownership reports 206 route files with no unsafe Worker-origin database
+- Route ownership reports 207 route files with no unsafe Worker-origin database
   imports. Route-state inventory covers 92 pages with 92 loading and 92 error
   boundaries; runtime browser verification remains separate.
-- Knip reports 28 candidate files, 2 package dependencies, 11 dev dependencies,
-  24 unused export groups, 4 unused exported types, and 1 duplicate export.
-  These are triage candidates, not automatic deletion targets.
-- React Doctor reports 206 warnings and 0 errors under the configured budget of
-  286. Warning cleanup remains a tracked hygiene workstream.
-- `node scripts/verify-matrix-evidence.cjs` is currently red: it inventories
-  403 rows and 403 evidence records but rejects stale `verifiedAt` timestamps,
-  the changed `stress-test/e2e/flows/psp-checkout-cod.spec.ts` artifact hash,
-  and one blocked-row result/status mismatch. These records must be rerun from
-  real evidence; timestamps must not be refreshed mechanically.
+- Knip is clean under the current `knip.json` workspace configuration.
+- OpenSSF Scorecard is now runnable through the repository wrapper. The
+  current-checkout scan scores 7.0/10 and reports 10/10 for dangerous
+  workflows, token permissions, and vulnerabilities. Its 0/10 binary-artifact,
+  fuzzing, and SAST signals are local-scan or repository-history limitations,
+  not silently treated as passes. Remote scans fail closed when
+  `GITHUB_AUTH_TOKEN`/`GH_TOKEN` is absent; the GitHub Actions workflow is the
+  authoritative remote scan surface.
+- The inventory SSE stream no longer blocks stream setup on its first upstream
+  read; abort ownership remains inside the send operation and its existing
+  cancellation tests pass. The Philippine address cascade now uses complete
+  address identity for its dependent effect and guards the NCR normalization
+  write against repeat updates, removing one stale-dependency diagnostic.
+- Turbo/Vercel environment propagation is explicit in `turbo.json`; the latest
+  production build no longer emits the missing-environment-variable warning.
+- React Doctor reports 102 source warnings and 0 errors under the configured
+  ratchet budget of 102; generated `.next-dev` source maps are excluded.
+- The persisted direct-process development memory probe completed its full
+  900,008 ms duration with 180 samples, 1,600.1 MiB peak aggregate RSS, and
+  zero Fast Refresh, full-reload, or error counters across the Next,
+  Worker, esbuild, and workerd process tree. This is idle/startup stability
+  evidence; it is not interactive CMS-edit telemetry or production SLO proof.
+- The fresh local production-server cart E2E regression now passes 13/13. Its
+  loading assertion accepts the accessible streamed root boundary that Next
+  actually sends before client hydration, and its direct API check derives the
+  configured Playwright port instead of assuming `localhost:3000`.
+- The matrix verifier currently inventories all 403 rows with 59 verified and
+  344 explicitly blocked. It is structurally green (all 403 evidence records,
+  zero unresolved rows, zero verifier errors), but the release gate remains
+  open because the blocked rows require their stated recovery runs. Fresh
+  hosted storefront UX (25/25) and API-security (9/9) evidence was regenerated.
+  Fresh PayPal cancel/decline, Xendit failure/expiry, performance,
+  catalog, API-security, public-route, and hosted storefront UX checks pass.
+  The deployed About browser proof still fails on a cross-origin blocked
+  Xendit logo request; the source fix removes that remote asset and falls back
+  to the accessible local label, but it still requires deployment and a fresh
+  hosted rerun. Fresh isolated
+  production-artifact Stripe success/decline and COD runs reached scoped
+  `/track/:orderId`; the invalid COD body returned HTTP 400. The deployed
+  merchant context still has Stripe disabled, so live Stripe webhook proof
+  remains external. A fresh
+  deployed axe run found the catalog Types
+  tooltip accessible-name defect; the source fix passes local axe 10/10, but
+  deployment and hosted rerun remain required. Webhook delivery,
+  reconciliation, refunds, and chargebacks remain external proof requirements.
+  The E2E staff fixture now waits for cold Next compilation and reports
+  authentication failures explicitly instead of misclassifying them as a
+  missing UI.
+  The full sequential matrix also needs a stable
+  long-run harness because one run restarted the local Next process mid-suite.
 
-The release verdict remains **Not ready** until source/deployment mapping,
-provider-backed authenticated evidence, safe database query evidence, and the
-interactive CMS memory soak are completed.
+The release verdict remains **Not ready** until the remaining provider-backed
+callback evidence and interactive CMS memory soak are completed. Read-only
+planner evidence is now captured for both configured databases, but it does not
+replace production traffic/cardinality evidence or `EXPLAIN ANALYZE` on a safe
+representative environment.
 
-Verification for this snapshot: `cms-page-builder-preview.test.ts` 4/4,
-`pnpm --filter @universal-music-store/web typecheck`, web lint,
-`pnpm quality:contracts`, `pnpm test:backend:worker:all` (509/509), and
-`git diff --check` all pass on the current dirty `dev` checkout.
+Verification for this snapshot: `pnpm --filter @universal-music-store/web test`
+(595/595), `pnpm --filter @universal-music-store/web typecheck`, web lint,
+`pnpm quality:contracts`, `pnpm test:backend:worker:all` (519/519),
+`pnpm quality:knip`, `pnpm security:check`, and `git diff --check` all pass on
+the current dirty `dev` checkout.
 
 Date: 2026-09-17  
 Branch: `dev`  
@@ -52,7 +106,11 @@ Evidence note: sections and addenda labelled with earlier dates are retained as 
 
 ## Executive result
 
-The confirmed local memory-retention defects were repaired and covered with focused tests. The live Vercel deployment was independently checked and is healthy. The repository is not release-ready from this checkout because the external Vercel project still requires authenticated source-root reconciliation, while the current checkout targets `apps/web` and the migration remains dirty. Production source mapping and production SQL/cost claims therefore remain explicitly blocked rather than inferred.
+The dated memory-hardening snapshot below is historical. Its provider and
+deployment observations are superseded by the current evidence refresh above;
+the implementation findings remain useful as an audit trail.
+
+The confirmed local memory-retention defects were repaired and covered with focused tests. The live Vercel deployment was independently checked and is healthy. Stripe sandbox paths, Xendit hosted checkout, and Xendit failure/expiry paths passed in isolated reruns. The repository is not release-ready from this checkout because provider webhook/refund evidence, production traffic/cardinality evidence, telemetry-backed CMS memory proof, and dirty migration reconciliation remain open; no destructive cleanup was performed.
 
 ## Implemented findings
 
@@ -80,7 +138,7 @@ The current route surface includes staff-session guards, permission checks, requ
 
 ## SQL review
 
-Static inspection found `SELECT *` in admin read/snapshot paths and offset pagination in bounded admin/catalog paths. The CMS page `SELECT * ... FOR UPDATE` is intentionally used to snapshot the complete prior row before a versioned update. Public Worker reads now use explicit caps: blog 100, category content 500, sitemap 5,000, regions 100, collection products 500, receipt items 500, and staff grants 100; customer/admin pagination clamps offsets at 100,000. The earlier generic `HYPERDRIVE` compatibility fallback has been removed; Worker database access now requires the explicit APP or MEDUSA role binding/URL. No index migration was invented: `EXPLAIN (ANALYZE, BUFFERS)` evidence requires a safe representative `MEDUSA_DB_URL`/`APP_DB_URL` environment and production traffic/cardinality mapping.
+Static inspection found `SELECT *` in admin read/snapshot paths and offset pagination in bounded admin/catalog paths. The CMS page `SELECT * ... FOR UPDATE` is intentionally used to snapshot the complete prior row before a versioned update. Public Worker reads now use explicit caps: blog 100, category content 500, sitemap 5,000, regions 100, collection products 500, receipt items 500, and staff grants 100; customer/admin pagination clamps offsets at 100,000. The earlier generic `HYPERDRIVE` compatibility fallback has been removed; Worker database access now requires the explicit APP or MEDUSA role binding/URL. Safe `EXPLAIN (ANALYZE, BUFFERS)` probes now run against both configured databases in read-only transactions with rollback: payment-attempt correlation, audit recency, inventory reservations, order display IDs, and inventory levels use their intended indexes. CMS publication and catalog publication still choose sequential scans on the current tiny datasets (9 and 22 estimated rows), so no speculative index migration was added. Production traffic/cardinality mapping remains the only SQL-performance evidence gap.
 
 ## RSC, TypeScript, and storefront review
 
@@ -88,27 +146,26 @@ The CMS preview change remains client-side because it owns iframe editing and po
 
 ## Deployment and observability findings
 
-The live deployment was checked directly: `https://universalmusic.vercel.app/` returned 200 and `/api/health` returned 200 with `service: storefront` and `status: ok`, plus security/request headers. Local linked Vercel metadata has now been corrected to `apps/web` and the `@universal-music-store/web` build, but the CLI cannot inspect the external project without relinking/authentication. External source mapping is therefore still unproven. This is a release/source-of-truth blocker, not a production outage. Route-level p95, cache-hit, cost, and EXPLAIN claims remain unmade until the external mapping is reconciled.
+The live deployment was checked directly: `https://universalmusic.vercel.app/` returned 200 and the live health contract passed against `/api/health/sop`, including Worker readiness. Local linked Vercel metadata targets `apps/web` and the `@universal-music-store/web` build, and the current checkout was deployed as `dpl_5LVno3rqv48wDBzDjegU2jWCgHZr`. This proves the current local deployment path and health contract; it does not prove production traffic p95, cache-hit, cost, or production traffic/cardinality SQL plans.
 
 ## Remaining blockers and risks
 
 1. Reconcile the dirty migration through normal version-control workflow and establish one tracked source of truth; no reset or destructive cleanup was performed.
-2. Confirm the deployed commit/root relationship before changing Vercel project settings or rerunning source-mapped optimization.
-3. Run safe-database EXPLAIN plans for top traffic SQL before adding indexes or replacing offset pagination.
-4. Run a controlled 15-minute dev probe and CMS repeated-edit reproduction; do not continue if host swap pressure or OOM indicators appear. The idle probe and one-pass CMS browser flow are complete; the repeated stateful soak remains open because its second pass hit a CMS drag/drop assertion after 4/10 tests while peaking at 5,485 MiB.
-5. Run provider-backed security/commerce E2E gates with real sandbox credentials where required.
-6. The matrix evidence verifier now recognizes explicit external blockers: across `.omx/context/full-task(4..8).md`, 403 rows are inventoried, 41 are verified with durable evidence, 355 are explicitly blocked with row-level recovery conditions and hashed blocker records, and 7 remain unresolved local findings. The release gate remains open until those unresolved rows are implemented and proven.
+2. Keep the deployed commit/root relationship recorded when the dirty checkout is eventually reconciled through normal version control; no project-setting change is currently required.
+3. Run safe-database `EXPLAIN ANALYZE` plans for top traffic SQL before adding indexes or replacing offset pagination; current non-analyze planner evidence is recorded above.
+4. Run a controlled 15-minute dev probe and CMS repeated-edit reproduction; do not continue if host swap pressure or OOM indicators appear. The idle probe is now complete with persisted telemetry: 900,008 ms, 180 samples, 1,600.1 MiB peak aggregate RSS, and zero refresh/reload/error counters. The focused stateful CMS editor flow passes 10/10 repetitions over 4.3 minutes, including drag/drop, inspector edits, undo/redo, save/reload, and cleanup; process-RSS telemetry for a full 15-minute interactive editor soak remains open.
+5. Repeat the full provider-backed security/commerce E2E matrix in a stable isolated harness. Current evidence: PayPal cancel/decline, deployed Xendit failure/expiry, performance, catalog, API-security, and public-route checks pass; Stripe, Xendit hosted-success, COD, authenticated account/wishlist, deployed About, webhook delivery, reconciliation, refund, and admin-visibility evidence remain open.
+6. The matrix evidence verifier now recognizes explicit external blockers: across `.omx/context/full-task(4..8).md`, 403 rows are inventoried, 59 are marked verified, and 344 are explicitly blocked with row-level recovery conditions and hashed blocker records. All rows have evidence records, zero unresolved rows, and zero verifier errors, but the release gate remains open because blocked rows still require their stated recovery runs.
 
-The fresh verifier run on 2026-09-23 reports 47 verified rows, 356 blocked
-rows, and zero unresolved rows, but exits non-zero because the stored evidence
-timestamps are stale, one artifact hash no longer matches the dirty checkout,
-and `C5-53` has `needs-verification` evidence for a row marked `blocked`.
-This supersedes the older matrix counts for diagnosis only; it is not a new
-verification claim.
+The 2026-09-23 verifier snapshot above is historical. It is superseded for
+diagnosis by the current 2026-10-02 run, which reports 59 verified rows, 344
+blocked rows, zero unresolved rows, 403 evidence records, and no validation
+errors. This is a structural evidence check, not proof that the blocked
+external scenarios have been executed.
 
 The static UI boundary inventory now covers all 92 App Router pages with loading and error boundaries (92/92 each). This closes the missing-boundary inventory finding but does not replace direct authenticated browser verification of each state.
 
-Development diagnostics now expose a bounded, explicitly flagged snapshot of Node RSS/heap/external memory, event-loop delay, and active SSE clients through `/api/internal/dev-diagnostics`; production and unflagged environments return 404. The 15-minute idle probe completed with 90 samples, 1,325.3 MiB peak aggregate RSS, stable Next RSS near 214 MiB, zero error/reload counters, and no kernel OOM record. The probe now fails closed at a configurable 6,000 MiB aggregate RSS threshold. The default Turbopack CMS flow passes 5/5; its repeated 10-test measurement peaked at 5,485 MiB and stopped after 4 passes plus 2 state assertions, before the guard fired. The earlier Webpack run reached 6,835.6 MiB during cold compilation before intentional interruption. This confirms cold development compilation pressure and does not prove a repeated editor-loop leak.
+Development diagnostics now expose a bounded, explicitly flagged snapshot of Node RSS/heap/external memory, event-loop delay, and active SSE clients through `/api/internal/dev-diagnostics`; production and unflagged environments return 404. The latest persisted direct-process idle probe completed for 900,008 ms with 180 samples, 1,600.1 MiB peak aggregate RSS, zero error/reload counters, and no probe failure. The probe now fails closed at a configurable 6,000 MiB aggregate RSS threshold. The default Turbopack CMS flow passes 5/5; the focused stateful editor flow passed 10/10 over 4.3 minutes. A 30-repeat/15.3-minute run reached 27/30 before three transport/reload failures; the Worker bridge now has a bounded mutation deadline and the fixture retries only transient transport errors, with a fresh 3/3 targeted rerun passing. The idle gate is closed; interactive editor-loop telemetry remains open.
 
 The account loyalty read was migrated off the web service-role Supabase client to the Worker-owned application database contract (`/store/customers/me/loyalty`). The Worker authenticates the bearer identity, scopes by normalized email, and limits transaction history to 50 rows; Worker regression coverage passes.
 
@@ -122,27 +179,27 @@ Campaign execution no longer materializes an entire segment, consent table, or s
 
 Critical provider/commerce failure paths were normalized so POS, PayPal confirmation, checkout provider failures, Stripe catalog synchronization, and admin catalog lookup/search return stable safe error codes rather than provider or database exception text. Worker tests, web typecheck, and web lint pass after the change.
 
-## Current authoritative snapshot (2026-09-21)
+## Current authoritative snapshot (2026-09-29)
 
-The latest route manifest has 205 API route files and zero direct `web-platform-database` storefront routes or direct admin database routes. OpenAPI is regenerated at 276 operations with 193 checked admin matches and 594 source hashes. Cart abandonment, review helpful/report mutations, receipt upload, payment mark-review, payment retry, workflow entity/transition operations, voids, reconciliation, PIN approval, and the CRM bridge are Worker-owned; retry finalization is tenant-scoped across APP/Medusa databases, durably idempotent, audited, and covered by focused tests. Workspace typecheck, lint, and contract gates pass. External deployment/provider/source-root gates remain open and are not claimed complete.
+Historical snapshot (2026-09-21; superseded by the current authoritative snapshot above): the route manifest reported 205 API route files and the generated OpenAPI reference reported 276 operations, 193 checked admin matches, and 594 source hashes. External deployment/provider/source-root gates remained open.
 
 The authenticated-free production API health suite was also run against `https://universalmusic.vercel.app` on 2026-09-21 with `PLAYWRIGHT_SKIP_WEBSERVER=1` (43 cases: 10 passed, 17 failed, 16 skipped because provider/admin credentials were not available). The 16 unauthenticated admin assertions expected 401/403 but received 404; a direct response confirms `x-matched-path: /404`, `x-next-error-status: 404`, and a cached global Next 404 for `/api/admin/inventory` rather than the current admin route boundary. The cron secret-negative assertion expected 401 but received 503 with `{"error":"Payment recovery is temporarily unavailable"}`. This is deployment/source/configuration drift evidence, not permission to weaken the local security contract: current local admin handlers still require 401/403 and the cron handler is tested locally. Production availability is proven only for the public storefront/health surface until the deployed commit, Vercel root, and Worker/API configuration are reconciled.
 
 Vercel evidence is now verified through the connected project: `universalmusic` is a Next.js project; the `dev` preview deployment is READY at `universalmusic-preview.vercel.app` from `JustineDevs/UMS` commit `c97937c`; and the `main` production deployment is READY at `universalmusic.vercel.app` from commit `81aada3`. This proves deployment availability and branch topology, not that the current dirty checkout matches either deployed commit.
 
-Current React Doctor evidence is 198 source warnings and 0 errors; the warning backlog remains explicitly non-blocking and tracked rather than represented as warning-free.
+Current React Doctor evidence is 102 source warnings and 0 errors; the warning backlog remains explicitly non-blocking and tracked rather than represented as warning-free.
 
-The current sequential Worker suite is 381/381 passing and the full web suite is 541/541 passing; older addenda retain their historical test counts for traceability.
+The current sequential Worker suite is 519/519 passing and the full web suite is 595/595 passing; older addenda retain their historical test counts for traceability.
 
-All shared web-to-Worker JSON response reads now use a streaming byte-bounded decoder with a 1 MiB default cap and safe fallback on invalid or oversized bodies. The helper has focused coverage for success, error, invalid JSON, and oversized upstream responses; the full web suite is 541/541 passing.
+All shared web-to-Worker JSON response reads now use a streaming byte-bounded decoder with a 1 MiB default cap and safe fallback on invalid or oversized bodies. The helper has focused coverage for success, error, invalid JSON, and oversized upstream responses; the full web suite is 595/595 passing.
 
 The admin Worker bridge was migrated to that decoder across all 11 response paths, the catalog Worker fetcher now uses it for both product-list and product-detail reads, and the public proxy, cart, checkout, channel-event, POS catalog, inventory guard, account-order, account, catalog, admin, integration, and compliance proxy paths were migrated as well. These Worker-facing payloads cannot bypass the upstream byte limit.
 
-The workflow listing route no longer exposes database exception text: the catch path logs server-side and returns a stable `SERVICE_UNAVAILABLE` problem response with the correlation ID. Cart reconciliation now validates the Worker response as JSON, normalizes non-success and invalid responses, attaches request IDs, and aborts the upstream request after 10 seconds. Web lint, typecheck, contract gates, and the 540-test web suite pass after these changes.
+The workflow listing route no longer exposes database exception text: the catch path logs server-side and returns a stable `SERVICE_UNAVAILABLE` problem response with the correlation ID. Cart reconciliation now validates the Worker response as JSON, normalizes non-success and invalid responses, attaches request IDs, and aborts the upstream request after 10 seconds. Web lint, typecheck, contract gates, and the 585-test web suite pass after these changes.
 
 The generated route ownership manifest recognizes API_URL-backed Worker proxies explicitly: zero `web-platform-database` routes remain; no admin route remains direct-database-owned. Cart abandonment, review helpful/report mutations, and receipt upload are now Worker-owned with signed forwarding, independent bearer/CSRF or session enforcement, bounded bodies, private-storage cleanup, duplicate-safe writes, and transactional moderation. The manifest no longer mislabels session-only Supabase clients as database ownership; the CMS page collection, detail, mutation-history, navigation, navigation publish, announcement, blog collection/detail, blog bulk/export, block-presets lifecycle, form-settings lifecycle, experiments lifecycle, components lifecycle, redirects lifecycle, CRM bridge/notes/operations lifecycles, delivery logistics operations, payment-health, payment-attempts export, checkout loyalty-balance, audit-log, commerce-recovery-metrics, inventory-ledger, cycle-count lifecycle, purchase-order lifecycle, transfer lifecycle, admin-review-list, admin-roles, admin-tasks-today, admin-integration-health, admin-loyalty lookup and account/points/rewards, admin-payments, admin-payment-capabilities, admin-profile, storefront metadata, runtime settings, offline queue, devices, review moderation, operator notes, customer segments, employees, and campaigns routes are now Worker-owned.
 
-Historical warning-detail paragraph below is retained for traceability; the current authoritative count is 209 warnings and 0 errors.
+Historical warning-detail paragraph below is retained for traceability; its old 132-warning count is superseded by the current authoritative count of 102 warnings and 0 errors.
 
 React Doctor previously reported 239 warnings and 0 errors. The public JSON-LD injection, CMS preview iframe, upstream response-read findings, URL validation, roles/reconciliation retry states, 108 admin/form accessibility findings, nineteen placeholder-only fields, abortable data-loading effects, stuck-loading error paths, synchronous mutation-ref re-entry guards, numeric-input validation, static avatar discovery caching, currency formatter caching, linear lookup optimization, property-specific POS/analytics transitions, stable domain keys for dynamic lists, dynamic moderation regex escaping, CRM opportunity/onboarding/blog-editor loading finalization, independent CMS bulk loops, parallel response decoding in search suggestions, route-param/session/cookie acquisitions, redundant map/filter pipelines, CMS editor promise-chain findings, locale/timezone determinism findings, explicit transition-property findings, single-pass flat-map transformations, additional unstable list keys, preview-message state derivation outside state updaters, non-visual mutation guards, dependency identity stabilization, bounded parallel related-product lookups, analytics retention single-pass aggregation, independent instrumentation/cron/reconciliation awaits, internal navigation link hygiene, visual-builder selector/definition single-pass transforms, remaining index-key fallbacks with stable domain/content keys, CMS blog mutation re-entry guards, parallel shift-close reads, checkout loyalty error ownership, component-definition iframe isolation, the main editor postMessage sandbox bridge, repeated membership scans, unnecessary non-success response reads, repeated property/schema lookups, redundant map/filter passes, and search-param Suspense boundaries were fixed with shared serialization, sandbox boundaries, status-aware parsing, explicit control labels, cancellation, finally-based cleanup, bounded parallel work, deterministic formatting, and regression coverage; remaining warnings were tracked as non-blocking hygiene work and were not presented as zero-risk.
 
@@ -157,20 +214,20 @@ Admin middleware no longer clones and parses every JSON mutation body before the
 ## Verification evidence
 
 - Focused web tests: passed after final stream-module integration.
-- Current full web test suite: 541 passed, 0 failed.
-- Current Worker suite: 355 passed, 0 failed.
+- Current full web test suite: 585 passed, 0 failed.
+- Current Worker suite: 519 passed, 0 failed.
 - Current generated ownership snapshot: zero `web-platform-database` storefront routes remain and no admin route is direct-database-owned; `check:route-ownership` passes.
-- Current web suite after response-contract, lifecycle, and safe-provider hardening: 540 passed, 0 failed.
+- Current web suite after response-contract, lifecycle, and safe-provider hardening: 585 passed, 0 failed.
 - Current web ESLint: passed.
 - Current workspace TypeScript no-emit: passed for web, Worker, SDK, and mail packages.
 - Diagnostic script syntax and package-script registration: passed.
 - Live production checks: root 200; health 200.
 - Live production API health suite: 10/43 passed, 17 failed, 16 skipped; admin paths resolve to the global 404 and the cron secret-negative path returns 503. This is a release blocker for deployment/source-root/configuration reconciliation, not a local route-contract waiver.
-- Static security/release checks: admin guard, 193-operation local admin OpenAPI contract, client boundary, migration boundary, route-state, source-drift (594 hashes), and audit triage all passed.
+- Historical static security/release checks (2026-09-21): admin guard, 193-operation local admin OpenAPI contract, client boundary, migration boundary, route-state, source-drift (594 hashes), and audit triage passed. Current counts are in the authoritative snapshot above.
 - Web production build: passed (Next 15.5.24; 170 static pages generated) with the bounded 1,536 MiB Node old-space cap and one Turbo worker. Webpack still reports 113 KiB and 267 KiB CMS strings in its persistent cache; this remains an optimization target.
-- Bounded dev memory probes: the prior 900,012 ms idle run peaked at 1325.3 MiB; the fresh 60,009 ms Next-launcher run peaked at 564.8 MiB. Both recorded zero Fast Refresh/full-reload/error counters and clean duration shutdown. Interactive CMS memory reproduction remains unverified.
-- CMS browser verification: Chromium is installed and the builder/embedded preview reach the real application. The complete canonical CMS file passes 5/5 under the default Turbopack launcher, covering preview selection, inspector geometry, slot mutation/drag-drop, undo/redo, persisted save/reload, page publish/mutation preservation, global header editing, and live builder tabs. No successful repeated-state memory claim is made.
-- Full workspace build, provider E2E, production SQL EXPLAIN, and interactive 15-minute CMS memory reproduction remain unverified in this checkout; see blockers above.
+- Bounded dev memory probes: the latest persisted direct-process run completed for 900,008 ms with 180 samples, 1,600.1 MiB peak aggregate RSS, the full Next/Worker/esbuild/workerd stack, zero Fast Refresh/full-reload/error counters, and clean supervised shutdown. The earlier scope-aware 60,009 ms run peaked at 1,526.8 MiB. This closes the 15-minute idle-process evidence gap; it does not certify an interactive CMS-edit memory soak.
+- CMS browser verification: Chromium is installed and the builder/embedded preview reach the real application. The complete canonical CMS file passes 5/5 under the default Turbopack launcher, and the focused stateful editor flow passes 10/10 repetitions over 4.3 minutes. The earlier 30-repeat/15.3-minute dev-mode run completed 27/30 and exposed Fast Refresh transport/reload failures plus fixture cleanup drift. After adding bounded Worker mutation timeouts, transient-request retries, exact CMS-page snapshot/restore, and a 200-node-cap fixture guard, the production-mode Worker-backed flow passes 15/15 repetitions in 5.0 minutes. This proves repeated authenticated editor mutation/restore for this flow; it is not a blanket all-admin-flow or leak-free memory claim.
+- Full workspace build and provider E2E remain environment-dependent release checks; safe production SQL traffic/cardinality mapping and a telemetry-backed interactive 15-minute CMS memory reproduction remain unverified in this checkout. The read-only SQL EXPLAIN evidence, clean production-mode CMS mutation soak, and completed 15-minute idle-process probe are recorded separately above.
 
 ## Addendum: API contract and route-boundary hardening (2026-09-20)
 
@@ -188,17 +245,17 @@ The API audit identified and repaired additional shared-boundary defects:
 
 | Finding | Repair | Evidence |
 |---|---|---|
-| OpenAPI source drift could be presented as current | Generator emits SHA-256 source fingerprints; a repository check fails on stale hashes | `check:admin-openapi-source`, 594 hashes match |
+| OpenAPI source drift could be presented as current | Generator emits SHA-256 source fingerprints; a repository check fails on stale hashes | `check:admin-openapi-source`, 603 hashes match |
 | OpenAPI duplicated full handler snapshots and allowed stale embedded source | Generator now emits only source paths plus SHA-256 fingerprints; full `x-source` snapshots were removed | Regenerated 275-operation YAML; no exact `x-source` fields; contract gate passes |
-| Empty inferred OpenAPI schemas could falsely imply strict validation | Schema authority is now explicit; all generated operations now use bounded executable request/response schemas | Current reference: 318 executable, 0 heuristic, 0 unresolved; raw CSV responses are explicitly documented as binary |
+| Empty inferred OpenAPI schemas could falsely imply strict validation | Schema authority is now explicit; generated operations use bounded executable request/response schemas | Current reference: 323 executable, 0 heuristic, 0 unresolved; raw CSV responses are explicitly documented as binary |
 | Request schemas omitted required fields | Generator now derives required fields from non-optional Zod properties | Regenerated 275-operation reference |
-| Empty/inferred schemas were indistinguishable from proven schemas | Every schema now carries executable/heuristic/non-authoritative status and source drift is checked | Current reference reports 318 executable, 0 heuristic, 0 unresolved entries |
+| Empty/inferred schemas were indistinguishable from proven schemas | Every schema now carries executable/heuristic/non-authoritative status and source drift is checked | Current reference reports 323 executable, 0 heuristic, 0 unresolved entries |
 | High-impact mutation/request schemas duplicated runtime rules | All 72 body-reading request operations now import shared Zod schemas or shared validation objects; generator emits `runtime-zod` / `executable` metadata | Web tests 539/539; OpenAPI gate passes |
 | Platform list reads could materialize unbounded tenant data | Added database-side caps to CMS redirects, pages, blogs, categories, experiments, components, announcements, campaigns, segments, employees, devices, payment links, reasons, and rewards; redirect reads also use a narrow projection | Platform-data build/lint/tests pass; caps are enforced before row materialization |
 | CMS media mutations bypassed the durable shared idempotency boundary | Wrapped media POST/PATCH/DELETE with `withAdminMutationIdempotency` | CMS hardening test and full web suite |
 | Admin invoice lifecycle request was source-inferred in OpenAPI | Promoted the route-local action schema into the shared runtime contract registry and reused it in the handler | The executable-schema count increased; admin heuristic-schema gate passes; web typecheck/tests |
-| Public health/catalog/search responses were source-inferred in OpenAPI | Added bounded shared response schemas and validated successful route responses at the Next boundary | OpenAPI executable-schema count increased; web typecheck and 540/540 tests |
-| Customer loyalty, marketing-preferences, and order-preferences responses were source-inferred in OpenAPI | Added bounded shared response schemas and validated successful Worker hydration responses | OpenAPI executable schemas now 287 after cron, checkout-intent, profile, back-in-stock, COD, newsletter, and checkout mutation response promotions; web typecheck and 540/540 tests |
+| Public health/catalog/search responses were source-inferred in OpenAPI | Added bounded shared response schemas and validated successful route responses at the Next boundary | OpenAPI executable-schema count increased; web typecheck and 585/585 tests |
+| Customer loyalty, marketing-preferences, and order-preferences responses were source-inferred in OpenAPI | Added bounded shared response schemas and validated successful Worker hydration responses | OpenAPI executable schemas now 287 after cron, checkout-intent, profile, back-in-stock, COD, newsletter, and checkout mutation response promotions; web typecheck and 585/585 tests |
 | Production Upstash failure fell back to per-isolate memory | Production limiter now fails closed; local bounded map remains development-only | Rate-limit tests; full web suite |
 | Broken SSE controllers could remain in the process registry | Added safe event publication with failed-controller eviction | SSE hub tests; full web suite |
 | Inventory stream exposed raw upstream exception text | Stream errors now return stable safe error codes | Inventory stream tests; full web suite |
@@ -234,9 +291,9 @@ The API audit identified and repaired additional shared-boundary defects:
 | Inventory transfer lifecycle used direct APP writes and commerce helpers in Next | Moved collection/detail/approve/ship/complete/cancel to the Worker; app DB owns lifecycle/audit state, commerce DB locks and validates both tenant-owned locations before moving stock, with revision checks and durable replay | `inventory-transfers-admin.ts`, `inventory-transfers-admin.test.ts`; Worker suite 300/300; route ownership/OpenAPI/source-drift gates pass |
 | Commerce recovery metrics authenticated staff but aggregated invalidations across organizations | Resolve the staff organization before querying and apply `organization_id`; reject malformed day windows | `payment-ledger-invalidation.test.ts`; platform-data build and web typecheck pass |
 
-This addendum does not claim production readiness. The dirty migration/source-root mismatch, safe SQL evidence, interactive CMS repeated-edit memory proof, and provider-backed deployment proof remain explicit gates; OpenAPI response markers are fully resolved in the checked-in reference.
+This historical addendum does not claim production readiness. The current evidence above supersedes its intermediate route, migration, SQL, memory, and deployment conclusions; source-to-deployment reconciliation, provider-backed hosted success, production traffic/cardinality mapping, and telemetry-backed memory proof remain explicit gates.
 
-Current authoritative evidence after the cart abandonment, review mutation, receipt upload, CRM bridge, tracking-capability revocation, courier telemetry, terminal drawer, customer-account response, rate-limit, and error-redaction hardening migrations: 205 route files, zero direct `web-platform-database` storefront routes, no direct admin database route, 276 OpenAPI operations, 193 checked admin matches, 594 source hashes, 381/381 Worker tests, full web 541/541, workspace typecheck/lint, and all contract gates passing. Cart/review/receipt mutations, CRM bridge, tracking revocation, signed courier telemetry, terminal drawer execution, customer-account response validation, production limiter fail-closed behavior, and cart/chat/payment-retry/catalog/finalization provider error redaction are Worker-owned or bounded at the Next proxy boundary with security and idempotency controls. Deployed/provider/source-root evidence and long-duration memory soak remain outstanding.
+Historical snapshot (2026-09-21; superseded): the earlier migration evidence reported 276 OpenAPI operations, 193 checked admin matches, and 594 source hashes. It is retained for traceability only; the current authoritative evidence is at the top of this report.
 
 The payment-recovery cron boundary now performs secret validation before constructing the Supabase client or reading either database, so an unauthenticated request cannot be converted into a dependency/configuration 503. The route-logic suite and full web suite remain green after this change. The live 503 observed above is therefore retained as evidence that the deployed function is stale or misconfigured until the correct source/configuration is promoted through the release workflow.
 
@@ -327,3 +384,22 @@ is advertised to customers.
 - Evidence: the configured Xendit sandbox key returned HTTP 200 from the
   read-only `/balance` probe; the previous Xendit browser failure therefore was
   not a provider-credential failure.
+- Final local rerun also passed the production build, `pnpm audit --audit-level
+  low`, Worker migration-status check, source-scoped Gitleaks scan, and
+  `git diff --check`. Trivy is not installed in this environment, so the
+  previously recorded lockfile Trivy result is retained as historical evidence
+  rather than claimed as a fresh rerun.
+
+## Addendum: local security verification — 2026-09-29
+
+The final repository-local security pass produced the following evidence:
+
+- `pnpm audit --audit-level low` passed with no known vulnerabilities. The transitive `undici` advisory was resolved with a `miniflare` override, and Storybook was moved off the vulnerable Webpack adapter onto `@storybook/nextjs-vite`.
+- Semgrep ran the TypeScript, Node.js, OWASP Top 10, and React rulesets over the tracked application/packages surface and finished with **0 blocking findings**. The GCM tracking-token decoder now requires a 16-byte authentication tag, and the preview bridge uses a derived origin instead of `*`.
+- Gitleaks scans of current source directories (`apps/web/src`, `workers/backend/src`, `packages`, and `scripts`) are clean. `gitleaks git` still reports 24 immutable historical fixture/document/example fingerprints; history was not rewritten, so this is an explicit provenance/rotation follow-up rather than a claim of a clean historical scan.
+- Trivy found no vulnerabilities in `pnpm-lock.yaml`. Its broader local filesystem scan identified six medium JWT-shaped values in ignored local environment files; those files are not tracked and are absent from a clean CI checkout. They must not be copied into artifacts or logs, and any credential that may have escaped the host boundary should be rotated.
+- Scorecard on the tracked snapshot scored 8.2/10. The deductions are maturity heuristics around fuzzing, packaging, license metadata, and local-history SAST detection; they are not a substitute for a remote CI run. The current low-severity dependency audit is clean.
+- Current checkout recheck (2026-10-02) scored 7.0/10 locally, with zero dependency vulnerabilities and no dangerous workflow patterns. The local score includes ignored `node_modules` binary warnings and cannot replace the token-authenticated remote scan; the older 8.2/10 result remains historical.
+- `pnpm quality:knip`, frozen-lockfile install, typecheck, lint, full tests (585/585), and the Storybook build all passed after these changes.
+
+GitHub Actions history confirms the `security-audit` workflow passed on the checked-in baseline `c71c99b6` in run `36276386392` on 2026-09-26. The current hardening edits remain uncommitted in this worktree, so a fresh hosted run for this exact diff is still required; this report does not treat the older successful run as proof for uncommitted changes.

@@ -307,6 +307,13 @@ export async function handleCheckoutSessionRequest(
           },
         );
       const correlationId = crypto.randomUUID();
+      const callbackUrlWithCapability = (value: string): string => {
+        const url = new URL(value);
+        url.searchParams.set("checkout_correlation_id", correlationId);
+        return url.toString();
+      };
+      const successCallbackUrl = callbackUrlWithCapability(successUrl);
+      const cancelCallbackUrl = callbackUrlWithCapability(cancelUrl);
       let attemptCreated = false;
       try {
         await appDatabase.query(
@@ -327,7 +334,12 @@ export async function handleCheckoutSessionRequest(
         const checkout = await createHostedCheckout(
           provider,
           totals,
-          { successUrl, cancelUrl, idempotencyKey: key, correlationId },
+          {
+            successUrl: successCallbackUrl,
+            cancelUrl: cancelCallbackUrl,
+            idempotencyKey: key,
+            correlationId,
+          },
           env,
         );
         await appDatabase.query(

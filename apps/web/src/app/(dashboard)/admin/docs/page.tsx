@@ -1,689 +1,223 @@
-import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AdminBreadcrumbs, AdminPageShell } from "@/components/admin-console";
 import {
-  ADMIN_COMMAND_CMS_GROUPS,
-  ADMIN_NAV_GROUPS,
-  type AdminNavItem,
-} from "@/config/admin-nav";
+  PageArticle,
+  PageRoot,
+  PageTOCItems,
+  PageTOCTitle,
+} from "fumadocs-ui/layouts/docs/page";
+import { DocsLayout } from "fumadocs-ui/layouts/docs";
+import { RootProvider } from "fumadocs-ui/provider";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AdminBreadcrumbs } from "@/components/admin-console";
+import { adminDocsInventory } from "@/config/admin-docs-inventory";
+import { ADMIN_NAV_GROUPS, flattenAdminNavItems } from "@/config/admin-nav";
 import { isEmailAllowedForGuideDemos } from "@/lib/admin-allowed-emails";
 import { getAdminSession } from "@/lib/auth";
-import { GUIDE_DEMO_CATALOG } from "@/lib/guide-demos-catalog";
 import { requirePagePermission } from "@/lib/require-page-permission";
 
 export const metadata: Metadata = {
   title: "Admin guide",
-  description:
-    "Staff admin guide: sidebar navigation, daily tasks, commerce versus website content, and permissions.",
+  description: "Fumadocs operator guide and route inventory for the store back office.",
 };
 
-const tocBase = [
-  { href: "#welcome", label: "Overview" },
-  { href: "#ownership", label: "Who owns what" },
-  { href: "#sidebar", label: "Sidebar and search" },
-  { href: "#navigation-map", label: "Navigation map" },
-  { href: "#daily-tasks", label: "Common tasks" },
-  { href: "#operations", label: "Operations" },
-  { href: "#interactive-demos", label: "Interactive demos" },
-  { href: "#important-notes", label: "Important notes" },
-] as const;
+const ROUTE_GROUP_PURPOSES: Record<string, string> = {
+  Commerce: "The selling system: catalog, prices, stock, orders, checkout, and performance.",
+  Customers: "Customer records, rewards, and customer-generated content.",
+  Content: "Storefront structure, editorial content, publishing, and developer reference.",
+  Operations: "People, connected hardware, channels, operator intake, and recovery work.",
+  More: "Configuration, approvals, traceability, and sensitive staff actions.",
+};
 
-function Section({
-  id,
-  title,
-  children,
-}: {
-  id: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className="scroll-mt-24 rounded-2xl border border-border/70 bg-card p-5 shadow-sm sm:p-6"
-    >
-      <h2 className="font-headline text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-        {title}
-      </h2>
-      <div className="mt-4 space-y-4 font-body text-sm leading-relaxed text-muted-foreground">
-        {children}
-      </div>
-    </section>
-  );
-}
+const routeGroups = ADMIN_NAV_GROUPS.map((group) => ({
+  label: group.label,
+  routes: flattenAdminNavItems(group.items).map((item) => [item.label, item.href] as const),
+  purpose: ROUTE_GROUP_PURPOSES[group.label] ?? "Admin tasks for this area.",
+}));
 
-function Subheading({ children }: { children: ReactNode }) {
+function RouteLinks({ routes }: { routes: readonly (readonly [string, string])[] }) {
   return (
-    <h3 className="mt-6 text-base font-semibold text-foreground first:mt-0">
-      {children}
-    </h3>
-  );
-}
-
-function GuideLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="font-medium text-primary underline decoration-primary/30 underline-offset-2 transition-colors hover:decoration-primary"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function GuideCard({
-  href,
-  eyebrow,
-  title,
-  children,
-}: {
-  href: string;
-  eyebrow: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group rounded-xl border border-border/70 bg-background p-4 transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary/75">
-        {eyebrow}
-      </p>
-      <h3 className="mt-2 font-semibold text-foreground group-hover:text-primary">
-        {title}
-      </h3>
-      <p className="mt-1 text-sm leading-5 text-muted-foreground">{children}</p>
-    </Link>
-  );
-}
-
-function NavTree({ items }: { items: readonly AdminNavItem[] }) {
-  return (
-    <ul className="mt-2 space-y-1.5">
-      {items.map((item) => (
-        <li key={item.href}>
-          <GuideLink href={item.href}>{item.label}</GuideLink>
-          {item.children?.length ? (
-            <ul className="ml-4 mt-1 space-y-1 border-l border-border/70 pl-3 text-sm">
-              <NavTree items={item.children} />
-            </ul>
-          ) : null}
-        </li>
+    <div className="flex flex-wrap gap-x-2 gap-y-1">
+      {routes.map(([label, href], index) => (
+        <span key={`${label}:${href}`} className="inline-flex items-center gap-2">
+          <Link className="text-primary underline-offset-4 hover:underline" href={href}>
+            {label}
+          </Link>
+          {index < routes.length - 1 ? <span aria-hidden="true" className="text-muted-foreground">·</span> : null}
+        </span>
       ))}
-    </ul>
+    </div>
   );
 }
 
 export default async function AdminDocsPage() {
   await requirePagePermission("dashboard:read");
   const session = await getAdminSession();
-  const canAccessGuideDemos = isEmailAllowedForGuideDemos(
-    session?.user?.email ?? null,
-  );
-  const toc = canAccessGuideDemos
-    ? tocBase
-    : tocBase.filter((item) => item.href !== "#interactive-demos");
-
-  const tocNav = (
-    <nav
-      aria-label="On this page"
-      className="xl:sticky xl:top-6 rounded-xl border border-border/70 bg-card p-4 shadow-sm"
-    >
-      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-        On this page
-      </p>
-      <ul className="mt-3 space-y-2 text-sm">
-        {toc.map((item) => (
-          <li key={item.href}>
-            <a
-              href={item.href}
-              className="text-muted-foreground transition-colors hover:text-primary"
-            >
-              {item.label}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
+  const canAccessGuideDemos = isEmailAllowedForGuideDemos(session?.user?.email ?? null);
 
   return (
-    <AdminPageShell
-      title="Admin guide"
-      subtitle="Operator guide for owners and managers: where to go for each task, what the commerce system owns versus website content, and how permissions shape the menu."
-      breadcrumbs={
-        <AdminBreadcrumbs
-          items={[
-            { label: "Dashboard", href: "/admin" },
-            { label: "Admin guide" },
-          ]}
-        />
-      }
-      inspector={tocNav}
-    >
-      <div className="mx-auto max-w-4xl space-y-6 pb-16">
-        <Section id="welcome" title="Overview">
-          <p className="max-w-3xl text-base leading-7 text-foreground/80">
-            <strong className="text-foreground">Staff admin console.</strong>{" "}
-            Use this guide to move from onboarding to daily operations without
-            guessing which system owns a change.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <GuideCard
-              href="/admin"
-              eyebrow="Start here"
-              title="Store overview"
-            >
-              Check sales, orders, inventory, traffic, and connected channels.
-            </GuideCard>
-            <GuideCard
-              href="/admin/cms/builder"
-              eyebrow="Content"
-              title="Storefront Builder"
-            >
-              Edit homepage sections, global navigation, footer, and modular
-              content in one workspace.
-            </GuideCard>
-            <GuideCard
-              href="/admin/settings/payments"
-              eyebrow="Settings"
-              title="Payments"
-            >
-              Connect merchant accounts and review provider capability status
-              before enabling checkout.
-            </GuideCard>
-          </div>
-          <div
-            className="mt-2 rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 text-foreground"
-            role="note"
-          >
-            <p className="font-semibold">Source-of-truth rule</p>
-            <p className="mt-1 text-muted-foreground">
-              Products, prices, stock, orders, and checkout are commerce data.
-              The CMS owns page structure, editorial content, media, navigation,
-              and publishing controls.
-            </p>
-          </div>
-        </Section>
-
-        <Section id="ownership" title="Who owns what">
-          <p>
-            Some data lives in the{" "}
-            <strong className="text-foreground">commerce engine</strong> (your
-            store&apos;s product catalog, prices, orders, inventory positions,
-            regions, and checkout configuration). That is the system of record
-            for selling.
-          </p>
-          <p className="mt-4">
-            Other data lives in{" "}
-            <strong className="text-foreground">platform tools</strong>{" "}
-            connected to this admin: staff access, CMS content and media,
-            loyalty, campaigns, devices, channels, chat orders, workflows, and
-            audit history. These tools coordinate work around commerce records;
-            they do not create a second product or order ledger.
-          </p>
-        </Section>
-
-        <Section id="sidebar" title="How to use the sidebar">
-          <p>
-            <strong className="text-primary">
-              Use the left sidebar to move by task.
-            </strong>{" "}
-            The sidebar is the main navigation of the admin, and it only shows
-            areas your role is allowed to access.
-          </p>
-          <p className="mt-4">
-            Press <strong className="text-primary">Ctrl+K</strong> (Windows) or{" "}
-            <strong className="text-primary">Cmd+K</strong> (Mac), or use{" "}
-            <strong className="text-primary">Search pages</strong> in the
-            sidebar, to jump to any screen by name.
-          </p>
-          <Subheading>Sidebar reference (matches the live menu)</Subheading>
-          <div className="grid gap-5 rounded-xl border border-border/70 bg-background p-5 sm:grid-cols-2">
-            {ADMIN_NAV_GROUPS.map((group) => (
-              <div key={group.label}>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  {group.label}
-                </p>
-                <NavTree items={group.items} />
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section id="navigation-map" title="Where do I go?">
-          <p>
-            Use the table below by{" "}
-            <strong className="text-primary">business intent</strong>. Links
-            match the real sidebar; group names below are for learning, not
-            separate menus.
-          </p>
-          <div className="mt-6 overflow-x-auto rounded-xl border border-outline-variant/20">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-outline-variant/20 bg-surface-container-lowest">
-                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
-                    Group
-                  </th>
-                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
-                    What belongs here
-                  </th>
-                  <th className="px-4 py-3 font-headline text-xs font-bold uppercase tracking-wider text-primary">
-                    Business explanation
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/15">
-                <tr>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
-                    Commerce
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    <Link href="/admin" className="text-primary underline">
-                      Dashboard
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/catalog"
-                      className="text-primary underline"
-                    >
-                      Products
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/inventory"
-                      className="text-primary underline"
-                    >
-                      Inventory
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/orders"
-                      className="text-primary underline"
-                    >
-                      Orders
-                    </Link>
-                    ,{" "}
-                    <Link href="/admin/pos" className="text-primary underline">
-                      POS
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/analytics"
-                      className="text-primary underline"
-                    >
-                      Analytics
-                    </Link>
-                    ,{" "}
-                    <Link href="/admin/crm" className="text-primary underline">
-                      CRM
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/settings/payments"
-                      className="text-primary underline"
-                    >
-                      Payments
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    Monitor sales, manage the catalog, check stock, review
-                    orders, run in-store sales, read business metrics, view
-                    customers, and inspect payment and region setup.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
-                    Team and growth
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    <Link
-                      href="/admin/users"
-                      className="text-primary underline"
-                    >
-                      Users
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/loyalty"
-                      className="text-primary underline"
-                    >
-                      Loyalty
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/campaigns"
-                      className="text-primary underline"
-                    >
-                      Campaigns
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    Staff records and access, customer rewards, and marketing
-                    execution.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
-                    Operations
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    <Link
-                      href="/admin/devices"
-                      className="text-primary underline"
-                    >
-                      Devices
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/channels"
-                      className="text-primary underline"
-                    >
-                      Channels
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/chat-orders"
-                      className="text-primary underline"
-                    >
-                      Chat orders
-                    </Link>
-                    ,{" "}
-                    <Link
-                      href="/admin/offline-queue"
-                      className="text-primary underline"
-                    >
-                      Offline queue
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    Register hardware, review channel events, process chat or
-                    manual intake, and clear POS sync when the network was down.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
-                    Website
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    <GuideLink href="/admin/cms/builder">Builder</GuideLink>,{" "}
-                    <GuideLink href="/admin/cms/builder">Builder</GuideLink>,{" "}
-                    <GuideLink href="/admin/cms/pages">Pages</GuideLink>,{" "}
-                    <GuideLink href="/admin/cms/navigation">
-                      Navigation
-                    </GuideLink>
-                    , <GuideLink href="/admin/cms/media">Media</GuideLink>,{" "}
-                    <GuideLink href="/admin/cms/blog">Blog</GuideLink>,{" "}
-                    <GuideLink href="/admin/reviews">Reviews</GuideLink>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    Build the storefront, manage page structure and publishing,
-                    connect media and commerce lookup, then moderate customer
-                    reviews.
-                  </td>
-                </tr>
-                <tr>
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-primary">
-                    Administration
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    <GuideLink href="/admin/users">Users</GuideLink>,{" "}
-                    <GuideLink href="/admin/roles">
-                      Roles &amp; permissions
-                    </GuideLink>
-                    ,{" "}
-                    <GuideLink href="/admin/settings/payments">
-                      Payments
-                    </GuideLink>
-                    , <GuideLink href="/admin/workflow">Workflow</GuideLink>,{" "}
-                    <GuideLink href="/admin/audit">Audit log</GuideLink>,{" "}
-                    <GuideLink href="/admin/docs">Admin guide</GuideLink>
-                  </td>
-                  <td className="px-4 py-3 text-on-surface-variant">
-                    Control access, configure connected operations, review
-                    workflow state, and trace sensitive staff actions.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <Subheading>
-            For catalog and order operations, think commerce first
-          </Subheading>
-          <p>
-            Products, prices, orders, inventory, and payment-region setup are
-            tied to the commerce system rather than the CMS layer.
-          </p>
-          <Subheading>For website updates, think content first</Subheading>
-          <p>
-            Homepage payload and CMS sections such as pages, navigation,
-            announcements, blog, media, forms, redirects, and experiments are
-            managed in the content side of admin.
-          </p>
-        </Section>
-
-        <Section id="daily-tasks" title="Daily tasks">
-          <Subheading>Most common tasks</Subheading>
-          <ol className="list-decimal space-y-3 pl-5 text-on-surface-variant">
-            <li>
-              <strong className="text-on-surface">
-                Check today&apos;s performance:
-              </strong>{" "}
-              open{" "}
-              <Link href="/admin" className="text-primary underline">
-                Dashboard
-              </Link>{" "}
-              for overview metrics, recent orders, and stock alerts.
-            </li>
-            <li>
-              <strong className="text-on-surface">
-                Review or fulfill an order:
-              </strong>{" "}
-              open{" "}
-              <Link href="/admin/orders" className="text-primary underline">
-                Orders
-              </Link>
-              , then select an order to view details and fulfillment actions.
-            </li>
-            <li>
-              <strong className="text-on-surface">
-                Update stock visibility:
-              </strong>{" "}
-              open{" "}
-              <Link href="/admin/inventory" className="text-primary underline">
-                Inventory
-              </Link>{" "}
-              and refresh the latest variant stock data.
-            </li>
-            <li>
-              <strong className="text-on-surface">Sell in person:</strong> open{" "}
-              <Link href="/admin/pos" className="text-primary underline">
-                POS
-              </Link>{" "}
-              for lookup, cart, draft order, and sale completion flows.
-            </li>
-            <li>
-              <strong className="text-on-surface">
-                Update homepage content:
-              </strong>{" "}
-              open{" "}
-              <Link
-                href="/admin/cms/builder"
-                className="text-primary underline"
-              >
-                Homepage
-              </Link>{" "}
-              for the homepage payload editor.
-            </li>
-            <li>
-              <strong className="text-on-surface">Edit website content:</strong>{" "}
-              open{" "}
-              <Link href="/admin/cms" className="text-primary underline">
-                Content workspace
-              </Link>{" "}
-              for pages, menus, announcement bar, categories, media, blog,
-              forms, redirects, experiments, and commerce lookup for authors.
-            </li>
-          </ol>
-        </Section>
-
-        <Section id="operations" title="Operations at a glance">
-          <Subheading>POS</Subheading>
-          <p>
-            The POS area supports lookup, cart building, draft order flow, sale
-            commit, suggestions, offline queue behavior, and optional terminal
-            printing paths.
-          </p>
-          <Subheading>Orders</Subheading>
-          <p>
-            The orders area includes list and detail views; the detail page
-            includes fulfillment actions and shipment-related tools.
-          </p>
-          <Subheading>Inventory</Subheading>
-          <p>
-            Inventory is the operational view for stock levels, movement
-            history, adjustments, and availability checks. Confirm the location
-            and variant before making a stock mutation.
-          </p>
-          <Subheading>Products</Subheading>
-          <p>
-            Products and catalog media are commerce-backed. Use the catalog
-            editor for product identity, pricing, variants, inventory
-            references, and media; use the CMS for editorial placement and page
-            content.
-          </p>
-          <Subheading>Payments, invoices, and receipts</Subheading>
-          <p>
-            Payment settings controls merchant connections and provider
-            capabilities. Payment attempts, invoices, receipts, refunds, and
-            reconciliation remain operational records and require the
-            permissions shown by your role.
-          </p>
-          <Subheading>Users, roles, and audit</Subheading>
-          <p>
-            Users are the staff identity record. Roles define permissions; the
-            audit log records sensitive actions. Do not share accounts or use a
-            broader role to bypass a missing permission.
-          </p>
-          <Subheading>Content hub sections</Subheading>
-          <ul className="mt-2 space-y-2 text-on-surface-variant">
-            {ADMIN_COMMAND_CMS_GROUPS.flatMap((g) =>
-              g.items.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="font-medium text-primary underline decoration-primary/30 underline-offset-2"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              )),
-            )}
-          </ul>
-          {canAccessGuideDemos ? (
-            <>
-              <Subheading>Training demos</Subheading>
-              <p>
-                Open the{" "}
-                <Link
-                  href="/guide-demos/index.html"
-                  className="font-semibold text-primary underline decoration-primary/30 underline-offset-2 hover:decoration-primary"
-                >
-                  demo index
-                </Link>{" "}
-                for static HTML simulators: fake browser chrome, sidebar that
-                matches this admin, mock data only, requestAnimationFrame cursor
-                paths, captions, optional Web Speech, pause, skip, speed, and
-                presentation or manual stepping. Access requires your email in{" "}
-                <code className="rounded bg-surface-container px-1 py-0.5 text-xs">
-                  ADMIN_ALLOWED_EMAILS
-                </code>
-                .
-              </p>
-            </>
-          ) : (
-            <>
-              <Subheading>Training demos</Subheading>
-              <p className="text-on-surface-variant">
-                Interactive HTML demos are limited to addresses configured in{" "}
-                <code className="rounded bg-surface-container px-1 py-0.5 text-xs">
-                  ADMIN_ALLOWED_EMAILS
-                </code>
-                . Ask your administrator if you need access.
-              </p>
-            </>
-          )}
-        </Section>
-
-        {canAccessGuideDemos ? (
-          <Section
-            id="interactive-demos"
-            title="Interactive demos (safe simulator)"
-          >
-            <p>
-              Each link opens a new tab. Demos are deterministic and offline
-              friendly. They explain how staff work in admin while commerce
-              truth stays in your commerce engine and customer-facing pages
-              reflect content and storefront settings separately.
-            </p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {GUIDE_DEMO_CATALOG.map((d) => (
-                <a
-                  key={d.key}
-                  href={`/guide-demos/${d.file}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-xl border border-outline-variant/25 bg-surface-container-lowest/90 p-4 shadow-sm transition hover:border-primary/40"
-                >
-                  <p className="font-headline text-sm font-bold text-primary">
-                    {d.title}
-                  </p>
-                  <p className="mt-1 text-xs text-on-surface-variant">
-                    <span className="font-semibold text-on-surface">
-                      Audience:
-                    </span>{" "}
-                    {d.audience}
-                  </p>
-                  <p className="mt-2 text-xs text-on-surface-variant">
-                    <span className="font-semibold text-on-surface">
-                      Outcome:
-                    </span>{" "}
-                    {d.outcome}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-                    {d.summary}
-                  </p>
-                </a>
-              ))}
+    <RootProvider>
+      <DocsLayout
+        tree={adminDocsInventory}
+        nav={{ enabled: false }}
+        searchToggle={{ enabled: false }}
+        themeSwitch={{ enabled: false }}
+        sidebar={{
+          collapsible: true,
+          banner: (
+            <div className="px-2 pb-2 text-xs text-muted-foreground">
+              Browse the live admin route inventory.
             </div>
-          </Section>
-        ) : null}
-
-        <Section id="important-notes" title="Important notes">
-          <div
-            className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-on-surface"
-            role="alert"
-          >
-            <p className="font-semibold text-primary">
-              Permissions and protected actions
-            </p>
-            <p className="mt-2 text-on-surface-variant">
-              The sidebar is permission-filtered. Read, create, update, delete,
-              export, payment, workflow, and device actions can have separate
-              permissions. If a control is not visible, request the appropriate
-              role assignment rather than sharing credentials.
-            </p>
+          ),
+        }}
+        containerProps={{ className: "min-w-0 flex-1 bg-background" }}
+      >
+      <PageRoot
+        className="mx-auto grid w-full max-w-[1440px] min-w-0 grid-cols-1 gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:px-10 lg:py-10 2xl:grid-cols-[minmax(0,1fr)_260px]"
+        toc={{
+          toc: [
+            { url: "#overview", title: "Overview", depth: 2 },
+            { url: "#ownership", title: "System ownership", depth: 2 },
+            { url: "#route-inventory", title: "Route inventory", depth: 2 },
+            { url: "#daily-operations", title: "Daily operations", depth: 2 },
+            { url: "#governance", title: "Governance", depth: 2 },
+            { url: "#training", title: "Training", depth: 2 },
+          ],
+        }}
+      >
+        <PageArticle className="min-w-0 max-w-none">
+          <div className="mb-6 text-sm text-muted-foreground">
+            <AdminBreadcrumbs items={[{ label: "Dashboard", href: "/admin" }, { label: "Admin guide" }]} />
           </div>
-          <p className="mt-6 text-on-surface-variant">
-            For technical setup (servers, domains, integrations), rely on your
-            development or IT partner. This guide stays focused on day-to-day
-            use of the back office.
-          </p>
-        </Section>
-      </div>
-    </AdminPageShell>
+          <header className="mb-10 border-b pb-8">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline">Operator handbook</Badge>
+              <Badge variant="secondary">Live route inventory</Badge>
+            </div>
+            <h1 className="mt-4 scroll-mt-20 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl" id="guide-title">
+              Admin guide
+            </h1>
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
+              A task-first map of the store back office. Use the Fumadocs inventory on the left to jump directly to an operational screen.
+            </p>
+          </header>
+
+          <div className="space-y-10">
+            <section id="overview" className="scroll-mt-20 space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">Overview</h2>
+              <div className="border-b pb-10">
+                <h3 className="text-lg font-semibold">Start with the task, not the system</h3>
+                <p className="mt-1 text-sm text-muted-foreground">The sidebar inventory mirrors the canonical admin navigation and keeps related actions together.</p>
+                <div className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3 xl:divide-x">
+                  <Link href="/admin" className="group sm:pr-6">
+                    <p className="font-medium group-hover:text-primary">Store overview</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Sales, orders, stock, and operational health.</p>
+                  </Link>
+                  <Link href="/admin/build" className="group xl:px-6">
+                    <p className="font-medium group-hover:text-primary">Build storefront</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Content, navigation, media, and publishing.</p>
+                  </Link>
+                  <Link href="/admin/settings/payments" className="group xl:pl-6">
+                    <p className="font-medium group-hover:text-primary">Payments</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">Provider connections and checkout readiness.</p>
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <section id="ownership" className="scroll-mt-20 space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">System ownership</h2>
+              <div className="grid gap-6 border-b pb-10 md:grid-cols-2 md:divide-x">
+                <div className="md:pr-6">
+                  <Badge>Commerce engine</Badge>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">Products, variants, prices, inventory, orders, regions, and checkout are the selling system of record.</p>
+                </div>
+                <div className="md:pl-6">
+                  <Badge variant="secondary">Platform tools</Badge>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">Build content, media, staff access, loyalty, campaigns, devices, workflows, and audit history coordinate work around commerce records.</p>
+                </div>
+              </div>
+            </section>
+
+            <section id="route-inventory" className="scroll-mt-20 space-y-4">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight">Route inventory</h2>
+                <p className="mt-2 text-sm text-muted-foreground">This table is a readable summary; the Fumadocs sidebar is the complete navigable inventory.</p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-32">Area</TableHead>
+                      <TableHead className="min-w-64">Routes</TableHead>
+                      <TableHead className="min-w-64">Use it for</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {routeGroups.map((group) => (
+                      <TableRow key={group.label}>
+                        <TableCell className="align-top font-medium">{group.label}</TableCell>
+                        <TableCell className="align-top"><RouteLinks routes={group.routes} /></TableCell>
+                        <TableCell className="align-top text-muted-foreground">{group.purpose}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+
+            <section id="daily-operations" className="scroll-mt-20 space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">Daily operations</h2>
+              <ol className="list-decimal space-y-4 border-b pb-10 pl-5 text-sm leading-6 text-muted-foreground">
+                <li><strong className="text-foreground">Start of day:</strong> open <Link className="text-primary underline-offset-4 hover:underline" href="/admin">Dashboard</Link> and review orders, stock, and connected-channel health.</li>
+                <li><strong className="text-foreground">Order work:</strong> use <Link className="text-primary underline-offset-4 hover:underline" href="/admin/orders">Orders</Link> for detail, fulfillment, receipts, invoices, and payment recovery.</li>
+                <li><strong className="text-foreground">Stock work:</strong> use <Link className="text-primary underline-offset-4 hover:underline" href="/admin/inventory">Inventory</Link> for adjustments and availability checks; confirm the variant before mutating stock.</li>
+                <li><strong className="text-foreground">Storefront work:</strong> use <Link className="text-primary underline-offset-4 hover:underline" href="/admin/build">Build</Link> for page structure and editorial content, not commerce records.</li>
+              </ol>
+            </section>
+
+            <section id="governance" className="scroll-mt-20 space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">Governance</h2>
+              <div className="grid gap-6 border-b pb-10 sm:grid-cols-3 sm:divide-x">
+                <div className="sm:pr-6"><p className="font-medium">Permissions</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Roles determine which routes and mutations are available.</p></div>
+                <div className="sm:px-6"><p className="font-medium">Workflow</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Use approvals and queues for sensitive operational changes.</p></div>
+                <div className="sm:pl-6"><p className="font-medium">Audit log</p><p className="mt-1 text-sm leading-6 text-muted-foreground">Trace staff actions and investigate changes from one source.</p></div>
+              </div>
+            </section>
+
+            <section id="training" className="scroll-mt-20 space-y-4">
+              <h2 className="text-2xl font-semibold tracking-tight">Training</h2>
+              <div className="border-b pb-10 text-sm leading-6 text-muted-foreground">
+                {canAccessGuideDemos ? (
+                  <p>Use the <Link className="text-primary underline-offset-4 hover:underline" href="/guide-demos/index.html">training demo index</Link> for guided operator walkthroughs.</p>
+                ) : (
+                  <p>Interactive training demos are limited to addresses configured in <code className="rounded bg-muted px-1.5 py-0.5 text-xs">ADMIN_ALLOWED_EMAILS</code>. Ask an administrator if you need access.</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </PageArticle>
+
+        <aside className="hidden lg:block">
+          <div className="sticky top-6 space-y-4">
+            <div className="border-l pl-5">
+              <PageTOCTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">On this page</PageTOCTitle>
+              <div className="my-3 border-t" />
+              <PageTOCItems className="space-y-2 text-sm" />
+            </div>
+            <p className="px-1 text-xs leading-5 text-muted-foreground">The left inventory is generated from the same navigation data used by the admin sidebar.</p>
+          </div>
+        </aside>
+      </PageRoot>
+      </DocsLayout>
+    </RootProvider>
   );
 }

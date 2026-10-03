@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ReconciliationSummary } from "@/app/api/admin/reconciliation/route";
+import { AdminPageShell } from "@/components/admin-console";
+import { Button } from "@/components/ui/button";
 
 const STATUS_COLORS: Record<string, string> = {
   matched: "bg-green-100 text-green-800",
@@ -55,18 +57,18 @@ export default function ReconciliationPage() {
   }, [days]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Payment Reconciliation</h1>
-          <p className="text-sm text-gray-500 mt-1">Payment provider payouts compared with store orders</p>
-        </div>
+    <AdminPageShell
+      title="Payment reconciliation"
+      subtitle="Compare payment provider payouts with store orders."
+    >
+      <div>
+      <div className="mb-6 flex justify-end">
         <label htmlFor="reconciliation-days" className="sr-only">Reconciliation period</label>
         <select
           id="reconciliation-days"
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+          className="min-h-11 w-full rounded border border-gray-300 px-3 py-1.5 text-sm sm:w-auto"
         >
           <option value={7}>Last 7 days</option>
           <option value={14}>Last 14 days</option>
@@ -86,7 +88,7 @@ export default function ReconciliationPage() {
 
       {data && !loading && (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 uppercase tracking-wide">Store total</p>
               <p className="text-2xl font-semibold mt-1">
@@ -116,12 +118,11 @@ export default function ReconciliationPage() {
               <p className="mt-2 text-xs text-amber-900/80">
                 Provider-confirmed totals below come from the current payment ledger, not external settlement files.
               </p>
-              <Link
+              <Button asChild variant="outline" size="sm" className="mt-3 border-amber-500 text-amber-900 hover:bg-amber-100">
+                <Link
                 href="/admin/payments"
-                className="mt-3 inline-flex rounded border border-amber-500 px-3 py-2 text-xs font-bold uppercase tracking-widest text-amber-900 transition-colors hover:bg-amber-100"
-              >
-                Open payment attempts
-              </Link>
+                >Open payment attempts</Link>
+              </Button>
             </div>
           )}
 
@@ -197,6 +198,7 @@ export default function ReconciliationPage() {
           ) : null}
         </>
       )}
-    </div>
+      </div>
+    </AdminPageShell>
   );
 }

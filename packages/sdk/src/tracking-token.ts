@@ -154,8 +154,10 @@ export function resolveOpaqueTrackingCapabilityDetails(
   const key = opaqueKey(keyVersion);
   if (!key) return null;
   try {
-    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivRaw, "base64url"));
-    decipher.setAuthTag(Buffer.from(tagRaw, "base64url"));
+    const authTag = Buffer.from(tagRaw, "base64url");
+    if (authTag.length !== 16) return null;
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivRaw, "base64url"), { authTagLength: 16 });
+    decipher.setAuthTag(authTag);
     const plaintext = Buffer.concat([
       decipher.update(Buffer.from(ciphertextRaw, "base64url")),
       decipher.final(),
@@ -300,8 +302,18 @@ export function buildTrackingUrl(
 }
 
 /** Build a separate capability for private order-confirmation data. */
-export function buildOrderConfirmationUrl(baseUrl: string, id: string): string | null {
-  const token = generateOpaqueTrackingCapability(id, Date.now(), DEFAULT_TTL_MS, CONFIRMATION_PURPOSE);
+export function buildOrderConfirmationUrl(
+  baseUrl: string,
+  id: string,
+  scope?: TrackingCapabilityScope,
+): string | null {
+  const token = generateOpaqueTrackingCapability(
+    id,
+    Date.now(),
+    DEFAULT_TTL_MS,
+    CONFIRMATION_PURPOSE,
+    scope,
+  );
   if (!token) return null;
   const cleanBase = baseUrl.replace(/\/$/, "");
   return `${cleanBase}/order-confirmation/cap_${encodeURIComponent(token)}`;

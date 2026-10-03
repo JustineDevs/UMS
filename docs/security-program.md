@@ -6,24 +6,24 @@ This document is the **live** counterpart to archived notes under `output/full-a
 
 - **Cloudflare Worker** reads payment credentials from its secret store at request time. Set `STRIPE_API_KEY`, `PAYPAL_*`, `XENDIT_*`, and webhook secrets on the Worker; deploy after rotation.
 - **Observability:** `GET /api/admin/payment-health` on the Worker returns which providers have credentials present (no secret values).
-- **Storefront** must not bundle server-only PSP secrets (`stress-test/scripts/check-storefront-client-boundary.mjs`).
+- **Storefront** must not bundle server-only PSP secrets (`scripts/stress-test/tools/check-storefront-client-boundary.mjs`).
 - **Payment-state reconciliation** is part of production readiness, not only credential hygiene: Supabase `payment_attempts`, server finalize routes, optional `GET /api/cron/finalize-payment-attempts` on the storefront, and staff **Payment attempts** in admin together reduce stuck orders when webhooks or browser returns fail. Treat missing cron or misconfigured `STOREFRONT_*` recovery env vars as an operational gap, not only a security gap.
 
 ## 2. Automated gates (CI and release)
 
 | Check | Script / workflow |
 | --- | --- |
-| Dependency audit triage | `stress-test/scripts/check-audit-triage.js` (document highs in the active security runbook) |
-| Storefront client bundle (no server secrets) | `stress-test/scripts/check-storefront-client-boundary.mjs` |
-| Legacy DB migrations vs commerce tables | `stress-test/scripts/check-commerce-migration-boundary.mjs` |
-| Admin API routes must show staff or internal guard patterns | `stress-test/scripts/check-admin-api-staff-guard.mjs` |
+| Dependency audit triage | `scripts/stress-test/tools/check-audit-triage.js` (document highs in the active security runbook) |
+| Storefront client bundle (no server secrets) | `scripts/stress-test/tools/check-storefront-client-boundary.mjs` |
+| Legacy DB migrations vs commerce tables | `scripts/stress-test/tools/check-commerce-migration-boundary.mjs` |
+| Admin API routes must show staff or internal guard patterns | `scripts/stress-test/tools/check-admin-api-staff-guard.mjs` |
 | Unit tests (incl. Worker env validation, admin webhook policy) | `pnpm test`, `pnpm release-gate` |
 
 GitHub Actions workflow: `.github/workflows/security-audit.yml`.
 
 ## 3. Internal and staff surfaces
 
-- **Express** compliance and health: `INTERNAL_API_KEY` required in production (`apps/api`).
+- **Worker** internal routes: `INTERNAL_API_KEY` is required for protected service-to-service requests in production (`workers/backend`).
 - **Admin** App Router APIs: expected to call `requireStaffSession`, `getAdminSession` (Supabase Auth SSR plus platform RBAC), or an approved internal/HMAC pattern (enforced by `check-admin-api-staff-guard.mjs`).
 - **Channel webhook** (`/api/integrations/channels/webhook`): `CHANNEL_WEBHOOK_SECRET` is required on every deployment, including Vercel preview and the Cloudflare Worker backend; only local `NODE_ENV=development` without a Vercel environment is exempt. HMAC is verified with constant-time compare (`channel-webhook-signature.ts`).
 

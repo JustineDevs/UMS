@@ -49,6 +49,7 @@ type CollectionProductRow = CollectionRow & {
   product_thumbnail: string | null;
   product_status: string | null;
   collection_id: string | null;
+  product_metadata: Record<string, unknown> | null;
   variants: unknown;
   total_count: string | number;
 };
@@ -61,6 +62,13 @@ type CatalogCategoryRow = {
   product_count: string | number;
 };
 
+type CatalogFacetRow = {
+  facet: string;
+  value: string | null;
+  product_id: string | null;
+  raw_products: string | number;
+};
+
 function boundedInteger(
   value: string | null,
   fallback: number,
@@ -68,6 +76,51 @@ function boundedInteger(
 ): number {
   if (value === null || !/^\d+$/.test(value)) return fallback;
   return Math.min(maximum, Number(value));
+}
+
+function nonNegativeNumber(value: string | null): number | null {
+  if (value === null || value.trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+// A published product without approved media cannot be rendered as a usable
+// storefront item. Keep legacy rows out of public catalog reads until staff
+// attach a canonical product or variant image.
+function publishedMediaPredicate(alias: string): string {
+  return `AND ((${alias}.thumbnail IS NOT NULL AND ${alias}.thumbnail NOT ILIKE '%gvsyfyaqxfrunoghgqiq.supabase.co%') OR EXISTS (
+    SELECT 1
+    FROM public.product_variant published_media_variant
+    WHERE published_media_variant.product_id = ${alias}.id
+      AND published_media_variant.deleted_at IS NULL
+      AND published_media_variant.thumbnail IS NOT NULL
+      AND published_media_variant.thumbnail NOT ILIKE '%gvsyfyaqxfrunoghgqiq.supabase.co%'
+  ))`;
+}
+
+function sellableVariantPredicate(productAlias: string): string {
+  return `AND EXISTS (
+    SELECT 1
+    FROM public.product_variant sellable_variant
+    WHERE sellable_variant.product_id = ${productAlias}.id
+      AND sellable_variant.deleted_at IS NULL
+      AND (
+        sellable_variant.manage_inventory = FALSE
+        OR NOT EXISTS (
+          SELECT 1
+          FROM public.product_variant_inventory_item sellable_pvi
+          WHERE sellable_pvi.variant_id = sellable_variant.id
+            AND sellable_pvi.deleted_at IS NULL
+        )
+        OR COALESCE((SELECT SUM(sellable_il.stocked_quantity - sellable_il.reserved_quantity)
+          FROM public.product_variant_inventory_item sellable_pvi
+          JOIN public.inventory_level sellable_il
+            ON sellable_il.inventory_item_id = sellable_pvi.inventory_item_id
+           AND sellable_il.deleted_at IS NULL
+          WHERE sellable_pvi.variant_id = sellable_variant.id
+            AND sellable_pvi.deleted_at IS NULL), 0) > 0
+      )
+  )`;
 }
 
 function mapRow(row: CatalogRow): CatalogProduct {
@@ -107,6 +160,14 @@ export async function listPublishedProducts(
   const offset = boundedInteger(url.searchParams.get("offset"), 0, 100_000);
   const query = url.searchParams.get("q")?.trim() ?? "";
   const productId = url.searchParams.get("id")?.trim() ?? "";
+  const category = url.searchParams.get("category")?.trim() ?? "";
+  const brand = url.searchParams.get("brand")?.trim() ?? "";
+  const minPrice = nonNegativeNumber(url.searchParams.get("minPrice"));
+  const maxPrice = nonNegativeNumber(url.searchParams.get("maxPrice"));
+  const requestedSort = url.searchParams.get("sort")?.trim();
+  const sort = requestedSort === "name_asc" || requestedSort === "price_asc" || requestedSort === "price_desc"
+    ? requestedSort
+    : "newest";
   const values: unknown[] = [];
   const filters: string[] = [];
   if (query) {
@@ -127,6 +188,88 @@ export async function listPublishedProducts(
     values.push(productId);
     filters.push(`AND p.id = $${values.length}`);
   }
+  if (category) {
+    values.push(category);
+    filters.push(`AND EXISTS (
+      SELECT 1
+      FROM public.product_category_product category_link
+      JOIN public.product_category category_row
+        ON category_row.id = category_link.product_category_id
+       AND category_row.deleted_at IS NULL
+       AND category_row.is_active = true
+      WHERE category_link.product_id = p.id
+        AND (category_row.handle = $${values.length}
+          OR lower(category_row.name) = lower($${values.length}))
+    )`);
+  }
+  if (brand) {
+    values.push(brand);
+    filters.push(`AND lower(COALESCE(p.metadata ->> 'brand', p.metadata ->> 'brand_name', p.metadata ->> 'legacy_brand', '')) = lower($${values.length})`);
+  }
+  const phpMinimumPriceExpression = `(SELECT MIN(pr.amount)
+        FROM public.product_variant_price_set pvps
+        JOIN public.price pr ON pr.price_set_id = pvps.price_set_id
+        JOIN public.product_variant priced_variant ON priced_variant.id = pvps.variant_id
+        WHERE priced_variant.product_id = p.id
+          AND priced_variant.deleted_at IS NULL
+          AND pvps.deleted_at IS NULL
+          AND pr.deleted_at IS NULL
+          AND pr.currency_code = 'php'
+          AND (pr.min_quantity IS NULL OR pr.min_quantity <= 1)
+          AND (pr.max_quantity IS NULL OR pr.max_quantity >= 1))`;
+  if (minPrice !== null) {
+    values.push(Math.round(minPrice * 100));
+    filters.push(`AND ${phpMinimumPriceExpression} >= $${values.length}`);
+  }
+  if (maxPrice !== null) {
+    values.push(Math.round(maxPrice * 100));
+    filters.push(`AND ${phpMinimumPriceExpression} <= $${values.length}`);
+  }
+  const addVariantAttributeFilter = (
+    value: string,
+    optionPattern: string,
+    metadataKeys: string[],
+  ): void => {
+    values.push(value);
+    const parameter = `$${values.length}`;
+    const metadata = metadataKeys
+      .map((key) => `vf.metadata ->> '${key}'`)
+      .join(", ");
+    const productMetadata = metadataKeys
+      .map((key) => `p.metadata ->> '${key}'`)
+      .join(", ");
+    filters.push(`AND EXISTS (
+      SELECT 1
+      FROM public.product_variant vf
+      LEFT JOIN public.product_variant_option vf_pvo ON vf_pvo.variant_id = vf.id
+      LEFT JOIN public.product_option_value vf_pov
+        ON vf_pov.id = vf_pvo.option_value_id AND vf_pov.deleted_at IS NULL
+      LEFT JOIN public.product_option vf_po
+        ON vf_po.id = vf_pov.option_id AND vf_po.deleted_at IS NULL
+      WHERE vf.product_id = p.id
+        AND vf.deleted_at IS NULL
+        AND (
+          (lower(vf_po.title) LIKE '${optionPattern}' AND lower(vf_pov.value) = lower(${parameter}))
+          OR lower(COALESCE(${metadata}, ${productMetadata}, '')) = lower(${parameter})
+        )
+    )`);
+  };
+  const variantFilters: Array<{
+    value: string;
+    optionPattern: string;
+    metadataKeys: string[];
+  }> = [
+    { value: url.searchParams.get("type")?.trim() ?? "", optionPattern: "%type%", metadataKeys: ["type", "model"] },
+    { value: url.searchParams.get("finish")?.trim() ?? "", optionPattern: "%finish%", metadataKeys: ["finish", "color", "colour"] },
+    { value: url.searchParams.get("pickupConfig")?.trim() ?? "", optionPattern: "%pickup%", metadataKeys: ["pickup_config", "pickupConfig", "pickup"] },
+    { value: url.searchParams.get("bodyWood")?.trim() ?? "", optionPattern: "%body%wood%", metadataKeys: ["body_wood", "bodyWood", "wood"] },
+    { value: url.searchParams.get("condition")?.trim() ?? "", optionPattern: "%condition%", metadataKeys: ["condition"] },
+    { value: url.searchParams.get("skillLevel")?.trim() ?? "", optionPattern: "%skill%", metadataKeys: ["skill_level", "skillLevel", "playing_level"] },
+    { value: url.searchParams.get("shippingSpeed")?.trim() ?? "", optionPattern: "%shipping%", metadataKeys: ["shipping_speed", "shippingSpeed", "shipping"] },
+  ];
+  for (const filter of variantFilters) {
+    if (filter.value) addVariantAttributeFilter(filter.value, filter.optionPattern, filter.metadataKeys);
+  }
   values.push(limit, offset);
   const limitParameter = values.length - 1;
   const offsetParameter = values.length;
@@ -137,6 +280,17 @@ export async function listPublishedProducts(
               'id', v.id, 'title', v.title, 'sku', v.sku, 'barcode', v.barcode,
               'thumbnail', v.thumbnail, 'allow_backorder', v.allow_backorder,
               'manage_inventory', v.manage_inventory, 'variant_rank', v.variant_rank,
+              'metadata', COALESCE(v.metadata, '{}'::jsonb),
+              'options', COALESCE((SELECT json_agg(json_build_object(
+                'id', pov.id, 'value', pov.value,
+                'option', json_build_object('id', po.id, 'title', po.title)
+                ) ORDER BY po.id, pov.id)
+                FROM public.product_variant_option pvo
+                JOIN public.product_option_value pov
+                  ON pov.id = pvo.option_value_id AND pov.deleted_at IS NULL
+                JOIN public.product_option po
+                  ON po.id = pov.option_id AND po.deleted_at IS NULL
+                WHERE pvo.variant_id = v.id), '[]'::json),
               'calculated_price', (SELECT json_build_object(
                 'calculated_amount', pr.amount, 'currency_code', pr.currency_code
               ) FROM public.product_variant_price_set pvps
@@ -154,9 +308,15 @@ export async function listPublishedProducts(
             count(*) OVER() AS total_count
      FROM public.product p
      LEFT JOIN public.product_variant v ON v.product_id = p.id AND v.deleted_at IS NULL
-     WHERE p.deleted_at IS NULL AND p.status = 'published' ${filters.join(" ")}
+     WHERE p.deleted_at IS NULL AND p.status = 'published' ${publishedMediaPredicate("p")} ${sellableVariantPredicate("p")} ${filters.join(" ")}
      GROUP BY p.id
-     ORDER BY p.updated_at DESC, p.id
+     ORDER BY ${sort === "name_asc"
+       ? "p.title ASC, p.id"
+       : sort === "price_asc"
+         ? `${phpMinimumPriceExpression} ASC NULLS LAST, p.id`
+         : sort === "price_desc"
+           ? `${phpMinimumPriceExpression} DESC NULLS LAST, p.id`
+           : "p.updated_at DESC, p.id"}
      LIMIT $${limitParameter} OFFSET $${offsetParameter}`,
     values,
   );
@@ -248,6 +408,17 @@ export async function getPublishedProductByHandle(
               'id', v.id, 'title', v.title, 'sku', v.sku, 'barcode', v.barcode,
               'thumbnail', v.thumbnail, 'allow_backorder', v.allow_backorder,
               'manage_inventory', v.manage_inventory, 'variant_rank', v.variant_rank,
+              'metadata', COALESCE(v.metadata, '{}'::jsonb),
+              'options', COALESCE((SELECT json_agg(json_build_object(
+                'id', pov.id, 'value', pov.value,
+                'option', json_build_object('id', po.id, 'title', po.title)
+                ) ORDER BY po.id, pov.id)
+                FROM public.product_variant_option pvo
+                JOIN public.product_option_value pov
+                  ON pov.id = pvo.option_value_id AND pov.deleted_at IS NULL
+                JOIN public.product_option po
+                  ON po.id = pov.option_id AND po.deleted_at IS NULL
+                WHERE pvo.variant_id = v.id), '[]'::json),
               'calculated_price', (SELECT json_build_object(
                 'calculated_amount', pr.amount, 'currency_code', pr.currency_code
               ) FROM public.product_variant_price_set pvps
@@ -265,7 +436,7 @@ export async function getPublishedProductByHandle(
             1 AS total_count
      FROM public.product p
      LEFT JOIN public.product_variant v ON v.product_id = p.id AND v.deleted_at IS NULL
-     WHERE p.handle = $1 AND p.deleted_at IS NULL AND p.status = 'published'
+     WHERE p.handle = $1 AND p.deleted_at IS NULL AND p.status = 'published' ${publishedMediaPredicate("p")} ${sellableVariantPredicate("p")}
      GROUP BY p.id`,
     [normalized],
   );
@@ -379,6 +550,8 @@ export async function handleCatalogCategoriesRequest(
          ON p.id = pcp.product_id
         AND p.deleted_at IS NULL
         AND p.status = 'published'
+        ${publishedMediaPredicate("p")}
+        ${sellableVariantPredicate("p")}
       WHERE pc.deleted_at IS NULL
         AND pc.is_active = true
       GROUP BY pc.id, pc.handle, pc.name, pc.parent_category_id, pc.rank
@@ -393,6 +566,125 @@ export async function handleCatalogCategoriesRequest(
       count: Number(row.product_count ?? 0),
       parentId: row.parent_category_id,
     })),
+  });
+}
+
+export async function handleCatalogFacetsRequest(
+  request: Request,
+  database: WorkerDatabaseClient,
+): Promise<Response> {
+  if (request.method !== "GET")
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  const category = new URL(request.url).searchParams.get("category")?.trim() ?? "";
+  const values: unknown[] = category ? [category] : [];
+  const categoryFilter = category
+    ? `AND EXISTS (
+        SELECT 1
+        FROM public.product_category_product facet_category_link
+        JOIN public.product_category facet_category
+          ON facet_category.id = facet_category_link.product_category_id
+         AND facet_category.deleted_at IS NULL
+         AND facet_category.is_active = true
+        WHERE facet_category_link.product_id = p.id
+          AND (facet_category.handle = $1 OR lower(facet_category.name) = lower($1))
+      )`
+    : "";
+  const result = await database.query<CatalogFacetRow>(
+    `WITH visible_products AS (
+       SELECT p.id, p.metadata
+       FROM public.product p
+       WHERE p.deleted_at IS NULL
+         AND p.status = 'published'
+         ${publishedMediaPredicate("p")}
+         ${sellableVariantPredicate("p")}
+         ${categoryFilter}
+     ), visible_variants AS (
+       SELECT v.id, v.product_id, v.metadata, vp.metadata AS product_metadata
+       FROM public.product_variant v
+       JOIN visible_products vp ON vp.id = v.product_id
+       WHERE v.deleted_at IS NULL
+     )
+     SELECT facet, value, product_id, raw_products
+     FROM (
+       SELECT 'types' AS facet, pov.value, vv.product_id, (SELECT COUNT(*) FROM visible_products) AS raw_products
+       FROM public.product_variant_option pvo
+       JOIN visible_variants vv ON vv.id = pvo.variant_id
+       JOIN public.product_option_value pov ON pov.id = pvo.option_value_id AND pov.deleted_at IS NULL
+       JOIN public.product_option po ON po.id = pov.option_id AND po.deleted_at IS NULL
+       WHERE lower(po.title) LIKE '%type%' OR lower(po.title) LIKE '%model%'
+       UNION ALL
+       SELECT 'finishes', pov.value, vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM public.product_variant_option pvo
+       JOIN visible_variants vv ON vv.id = pvo.variant_id
+       JOIN public.product_option_value pov ON pov.id = pvo.option_value_id AND pov.deleted_at IS NULL
+       JOIN public.product_option po ON po.id = pov.option_id AND po.deleted_at IS NULL
+       WHERE lower(po.title) LIKE '%finish%' OR lower(po.title) LIKE '%color%' OR lower(po.title) LIKE '%colour%'
+       UNION ALL
+       SELECT 'pickupConfigs', COALESCE(vv.metadata ->> key, vv.product_metadata ->> key), vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_variants vv CROSS JOIN unnest(ARRAY['pickup_config', 'pickupConfig', 'pickup']) AS keys(key)
+       WHERE NULLIF(trim(COALESCE(vv.metadata ->> key, vv.product_metadata ->> key)), '') IS NOT NULL
+       UNION ALL
+       SELECT 'bodyWoods', COALESCE(vv.metadata ->> key, vv.product_metadata ->> key), vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_variants vv CROSS JOIN unnest(ARRAY['body_wood', 'bodyWood', 'wood']) AS keys(key)
+       WHERE NULLIF(trim(COALESCE(vv.metadata ->> key, vv.product_metadata ->> key)), '') IS NOT NULL
+       UNION ALL
+       SELECT 'conditions', COALESCE(vv.metadata ->> 'condition', vv.product_metadata ->> 'condition'), vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_variants vv
+       WHERE NULLIF(trim(COALESCE(vv.metadata ->> 'condition', vv.product_metadata ->> 'condition')), '') IS NOT NULL
+       UNION ALL
+       SELECT 'skillLevels', COALESCE(vv.metadata ->> key, vv.product_metadata ->> key), vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_variants vv CROSS JOIN unnest(ARRAY['skill_level', 'skillLevel', 'playing_level']) AS keys(key)
+       WHERE NULLIF(trim(COALESCE(vv.metadata ->> key, vv.product_metadata ->> key)), '') IS NOT NULL
+       UNION ALL
+       SELECT 'shippingSpeeds', COALESCE(vv.metadata ->> key, vv.product_metadata ->> key), vv.product_id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_variants vv CROSS JOIN unnest(ARRAY['shipping_speed', 'shippingSpeed', 'shipping']) AS keys(key)
+       WHERE NULLIF(trim(COALESCE(vv.metadata ->> key, vv.product_metadata ->> key)), '') IS NOT NULL
+       UNION ALL
+       SELECT 'brands', vp.metadata ->> key, vp.id, (SELECT COUNT(*) FROM visible_products)
+       FROM visible_products vp CROSS JOIN unnest(ARRAY['brand', 'brand_name', 'legacy_brand']) AS keys(key)
+       WHERE NULLIF(trim(vp.metadata ->> key), '') IS NOT NULL
+       UNION ALL
+       SELECT '__quality__', NULL, NULL, COUNT(*)
+       FROM visible_products
+     ) facets
+     ORDER BY facet, lower(value), value`,
+    values,
+  );
+  const facets = {
+    types: [], finishes: [], brands: [], pickupConfigs: [], bodyWoods: [],
+    conditions: [], skillLevels: [], shippingSpeeds: [],
+  } as Record<string, string[]>;
+  let rawProducts = 0;
+  let facetValuesSeen = 0;
+  let invalidFacetValues = 0;
+  const normalizeFacetValue = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const normalized = value.trim().replace(/\s+/gu, " ");
+    if (!normalized || normalized.length > 80 || new Set(["n/a", "na", "none", "null", "unknown", "-", "—"]).has(normalized.toLowerCase())) return null;
+    return normalized;
+  };
+  for (const row of result.rows) {
+    rawProducts = Number(row.raw_products ?? rawProducts);
+    if (row.facet === "__quality__") continue;
+    facetValuesSeen += 1;
+    const value = normalizeFacetValue(row.value);
+    if (!value) {
+      invalidFacetValues += 1;
+      continue;
+    }
+    if (facets[row.facet] && !facets[row.facet]!.includes(value)) facets[row.facet]!.push(value);
+  }
+  return cacheableJson({
+    facets,
+    quality: {
+      rawProducts,
+      mappedProducts: rawProducts,
+      facetValuesSeen,
+      invalidFacetValues,
+    },
   });
 }
 
@@ -417,15 +709,41 @@ export async function handleCollectionRequest(
             p.id AS product_id, p.title AS product_title, p.handle AS product_handle,
             p.subtitle AS product_subtitle, p.description AS product_description,
             p.thumbnail AS product_thumbnail, p.status AS product_status,
-            p.collection_id, COALESCE(json_agg(json_build_object(
+            p.collection_id, p.metadata AS product_metadata,
+            COALESCE(json_agg(json_build_object(
               'id', v.id, 'title', v.title, 'sku', v.sku, 'barcode', v.barcode,
               'thumbnail', v.thumbnail, 'allow_backorder', v.allow_backorder,
-              'manage_inventory', v.manage_inventory, 'variant_rank', v.variant_rank
+              'manage_inventory', v.manage_inventory, 'variant_rank', v.variant_rank,
+              'metadata', COALESCE(v.metadata, '{}'::jsonb),
+              'options', COALESCE((SELECT json_agg(json_build_object(
+                'id', pov.id, 'value', pov.value,
+                'option', json_build_object('id', po.id, 'title', po.title)
+                ) ORDER BY po.id, pov.id)
+                FROM public.product_variant_option pvo
+                JOIN public.product_option_value pov
+                  ON pov.id = pvo.option_value_id AND pov.deleted_at IS NULL
+                JOIN public.product_option po
+                  ON po.id = pov.option_id AND po.deleted_at IS NULL
+                WHERE pvo.variant_id = v.id), '[]'::json),
+              'calculated_price', (SELECT json_build_object(
+                'calculated_amount', pr.amount, 'currency_code', pr.currency_code
+              ) FROM public.product_variant_price_set pvps
+              JOIN public.price pr ON pr.price_set_id = pvps.price_set_id
+              WHERE pvps.variant_id = v.id AND pvps.deleted_at IS NULL AND pr.deleted_at IS NULL
+                AND (pr.min_quantity IS NULL OR pr.min_quantity <= 1)
+                AND (pr.max_quantity IS NULL OR pr.max_quantity >= 1)
+              ORDER BY CASE WHEN pr.currency_code = 'php' THEN 0 ELSE 1 END, pr.amount ASC
+              LIMIT 1),
+              'inventory_quantity', COALESCE((SELECT SUM(il.stocked_quantity - il.reserved_quantity)
+                FROM public.product_variant_inventory_item pvi
+                JOIN public.inventory_level il ON il.inventory_item_id = pvi.inventory_item_id AND il.deleted_at IS NULL
+                WHERE pvi.variant_id = v.id AND pvi.deleted_at IS NULL), 0)
             ) ORDER BY v.variant_rank NULLS LAST, v.id) FILTER (WHERE v.id IS NOT NULL), '[]'::json) AS variants,
             0 AS total_count
        FROM public.product_collection pc
        LEFT JOIN public.product p
          ON p.collection_id = pc.id AND p.deleted_at IS NULL AND p.status = 'published'
+         ${publishedMediaPredicate("p")} ${sellableVariantPredicate("p")}
        LEFT JOIN public.product_variant v
          ON v.product_id = p.id AND v.deleted_at IS NULL
       WHERE pc.handle = $1 AND pc.deleted_at IS NULL
@@ -451,6 +769,7 @@ export async function handleCollectionRequest(
       thumbnail: row.product_thumbnail as string | null,
       status: row.product_status as string,
       collection_id: row.collection_id,
+      metadata: row.product_metadata,
       variants: row.variants,
       total_count: 0,
     }));

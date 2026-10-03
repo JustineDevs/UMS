@@ -117,12 +117,12 @@ export function FileUpload({
 
   return (
     <div
-      className={cn("mx-auto mt-40 w-full max-w-sm space-y-6", className)}
+      className={cn("mx-auto mt-40 flex w-full max-w-sm flex-col gap-6", className)}
       {...props}
     >
       <Card
         className={cn(
-          "group bg-oklch(1 0 0) border-oklch(0.97 0 0)/40 relative h-auto w-full max-w-sm cursor-pointer overflow-hidden rounded-[36px] px-2 py-2 transition-all duration-200 ease-in-out dark:bg-oklch(0.145 0 0) dark:border-oklch(0.269 0 0)/40",
+          "group bg-oklch(1 0 0) border-oklch(0.97 0 0)/40 relative h-auto w-full max-w-sm cursor-pointer overflow-hidden rounded-[36px] px-2 py-2 transition-[background-color,border-color,box-shadow,transform] duration-200 ease-in-out dark:bg-oklch(0.145 0 0) dark:border-oklch(0.269 0 0)/40",
         )}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -130,7 +130,7 @@ export function FileUpload({
         onClick={() => fileInputRef.current?.click()}
       >
         <CardHeader className="relative z-10">
-          <div className="space-y-2 text-center">
+          <div className="flex flex-col gap-2 text-center">
             <h2 className="text-oklch(0.145 0 0) text-2xl font-semibold tracking-tight dark:text-oklch(0.985 0 0)">
               Upload Documents
             </h2>
@@ -196,7 +196,7 @@ export function FileUpload({
                   {fileItem.status === "uploading" && (
                     <div className="bg-oklch(0.97 0 0) absolute bottom-0 left-0 h-1 w-full dark:bg-oklch(0.269 0 0)">
                       <div
-                        className="bg-oklch(0.205 0 0) h-full transition-all duration-300 ease-in-out dark:bg-oklch(0.922 0 0)"
+                        className="bg-oklch(0.205 0 0) h-full transition-[width] duration-300 ease-in-out dark:bg-oklch(0.922 0 0)"
                         style={{ width: `${fileItem.progress}%` }}
                       />
                     </div>

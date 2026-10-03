@@ -33,7 +33,7 @@ interface Footer12SocialLink {
   icon: ReactNode;
 }
 
-export interface Footer12Props {
+interface Footer12Props {
   newsletterTitle?: string;
   inputPlaceholder?: string;
   subscribeText?: string;
@@ -189,7 +189,7 @@ export function Footer12({
                 <h3 className="text-lg leading-none font-normal tracking-wide text-neutral-900 uppercase">
                   {column.title}
                 </h3>
-                <ul className="mt-5 space-y-3">
+                <ul className="mt-5 flex flex-col gap-3">
                   {column.links.map((link) => (
                     <li key={link.label}>
                       <a

@@ -49,7 +49,7 @@ export default async function CollectionsPage() {
   return (
     <main className="storefront-page-shell max-w-[1200px]">
       <header className="mb-10 sm:mb-12 md:mb-16">
-        <p className="mb-3 font-label text-xs uppercase tracking-[0.25em] text-secondary sm:mb-4">
+        <p className="mb-3 font-label text-xs uppercase tracking-[0.25em] text-primary sm:mb-4">
           {SITE_NAME}
         </p>
         <h1 className="mb-4 font-headline text-4xl font-bold tracking-tighter text-primary sm:mb-6 sm:text-5xl md:text-6xl">

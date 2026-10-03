@@ -46,7 +46,9 @@ async function handleMutation(request: Request, database: WorkerDatabaseClient, 
       if (!commerce) return json({ error: "commerce_database_unavailable" }, 503);
       const orderResult = await commerce.query<{ display_id: string | number | null; email: string | null }>(
         `SELECT display_id, email FROM public."order"
-         WHERE id = $1 AND deleted_at IS NULL AND metadata->>'organization_id' = $2 LIMIT 1`,
+         WHERE id = $1 AND deleted_at IS NULL
+           AND (metadata->>'organization_id' = $2 OR metadata->>'store_id' = $2)
+         LIMIT 1`,
         [orderId, org],
       );
       const order = orderResult.rows[0];

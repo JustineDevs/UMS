@@ -39,7 +39,7 @@ export default async function OrderReturnPage({
   const userEmail = session?.user?.email?.trim().toLowerCase();
   if (!userEmail) {
     redirect(
-      `/sign-in?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`,
+      `/login?callbackUrl=/account/orders/${encodeURIComponent(orderId)}/return`,
     );
   }
 
@@ -75,11 +75,11 @@ export default async function OrderReturnPage({
   return (
     <main className="storefront-page-shell max-w-2xl">
       <p className="text-sm text-on-surface-variant mb-2">
-        <Link href="/account" className="text-primary hover:underline">
+          <Link href="/account/profile" className="text-primary hover:underline">
           Account
         </Link>
         <span className="mx-2">/</span>
-        <Link href="/account" className="text-primary hover:underline">
+          <Link href="/account/profile" className="text-primary hover:underline">
           Orders
         </Link>
       </p>

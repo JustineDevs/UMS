@@ -1,6 +1,7 @@
 "use client";
 
 import { POS_FEATURE_MAPPINGS, type PosSaleFeatureMetadata } from "@universal-music-store/platform-data";
+import { ChevronDown, SlidersHorizontal } from "lucide-react";
 
 export function PosSaleDetailsPanel({
   value,
@@ -14,14 +15,14 @@ export function PosSaleDetailsPanel({
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 [&::-webkit-details-marker]:hidden">
         <span>
           <span className="flex items-center gap-2 text-sm font-bold text-primary">
-            <span className="material-symbols-outlined text-base">tune</span>
+            <SlidersHorizontal className="size-4" aria-hidden="true" />
             Sale details
           </span>
           <span className="mt-1 block text-xs text-on-surface-variant">
             Add information that should follow this sale into orders, receipts, and customer records.
           </span>
         </span>
-        <span className="material-symbols-outlined text-on-surface-variant transition-transform group-open:rotate-180">expand_more</span>
+        <ChevronDown className="size-4 text-on-surface-variant transition-transform group-open:rotate-180" aria-hidden="true" />
       </summary>
       <div className="grid gap-4 border-t border-outline-variant/15 p-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="space-y-3">

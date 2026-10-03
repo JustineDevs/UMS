@@ -58,8 +58,8 @@ export async function GET(req: Request) {
     }
     if (!response.ok) throw new Error(`worker_catalog_${response.status}`);
     const payload = await readResponseJson<{
-      product?: { variants?: unknown[] };
-      products?: Array<{ variants?: unknown[] }>;
+      product?: { title?: string | null; thumbnail?: string | null; variants?: unknown[] };
+      products?: Array<{ title?: string | null; thumbnail?: string | null; variants?: unknown[] }>;
     }>(response, {});
     const variants = (payload.product?.variants ?? payload.products?.[0]?.variants ?? [])
       .filter((variant): variant is {
@@ -77,6 +77,7 @@ export async function GET(req: Request) {
     // When quantity is unavailable in this scope, fall back to the first variant.
     const chosen = variants[0];
     const amount = chosen.calculated_price?.calculated_amount;
+    const product = payload.product ?? payload.products?.[0];
     return Response.json(catalogDefaultVariantResponseSchema.parse({
       variantId: chosen.id,
       sku: chosen.sku ?? "",
@@ -86,6 +87,8 @@ export async function GET(req: Request) {
             minorUnitDivisor(chosen.calculated_price?.currency_code ?? "PHP")
           : null,
       currency: chosen.calculated_price?.currency_code ?? "PHP",
+      productName: product?.title?.trim() || undefined,
+      imageUrl: product?.thumbnail?.trim() || null,
     }));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Failed to resolve variant";

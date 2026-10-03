@@ -1,7 +1,6 @@
 import {
   AdminBreadcrumbs,
   AdminPageShell,
-  AuditTimeline,
 } from "@/components/admin-console";
 import { DigitalReceiptLookup } from "@/components/DigitalReceiptLookup";
 import { fetchWorkerOrdersForAdmin } from "@/lib/worker-admin-bridge";
@@ -29,7 +28,6 @@ export default async function ReceiptsPage({
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Receipts" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       <DigitalReceiptLookup
         initialOrderId={initialOrderId}

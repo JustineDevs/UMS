@@ -9,10 +9,18 @@ const Context = createContext<State>({ data: null, status: "loading", update: as
 export function SupabaseSessionProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ data: null, status: "loading", update: async () => {} });
   const refresh = useCallback(async (_patch?: { name?: string | null }) => {
-    const response = await fetch("/api/auth/session", { credentials: "include", cache: "no-store" });
-    if (!response.ok) { setState({ data: null, status: "unauthenticated", update: refresh }); return; }
-    const session = (await response.json()) as AdminSession | null;
-    setState({ data: session, status: session ? "authenticated" : "unauthenticated", update: refresh });
+    try {
+      const response = await fetch("/api/auth/session", {
+        credentials: "include",
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) { setState({ data: null, status: "unauthenticated", update: refresh }); return; }
+      const session = (await response.json()) as AdminSession | null;
+      setState({ data: session, status: session ? "authenticated" : "unauthenticated", update: refresh });
+    } catch {
+      setState({ data: null, status: "unauthenticated", update: refresh });
+    }
   }, []);
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_AUTH_DISABLED === "true" || process.env.NEXT_PUBLIC_AUTH_DISABLE === "true") { setState({ data: { user: { id: "local-admin", email: "local-admin@example.com", name: "Local admin", role: "admin", permissions: ["*"] }, expires: "2099-01-01T00:00:00.000Z" }, status: "authenticated", update: refresh }); return; }
@@ -32,35 +40,3 @@ export function SupabaseSessionProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={contextValue}>{children}</Context.Provider>;
 }
 export function useSession() { return useContext(Context); }
-export async function signIn(provider: "google", options?: { callbackUrl?: string }, oauthOptions?: { prompt?: string }) {
-  // Build the callback from the page origin so production OAuth cannot drift
-  // to a build-time/local NEXT_PUBLIC_SITE_URL value.
-  const callback = new URL("/api/auth/callback", window.location.origin);
-  callback.searchParams.set("origin", window.location.origin);
-  if (options?.callbackUrl?.startsWith("/")) callback.searchParams.set("next", options.callbackUrl);
-  const { error } = await createSupabaseBrowserClient().auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo: callback.toString(),
-      queryParams: oauthOptions?.prompt ? { prompt: oauthOptions.prompt } : undefined,
-    },
-  });
-  if (error) throw error;
-}
-export async function signOut(options?: { callbackUrl?: string }) {
-  await Promise.allSettled([
-    createSupabaseBrowserClient().auth.signOut(),
-    fetch("/api/auth/e2e", {
-      method: "DELETE",
-      credentials: "include",
-      cache: "no-store",
-    }),
-  ]);
-  window.location.assign(options?.callbackUrl ?? "/");
-}
-export async function signInWithPassword(email: string, password: string, callbackUrl: string) {
-  const { error } = await createSupabaseBrowserClient().auth.signInWithPassword({ email, password });
-  if (error) return { ok: false as const, error: error.message };
-  window.location.assign(callbackUrl.startsWith("/") ? callbackUrl : "/admin");
-  return { ok: true as const };
-}

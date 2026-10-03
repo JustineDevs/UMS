@@ -1,6 +1,18 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
+import type { ComponentType } from "react";
+
+type DynamicChartComponent = ComponentType<Record<string, unknown>>;
+const loadChart = <T extends DynamicChartComponent>(loader: () => Promise<T>) =>
+  dynamic<Record<string, unknown>>(() => loader().then((component) => ({ default: component })), { ssr: false });
+
+const Bar = loadChart(() => import("recharts").then((module) => module.Bar as unknown as DynamicChartComponent));
+const BarChart = loadChart(() => import("recharts").then((module) => module.BarChart as unknown as DynamicChartComponent));
+const CartesianGrid = loadChart(() => import("recharts").then((module) => module.CartesianGrid as unknown as DynamicChartComponent));
+const XAxis = loadChart(() => import("recharts").then((module) => module.XAxis as unknown as DynamicChartComponent));
+const YAxis = loadChart(() => import("recharts").then((module) => module.YAxis as unknown as DynamicChartComponent));
 
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -23,18 +35,24 @@ function getRollingMonthData(values: readonly number[]) {
 }
 
 export function PipelineActivityRenderer({ monthlyQualified, discoveryCallsBooked }: { monthlyQualified: number[]; discoveryCallsBooked: number }) {
-  const pipelineChartData = getRollingMonthData(monthlyQualified);
+  const [range, setRange] = useState("last-12-months");
+  const rangeLength = range === "last-30-days" ? 1 : range === "last-quarter" ? 3 : monthlyQualified.length;
+  const rangeLabel = range === "last-30-days" ? "last 30 days" : range === "last-quarter" ? "last quarter" : "last 12 months";
+  const pipelineChartData = useMemo(
+    () => getRollingMonthData(monthlyQualified.slice(-Math.max(1, rangeLength))),
+    [monthlyQualified, rangeLength],
+  );
   const totalQualified = pipelineChartData.reduce((sum, item) => sum + item.qualified, 0);
   const discoveryProgress = totalQualified ? Math.min(100, Math.round((discoveryCallsBooked / totalQualified) * 100)) : 0;
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
       <Card className="xl:col-span-12">
-        <CardHeader>
+        <CardHeader className="relative pr-44">
           <CardTitle>Qualified Lead Flow</CardTitle>
-          <CardAction>
-            <Select defaultValue="last-12-months">
-              <SelectTrigger size="sm" className="min-w-40"><SelectValue placeholder="Select range" /></SelectTrigger>
+          <CardAction className="absolute right-6 top-6">
+            <Select value={range} onValueChange={setRange}>
+                <SelectTrigger size="sm" className="min-w-40"><SelectValue placeholder={rangeLabel} /></SelectTrigger>
               <SelectContent><SelectGroup>
                 <SelectItem value="last-30-days">Last 30 days</SelectItem>
                 <SelectItem value="last-quarter">Last quarter</SelectItem>
@@ -52,7 +70,7 @@ export function PipelineActivityRenderer({ monthlyQualified, discoveryCallsBooke
                   <line x1="0" y1="0" x2="0" y2="6" stroke="var(--color-qualified)" strokeWidth="1.25" strokeOpacity="0.40" />
                 </pattern></defs>
                 <CartesianGrid vertical={false} strokeDasharray="0" />
-                <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} tickFormatter={(value) => axisMonthFormatter.format(new Date(String(value)))} />
+                <XAxis dataKey="date" tickLine={false} tickMargin={10} axisLine={false} tickFormatter={(value: unknown) => axisMonthFormatter.format(new Date(String(value)))} />
                 <YAxis hide />
                 <ChartTooltip content={<ChartTooltipContent hideIndicator labelFormatter={(value) => tooltipMonthFormatter.format(new Date(String(value)))} />} />
                 <Bar dataKey="qualified" fill="url(#crm-qualified-pattern)" radius={[8, 8, 0, 0]} stroke="var(--color-qualified)" strokeOpacity={0.5} strokeWidth={0.5} />
@@ -61,7 +79,7 @@ export function PipelineActivityRenderer({ monthlyQualified, discoveryCallsBooke
             <div className="flex flex-col gap-5 rounded-lg p-4 lg:col-span-4">
               <div className="flex flex-col gap-1">
                 <div className="font-medium text-4xl tabular-nums leading-none">{totalQualified} <span className="font-normal text-lg text-muted-foreground">leads</span></div>
-                <p className="text-muted-foreground text-sm">Total qualified leads captured over the last 12 months.</p>
+                <p className="text-muted-foreground text-sm">Total qualified leads captured over the {rangeLabel}.</p>
               </div>
               <div className="flex flex-col gap-3 rounded-lg border border-border/60 p-3">
                 <div className="text-[11px] text-muted-foreground uppercase tracking-widest">Discovery Calls Booked</div>

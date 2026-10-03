@@ -12,33 +12,35 @@ export async function GET() {
 
   const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "") ?? "";
   const missingObservabilityEnv = listMissingPostHogEnv();
-  let workerReachable = false;
+  let workerReady = false;
   if (workerBaseUrl) {
     try {
-      const res = await fetch(`${workerBaseUrl}/healthz`, {
+      const res = await fetch(`${workerBaseUrl}/readyz`, {
         cache: "no-store",
         next: { revalidate: 0 },
       });
-      workerReachable = res.ok;
+      workerReady = res.ok;
     } catch {
-      workerReachable = false;
+      workerReady = false;
     }
   }
 
-  const degraded = !workerBaseUrl || missingObservabilityEnv.length > 0 || !workerReachable;
+  const degraded = !workerBaseUrl || missingObservabilityEnv.length > 0 || !workerReady;
 
-  /** Always 200; use `status` for SOP readiness (avoids 503 during Medusa cold start in E2E). */
   return NextResponse.json(
     healthSopResponseSchema.parse({
       status: degraded ? "degraded" : "ok",
       commerceSource: "cloudflare_worker",
       worker: {
         configured: Boolean(workerBaseUrl),
-        healthReachable: workerReachable,
+        readyReachable: workerReady,
+      },
+      deployment: {
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.trim() || process.env.GIT_COMMIT_SHA?.trim() || "unknown",
       },
       missingObservabilityEnv,
       timestamp,
     }),
-    { status: 200 },
+    { status: degraded ? 503 : 200 },
   );
 }

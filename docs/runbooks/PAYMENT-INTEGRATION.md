@@ -29,11 +29,11 @@ Configure provider secrets in the Cloudflare Worker environment. Keep provider c
 
 1. Open the Stripe **UVS** project in the correct Stripe account. Confirm the Dashboard account/business label is **UVS** before configuring events; the label is separate from the webhook endpoint and must not be used as a webhook path or application identifier.
 2. Obtain **Secret key** and **Webhook signing secret** from the UVS project’s selected mode (Test or Live).
-3. Register the Cloudflare backend webhook URL: `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe` in the matching Stripe mode (local development uses `http://localhost:8787/webhooks/stripe`). The Worker verifies and persists the event directly.
+3. Register `${PUBLIC_WORKER_URL}/webhooks/stripe` in the matching Stripe mode (local development uses `http://localhost:8787/webhooks/stripe`). For production, `${PUBLIC_WORKER_URL}` is the production value declared in `wrangler.jsonc`. The Worker verifies and persists the event directly.
 
 ### Worker environment
 
-Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The production Worker endpoint is `https://ums-backend-production.pcg0255.workers.dev/webhooks/stripe`; do not use the storefront/Vercel origin or `/hooks/payment/stripe`.
+Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. Use `${PUBLIC_WORKER_URL}/webhooks/stripe`; do not use the storefront/Vercel origin or `/hooks/payment/stripe`.
 
 ---
 
@@ -41,7 +41,10 @@ Set `STRIPE_WEBHOOK_SECRET` in the Worker secret store. The production Worker en
 
 1. Create REST app credentials in the [PayPal Developer](https://developer.paypal.com) portal.
 2. Configure sandbox vs live via `PAYPAL_ENVIRONMENT`.
-3. Register PayPal webhooks at `${API_URL}/webhooks/paypal`.
+3. Register PayPal webhooks at `${PUBLIC_WORKER_URL}/webhooks/paypal`.
+   For local development, use `http://localhost:8787/webhooks/paypal`. Never register the
+   Vercel storefront host or the legacy `universalmusic-store.vercel.app` host as the
+   provider callback.
 
 ### Worker environment
 

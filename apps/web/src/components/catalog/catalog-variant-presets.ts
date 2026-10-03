@@ -42,3 +42,9 @@ export const CATALOG_COLOR_PRESETS = [
   "Multicolor",
   "Printed",
 ] as const;
+
+export const MAX_CATALOG_VARIANTS = 80;
+
+export function exceedsCatalogVariantLimit(sizeCount: number, colorCount: number): boolean {
+  return sizeCount > 0 && colorCount > 0 && sizeCount * colorCount > MAX_CATALOG_VARIANTS;
+}

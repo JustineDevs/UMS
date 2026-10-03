@@ -57,12 +57,16 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <article className="storefront-page-shell max-w-3xl">
+      {/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */}
       <script
         type="application/ld+json"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
       />
+      {/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */}
       <script
         type="application/ld+json"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- JSON-LD is escaped by serializeJsonLd. */
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <nav aria-label="Breadcrumb" className="mb-6 flex items-center gap-1 text-xs text-on-surface-variant">
@@ -91,8 +95,10 @@ export default async function BlogPostPage({ params }: Props) {
           />
         </div>
       ) : null}
+      {/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering. */}
       <div
         className="mt-10 space-y-6 font-body text-sm leading-relaxed text-on-surface-variant"
+        /* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- CMS HTML is sanitized before rendering. */
         dangerouslySetInnerHTML={{ __html: sanitizeCmsHtml(post.body) }}
       />
     </article>

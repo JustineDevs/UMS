@@ -26,7 +26,7 @@ export default function Announcement4({
       <div className="border-oklch(0.205 0 0)/20 bg-oklch(0.205 0 0)/10 shadow-sxs relative isolate flex w-full items-center justify-center overflow-hidden rounded-sm border border-oklch(0.922 0 0) px-4 py-1.5 tracking-tight dark:border-oklch(0.922 0 0)/20 dark:bg-oklch(0.922 0 0)/10 dark:border-oklch(1 0 0 / 10%)">
         <div
           aria-hidden="true"
-          className="absolute top-1/2 left-[max(-7rem,calc(50%-52rem))] -z-10 -translate-y-1/2 transform-gpu blur-2xl"
+          className="absolute top-1/2 left-[max(-7rem,calc(50%_-_52rem))] -z-10 -translate-y-1/2 transform-gpu blur-2xl"
         >
           <div
             style={{
@@ -50,7 +50,7 @@ export default function Announcement4({
           />
         </div>
 
-        <div className="relative z-10 flex-col items-center space-y-2 text-sm sm:flex sm:flex-row sm:gap-3 sm:space-y-0">
+        <div className="relative z-10 flex-col items-center gap-2 text-sm sm:flex sm:flex-row sm:gap-3">
           <div className="text-oklch(0.145 0 0) text-md flex items-center gap-3 font-medium dark:text-oklch(0.985 0 0)">
             {message}
           </div>

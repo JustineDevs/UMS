@@ -85,15 +85,6 @@ create table if not exists public.audit_logs (
   created_at timestamptz not null default now()
 );
 
-create table if not exists public.legacy_import_runs (
-  id uuid primary key default gen_random_uuid(),
-  import_type text not null,
-  status text not null default 'pending',
-  run_at timestamptz,
-  metadata jsonb default '{}',
-  created_at timestamptz not null default now()
-);
-
 create table if not exists public.return_refund_reasons (
   id uuid primary key default gen_random_uuid(),
   kind text not null check (kind in ('return', 'refund')),
@@ -130,7 +121,6 @@ alter table public.compliance_requests enable row level security;
 alter table public.compliance_exports enable row level security;
 alter table public.retention_jobs enable row level security;
 alter table public.audit_logs enable row level security;
-alter table public.legacy_import_runs enable row level security;
 alter table public.return_refund_reasons enable row level security;
 
 insert into public.return_refund_reasons (kind, code, label, description, sort_order)

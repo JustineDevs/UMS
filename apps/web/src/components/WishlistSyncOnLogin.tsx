@@ -25,20 +25,24 @@ const publicAuthBypass =
  * Include once in the authenticated layout:
  *   <WishlistSyncOnLogin />
  */
-export function WishlistSyncOnLogin({ disabled = false }: { disabled?: boolean } = {}) {
+export function WishlistSyncOnLogin({
+  disabled = false,
+  allowLocalAuthBypass = false,
+}: { disabled?: boolean; allowLocalAuthBypass?: boolean } = {}) {
   const { data: session, status } = useSession();
   const syncedRef = useRef(false);
   const identityRef = useRef<string | null>(null);
   const inFlightIdentityRef = useRef<string | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "syncing" | "partial" | "error">("idle");
-  const localAuthBypass = disabled || publicAuthBypass;
+  const localAuthBypass = disabled || (publicAuthBypass && !allowLocalAuthBypass);
   const identity =
     session?.user?.email?.trim().toLowerCase() ||
     session?.user?.id?.trim() ||
     null;
 
-  const sync = useCallback(async () => {
-    if (!identity || inFlightIdentityRef.current === identity) return;
+  const sync = useCallback(async (force = false) => {
+    if (!identity || (!force && inFlightIdentityRef.current === identity)) return;
+    identityRef.current = identity;
     inFlightIdentityRef.current = identity;
     setSyncState("syncing");
     const localItems = getWishlist();
@@ -143,7 +147,14 @@ export function WishlistSyncOnLogin({ disabled = false }: { disabled?: boolean }
           ? "Some saved items are no longer available and were kept locally for review."
           : "Saved items could not be synchronized. Your local list is unchanged."}
       </span>
-      <button type="button" onClick={() => void sync()} className="min-h-11 shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary">
+      <button
+        type="button"
+        onClick={() => {
+          inFlightIdentityRef.current = null;
+          void sync(true);
+        }}
+        className="min-h-11 shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary"
+      >
         Retry
       </button>
     </div>

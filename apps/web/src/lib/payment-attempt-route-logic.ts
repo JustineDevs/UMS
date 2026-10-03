@@ -13,8 +13,8 @@ type PaymentAttemptRouteRow = {
   provider_session_id?: string | null;
   provider_payment_id?: string | null;
   status?: string;
-  webhook_last_status?: string | null;
   checkout_state?: string;
+  webhook_last_status?: string | null;
   medusa_order_id?: string | null;
   order_id?: string | null;
   quote_fingerprint?: string | null;
@@ -152,7 +152,9 @@ function providerPaymentIsPending(row: PaymentAttemptRouteRow): boolean {
 
 function completedOrderResult(row: PaymentAttemptRouteRow): JsonRouteResult | null {
   const orderId = row.medusa_order_id?.trim() || row.order_id?.trim();
-  if (row.status !== "completed" || !orderId) return null;
+  const isCompleted =
+    row.status === "completed" || row.checkout_state === "completed";
+  if (!isCompleted || !orderId) return null;
   const trackingUrl = buildTrackingUrl(
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || DEFAULT_PUBLIC_SITE_ORIGIN,
     orderId,
@@ -524,10 +526,6 @@ export async function finalizeCheckoutIntentRouteLogic(
 export async function codPlaceOrderRouteLogic(
   input: CodPlaceOrderInput,
 ): Promise<JsonRouteResult> {
-  if (!input.cartId) {
-    return { status: 400, body: { error: "No active cart" } };
-  }
-
   if (!input.correlationId.trim()) {
     return { status: 400, body: { error: "correlationId is required" } };
   }
@@ -546,6 +544,13 @@ export async function codPlaceOrderRouteLogic(
 
   const completed = completedOrderResult(input.row);
   if (completed) return completed;
+
+  // A completed checkout may have cleared the cart cookie before a replay.
+  // Only the capability-bound completed result may proceed without a cart;
+  // every new placement still requires the active cart below.
+  if (!input.cartId) {
+    return { status: 400, body: { error: "No active cart" } };
+  }
 
   const staleMismatchMessage = await expireAttemptForQuoteMismatch({
     correlationId: input.correlationId,

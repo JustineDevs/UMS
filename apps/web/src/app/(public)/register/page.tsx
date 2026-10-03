@@ -21,7 +21,7 @@ export default async function RegisterPage({
   const callback =
     typeof sp.callbackUrl === "string" && sp.callbackUrl.startsWith("/")
       ? sp.callbackUrl
-      : "/account";
+      : "/account/profile";
   const authErr = describeAuthSignInError(sp.error);
 
   return (

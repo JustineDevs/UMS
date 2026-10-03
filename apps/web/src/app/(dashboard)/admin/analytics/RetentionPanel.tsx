@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { AdminLoadingState } from "@/components/admin-console";
 
 type RetentionMetric = {
   period: string;
@@ -27,7 +28,7 @@ export function RetentionPanel() {
         <h3 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">
           Customer Retention
         </h3>
-        <p className="text-sm text-on-surface-variant">Loading...</p>
+        <AdminLoadingState label="Loading customer retention" />
       </div>
     );
   }

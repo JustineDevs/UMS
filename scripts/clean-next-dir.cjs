@@ -2,7 +2,7 @@
 
 /**
  * Removes `<app>/.next` before `next build`. Used from app package.json so the path
- * does not depend on `stress-test/` (that tree may be absent on hosts that do not ship it).
+ * does not depend on `scripts/stress-test/` (that tree may be absent on hosts that do not ship it).
  * On Windows, a single rm can fail with ENOTEMPTY/EPERM when handles are still releasing.
  */
 

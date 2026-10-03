@@ -17,7 +17,7 @@ async function routeFiles(dir) {
 }
 
 function apiPath(file) {
-  return `/${path.relative(apiRoot, path.dirname(file)).split(path.sep).join("/").replace(/\[([^\]]+)\]/g, "{$1}")}`;
+  return `/${path.relative(apiRoot, path.dirname(file)).split(path.sep).join("/").replace(/\[([A-Za-z0-9_-]+)\]/g, "{$1}")}`;
 }
 
 function methods(source) {
@@ -28,7 +28,7 @@ function methods(source) {
 
 async function classify(route, source) {
   const signals = [];
-  const workerAdminBridge = /import\s*\{[^}]*\b[A-Za-z_$][\w$]*Worker[A-Za-z_$\w]*ForAdmin\b[^}]*\}\s*from\s*["']@\/lib\/worker-admin-bridge["']/.test(source);
+  const workerAdminBridge = /import\s*\{[^}]*\b[A-Za-z_$][A-Za-z0-9_$]*Worker[A-Za-z_$][A-Za-z0-9_$]*ForAdmin\b[^}]*\}\s*from\s*["']@\/lib\/worker-admin-bridge["']/.test(source);
   const chatOrderWorkerSearch = /import\s*\{\s*searchCatalogVariantLines\s*\}\s*from\s*["']@\/lib\/chat-order-catalog-search["']/.test(source) &&
     /fetchWorkerCatalogProductsForAdmin/.test(await fs.readFile(path.join(root, "apps/web/src/lib/chat-order-catalog-search.ts"), "utf8"));
   const workerProxy = workerAdminBridge || chatOrderWorkerSearch ||

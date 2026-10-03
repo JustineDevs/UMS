@@ -16,6 +16,10 @@ export type IntegrationHealthEntry = {
 /** Worker auth: settings:read. Provider capability status is organization-scoped in the Worker. */
 export async function GET(request: Request) {
   const correlationId = getCorrelationId(request);
-  const response = await fetchWorkerAdminIntegrationHealthForAdmin();
-  return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
+  try {
+    const response = await fetchWorkerAdminIntegrationHealthForAdmin();
+    return response ?? new Response(JSON.stringify({ error: "Worker backend is unavailable", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "x-request-id": correlationId } });
+  } catch {
+    return new Response(JSON.stringify({ error: "integration_health_unavailable", message: "Integration health is temporarily unavailable. Try again shortly.", requestId: correlationId }), { status: 503, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "x-request-id": correlationId } });
+  }
 }

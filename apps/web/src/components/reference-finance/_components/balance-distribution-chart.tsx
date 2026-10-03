@@ -27,7 +27,7 @@ export function BalanceDistributionChart({
     <ChartContainer config={chartConfig} className="mx-auto aspect-square h-50">
       <PieChart>
         <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel className="w-52" nameKey="account" />} />
-        <Pie cornerRadius={6} data={balanceData} dataKey="amount" id="finance-balance-distribution" innerRadius={65} nameKey="account" outerRadius={90} paddingAngle={2} strokeWidth={5}>
+        <Pie cornerRadius={6} data={balanceData} dataKey="amount" innerRadius={65} nameKey="account" outerRadius={90} paddingAngle={2} strokeWidth={5}>
           <Label
             content={({ viewBox }) => {
               if (!(viewBox && "cx" in viewBox && "cy" in viewBox)) return null;

@@ -1,34 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { buildFreshnessSignature } from "./browse-price-freshness";
 
 type Props = {
   slug: string;
   initialMinPrice: number;
   initialInventorySignature: string;
 };
-
-export function buildFreshnessSignature(
-  variants: Array<{
-    id?: string;
-    inventoryQuantity?: number | null;
-    manageInventory?: boolean;
-    isActive?: boolean;
-  }>,
-): string {
-  return variants
-    .map((variant) =>
-      [
-        variant.id ?? "",
-        variant.manageInventory === false
-          ? "unmanaged"
-          : String(variant.inventoryQuantity ?? "unknown"),
-        variant.isActive === false ? "inactive" : "active",
-      ].join(":"),
-    )
-    .sort()
-    .join("|");
-}
 
 /**
  * After tab focus or on an interval, refetches the product and shows a quiet cue when

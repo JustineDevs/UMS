@@ -165,11 +165,18 @@ export function ProductGalleryCarousel({
   );
 
   useEffect(() => {
-    if (active >= count) setActive(0);
-  }, [active, count]);
-
-  useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (
+        e.defaultPrevented ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.shiftKey ||
+        target?.closest("input, textarea, select, [contenteditable=\"true\"]")
+      ) {
+        return;
+      }
       if (e.key === "ArrowLeft") go(-1);
       if (e.key === "ArrowRight") go(1);
     }

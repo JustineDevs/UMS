@@ -3,7 +3,7 @@
  *
  * Medusa-style behavior:
  * - Each file in MIGRATION_FILES runs at most once per database.
- * - Applied filenames are recorded in `public.legacy_platform_schema_migrations`.
+ * - Applied filenames are recorded in `public.platform_schema_migrations`.
  * - New database: empty ledger, every file runs in order inside a transaction.
  * - Existing database (first use of this runner): empty ledger, all files run once;
  *   SQL is idempotent (`IF NOT EXISTS`, `DROP IF EXISTS`, etc.) where possible.
@@ -159,11 +159,14 @@ const MIGRATION_FILES = [
   "125_order_fulfillment_notifications.sql",
   "126_cms_media_storage_cleanup_saga.sql",
   "127_customer_order_preferences_organization_text.sql",
+  "128_schema_cleanup.sql",
+  "129_delivery_event_projection_monotonicity.sql",
   "enable_rls.sql",
   "rls_deny_anon_sensitive.sql",
 ] as const;
 
-const MIGRATIONS_TABLE = "legacy_platform_schema_migrations";
+const MIGRATIONS_TABLE = "platform_schema_migrations";
+const LEGACY_MIGRATIONS_TABLE = "legacy_platform_schema_migrations";
 
 const databaseUrl = process.env.APP_DB_URL;
 if (!databaseUrl?.trim()) {
@@ -231,6 +234,33 @@ async function connectWithPoolerFallback(): Promise<{
 }
 
 async function ensureMigrationsTable(client: pg.Client): Promise<void> {
+  const [{ rows: canonicalRows }, { rows: legacyRows }] = await Promise.all([
+    client.query<{ present: boolean }>(
+      "SELECT to_regclass($1) IS NOT NULL AS present",
+      [`public.${MIGRATIONS_TABLE}`],
+    ),
+    client.query<{ present: boolean }>(
+      "SELECT to_regclass($1) IS NOT NULL AS present",
+      [`public.${LEGACY_MIGRATIONS_TABLE}`],
+    ),
+  ]);
+  const canonicalPresent = canonicalRows[0]?.present === true;
+  const legacyPresent = legacyRows[0]?.present === true;
+
+  if (!canonicalPresent && legacyPresent) {
+    await client.query(
+      `ALTER TABLE public.${LEGACY_MIGRATIONS_TABLE} RENAME TO ${MIGRATIONS_TABLE}`,
+    );
+  } else if (canonicalPresent && legacyPresent) {
+    await client.query(`
+      INSERT INTO public.${MIGRATIONS_TABLE} (filename, applied_at)
+      SELECT filename, applied_at
+      FROM public.${LEGACY_MIGRATIONS_TABLE}
+      ON CONFLICT (filename) DO NOTHING;
+      DROP TABLE public.${LEGACY_MIGRATIONS_TABLE};
+    `);
+  }
+
   await client.query(`
     CREATE TABLE IF NOT EXISTS public.${MIGRATIONS_TABLE} (
       filename text PRIMARY KEY,
@@ -283,18 +313,12 @@ async function printStatusAndExit(
 async function main(): Promise<void> {
   const { client } = await connectWithPoolerFallback();
   try {
+    await ensureMigrationsTable(client);
     if (statusOnly) {
-      const table = await client.query<{ present: boolean }>(
-        "SELECT to_regclass($1) IS NOT NULL AS present",
-        [`public.${MIGRATIONS_TABLE}`],
-      );
-      const applied = table.rows[0]?.present
-        ? await getAppliedSet(client)
-        : new Set<string>();
+      const applied = await getAppliedSet(client);
       await printStatusAndExit(client, applied);
     }
 
-    await ensureMigrationsTable(client);
     const applied = await getAppliedSet(client);
     const dir = join(__dirname, "..", "supabase", "migrations");
     let ran = 0;

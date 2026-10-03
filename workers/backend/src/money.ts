@@ -19,7 +19,7 @@ const ZERO_DECIMAL_CURRENCIES = new Set([
 
 const THREE_DECIMAL_CURRENCIES = new Set(["BHD", "JOD", "KWD", "OMR", "TND"]);
 
-export function minorUnitDivisor(currencyCode: string): number {
+function minorUnitDivisor(currencyCode: string): number {
   const code = currencyCode.trim().toUpperCase();
   if (ZERO_DECIMAL_CURRENCIES.has(code)) return 1;
   if (THREE_DECIMAL_CURRENCIES.has(code)) return 1_000;

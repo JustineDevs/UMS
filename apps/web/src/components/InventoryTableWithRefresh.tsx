@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { parseAsInteger, useQueryStates } from "nuqs";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
+import { AlertTriangle, Boxes, PackageCheck, PackageX } from "lucide-react";
 import {
   Card,
   CardContent,
+  Button,
   Table,
   TableBody,
   TableCell,
@@ -31,6 +33,34 @@ export type InventoryRow = {
 const POLL_MS = 15_000;
 
 const PAGE_SIZE_OPTIONS: AdminPreferences["inventoryPageSize"][] = [25, 50, 100];
+
+type LiveState = {
+  rows: InventoryRow[];
+  totalCount: number;
+  lastSync: string | null;
+  error: string | null;
+  mode: "sse" | "poll" | "connecting";
+};
+
+type LiveAction =
+  | { type: "rows"; rows: InventoryRow[] }
+  | { type: "total"; total: number }
+  | { type: "sync"; at: string }
+  | { type: "error"; message: string | null }
+  | { type: "mode"; mode: LiveState["mode"] }
+  | { type: "reset"; rows: InventoryRow[]; total: number };
+
+function liveReducer(state: LiveState, action: LiveAction): LiveState {
+  switch (action.type) {
+    case "rows": return { ...state, rows: action.rows };
+    case "total": return { ...state, totalCount: action.total };
+    case "sync": return { ...state, lastSync: action.at };
+    case "error": return { ...state, error: action.message };
+    case "mode": return { ...state, mode: action.mode };
+    case "reset": return { ...state, rows: action.rows, totalCount: action.total };
+    default: return state;
+  }
+}
 
 function formatSyncLabel(mode: "sse" | "poll" | "connecting"): string {
   if (mode === "sse") return "live updates";
@@ -63,12 +93,10 @@ export function InventoryTableWithRefresh({
     },
     { history: "push", shallow: false },
   );
-  const [rows, setRows] = useState(initialRows);
-  const [totalCount, setTotalCount] = useState(total);
-  // Keep the first render deterministic; the browser supplies the live timestamp after mount.
-  const [lastSync, setLastSync] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"sse" | "poll" | "connecting">("connecting");
+  const [{ rows, totalCount, lastSync, error, mode }, dispatchLive] = useReducer(
+    liveReducer,
+    { rows: initialRows, totalCount: total, lastSync: null, error: null, mode: "connecting" },
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adjustmentMode, setAdjustmentMode] = useState<"set" | "delta">("set");
   const [quantity, setQuantity] = useState(0);
@@ -79,22 +107,18 @@ export function InventoryTableWithRefresh({
   const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
-    setLastSync(new Date().toISOString());
-  }, []);
-
-  useEffect(() => {
-    setRows(initialRows);
-  }, [initialRows]);
+    dispatchLive({ type: "reset", rows: initialRows, total });
+  }, [initialRows, total]);
 
   useEffect(() => {
     let cancelled = false;
     const fallbackMs = 4000;
     const timer = window.setTimeout(() => {
-      setMode((m) => (m === "connecting" ? "poll" : m));
+      dispatchLive({ type: "mode", mode: "poll" });
     }, fallbackMs);
     if (typeof EventSource === "undefined") {
       window.clearTimeout(timer);
-      setMode("poll");
+      dispatchLive({ type: "mode", mode: "poll" });
       return undefined;
     }
     const q = buildQuery(page, pageSize);
@@ -110,23 +134,23 @@ export function InventoryTableWithRefresh({
         };
         if (!cancelled && Array.isArray(data.rows)) {
           if (data.page === page && data.pageSize === pageSize) {
-            setRows(data.rows);
+            dispatchLive({ type: "rows", rows: data.rows });
             if (typeof data.total === "number") {
-              setTotalCount(data.total);
+              dispatchLive({ type: "total", total: data.total });
             }
-            setLastSync(new Date().toISOString());
-            setError(null);
-            setMode("sse");
+            dispatchLive({ type: "sync", at: new Date().toISOString() });
+            dispatchLive({ type: "error", message: null });
+            dispatchLive({ type: "mode", mode: "sse" });
           }
         }
       } catch {
-        if (!cancelled) setError("Update unavailable");
+        if (!cancelled) dispatchLive({ type: "error", message: "Update unavailable" });
       }
     };
     es.onerror = () => {
       window.clearTimeout(timer);
       es.close();
-      if (!cancelled) setMode("poll");
+      if (!cancelled) dispatchLive({ type: "mode", mode: "poll" });
     };
     return () => {
       cancelled = true;
@@ -147,7 +171,7 @@ export function InventoryTableWithRefresh({
         });
         if (cancelled) return;
         if (!res.ok) {
-          setError(`Update unsuccessful (${res.status})`);
+          dispatchLive({ type: "error", message: `Update unsuccessful (${res.status})` });
           return;
         }
         const data = (await res.json()) as {
@@ -162,15 +186,15 @@ export function InventoryTableWithRefresh({
           data.page === page &&
           data.pageSize === pageSize
         ) {
-          setRows(data.rows);
+          dispatchLive({ type: "rows", rows: data.rows });
           if (typeof data.total === "number") {
-            setTotalCount(data.total);
+            dispatchLive({ type: "total", total: data.total });
           }
-          setLastSync(new Date().toISOString());
-          setError(null);
+          dispatchLive({ type: "sync", at: new Date().toISOString() });
+          dispatchLive({ type: "error", message: null });
         }
       } catch {
-        if (!cancelled && !controller.signal.aborted) setError("Refresh unavailable");
+        if (!cancelled && !controller.signal.aborted) dispatchLive({ type: "error", message: "Refresh unavailable" });
       }
     }
     const id = window.setInterval(pull, POLL_MS);
@@ -190,8 +214,46 @@ export function InventoryTableWithRefresh({
     void setQuery({ page: 1, pageSize: next });
   }
 
+  const visibleUnits = rows.reduce((sum, row) => sum + Math.max(0, row.available), 0);
+  const lowStockCount = rows.filter((row) => row.available > 0 && row.available <= 5).length;
+  const outOfStockCount = rows.filter((row) => row.available <= 0).length;
+
   return (
     <div>
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">Total variants</span>
+            <Boxes className="size-4 text-muted-foreground" />
+          </div>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{totalCount}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Across the current catalog</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">Units on page</span>
+            <PackageCheck className="size-4 text-muted-foreground" />
+          </div>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{visibleUnits}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Available stock in this view</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">Low stock</span>
+            <AlertTriangle className="size-4 text-amber-600" />
+          </div>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{lowStockCount}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Between 1 and 5 units</p>
+        </article>
+        <article className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-foreground">Out of stock</span>
+            <PackageX className="size-4 text-destructive" />
+          </div>
+          <p className="mt-4 text-2xl font-semibold tracking-tight tabular-nums">{outOfStockCount}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Needs replenishment</p>
+        </article>
+      </div>
       <p className="mb-4 text-xs font-medium text-on-surface-variant">
         Last updated: {lastSync ?? "not available"}
         {error ? (
@@ -253,11 +315,11 @@ export function InventoryTableWithRefresh({
                             event.preventDefault();
                             if (savingId) return;
                             if (!row.productId) {
-                              setError("This variant has no product reference");
+                              dispatchLive({ type: "error", message: "This variant has no product reference" });
                               return;
                             }
                             setSavingId(row.variantId);
-                            setError(null);
+                            dispatchLive({ type: "error", message: null });
                             try {
                             const response = await fetch("/api/admin/inventory/adjust", {
                                 method: "POST",
@@ -277,7 +339,7 @@ export function InventoryTableWithRefresh({
                               });
                               if (!response.ok) {
                                 const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-                                setError(payload?.error ?? `Unable to save stock (${response.status})`);
+                                dispatchLive({ type: "error", message: payload?.error ?? `Unable to save stock (${response.status})` });
                                 return;
                               }
                               const payload = (await response.clone().json().catch(() => null)) as {
@@ -285,13 +347,13 @@ export function InventoryTableWithRefresh({
                               } | null;
                               const nextQuantity = payload?.data?.availableQuantity;
                               if (typeof nextQuantity !== "number") {
-                                setError("Inventory was saved but the authoritative available quantity could not be read; refresh the table.");
+                                dispatchLive({ type: "error", message: "Inventory was saved but the authoritative available quantity could not be read; refresh the table." });
                                 return;
                               }
-                              setRows((current) => current.map((item) => item.variantId === row.variantId ? { ...item, available: nextQuantity } : item));
+                              dispatchLive({ type: "rows", rows: rows.map((item) => item.variantId === row.variantId ? { ...item, available: nextQuantity } : item) });
                               setEditingId(null);
                             } catch {
-                              setError("Unable to save stock");
+                              dispatchLive({ type: "error", message: "Unable to save stock" });
                             } finally {
                               setSavingId(null);
                             }
@@ -335,7 +397,18 @@ export function InventoryTableWithRefresh({
                             <option value="return">Return</option>
                             <option value="transfer">Transfer</option>
                           </select>
-                          <button type="submit" className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground" disabled={savingId === row.variantId}>{savingId === row.variantId ? "..." : "Save"}</button>
+                          <Button type="submit" size="sm" className="text-xs" disabled={savingId === row.variantId}>{savingId === row.variantId ? "..." : "Save"}</Button>
+                          <button
+                            type="button"
+                            className="rounded border border-outline-variant/40 px-2 py-1 text-xs text-on-surface-variant hover:bg-surface-container"
+                            onClick={() => {
+                              setEditingId(null);
+                              dispatchLive({ type: "error", message: null });
+                            }}
+                            disabled={savingId === row.variantId}
+                          >
+                            Cancel
+                          </button>
                         </form>
                       ) : (
                         <button type="button" className="text-xs text-primary underline-offset-4 hover:underline" onClick={() => { setEditingId(row.variantId); setAdjustmentMode("set"); setQuantity(Math.max(0, row.available)); setDelta(0); setReason("correction"); }}>Adjust</button>

@@ -13,5 +13,10 @@ export function TrackingAutoRefresh() {
     return () => window.clearInterval(timer);
   }, [router]);
 
-  return <p className="mt-1 text-xs text-on-surface-variant">Updates automatically every minute while this page is open.</p>;
+  return (
+    <p className="mt-3 inline-flex items-center gap-2 text-xs font-medium text-on-surface-variant" role="status" aria-live="polite">
+      <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+      Live status sync active
+    </p>
+  );
 }

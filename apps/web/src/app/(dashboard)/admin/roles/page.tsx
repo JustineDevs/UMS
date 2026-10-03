@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@universal-music-store/ui";
 import { Roles } from "@/components/reference-roles/_components/roles";
 import type { Role } from "@/components/reference-roles/_components/roles-table/data";
+import { AdminPageShell } from "@/components/admin-console";
 
 export default function RolesPage() {
   const [roles, setRoles] = React.useState<Role[]>([]);
@@ -29,12 +31,18 @@ export default function RolesPage() {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; controller.abort(); };
   }, [reloadToken]);
-  if (loading) return <div className="text-muted-foreground py-16 text-center text-sm">Loading roles...</div>;
-  if (error) return (
-    <div className="py-16 text-center">
-      <p className="text-sm text-destructive">{error}</p>
-      <button type="button" className="mt-4 rounded border px-3 py-2 text-sm" onClick={() => setReloadToken((value) => value + 1)}>Retry</button>
-    </div>
+  return (
+    <AdminPageShell
+      hideHeader
+    >
+      {loading ? <div className="py-16 text-center text-sm text-muted-foreground">Loading roles...</div> : null}
+      {error ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          <Button type="button" variant="outline" className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>Retry</Button>
+        </div>
+      ) : null}
+      {!loading && !error ? <Roles roles={roles} /> : null}
+    </AdminPageShell>
   );
-  return <Roles roles={roles} />;
 }

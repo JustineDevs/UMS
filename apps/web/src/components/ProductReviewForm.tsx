@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useRef, useState } from "react";
 import { REVIEW_STAR_PATH } from "@/components/ReviewStarRatingDisplay";
-import { getRecaptchaToken } from "@/components/RecaptchaScript";
+import { getRecaptchaToken } from "@/lib/recaptcha-client";
 
 export function ProductReviewForm({
   productSlug,
@@ -24,7 +24,7 @@ export function ProductReviewForm({
   const [done, setDone] = useState(false);
   const [verifiedHint, setVerifiedHint] = useState<boolean | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
-  const [formStartedAt, setFormStartedAt] = useState(() => Date.now());
+  const formStartedAtRef = useRef<number | undefined>(undefined);
   const honeypotRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function ProductReviewForm({
     return () => controller.abort();
   }, []);
 
-  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(pathname || "/shop")}`;
+  const signInHref = `/login?callbackUrl=${encodeURIComponent(pathname || "/shop")}`;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +65,7 @@ export function ProductReviewForm({
           body: body.trim(),
           recaptchaToken,
           csrfToken,
-          formStartedAt,
+          formStartedAt: formStartedAtRef.current ?? Date.now(),
           _hp: honeypotRef.current?.value ?? "",
         }),
       });
@@ -88,7 +88,7 @@ export function ProductReviewForm({
       setDone(true);
       setBody("");
       setRating(5);
-      setFormStartedAt(Date.now());
+      formStartedAtRef.current = Date.now();
       router.refresh();
     } catch {
       setError("Network error");
@@ -177,7 +177,7 @@ export function ProductReviewForm({
           aria-label={`Rating: ${rating} out of 5 stars`}
           className="flex flex-wrap items-center gap-2"
         >
-          <div className="flex items-center gap-0.5">
+          <div className="grid w-full max-w-[230px] grid-cols-5 gap-0.5">
             {[1, 2, 3, 4, 5].map((n) => {
               const active = n <= rating;
               return (
@@ -188,7 +188,7 @@ export function ProductReviewForm({
                   role="radio"
                   aria-checked={rating === n}
                   aria-label={`Set rating to ${n} out of 5`}
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-0.5 transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-surface-container-lowest"
+                  className="inline-flex min-h-11 min-w-0 w-full items-center justify-center rounded-md p-0.5 transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-surface-container-lowest"
                   onClick={() => setRating(n)}
                 >
                   <svg

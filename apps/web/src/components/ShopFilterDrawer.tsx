@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 type Props = {
   activeFilterCount: number;
@@ -12,11 +13,7 @@ export function ShopFilterDrawer({ activeFilterCount, children }: Props) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
+  const hydrated = useHydrated();
 
   useEffect(() => {
     if (!open) {
@@ -89,7 +86,7 @@ export function ShopFilterDrawer({ activeFilterCount, children }: Props) {
           if (event.target === event.currentTarget) setOpen(false);
         }}
       >
-        <div className="mx-auto max-h-[calc(100vh-2rem)] max-w-lg overflow-y-auto rounded-lg bg-surface-container-lowest p-4 shadow-xl lg:max-h-none lg:max-w-none lg:overflow-visible lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none">
+        <div className="mx-auto max-h-[calc(100vh_-_2rem)] max-w-lg overflow-y-auto rounded-lg bg-surface-container-lowest p-4 shadow-xl lg:max-h-none lg:max-w-none lg:overflow-visible lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none">
           <div className="mb-5 flex items-center justify-between lg:hidden">
             <h2 className="font-headline text-lg font-bold text-primary">Filters</h2>
             <button

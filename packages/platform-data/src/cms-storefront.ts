@@ -28,17 +28,24 @@ function workerBaseUrl(): string | null {
   return value || null;
 }
 
+const CMS_WORKER_READ_TIMEOUT_MS = 5_000;
+
 async function workerGet<T>(path: string): Promise<T | null> {
   const base = workerBaseUrl();
   if (!base) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CMS_WORKER_READ_TIMEOUT_MS);
   try {
     const response = await fetch(`${base}${path}`, {
       headers: { Accept: "application/json" },
+      signal: controller.signal,
     });
     if (!response.ok) return null;
     return (await response.json()) as T;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -17,8 +17,8 @@ export type { CmsNode } from "./cms-types.js";
 
 export type CmsPublishValidation = { ok: true } | { ok: false; errors: string[] };
 
-export const CMS_MAX_TREE_NODES = 200;
-export const CMS_MAX_TREE_DEPTH = 4;
+const CMS_MAX_TREE_NODES = 200;
+const CMS_MAX_TREE_DEPTH = 4;
 
 /** Rejects structural corruption before a page can become public. Unknown component IDs are retained for migration compatibility. */
 export function validateCmsPublishTree(nodes: readonly CmsNode[]): CmsPublishValidation {

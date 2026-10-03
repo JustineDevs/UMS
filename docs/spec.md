@@ -3,7 +3,7 @@ title: Universal Music Store
 description: A composable commerce system for music retail across storefront, POS, and fulfillment.
 author: @Justinedevs
 website-to: https://universalmusic.vercel.app
-status: Draft
+status: Historical draft — superseded by the consolidated `apps/web` + Worker topology
 type: Informational
 created: 2026-03-20
 requires tech stack:
@@ -20,7 +20,7 @@ requires tech stack:
 
 ## Abstract
 
-This specification defines a composable music retail platform for a store operating through a customer storefront, internal admin dashboard, point-of-sale terminal, and centralized order management. **Commerce truth for catalog, cart, checkout, orders, and payments runs on Medusa 2.x** (`universal-music-store/apps/medusa`) with a **dedicated PostgreSQL** database. Legacy **Supabase** schema and `packages/database` remain for **staff OAuth user records**, **compliance exports**, **migration tooling**, and optional historical data; they are **not** the runtime path for new web checkout when the storefront is wired to Medusa.
+This document is retained as a historical architecture draft. The current runtime is the consolidated `apps/web` application, `workers/backend`, and shared packages. References below to standalone Medusa, Express, or pre-consolidation application directories describe the former architecture and are not current runtime evidence.
 
 ### Implementation status (do not over-read this document)
 

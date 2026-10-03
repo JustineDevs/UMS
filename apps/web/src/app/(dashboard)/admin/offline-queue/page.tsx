@@ -10,7 +10,7 @@ export default async function OfflineQueuePage() {
   return (
     <AdminPageShell
       title="Offline queue"
-      subtitle="Pending POS sales waiting to sync to the store. Requires pos:use."
+      subtitle="Review sales cached on POS devices while they wait for synchronization."
       breadcrumbs={
         <AdminBreadcrumbs
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Offline queue" }]}

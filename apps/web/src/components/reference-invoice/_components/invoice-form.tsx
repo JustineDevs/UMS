@@ -8,7 +8,7 @@ import type { InvoiceToDetails } from "./data";
 
 export function InvoiceForm({ clients }: { clients: InvoiceToDetails[] }) {
   return (
-    <div className="flex flex-col gap-4 rounded-xl border bg-card p-4">
+    <div className="flex min-w-0 max-w-full flex-col gap-4 rounded-xl border bg-card p-4">
       <InvoiceDetails />
 
       <Separator />

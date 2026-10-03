@@ -22,7 +22,7 @@ export function StoreTraffic() {
       </CardHeader>
 
       <CardContent>
-        <div className="flex h-54 items-center justify-center rounded-lg border border-dashed text-center">
+        <div className="flex h-56 items-center justify-center rounded-lg border border-dashed text-center">
           <div className="max-w-xs px-6">
             <div className="font-medium text-sm">Traffic analytics not connected</div>
             <div className="mt-1 text-muted-foreground text-sm">

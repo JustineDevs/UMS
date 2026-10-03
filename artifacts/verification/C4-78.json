@@ -1,0 +1,30 @@
+{
+  "matrixId": "C4-78",
+  "command": "UVS_ALLOW_NONSTANDARD_PORT=1 PLAYWRIGHT_WEB_PORT=3100 CLOUDFLARE_DEV_PORT=8788 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3100 PLAYWRIGHT_WORKER_URL=http://127.0.0.1:8788 AUTH_DISABLED=true NEXT_PUBLIC_AUTH_DISABLED=true UVS_E2E_LOCAL=1 UVS_E2E_REAL_SESSION=0 pnpm exec playwright test scripts/stress-test/e2e/flows/psp-checkout-cod.spec.ts --project=chromium --workers=1 --timeout=120000 --grep \"incomplete delivery profile|stale COD quote\"",
+  "runtime": "local",
+  "runner": "playwright",
+  "exitCode": 0,
+  "prerequisites": [
+    "Implementation evidence and the remaining external acceptance condition are recorded in the matrix row."
+  ],
+  "result": "pass",
+  "observed": [
+    "Chromium passed the incomplete delivery profile flow and confirmed the onboarding gate with required profile fields and Continue action.",
+    "Chromium passed the stale COD quote flow and confirmed the checkout remains open after a 409 quote-expired response.",
+    "Existing C4-50/C4-51 artifacts cover successful COD checkout, cart-cleared duplicate replay, replayed: true, and no second finalization request."
+  ],
+  "externalAcceptanceRemaining": "Provider-hosted COD delivery handoff remains a separate production acceptance condition.",
+  "artifacts": [
+    "artifacts/verification/C4-50.json",
+    "artifacts/verification/C4-51.json",
+    "scripts/stress-test/e2e/flows/psp-checkout-cod.spec.ts"
+  ],
+  "artifactSha256": {
+    "artifacts/verification/C4-50.json": "7ce728f17302c599a9802e2cc5bba5522c3fd361c4ba80809429befacc1f35c2",
+    "artifacts/verification/C4-51.json": "b12b8f0d840272b3f6553a5d7d56a1b7a6abd4121ea784667cddbd20844a703d",
+    "scripts/stress-test/e2e/flows/psp-checkout-cod.spec.ts": "ab4c39ce19de5c1269a2b4ff352435df0929732b855092b23c0d57387f065ded"
+  },
+  "verifiedAt": "2026-10-02T18:45:18Z",
+  "refreshLog": "artifacts/verification/logs/C4-78-cod-gate-refresh-20261003T1841Z.log",
+  "refreshLogSha256": "a572a2812482744ee97d580f4ec363fbddf49cf810a16a093b3735ae798c2490"
+}

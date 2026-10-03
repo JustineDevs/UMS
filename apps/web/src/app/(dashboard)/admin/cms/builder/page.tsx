@@ -1,8 +1,5 @@
-import { CmsBuilderPageClient } from "@/components/cms/CmsBuilderPageClient";
-import { requirePagePermission } from "@/lib/require-page-permission";
+import { redirect } from "next/navigation";
 
 export default async function CmsBuilderPage() {
-  await requirePagePermission("content:read");
-
-  return <CmsBuilderPageClient />;
+  redirect("/admin/build");
 }

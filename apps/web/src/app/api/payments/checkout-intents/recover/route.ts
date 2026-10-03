@@ -23,6 +23,8 @@ export async function GET(req: Request) {
   workerUrl.searchParams.set("provider", provider);
   const providerOrderId = searchParams.get("provider_order_id")?.trim();
   if (providerOrderId) workerUrl.searchParams.set("provider_order_id", providerOrderId);
+  const correlationId = searchParams.get("correlation_id")?.trim();
+  if (correlationId) workerUrl.searchParams.set("correlation_id", correlationId);
   let response: Response;
   try {
     response = await fetch(workerUrl, {
@@ -42,5 +44,8 @@ export async function GET(req: Request) {
   }
   const parsed = checkoutIntentRecoveryResponseSchema.safeParse(payload);
   if (!parsed.success) return NextResponse.json({ error: "Invalid payment recovery response" }, { status: 502 });
-  return NextResponse.json(parsed.data, { status: 200 });
+  const result = NextResponse.json(parsed.data, { status: 200 });
+  const workerSetCookie = response.headers.get("set-cookie");
+  if (workerSetCookie) result.headers.set("set-cookie", workerSetCookie);
+  return result;
 }

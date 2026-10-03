@@ -16,7 +16,7 @@ CI fails on unguarded routes; centralized error logger scrubs known secret patte
 
 ## Concrete plan
 
-1. Run `node stress-test/scripts/check-admin-api-staff-guard.mjs` locally; open issues for any hit.
+1. Run `node scripts/stress-test/tools/check-admin-api-staff-guard.mjs` locally; open issues for any hit.
 2. Implement `redactForLogs(error: unknown)` helper in `apps/admin/src/lib/` and use in catch blocks of API routes (incremental migration OK if tracked).
 3. Add unit tests with fake tokens resembling Medusa and Supabase keys.
 4. Extend CI job to run guard on PR.

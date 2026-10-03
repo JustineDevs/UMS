@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, Save } from "lucide-react";
+import { Save, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,12 +17,12 @@ export function InvoiceActions() {
     return () => window.removeEventListener("invoice-status", onStatus);
   }, []);
   return (
-    <div className="flex items-center gap-2">
-      <Button type="button" variant="outline" size="sm" onClick={() => dispatch("invoice-save-draft")}>
+    <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <Button className="w-full min-w-0 sm:w-auto" type="button" variant="outline" size="sm" onClick={() => dispatch("invoice-save-draft")}>
         <Save data-icon="inline-start" /> Save as Draft
       </Button>
-      <Button type="button" size="sm" onClick={() => dispatch("invoice-send")}>
-        <Download data-icon="inline-start" /> Send Invoice
+      <Button className="w-full min-w-0 sm:w-auto" type="button" size="sm" onClick={() => dispatch("invoice-send")}>
+        <Send data-icon="inline-start" /> Send Invoice
       </Button>
       {status ? <span role="status" className="text-xs text-muted-foreground">{status}</span> : null}
     </div>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildFreshnessSignature } from "./BrowsePriceFreshnessCue";
+import { buildFreshnessSignature } from "./browse-price-freshness";
 
 test("freshness signature changes when tracked inventory or sellability changes", () => {
   const before = buildFreshnessSignature([

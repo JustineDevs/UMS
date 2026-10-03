@@ -88,8 +88,8 @@ export const DELIVERY_LOGISTICS_CHECKLIST: readonly DeliveryLogisticsChecklistGr
       {
         feature: "Geocoding and address verification",
         status: "covered",
-        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts", "apps/web/src/lib/logistics-provider-client.ts"],
-        notes: "Strict address input is normalized through the configured geocoding provider; provider credentials remain a deployment prerequisite.",
+        evidence: ["apps/web/src/app/api/admin/delivery-logistics/operations/route.ts"],
+        notes: "Strict address input is normalized through the delivery-logistics operations boundary.",
       },
       {
         feature: "Dynamic SLA assignment",

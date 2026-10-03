@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AdminBreadcrumbs,
   AdminEmptyState,
   AdminErrorState,
+  AdminLoadingState,
   AdminPageShell,
   AdminSection,
-  AuditTimeline,
 } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { CrmCustomerRow } from "@/lib/customer-admin-bridge";
+
+type LoyaltyPageClientProps = {
+  customers: CrmCustomerRow[];
+};
+
+function ModalPortal({ children }: { children: ReactNode }) {
+  return typeof document === "undefined" ? null : createPortal(children, document.body);
+}
 
 type LoyaltyAccount = {
   id: string;
@@ -47,7 +57,7 @@ const TIER_COLORS: Record<string, string> = {
   platinum: "bg-purple-100 text-purple-700",
 };
 
-export function LoyaltyPageClient() {
+export function LoyaltyPageClient({ customers = [] }: LoyaltyPageClientProps) {
   const [tab, setTab] = useState<"accounts" | "rewards">("accounts");
   const [accounts, setAccounts] = useState<LoyaltyAccount[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
@@ -55,6 +65,8 @@ export function LoyaltyPageClient() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showEnroll, setShowEnroll] = useState(false);
   const [enrollEmail, setEnrollEmail] = useState("");
+  const [enrollSearch, setEnrollSearch] = useState("");
+  const [enrollSort, setEnrollSort] = useState<"name" | "email" | "newest">("name");
   const [showRewardForm, setShowRewardForm] = useState(false);
   const [rewardForm, setRewardForm] = useState({ name: "", points_cost: "", reward_type: "discount" });
   const [pointsModal, setPointsModal] = useState<LoyaltyAccount | null>(null);
@@ -62,6 +74,24 @@ export function LoyaltyPageClient() {
   const [pointsReason, setPointsReason] = useState("");
   const [lookupValue, setLookupValue] = useState("");
   const mutationBusyRef = useRef(false);
+
+  const enrolledEmails = new Set(accounts.map((account) => account.customer_email.toLowerCase()));
+  const search = enrollSearch.trim().toLowerCase();
+  const enrollableCustomers = customers
+    .filter((customer) => {
+      if (!customer.email || enrolledEmails.has(customer.email.toLowerCase())) return false;
+      if (!search) return true;
+      return [customer.email, customer.first_name, customer.last_name]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(search));
+    })
+    .sort((left, right) => {
+      if (enrollSort === "newest") return right.created_at.localeCompare(left.created_at);
+      if (enrollSort === "email") return (left.email ?? "").localeCompare(right.email ?? "");
+      return `${left.first_name ?? ""} ${left.last_name ?? ""} ${left.email ?? ""}`
+        .trim()
+        .localeCompare(`${right.first_name ?? ""} ${right.last_name ?? ""} ${right.email ?? ""}`.trim());
+    });
 
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
@@ -89,6 +119,23 @@ export function LoyaltyPageClient() {
     void fetchAccounts();
     void fetchRewards();
   }, [fetchAccounts, fetchRewards]);
+
+  useEffect(() => {
+    if (!showEnroll && !showRewardForm && !pointsModal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (pointsModal) setPointsModal(null);
+      else if (showRewardForm) setShowRewardForm(false);
+      else setShowEnroll(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [pointsModal, showEnroll, showRewardForm]);
 
   async function handleEnroll(e: React.FormEvent) {
     e.preventDefault();
@@ -167,7 +214,6 @@ export function LoyaltyPageClient() {
           items={[{ label: "Dashboard", href: "/admin" }, { label: "Loyalty" }]}
         />
       }
-      inspector={<AuditTimeline title="Recent activity" />}
       actions={
         <Button
           size="sm"
@@ -207,7 +253,7 @@ export function LoyaltyPageClient() {
 
       {tab === "accounts" && (
         loading ? (
-          <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading...</div>
+          <AdminLoadingState label="Loading loyalty accounts" />
         ) : loadError ? (
           <AdminErrorState title="Loyalty unavailable" detail={loadError} onRetry={() => void fetchAccounts()} />
         ) : (
@@ -281,42 +327,109 @@ export function LoyaltyPageClient() {
       </div>
 
       {showEnroll && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleEnroll} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Enroll Customer</h2>
-            <input aria-label="Customer email" required type="email" placeholder="Customer email" value={enrollEmail} onChange={(e) => setEnrollEmail(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" autoFocus />
-            <div className="flex gap-3 justify-end">
+        <ModalPortal>
+          <dialog open aria-labelledby="enroll-customer-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+          <form onSubmit={handleEnroll} className="flex max-h-[min(720px,max(0px,calc(100dvh_-_2rem)))] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="border-b border-border px-6 py-5">
+              <h2 id="enroll-customer-title" className="text-lg font-bold font-headline">Enroll Customer</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Choose an existing customer to add to the loyalty program.</p>
+            </div>
+            <div className="flex min-h-0 flex-col gap-4 p-6">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Input
+                  aria-label="Search customers to enroll"
+                  placeholder="Search by name or email..."
+                  value={enrollSearch}
+                  onChange={(event) => setEnrollSearch(event.target.value)}
+                  autoFocus
+                  className="flex-1"
+                />
+                <select
+                  aria-label="Sort customers to enroll"
+                  value={enrollSort}
+                  onChange={(event) => setEnrollSort(event.target.value as typeof enrollSort)}
+                  className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="name">Name A–Z</option>
+                  <option value="email">Email A–Z</option>
+                  <option value="newest">Newest first</option>
+                </select>
+              </div>
+              <div className="min-h-0 overflow-y-auto rounded-lg border border-border" role="radiogroup" aria-label="Customers available for enrollment">
+                {enrollableCustomers.length > 0 ? enrollableCustomers.map((customer) => {
+                  const email = customer.email!;
+                  const name = [customer.first_name, customer.last_name].filter(Boolean).join(" ");
+                  return (
+                    <label key={customer.id} className="flex cursor-pointer items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-muted/50">
+                      <input
+                        type="radio"
+                        name="enroll-customer"
+                        value={email}
+                        checked={enrollEmail === email}
+                        onChange={() => setEnrollEmail(email)}
+                        required
+                        className="size-4 accent-primary"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{name || email}</span>
+                        {name ? <span className="block truncate text-xs text-muted-foreground">{email}</span> : null}
+                      </span>
+                    </label>
+                  );
+                }) : (
+                  <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                    {customers.length === 0 ? "No customers are available." : "No customers match this search or all customers are already enrolled."}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex w-full justify-end gap-3 border-t border-border px-6 py-4">
               <Button type="button" variant="outline" onClick={() => setShowEnroll(false)}>Cancel</Button>
-              <Button type="submit">Enroll</Button>
+              <Button type="submit" disabled={!enrollEmail || enrollableCustomers.length === 0}>Enroll</Button>
             </div>
           </form>
-        </div>
+          </dialog>
+        </ModalPortal>
       )}
 
       {showRewardForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleCreateReward} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Create Reward</h2>
-            <input aria-label="Reward name" required placeholder="Reward name" value={rewardForm.name} onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <input aria-label="Points cost" required type="number" min="1" placeholder="Points cost" value={rewardForm.points_cost} onChange={(e) => setRewardForm({ ...rewardForm, points_cost: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
-            <select aria-label="Reward type" value={rewardForm.reward_type} onChange={(e) => setRewardForm({ ...rewardForm, reward_type: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
-              <option value="discount">Discount</option>
-              <option value="free_item">Free Item</option>
-              <option value="free_shipping">Free Shipping</option>
-              <option value="custom">Custom</option>
-            </select>
-            <div className="flex gap-3 justify-end">
-              <Button type="button" variant="outline" onClick={() => setShowRewardForm(false)}>Cancel</Button>
-              <Button type="submit">Create</Button>
-            </div>
-          </form>
-        </div>
+        <ModalPortal>
+          <dialog open tabIndex={-1} aria-labelledby="create-reward-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowRewardForm(false); }} onKeyDown={(event) => { if (event.key === "Escape") setShowRewardForm(false); }}>
+            <form onSubmit={handleCreateReward} className="my-auto flex max-h-[calc(100dvh_-_2rem)] w-full max-w-md flex-col gap-5 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-2xl sm:p-7">
+              <div>
+                <h2 id="create-reward-title" className="text-lg font-bold font-headline">Create Reward</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Define the points cost and benefit customers can redeem.</p>
+              </div>
+              <div className="grid gap-4">
+                <label className="grid gap-1.5 text-sm font-medium" htmlFor="reward-name">Reward name
+                  <Input id="reward-name" autoFocus required placeholder="e.g. 10% off accessories" value={rewardForm.name} onChange={(event) => setRewardForm({ ...rewardForm, name: event.target.value })} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-medium" htmlFor="reward-points">Points cost
+                  <Input id="reward-points" required type="number" min="1" inputMode="numeric" placeholder="e.g. 500" value={rewardForm.points_cost} onChange={(event) => setRewardForm({ ...rewardForm, points_cost: event.target.value })} />
+                </label>
+                <label className="grid gap-1.5 text-sm font-medium" htmlFor="reward-type">Reward type
+                  <select id="reward-type" aria-label="Reward type" value={rewardForm.reward_type} onChange={(event) => setRewardForm({ ...rewardForm, reward_type: event.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                    <option value="discount">Discount</option>
+                    <option value="free_item">Free Item</option>
+                    <option value="free_shipping">Free Shipping</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+                <Button className="w-full sm:w-auto" type="button" variant="outline" onClick={() => setShowRewardForm(false)}>Cancel</Button>
+                <Button className="w-full sm:w-auto" type="submit">Create</Button>
+              </div>
+            </form>
+          </dialog>
+        </ModalPortal>
       )}
 
       {pointsModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleAddPoints} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Adjust Points</h2>
+        <ModalPortal>
+          <dialog open aria-labelledby="adjust-points-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+          <form onSubmit={handleAddPoints} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8 space-y-5">
+            <h2 id="adjust-points-title" className="text-lg font-bold font-headline">Adjust Points</h2>
             <p className="text-sm text-on-surface-variant">{pointsModal.customer_email}</p>
             <p className="text-xs text-on-surface-variant">Current balance: {pointsModal.points_balance.toLocaleString()}</p>
             <input aria-label="Points adjustment" required type="number" placeholder="Points (negative to deduct)" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
@@ -326,7 +439,8 @@ export function LoyaltyPageClient() {
               <Button type="submit">Submit</Button>
             </div>
           </form>
-        </div>
+          </dialog>
+        </ModalPortal>
       )}
     </AdminPageShell>
   );

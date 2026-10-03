@@ -1,50 +1,25 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-
-const PROFILE_REQUIRED_PREFIXES = ["/account", "/checkout", "/wishlist"];
-const PROFILE_EXEMPT_CHECKOUT_ROUTES = new Set([
-  "/checkout/hosted-return",
-  "/checkout/stripe-return",
-]);
-
-export function isExplicitGuestCheckout(
-  pathname: string,
-  search: string,
-): boolean {
-  return pathname === "/checkout" && new URLSearchParams(search).get("guest") === "1";
-}
-
-export function requiresStorefrontOnboarding(pathname: string): boolean {
-  if (pathname.startsWith("/api")) return false;
-  if (pathname.startsWith("/_next")) return false;
-  if (pathname.includes(".")) return false;
-  if (PROFILE_EXEMPT_CHECKOUT_ROUTES.has(pathname)) return false;
-  return PROFILE_REQUIRED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-}
+import { isExplicitGuestCheckout, requiresStorefrontOnboarding } from "./onboarding-guard-rules";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const search = searchParams?.toString() ?? "";
   const guestCheckout = isExplicitGuestCheckout(
     pathname ?? "",
     search,
   );
   const [checked, setChecked] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const hydrated = useHydrated();
   const [guardError, setGuardError] = useState<string | null>(null);
   const redirecting = useRef(false);
-
-  useEffect(() => {
-    setHydrated(true);
-    setSearch(window.location.search.slice(1));
-  }, []);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -57,7 +32,7 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       ) {
         redirecting.current = true;
         const next = `${pathname}${search ? `?${search}` : ""}`;
-        router.replace(`/sign-in?callbackUrl=${encodeURIComponent(next)}`);
+        router.replace(`/login?callbackUrl=${encodeURIComponent(next)}`);
         return;
       }
       setChecked(true);
@@ -78,9 +53,11 @@ export function OnboardingGuard({ children }: { children: React.ReactNode }) {
       let lastError: unknown = null;
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
+          const profileStatusSignal = AbortSignal.timeout(10_000);
           const response = await fetch("/api/account/profile/status", {
             credentials: "same-origin",
             cache: "no-store",
+            signal: profileStatusSignal,
           });
           if (!response.ok) {
             throw new Error(`Profile status request failed (${response.status})`);

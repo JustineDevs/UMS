@@ -3,7 +3,19 @@ export type CrmActivity = { type: "email" | "call" | "meeting" | "note" | "task"
 
 export function normalizeCrmEmail(email: string): string {
   const normalized = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) throw new Error("A valid customer email is required");
+  const [local, domain, ...extra] = normalized.split("@");
+  const domainParts = domain?.split(".") ?? [];
+  if (
+    !local ||
+    !domain ||
+    extra.length > 0 ||
+    local.includes(" ") ||
+    domain.includes(" ") ||
+    domainParts.length < 2 ||
+    domainParts.some((part) => !part)
+  ) {
+    throw new Error("A valid customer email is required");
+  }
   return normalized;
 }
 

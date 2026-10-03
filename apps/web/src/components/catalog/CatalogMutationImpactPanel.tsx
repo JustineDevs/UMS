@@ -9,15 +9,16 @@ type Props = {
 
 export function CatalogMutationImpactPanel({ lastClassification }: Props) {
   return (
-    <div
-      className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-200"
+    <details
+      className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-200"
       role="region"
       aria-label="Storefront impact of catalog saves"
     >
-      <p className="font-medium text-neutral-900 dark:text-neutral-100">
+      <summary className="cursor-pointer list-none font-medium text-neutral-900 marker:hidden dark:text-neutral-100">
         How saves affect the storefront
-      </p>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-neutral-700 dark:text-neutral-300">
+        <span className="ml-2 text-xs font-normal text-neutral-500">Review impact before saving</span>
+      </summary>
+      <ul className="mt-3 grid gap-2 border-t border-neutral-200 pt-3 text-xs leading-relaxed text-neutral-700 sm:grid-cols-2 dark:border-neutral-700 dark:text-neutral-300">
         <li>
           <strong>Checkout-affecting</strong> changes (sell price) refresh listings
           and open checkouts may need a fresh review of totals.
@@ -44,6 +45,6 @@ export function CatalogMutationImpactPanel({ lastClassification }: Props) {
           <span className="font-mono text-xs">{lastClassification}</span>
         </p>
       ) : null}
-    </div>
+    </details>
   );
 }

@@ -3,12 +3,18 @@
 import { staffHasPermission, type PlatformRuntimeSettings, RUNTIME_PAYMENT_PROVIDERS } from "@universal-music-store/platform-data";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { readResponseJson } from "@/lib/read-response-json";
 
 const inputClass = "w-full rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800";
 const labelClass = "block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1.5";
 
 function NumberField({ id, label, value, onChange, disabled }: { id: string; label: string; value: number; onChange: (_value: number) => void; disabled: boolean }) {
-  return <div><label className={labelClass} htmlFor={id}>{label}</label><input id={id} className={inputClass} type="number" min={0} value={value} onChange={(event) => { const raw = event.target.value.trim(); if (!raw) return; const next = Number(raw); if (Number.isFinite(next)) onChange(next); }} disabled={disabled} /></div>;
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => setDraft(String(value)), [value]);
+
+  return <div><label className={labelClass} htmlFor={id}>{label}</label><input id={id} className={inputClass} type="number" min={0} value={draft} onChange={(event) => { const raw = event.target.value.trim(); setDraft(raw); if (!raw) return; const next = Number(raw); if (Number.isFinite(next)) onChange(next); }} onBlur={() => { if (!draft) setDraft(String(value)); }} disabled={disabled} /></div>;
 }
 
 export function PlatformRuntimeSettingsEditor() {
@@ -23,7 +29,7 @@ export function PlatformRuntimeSettingsEditor() {
     let cancelled = false;
     fetch("/api/admin/runtime-settings", { credentials: "include", cache: "no-store" })
       .then(async (response) => {
-        const body = (await response.json()) as { data?: PlatformRuntimeSettings; error?: string };
+        const body = await readResponseJson<{ data?: PlatformRuntimeSettings; error?: string }>(response, {});
         if (!response.ok || !body.data) throw new Error(body.error ?? response.statusText);
         if (!cancelled) setSettings(body.data);
       })
@@ -46,7 +52,7 @@ export function PlatformRuntimeSettingsEditor() {
     setSaving(true); setSaved(false); setError(null);
     try {
       const response = await fetch("/api/admin/runtime-settings", { method: "PUT", credentials: "include", headers: { "Content-Type": "application/json", "Idempotency-Key": `runtime-settings-${crypto.randomUUID()}` }, body: JSON.stringify(settings) });
-      const body = (await response.json()) as { data?: PlatformRuntimeSettings; error?: string };
+      const body = await readResponseJson<{ data?: PlatformRuntimeSettings; error?: string }>(response, {});
       if (!response.ok || !body.data) throw new Error(body.error ?? response.statusText);
       setSettings(body.data); setSaved(true);
     } catch (reason: unknown) { setError(reason instanceof Error ? reason.message : "Unable to save settings"); }
@@ -68,6 +74,6 @@ export function PlatformRuntimeSettingsEditor() {
     <fieldset><legend className="text-xs font-bold uppercase tracking-widest text-slate-500">Operational controls</legend><div className="mt-3 grid gap-6 md:grid-cols-2"><NumberField id="runtime-retention" label="Retention days" value={settings.retentionDays} onChange={(value) => update({ retentionDays: value })} disabled={!canWrite} /><NumberField id="runtime-low-stock" label="Low-stock threshold" value={settings.lowStockThreshold} onChange={(value) => update({ lowStockThreshold: value })} disabled={!canWrite} /><NumberField id="runtime-checkout-limit" label="Checkout intents / minute" value={settings.rateLimits.checkoutIntentPerMinute} onChange={(value) => updateLimits("checkoutIntentPerMinute", value)} disabled={!canWrite} /><NumberField id="runtime-track-limit" label="Public tracking / minute" value={settings.rateLimits.publicTrackPerMinute} onChange={(value) => updateLimits("publicTrackPerMinute", value)} disabled={!canWrite} /></div></fieldset>
     <fieldset><legend className="text-xs font-bold uppercase tracking-widest text-slate-500">Pancake pickup location</legend><div className="mt-3 grid gap-6 md:grid-cols-2">{(["name", "phone", "province", "city", "area", "address"] as const).map((key) => <div key={key}><label className={labelClass} htmlFor={`runtime-pickup-${key}`}>{key}</label><input id={`runtime-pickup-${key}`} className={inputClass} value={settings.pickup[key]} onChange={(e) => updatePickup(key, e.target.value)} disabled={!canWrite} /></div>)}</div></fieldset>
     {error ? <p className="text-sm text-red-700" role="alert">{error}</p> : null}
-    <div className="flex items-center gap-3"><button type="button" onClick={() => void save()} disabled={!canWrite || saving} className="rounded bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving…" : "Save settings"}</button>{saved ? <span className="text-sm text-emerald-700" role="status">Saved for this organization.</span> : null}</div>
+    <div className="flex items-center gap-3"><Button type="button" onClick={() => void save()} disabled={!canWrite || saving}>{saving ? "Saving…" : "Save settings"}</Button>{saved ? <span className="text-sm text-emerald-700" role="status">Saved for this organization.</span> : null}</div>
   </section>;
 }

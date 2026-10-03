@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { WishlistPageClient } from "@/components/WishlistPageClient";
+import {
+  StorefrontPageFrame,
+  StorefrontPageHeader,
+} from "@/components/storefront/StorefrontPagePrimitives";
 import { buildPageMetadata, SEO_KEYWORDS } from "@/lib/seo";
 
 export const metadata: Metadata = buildPageMetadata({
@@ -12,17 +16,15 @@ export const metadata: Metadata = buildPageMetadata({
 
 export default function WishlistPage() {
   return (
-    <main className="storefront-page-shell max-w-2xl">
-      <h1 className="font-headline text-3xl font-bold text-primary sm:text-4xl">
-        Saved items
-      </h1>
-      <p className="mt-2 text-sm text-on-surface-variant">
-        Favorites you mark with the heart are stored on this browser. Sign in to
-        open this page and manage your list.
-      </p>
-      <div className="mt-10">
+    <StorefrontPageFrame>
+      <StorefrontPageHeader
+        title="Saved items"
+        description="Keep products you want close."
+        aside="Save products, share your list, and add available items to your bag."
+      />
+      <div className="mt-8">
         <WishlistPageClient />
       </div>
-    </main>
+    </StorefrontPageFrame>
   );
 }

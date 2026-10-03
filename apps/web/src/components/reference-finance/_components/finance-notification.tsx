@@ -6,7 +6,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
 
 export function FinanceNotification() {
   return (
-    <Item className="rounded-xl" variant="outline">
+    <Item className="rounded-xl bg-muted/30">
       <ItemMedia variant="icon">
         <AlertCircle />
       </ItemMedia>

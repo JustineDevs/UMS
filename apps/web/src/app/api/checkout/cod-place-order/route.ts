@@ -47,6 +47,12 @@ export async function POST(req: Request) {
 
   const isolatedCodE2E = isIsolatedCodE2E();
   const cartId = await readCartIdFromCookie();
+  const checkoutAttemptId = req.headers
+    .get("cookie")
+    ?.split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("checkout_attempt_id="))
+    ?.slice("checkout_attempt_id=".length);
   const workerBaseUrl = process.env.API_URL?.trim().replace(/\/$/, "");
   const response = await handleCodPlaceOrderRequest(req, {
     applyRateLimit: async (request) =>
@@ -55,12 +61,16 @@ export async function POST(req: Request) {
     getPaymentAttemptRow: async (id, requestedCartId) => {
       if (isolatedCodE2E) return getIsolatedCodAttempt(id);
       const activeCartId = requestedCartId ?? cartId;
-      if (!workerBaseUrl || !activeCartId) return null;
+      if (!workerBaseUrl || (!activeCartId && !checkoutAttemptId)) return null;
       try {
+        const cookies = [
+          activeCartId ? `mcart_id=${encodeURIComponent(activeCartId)}` : "",
+          checkoutAttemptId ? `checkout_attempt_id=${checkoutAttemptId}` : "",
+        ].filter(Boolean).join("; ");
         const workerResponse = await fetch(
           `${workerBaseUrl}/store/checkout-intents/${encodeURIComponent(id)}`,
           {
-            headers: { Cookie: `mcart_id=${encodeURIComponent(activeCartId)}` },
+            headers: { Cookie: cookies },
             cache: "no-store",
           },
         );
@@ -80,6 +90,16 @@ export async function POST(req: Request) {
           provider: attempt.provider,
           status:
             typeof attempt.status === "string" ? attempt.status : undefined,
+          checkout_state:
+            typeof attempt.checkoutState === "string"
+              ? attempt.checkoutState
+              : undefined,
+          medusa_order_id:
+            typeof attempt.medusaOrderId === "string"
+              ? attempt.medusaOrderId
+              : null,
+          order_id:
+            typeof attempt.orderId === "string" ? attempt.orderId : null,
           quote_fingerprint:
             typeof attempt.quoteFingerprint === "string"
               ? attempt.quoteFingerprint

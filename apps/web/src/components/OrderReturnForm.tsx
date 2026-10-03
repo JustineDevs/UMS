@@ -63,7 +63,7 @@ export function OrderReturnForm({
         setError(data.error ?? "Request failed");
         return;
       }
-      router.push(`/account?return=submitted`);
+      router.push(`/account/profile?return=submitted`);
       router.refresh();
     } catch {
       setError("Network error");

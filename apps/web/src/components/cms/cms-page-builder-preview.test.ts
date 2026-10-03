@@ -4,6 +4,7 @@ import type { CmsComponentDefinition } from "@universal-music-store/platform-dat
 import {
   componentCanvasDocument,
   createComponentCanvasPreviewBlock,
+  cmsPreviewMutationNodeId,
   sanitizeVisualPropertyValue,
 } from "./CmsPageBuilder";
 import type { VisualBuilderProperty } from "@/lib/visual-builder/component-definitions";
@@ -102,4 +103,9 @@ test("visual property edits use the published CMS HTML policy", () => {
   assert.equal(sanitizeVisualPropertyValue(urlProperty, "/shop#new"), "/shop#new");
   assert.equal(sanitizeVisualPropertyValue(urlProperty, "javascript:alert(1)"), "");
   assert.equal(sanitizeVisualPropertyValue(urlProperty, "data:text/html,payload"), "");
+});
+
+test("preview mutation history uses the owning component id", () => {
+  assert.equal(cmsPreviewMutationNodeId("block-1::hero.title"), "block-1");
+  assert.equal(cmsPreviewMutationNodeId("block-1"), "block-1");
 });

@@ -71,7 +71,7 @@ export function Faq4({
               <AccordionItem
                 key={faq.id}
                 value={faq.id}
-                className="rounded-2xl border-none bg-neutral-100/70 px-6 transition-all duration-300 data-[state=open]:bg-neutral-100 data-[state=open]:ring-2 data-[state=open]:ring-neutral-950/20 dark:bg-neutral-900/70 dark:data-[state=open]:bg-neutral-900 dark:data-[state=open]:ring-neutral-100/20"
+                className="rounded-2xl border-none bg-neutral-100/70 px-6 transition-[background-color,box-shadow] duration-300 data-[state=open]:bg-neutral-100 data-[state=open]:ring-2 data-[state=open]:ring-neutral-950/20 dark:bg-neutral-900/70 dark:data-[state=open]:bg-neutral-900 dark:data-[state=open]:ring-neutral-100/20"
               >
                 <AccordionTrigger className="group py-5 hover:no-underline">
                   <span className="pr-4 text-left text-base font-medium text-neutral-950 dark:text-neutral-50">
@@ -91,7 +91,7 @@ export function Faq4({
               <AccordionItem
                 key={faq.id}
                 value={faq.id}
-                className="rounded-2xl border-none bg-neutral-100/70 px-6 transition-all duration-300 data-[state=open]:bg-neutral-100 data-[state=open]:ring-2 data-[state=open]:ring-neutral-950/20 dark:bg-neutral-900/70 dark:data-[state=open]:bg-neutral-900 dark:data-[state=open]:ring-neutral-100/20"
+                className="rounded-2xl border-none bg-neutral-100/70 px-6 transition-[background-color,box-shadow] duration-300 data-[state=open]:bg-neutral-100 data-[state=open]:ring-2 data-[state=open]:ring-neutral-950/20 dark:bg-neutral-900/70 dark:data-[state=open]:bg-neutral-900 dark:data-[state=open]:ring-neutral-100/20"
               >
                 <AccordionTrigger className="group py-5 hover:no-underline">
                   <span className="pr-4 text-left text-base font-medium text-neutral-950 dark:text-neutral-50">

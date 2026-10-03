@@ -27,7 +27,7 @@ export function InvoicePreview({ invoice }: { invoice: InvoiceFormValues }) {
   return (
     <>
       <PrintInvoice invoice={invoice} />
-      <div className="flex flex-col rounded-xl border bg-card">
+      <div className="flex min-w-0 max-w-full flex-col rounded-xl border bg-card">
         <div className="flex items-center justify-between px-4 py-4">
           <h2 className="font-medium text-lg">Preview</h2>
           <ButtonGroup>
@@ -37,14 +37,14 @@ export function InvoicePreview({ invoice }: { invoice: InvoiceFormValues }) {
             </Button>
             <Button type="button" variant="outline" onClick={handlePrint}>
               <Download data-icon="inline-start" />
-              Download PDF
+              Print / Save PDF
             </Button>
           </ButtonGroup>
         </div>
 
         <div
           ref={previewBodyRef}
-          className="@container/preview relative min-h-[calc(100svh-15rem)] flex-1 rounded-b-xl bg-stone-200 p-4 dark:bg-stone-800"
+          className="@container/preview relative min-h-[calc(100svh_-_15rem)] flex-1 overflow-hidden rounded-b-xl bg-stone-200 p-4 dark:bg-stone-800"
         >
           {paperLayout === null ? (
             <div className="absolute inset-0 grid place-items-center text-muted-foreground text-sm">
@@ -57,10 +57,9 @@ export function InvoicePreview({ invoice }: { invoice: InvoiceFormValues }) {
                 ? INVOICE_PAPER_HEIGHT * paperLayout.scale
                 : INVOICE_PAPER_HEIGHT * INVOICE_PAPER_SCALE,
               top: paperLayout?.top ?? "50%",
-              transform: paperLayout === null ? "translate(-50%, -50%)" : "translateX(-50%)",
               width: paperLayout ? INVOICE_PAPER_WIDTH * paperLayout.scale : INVOICE_PAPER_WIDTH * INVOICE_PAPER_SCALE,
             }}
-            className="absolute left-1/2 opacity-0 data-[ready=true]:opacity-100"
+            className="absolute left-1/2 max-sm:left-4 max-sm:translate-x-0 sm:-translate-x-1/2 opacity-0 data-[ready=true]:opacity-100"
             data-ready={paperLayout !== null}
           >
             <div

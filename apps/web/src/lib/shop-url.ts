@@ -18,7 +18,9 @@ export type ShopQuery = {
 
 export function shopHref(q: ShopQuery): string {
   const params = new URLSearchParams();
-  if (q.category?.trim()) params.set("category", q.category.trim());
+  // Category pages were consolidated into the canonical /shop catalog. Keep
+  // the legacy field in the type so older callers remain source-compatible,
+  // but never generate the retired query route again.
   if (q.type?.trim()) params.set("type", q.type.trim());
   if (q.finish?.trim()) params.set("finish", q.finish.trim());
   if (q.brand?.trim()) params.set("brand", q.brand.trim());

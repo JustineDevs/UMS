@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   AdminBreadcrumbs,
   AdminErrorState,
   AdminEmptyState,
+  AdminLoadingState,
   AdminPageShell,
-  AuditTimeline,
 } from "@/components/admin-console";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +41,10 @@ type FormData = {
 
 const EMPTY_FORM: FormData = { full_name: "", email: "", phone: "", role: "staff", hired_at: "" };
 
+function ModalPortal({ children }: { children: React.ReactNode }) {
+  return typeof document === "undefined" ? null : createPortal(children, document.body);
+}
+
 export function UsersPageClient() {
   const pinMutationRef = useRef(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -49,6 +54,7 @@ export function UsersPageClient() {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [actionKey, setActionKey] = useState<string | null>(null);
   const [pinModal, setPinModal] = useState<{ id: string; name: string } | null>(null);
   const [pinValue, setPinValue] = useState("");
@@ -73,9 +79,37 @@ export function UsersPageClient() {
 
   useEffect(() => { void fetchEmployees(); }, [fetchEmployees]);
 
+  useEffect(() => {
+    if (!showForm && !deleteModal && !pinModal) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (deleteModal) {
+        setDeleteModal(null);
+        setDeleteError(null);
+      } else if (pinModal) {
+        setPinModal(null);
+        setPinValue("");
+      } else {
+        setShowForm(false);
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [deleteModal, pinModal, showForm]);
+
+  useEffect(() => {
+    if (!showForm && !deleteModal && !pinModal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [deleteModal, pinModal, showForm]);
+
   function openCreate() {
     setEditId(null);
     setForm(EMPTY_FORM);
+    setFormError(null);
     setShowForm(true);
   }
 
@@ -88,6 +122,7 @@ export function UsersPageClient() {
       role: emp.role,
       hired_at: emp.hired_at ?? "",
     });
+    setFormError(null);
     setShowForm(true);
   }
 
@@ -96,6 +131,7 @@ export function UsersPageClient() {
     if (saving) return;
     setSaving(true);
     setLoadError(null);
+    setFormError(null);
     const url = editId ? `/api/admin/employees/${editId}` : "/api/admin/employees";
     const method = editId ? "PATCH" : "POST";
     try {
@@ -108,7 +144,7 @@ export function UsersPageClient() {
       setShowForm(false);
       await fetchEmployees();
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "User could not be saved.");
+      setFormError(error instanceof Error ? error.message : "User could not be saved.");
     } finally {
       setSaving(false);
     }
@@ -211,10 +247,9 @@ export function UsersPageClient() {
           Add User
         </Button>
       }
-      inspector={<AuditTimeline title="Recent activity" />}
     >
       {loading ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading...</div>
+        <AdminLoadingState label="Loading users" />
       ) : loadError ? (
         <AdminErrorState title="Users unavailable" detail={loadError} onRetry={() => void fetchEmployees()} />
       ) : (
@@ -240,7 +275,11 @@ export function UsersPageClient() {
                     </span>
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className={`inline-block w-2 h-2 rounded-full ${emp.is_active ? "bg-emerald-500" : "bg-slate-300"}`} />
+                    <span
+                      className={`inline-block h-2 w-2 rounded-full ${emp.is_active ? "bg-emerald-500" : "bg-slate-300"}`}
+                      aria-label={emp.is_active ? "Active" : "Inactive"}
+                      role="img"
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
@@ -275,52 +314,69 @@ export function UsersPageClient() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">{editId ? "Edit User" : "Add User"}</h2>
-            <div>
-              <label htmlFor="employee-full-name" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Full Name</label>
-              <input id="employee-full-name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+        <ModalPortal>
+        <dialog
+          open
+          tabIndex={-1}
+          aria-labelledby="user-form-title"
+          aria-describedby="user-form-description"
+          className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/50 p-4 sm:p-6"
+          onMouseDown={(event) => {
+            if (!saving && event.target === event.currentTarget) setShowForm(false);
+          }}
+          onKeyDown={(event) => { if (event.key === "Escape") setShowForm(false); }}
+        >
+          <form onSubmit={handleSubmit} className="my-auto flex max-h-[calc(100dvh_-_2rem)] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-2xl sm:p-7">
+            <div className="space-y-1">
+              <h2 id="user-form-title" className="text-xl font-bold font-headline">{editId ? "Edit User" : "Add User"}</h2>
+              <p id="user-form-description" className="text-sm text-muted-foreground">Create a staff account and assign its access level.</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="employee-email" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Email</label>
-                <input id="employee-email" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+            {formError ? <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{formError}</p> : null}
+            <div className="space-y-2">
+              <label htmlFor="employee-full-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Full Name</label>
+              <input id="employee-full-name" required autoFocus autoComplete="name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
+            </div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="employee-email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Email</label>
+                <input id="employee-email" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
               </div>
-              <div>
-                <label htmlFor="employee-phone" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Phone</label>
-                <input id="employee-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+              <div className="space-y-2">
+                <label htmlFor="employee-phone" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Phone</label>
+                <input id="employee-phone" type="tel" autoComplete="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="employee-role" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Role</label>
-                <select id="employee-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label htmlFor="employee-role" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Role</label>
+                <select id="employee-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30">
                   <option value="staff">Staff</option>
                   <option value="cashier">Cashier</option>
                   <option value="manager">Manager</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div>
-                <label htmlFor="employee-hired-date" className="text-xs font-bold uppercase tracking-widest text-on-surface-variant block mb-1">Hired Date</label>
-                <input id="employee-hired-date" type="date" value={form.hired_at} onChange={(e) => setForm({ ...form, hired_at: e.target.value })} className="w-full border border-outline-variant/20 rounded px-3 py-2.5 text-sm focus:ring-1 focus:ring-primary/40" />
+              <div className="space-y-2">
+                <label htmlFor="employee-hired-date" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Hired Date</label>
+                <input id="employee-hired-date" type="date" value={form.hired_at} onChange={(e) => setForm({ ...form, hired_at: e.target.value })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/30" />
               </div>
             </div>
-            <div className="flex gap-3 justify-end pt-2">
+            <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
               <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              <Button type="submit" disabled={saving}>
+              <Button type="submit" disabled={saving} className="sm:min-w-24">
                 {saving ? "Saving..." : editId ? "Update" : "Create"}
               </Button>
             </div>
           </form>
-        </div>
+        </dialog>
+        </ModalPortal>
       )}
 
       {deleteModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Delete user</h2>
+        <ModalPortal>
+        <dialog open aria-labelledby="delete-user-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+          <div className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="delete-user-title" className="text-lg font-bold font-headline">Delete user</h2>
             <p className="text-sm text-on-surface-variant">
               Remove{" "}
               <span className="font-semibold text-on-surface">{deleteModal.name}</span>{" "}
@@ -354,13 +410,15 @@ export function UsersPageClient() {
               </Button>
             </div>
           </div>
-        </div>
+        </dialog>
+        </ModalPortal>
       )}
 
       {pinModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSetPin} className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-8 space-y-5">
-            <h2 className="text-lg font-bold font-headline">Set PIN for {pinModal.name}</h2>
+        <ModalPortal>
+        <dialog open aria-labelledby="set-pin-title" className="fixed inset-0 z-[100] m-0 flex h-dvh w-dvw max-w-none items-center justify-center overflow-y-auto border-0 bg-black/40 p-4 sm:p-6">
+          <form onSubmit={handleSetPin} className="my-auto max-h-[calc(100dvh_-_2rem)] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-8">
+            <h2 id="set-pin-title" className="text-lg font-bold font-headline">Set PIN for {pinModal.name}</h2>
             <p className="text-sm text-on-surface-variant">Enter a 4-8 digit PIN for POS operations.</p>
             <input
               aria-label="POS PIN"
@@ -382,7 +440,8 @@ export function UsersPageClient() {
               </Button>
             </div>
           </form>
-        </div>
+        </dialog>
+        </ModalPortal>
       )}
     </AdminPageShell>
   );

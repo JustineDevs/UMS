@@ -6,13 +6,10 @@ import { createPortal } from "react-dom";
 
 import type { InvoiceFormValues } from "./data";
 import { InvoicePaper } from "./invoice-paper";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function PrintInvoice({ invoice }: { invoice: InvoiceFormValues }) {
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
 
   if (!mounted) return null;
 

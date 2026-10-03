@@ -32,6 +32,7 @@ test("delivery shipment mutation uses tenant-scoped upsert and durable idempoten
   }, end: async () => {} };
   const commerce = { query: async <T extends Record<string, unknown>>(text: string, values: readonly unknown[] = []) => {
     assert.match(text, /metadata->>'organization_id' = \$2/);
+    assert.match(text, /metadata->>'store_id' = \$2/);
     assert.deepEqual(values, ["order-1", "org_1"]);
     return { rows: [{ display_id: 77, email: "buyer@example.com" }] as T[], rowCount: 1 };
   }, end: async () => {} };

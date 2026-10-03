@@ -1,8 +1,17 @@
 import { CalendarDays, CalendarRange } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@universal-music-store/ui";
 
 type ReminderActivity = {
   subject: string;
@@ -20,6 +29,7 @@ export function TaskReminders({
   proposalSent: number;
   proposalGoal: number;
 }) {
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const meeting = activities.find((activity) => activity.activity_type === "meeting");
   const safeGoal = Math.max(proposalGoal, proposalSent, 1);
   const proposalProgressPercentage = Math.min(100, Math.round((proposalSent / safeGoal) * 100));
@@ -32,10 +42,10 @@ export function TaskReminders({
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
       <Card className="xl:col-span-8">
-        <CardHeader>
+        <CardHeader className="relative pr-40">
           <CardTitle>Upcoming Meetings</CardTitle>
-          <CardAction>
-            <Button variant="outline" size="sm">
+          <CardAction className="absolute right-6 top-6">
+            <Button variant="outline" size="sm" onClick={() => setCalendarOpen(true)}>
               <CalendarDays data-icon="inline-start" />
               View Calendar
             </Button>
@@ -82,6 +92,33 @@ export function TaskReminders({
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upcoming meetings</DialogTitle>
+            <DialogDescription>Review scheduled CRM meetings and their customer details.</DialogDescription>
+          </DialogHeader>
+          {meeting ? (
+            <div className="rounded-lg border p-4">
+              <div className="font-medium">{meeting.subject}</div>
+              <div className="mt-1 text-muted-foreground text-sm">{meeting.customer_email}</div>
+              {meeting.due_at ? (
+                <div className="mt-3 text-muted-foreground text-sm">
+                  {new Date(meeting.due_at).toLocaleString("en-PH", { timeZone: "Asia/Manila" })}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="py-4 text-muted-foreground text-sm">No upcoming meetings.</p>
+          )}
+          <div className="flex justify-end">
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card className="xl:col-span-4">
         <CardHeader>

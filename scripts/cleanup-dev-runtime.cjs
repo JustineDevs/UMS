@@ -10,6 +10,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const projectRoot = path.resolve(__dirname, "..");
+const runtimeLockModule = require("./uvs-runtime-lock.cjs");
 const runtimeLockPath = path.join(
   projectRoot,
   ".uvs-dev-runtime",
@@ -103,7 +104,9 @@ function stopWorkspaceDevProcesses() {
   const knownCommands = [
     "dev-worker-first.mjs",
     "run-next-dev.cjs",
+    "next dev",
     "next dev --port",
+    "next dev -p",
     "wrangler dev",
     "tsx watch",
     "tsx/dist/cli.mjs watch",
@@ -153,6 +156,15 @@ function stopWorkspaceDevProcesses() {
 }
 
 try {
+  const runtimeLock = runtimeLockModule.readLock();
+  if (runtimeLock?.pgid && runtimeLock.pgid !== process.pid) {
+    stopProcessGroup(runtimeLock.pgid);
+    reapPids([runtimeLock.pid]);
+  }
+} catch {
+  // The lock may be absent or already stale.
+}
+try {
   const lock = JSON.parse(fs.readFileSync(runtimeLockPath, "utf8"));
   if (Number.isInteger(lock.pid) && lock.pid !== process.pid) {
     stopProcessGroup(lock.pid);
@@ -160,6 +172,12 @@ try {
   }
 } catch {
   // No active supervisor or the lock is stale.
+}
+runtimeLockModule.release();
+try {
+  fs.rmSync(runtimeLockModule.getLockPath(), { force: true });
+} catch {
+  // The lock may already have been removed by the owner.
 }
 try {
   fs.rmSync(runtimeLockPath, { force: true });

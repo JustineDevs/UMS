@@ -23,7 +23,3 @@ export function formatAuditActorLabel(entry: AuditActorSource): string {
   }
   return "Unknown";
 }
-
-export function auditActorCsvCell(entry: AuditActorSource): string {
-  return formatAuditActorLabel(entry);
-}

@@ -5,6 +5,7 @@ node_modules/
 # Build outputs
 .next/
 .next-production/
+.next-dev/
 .wrangler/
 .turbo/
 .medusa/
@@ -15,6 +16,9 @@ node_modules/
 dist/
 out/
 build/
+# The admin CMS route is source code, not a build artifact.
+!apps/web/src/app/(dashboard)/admin/build/
+!apps/web/src/app/(dashboard)/admin/build/page.tsx
 *.tsbuildinfo
 *.swc
 *.eslintcache
@@ -68,17 +72,17 @@ artifacts
 coverage/
 .nyc_output/
 
-# E2E / stress-test (all test outputs live under stress-test/)
-stress-test/playwright-report/
-stress-test/test-results/
-stress-test/blob-report/
-stress-test/.playwright-cache/
-stress-test/release-gate-logs/
-stress-test/checkout-provider-stress-logs/
-stress-test/e2e/.auth/
-stress-test/dogfood-output/**/*.png
-stress-test/dogfood-output/**/*.webm
-stress-test/dogfood-output/**/*.mp4
+# E2E / stress-test (source and outputs live under scripts/stress-test/)
+scripts/stress-test/playwright-report/
+scripts/stress-test/test-results/
+scripts/stress-test/blob-report/
+scripts/stress-test/.playwright-cache/
+scripts/stress-test/release-gate-logs/
+scripts/stress-test/checkout-provider-stress-logs/
+scripts/stress-test/e2e/.auth/
+scripts/stress-test/dogfood-output/**/*.png
+scripts/stress-test/dogfood-output/**/*.webm
+scripts/stress-test/dogfood-output/**/*.mp4
 
 # Legacy root paths (deprecated: use stress-test/ for all E2E outputs)
 playwright-report/

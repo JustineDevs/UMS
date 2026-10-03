@@ -11,7 +11,8 @@ If you discover a security vulnerability in the Universal Music Store Platform, 
 ### How to Report
 
 1. **Do not** open a public GitHub issue for security vulnerabilities.
-2. Contact the maintainers directly via the contact method listed in the repository or project documentation.
+2. Submit a private vulnerability report through the repository's
+   [GitHub Security Advisory form](https://github.com/JustineDevs/UMS/security/advisories/new).
 3. Include a clear description of the vulnerability, steps to reproduce, and potential impact.
 4. Allow a reasonable time for a fix before any public disclosure.
 

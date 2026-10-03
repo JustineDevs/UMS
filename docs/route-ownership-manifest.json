@@ -11,17 +11,6 @@
   },
   "entries": [
     {
-      "route": "/account/loyalty",
-      "methods": [
-        "get"
-      ],
-      "source": "apps/web/src/app/api/account/loyalty/route.ts",
-      "owner": "worker-origin",
-      "signals": [
-        "worker-proxy"
-      ]
-    },
-    {
       "route": "/account/marketing-preferences",
       "methods": [
         "get",
@@ -186,6 +175,19 @@
         "post"
       ],
       "source": "apps/web/src/app/api/admin/catalog/categories/route.ts",
+      "owner": "worker-origin",
+      "signals": [
+        "worker-proxy"
+      ]
+    },
+    {
+      "route": "/admin/catalog/media/{id}",
+      "methods": [
+        "delete",
+        "get",
+        "patch"
+      ],
+      "source": "apps/web/src/app/api/admin/catalog/media/[id]/route.ts",
       "owner": "worker-origin",
       "signals": [
         "worker-proxy"

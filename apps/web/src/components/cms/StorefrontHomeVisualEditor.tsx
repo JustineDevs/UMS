@@ -13,9 +13,10 @@ import {
 } from "@universal-music-store/platform-data";
 import { useSession } from "@/lib/auth-client";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getStorefrontPublicOrigin } from "@/lib/storefront-public-url";
 import { cmsMutationHeaders } from "@/lib/cms-mutation-headers";
+import { readResponseJson } from "@/lib/read-response-json";
 
 const StorefrontPublicMetadataEditor = dynamic(
   () => import("@/components/StorefrontPublicMetadataEditor").then((module) => module.StorefrontPublicMetadataEditor),
@@ -31,9 +32,7 @@ const IDS = {
   headerNavigation: "header-navigation",
   headerActions: "header-actions",
   hero: "home-hero",
-  tiles: "home-tiles",
   latest: "home-latest",
-  newsletter: "home-newsletter",
   footer: "storefront-footer",
   footerColumns: "footer-columns",
 } as const;
@@ -82,22 +81,10 @@ function toBlocks(payload: StorefrontHomePayload): CmsBlock[] {
         domOverrides: payload.domOverrides,
       },
     },
-    { id: IDS.tiles, type: "home_tiles", props: { tiles: payload.tiles, layout: payload.sectionLayout?.tiles } },
     {
       id: IDS.latest,
       type: "latest_section",
       props: { ...payload.latestSection, layout: payload.sectionLayout?.latest },
-    },
-    {
-      id: IDS.newsletter,
-      type: "newsletter",
-      props: {
-        heading: payload.newsletter.title,
-        subtitle: payload.newsletter.body,
-        placeholder: payload.newsletter.placeholder,
-        buttonLabel: payload.newsletter.buttonLabel,
-        layout: payload.sectionLayout?.newsletter,
-      },
     },
     {
       id: IDS.footer,
@@ -125,7 +112,7 @@ export function StorefrontHomeVisualEditor({
   );
   const [payload, setPayload] = useState<StorefrontHomePayload | null>(null);
   const [blocks, setBlocks] = useState<CmsBlock[]>([]);
-  const [mutations, setMutations] = useState<CmsMutationRecord[]>([]);
+  const mutationsRef = useRef<CmsMutationRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -137,14 +124,14 @@ export function StorefrontHomeVisualEditor({
       fetch("/api/admin/cms/pages?locale=en&slug=home", { signal: controller.signal }),
     ])
       .then(async ([legacyResponse, canonicalResponse]) => {
-        const legacyJson = (await legacyResponse.json()) as {
+        const legacyJson = await readResponseJson<{
           data?: StorefrontHomePayload;
           error?: string;
           devMode?: boolean;
-        };
+        }>(legacyResponse, {});
         if (!legacyResponse.ok) throw new Error(legacyJson.error ?? legacyResponse.statusText);
         const canonicalJson = canonicalResponse.ok
-          ? ((await canonicalResponse.json()) as { data?: Array<{ tree?: CmsNode[] }> })
+          ? await readResponseJson<{ data?: Array<{ tree?: CmsNode[] }> }>(canonicalResponse, {})
           : { data: [] };
         if (!cancelled) {
           const normalizedPayload = mergeStorefrontHomePayload(legacyJson.data);
@@ -203,7 +190,7 @@ export function StorefrontHomeVisualEditor({
           status: "published",
           tree: cmsBlocksToTree(currentBlocks),
           blocks: currentBlocks,
-          mutations,
+          mutations: mutationsRef.current,
         }),
       });
       if (!canonical.ok) {
@@ -234,7 +221,9 @@ export function StorefrontHomeVisualEditor({
       onChange={(next) => {
         setBlocks(next);
       }}
-      onMutation={(mutation) => setMutations((current) => [...current, mutation])}
+      onMutation={(mutation) => {
+        mutationsRef.current = [...mutationsRef.current, mutation];
+      }}
       disabled={!canWrite}
       immersive
       pageTitle="Homepage"
@@ -255,7 +244,7 @@ export function StorefrontHomeVisualEditor({
             </p>
             <p>
               Use the Components panel to add reusable content sections. Homepage
-              sections are kept in the same CMS canvas as ordinary pages.
+              sections are kept in the same Build canvas as ordinary pages.
             </p>
             {saved ? (
               <p className="rounded bg-emerald-50 px-2.5 py-2 text-emerald-700">

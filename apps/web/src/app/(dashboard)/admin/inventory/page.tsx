@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { AdminBreadcrumbs, AdminPageShell, AuditTimeline } from "@/components/admin-console";
+import Link from "next/link";
+import { AdminPageHeader, AdminPageShell } from "@/components/admin-console";
 import { InventoryDefaultQuerySync } from "@/components/InventoryDefaultQuerySync";
 import { InventoryTableWithRefresh } from "@/components/InventoryTableWithRefresh";
 import { fetchInventoryPage } from "@/lib/inventory-admin-bridge";
@@ -40,15 +41,20 @@ export default async function InventoryPage({
 
   return (
     <AdminPageShell
-      title="Inventory"
-      subtitle={`Live stock levels. ${result.total} variant${result.total === 1 ? "" : "s"} in your store.`}
-      breadcrumbs={
-        <AdminBreadcrumbs
-          items={[{ label: "Dashboard", href: "/admin" }, { label: "Inventory" }]}
-        />
-      }
-      inspector={<AuditTimeline title="Recent activity" />}
+      hideHeader
     >
+      <AdminPageHeader
+        title="Inventory"
+        subtitle={`Stock control · ${result.total} catalog variant${result.total === 1 ? "" : "s"} currently tracked`}
+        actions={
+          <Link
+            href="/admin/catalog/new"
+            className="inline-flex h-9 items-center rounded-lg bg-slate-950 px-3.5 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90 dark:bg-white dark:text-slate-950"
+          >
+            Add product
+          </Link>
+        }
+      />
       <Suspense
         fallback={
           <div

@@ -9,6 +9,7 @@ import {
   expandSearchQueries,
 } from "@/lib/search-suggestion-ranking";
 import { searchSuggestionsResponseSchema } from "@/lib/admin-api-contracts";
+import { catalogAmountToStorefrontPrice } from "@/lib/storefront-price";
 
 const SUGGESTION_CACHE_HEADERS = {
   "Cache-Control": "public, max-age=5, s-maxage=60, stale-while-revalidate=300",
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
           suggestionsBySlug.set(suggestion.slug, {
             slug: suggestion.slug,
             name: suggestion.name,
-            minPrice: suggestion.minPrice,
+            minPrice: catalogAmountToStorefrontPrice(suggestion.minPrice),
             ...(typeof suggestion.imageUrl === "string" ? { imageUrl: suggestion.imageUrl } : {}),
           });
         }

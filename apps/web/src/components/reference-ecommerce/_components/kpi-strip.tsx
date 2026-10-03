@@ -3,7 +3,7 @@
 import { ArrowUpRight, Banknote, PackageCheck, ReceiptText, RotateCcw, ShoppingBag, Users } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ const SalesOverviewChart = dynamic(
 );
 
 export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   const totalSales = data?.totalSales ?? 0;
   const totalOrders = data?.totalOrders ?? 0;
   const customerGrowth = data?.customerGrowth ?? 0;
@@ -28,10 +28,8 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
   const maxOrders = Math.max(1, ...salesOverviewData.map((row) => row.orders));
   const metricNote = data?.commerceUnavailable ? "Commerce unavailable" : "From live commerce data";
 
-  useEffect(() => setMounted(true), []);
-
   return (
-    <div className="h-full overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 xl:col-span-12">
+    <div className="h-full overflow-hidden rounded-xl bg-card xl:col-span-12">
       <div>
         <div className="grid grid-cols-1 xl:grid-cols-12">
           <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-3 xl:col-span-5 xl:border-r">
@@ -142,7 +140,7 @@ export function KpiStrip({ data }: { data?: EcommerceDashboardData }) {
               {hasSalesOverview && mounted ? (
                 <SalesOverviewChart data={salesOverviewData} maxRevenue={maxRevenue} maxOrders={maxOrders} />
               ) : (
-                <div className="flex h-74 items-center justify-center rounded-lg border border-dashed text-center">
+                <div className="flex h-72 items-center justify-center rounded-lg border border-dashed text-center">
                   <div className="max-w-xs px-6">
                     <div className="font-medium text-sm">{mounted ? "No sales chart yet" : "Loading sales chart…"}</div>
                     <div className="mt-1 text-muted-foreground text-sm">

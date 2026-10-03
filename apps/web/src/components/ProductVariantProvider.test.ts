@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 import test from "node:test";
 import type { ProductVariant } from "@universal-music-store/types";
-import { findSellableVariantForOptions, isVariantSellable } from "./ProductVariantProvider";
+import { findSellableVariantForOptions, isVariantSellable } from "./product-variant-rules";
 
 function variant(overrides: Partial<ProductVariant> = {}): ProductVariant {
   return {

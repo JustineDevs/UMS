@@ -30,3 +30,49 @@ test("receipt upload rejects a mismatched file signature before storage", async 
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "Receipt contents do not match the declared file type" });
 });
+
+test("receipt upload removes the private object when metadata insertion fails", async () => {
+  const app = {
+    query: async <T extends Record<string, unknown>>(text: string) => {
+      if (text.includes("payment_attempts")) {
+        return { rows: [{ id: "attempt-1", organization_id: "org-1" }], rowCount: 1 } as { rows: T[]; rowCount: number };
+      }
+      throw new Error("metadata_insert_failed");
+    },
+    end: async () => {},
+  };
+  const commerce = {
+    query: async <T extends Record<string, unknown>>() =>
+      ({ rows: [{ id: "order-1" }], rowCount: 1 }) as { rows: T[]; rowCount: number },
+    end: async () => {},
+  };
+  const requests: Array<{ url: string; method: string }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    requests.push({ url: String(input), method: init?.method ?? "GET" });
+    return new Response(JSON.stringify({}), { status: 201 });
+  };
+  try {
+    const form = new FormData();
+    form.set("orderId", "order-1");
+    form.set("receipt", new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: "image/png" }), "receipt.png");
+    const response = await handleReceiptUploadRequest(
+      new Request("https://worker.test/store/checkout/upload-payment-receipt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+        body: form,
+      }),
+      app,
+      commerce,
+      { JWT_SECRET: secret, SUPABASE_STORAGE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "service-key" },
+    );
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), { error: "Failed to record receipt. Contact support." });
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0]?.method, "POST");
+    assert.equal(requests[1]?.method, "DELETE");
+    assert.match(requests[1]?.url ?? "", /\/storage\/v1\/object\/payment-receipts\/order-1\/.+\.png$/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

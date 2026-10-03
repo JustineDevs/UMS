@@ -1,3 +1,7 @@
 .vercel
 .next
 .next-production
+.next-dev
+
+*storybook.log
+storybook-static

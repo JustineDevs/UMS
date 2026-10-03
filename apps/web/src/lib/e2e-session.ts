@@ -2,7 +2,6 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { E2E_SESSION_COOKIE } from "./e2e-session-constants";
 
-export { E2E_SESSION_COOKIE } from "./e2e-session-constants";
 const MAX_AGE_SECONDS = 8 * 60 * 60;
 
 function enabled(): boolean {

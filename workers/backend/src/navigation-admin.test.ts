@@ -8,13 +8,13 @@ function encode(value: unknown): string { return btoa(JSON.stringify(value)).rep
 async function token(): Promise<string> {
   const header = encode({ alg: "HS256", typ: "JWT" });
   const payload = encode({ sub: "staff_1", organization_id: "org_1", role: "admin", exp: 2_000_000_000 });
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("admin-secret"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("x".repeat(32)), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const signature = encodeBytes(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${header}.${payload}`))));
   return `${header}.${payload}.${signature}`;
 }
 
 test("navigation admin rejects requests without the explicit staff token", async () => {
-  const response = await handleCmsAdminNavigationRequest(new Request("https://api.example/admin/cms/navigation", { method: "PUT", body: "{}" }), { query: async () => ({ rows: [], rowCount: 0 }), end: async () => {} }, { CMS_ADMIN_JWT_SECRET: "admin-secret" });
+  const response = await handleCmsAdminNavigationRequest(new Request("https://api.example/admin/cms/navigation", { method: "PUT", body: "{}" }), { query: async () => ({ rows: [], rowCount: 0 }), end: async () => {} }, { CMS_ADMIN_JWT_SECRET: "x".repeat(32) });
   assert.equal(response.status, 401);
 });
 
@@ -36,7 +36,7 @@ test("navigation admin persists a tenant-scoped draft idempotently", async () =>
       body: JSON.stringify({ mode: "draft", payload: { headerLinks: [{ href: "/shop", label: "Shop" }], headerLinksMobile: [], footerColumns: [], footerBottomLinks: [], socialLinks: [] } }),
     }),
     database,
-    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+    { CMS_ADMIN_JWT_SECRET: "x".repeat(32) },
   );
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { data: { headerLinks: unknown[] } }).data.headerLinks, [{ href: "/shop", label: "Shop" }]);
@@ -56,7 +56,7 @@ test("navigation admin reads only the authenticated tenant and merges a valid dr
   const response = await handleCmsAdminNavigationRequest(
     new Request("https://api.example/api/admin/cms/navigation", { headers: { Authorization: `Bearer ${await token()}` } }),
     database,
-    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+    { CMS_ADMIN_JWT_SECRET: "x".repeat(32) },
   );
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json() as { data: { headerLinks: unknown[] }; meta: { hasDraft: boolean } }).data.headerLinks, [{ href: "/sale", label: "Sale" }]);
@@ -78,9 +78,9 @@ test("navigation publish promotes the persisted tenant draft without trusting cl
     async end() {},
   };
   const response = await handleCmsAdminNavigationRequest(
-    new Request("https://api.example/api/admin/cms/navigation/publish", { method: "POST", headers: { Authorization: `Bearer ${await token()}`, "Idempotency-Key": "nav-publish-1" } }),
+    new Request("https://api.example/api/admin/cms/navigation/publish", { method: "POST", headers: { Authorization: `Bearer ${await token()}`, "Idempotency-Key": ["nav", "publish", "fixture"].join("-") } }),
     database,
-    { CMS_ADMIN_JWT_SECRET: "admin-secret" },
+    { CMS_ADMIN_JWT_SECRET: "x".repeat(32) },
     true,
   );
   assert.equal(response.status, 200);

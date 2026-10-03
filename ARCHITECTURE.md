@@ -293,7 +293,7 @@ Shell and navigation:
 
 - `AdminDashboardChrome`, `AdminSidebar`, `AdminCommandPalette`, `AdminToastProvider`
 - `AdminPageShell`, `AdminBreadcrumbs`, `AdminPageTitleWithHelp`, `AdminPageHelpTip`
-- `AdminPageState`, `AdminPageStatusBadge`, `AdminTechnicalDetails`
+- `AdminPageState`, `AdminPageStatusBadge`
 - `AdminCmsSectionNav`, `CmsPageFrame`, `CrudManagerLayout`, `CollapsibleInspectorColumn`
 
 Operational views:
@@ -390,12 +390,12 @@ These primitives are the basis for forms, lists, dialogs, command palettes, chec
   - authenticated admin operations across dashboard, orders, inventory, catalog, POS, CMS, settings, CRM, devices, loyalty, employees, campaigns, analytics, offline queue, receipts, audit, chat orders, and finance reconciliation
   - guest storefront commerce flow across `/`, `/shop`, `/shop/[slug]`, `/checkout`, and `/sign-in`
   - storefront API hardening
-- Route coverage manifests live in `stress-test/e2e/manifests/` and map smoke tags to the key public/admin entry points in the unified web app.
+- Route coverage manifests live in `scripts/stress-test/e2e/manifests/` and map smoke tags to the key public/admin entry points in the unified web app.
 - Component coverage manifests capture the main UI primitives and test IDs used by the harness.
 
 ## Remaining Coverage Gap
 
-- The remaining unverified leg is the signed-in customer checkout stress path in `stress-test/e2e/flows/end-to-end-stress-journey.spec.ts`.
+- The remaining unverified leg is the signed-in customer checkout stress path in `scripts/stress-test/e2e/flows/end-to-end-stress-journey.spec.ts`.
 - That path requires a real storefront customer `storageState` created from a Google sign-in session.
 - No customer storage-state artifact exists in this workspace, so the harness can verify the guest storefront flow and admin security checks but cannot complete the authenticated customer stress journey here.
 - This is an external-state prerequisite, not a storefront code defect.

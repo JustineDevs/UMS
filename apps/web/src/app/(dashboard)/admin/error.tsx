@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { Button } from "@universal-music-store/ui";
 
 export default function AdminDashboardError({
   error,
@@ -22,13 +23,13 @@ export default function AdminDashboardError({
         <p className="mt-2 text-sm text-on-surface-variant">
           {error.message || "An unexpected error occurred loading this page."}
         </p>
-        <button
+        <Button
           type="button"
           onClick={reset}
-          className="mt-6 rounded-md bg-primary px-6 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary/90"
+          className="mt-6 text-sm font-medium"
         >
           Try again
-        </button>
+        </Button>
       </div>
     </div>
   );

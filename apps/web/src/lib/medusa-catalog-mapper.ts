@@ -30,6 +30,7 @@ type MedusaVariantRaw = {
     original_amount?: number | null;
     currency_code?: string | null;
   } | null;
+  metadata?: Record<string, unknown> | null;
   options?: MedusaOptionRow[] | null;
 };
 
@@ -488,25 +489,21 @@ function mapMedusaProductToProduct(
   raw: MedusaProductRaw & { id: string },
 ): Product {
   const id = raw.id;
-  const images: ProductImage[] = (raw.images ?? [])
-    .flatMap((img, i) =>
-      img
-        ? [
-            {
-              id: img?.id ?? `${id}-img-${i}`,
-              productId: id,
-              imageUrl: img?.url ?? raw.thumbnail ?? "",
-              sortOrder: i,
-              altText:
-                typeof (img?.alt_text ?? img?.alt) === "string" &&
-                (img?.alt_text ?? img?.alt)?.trim()
-                  ? (img?.alt_text ?? img?.alt)!.trim()
-                  : undefined,
-            },
-          ]
-        : [],
-    )
-    .filter((img) => !isKnownUnavailableExternalImage(img.imageUrl));
+  const images: ProductImage[] = (raw.images ?? []).reduce<ProductImage[]>((matches, img, i) => {
+    if (!img) return matches;
+    const image = {
+      id: img.id ?? `${id}-img-${i}`,
+      productId: id,
+      imageUrl: img.url ?? raw.thumbnail ?? "",
+      sortOrder: i,
+      altText:
+        typeof (img.alt_text ?? img.alt) === "string" && (img.alt_text ?? img.alt)?.trim()
+          ? (img.alt_text ?? img.alt)!.trim()
+          : undefined,
+    } satisfies ProductImage;
+    if (!isKnownUnavailableExternalImage(image.imageUrl)) matches.push(image);
+    return matches;
+  }, []);
 
   if (images.length === 0 && raw.thumbnail) {
     if (!isKnownUnavailableExternalImage(raw.thumbnail)) {
@@ -525,7 +522,7 @@ function mapMedusaProductToProduct(
       const { type, finish } = optionRowsToTypeFinish(v.options ?? []);
       const attrs = optionRowsToInstrumentAttributes(
         v.options ?? [],
-        raw.metadata ?? null,
+        { ...(raw.metadata ?? {}), ...(v.metadata ?? {}) },
       );
       const bc =
         typeof v.barcode === "string" && v.barcode.trim()
@@ -616,84 +613,6 @@ function mapMedusaProductToProduct(
     audioDemos,
     trustContent,
   };
-}
-
-export function productMatchesVariantFilters(
-  p: Product,
-  filters: {
-    type?: string;
-    finish?: string;
-    pickupConfig?: string;
-    bodyWood?: string;
-    condition?: string;
-    skillLevel?: string;
-    shippingSpeed?: string;
-  },
-): boolean {
-  if (filters.type?.trim()) {
-    const want = filters.type.trim();
-    if (!p.variants.some((v) => v.type === want)) return false;
-  }
-  if (filters.finish?.trim()) {
-    const want = filters.finish.trim();
-    if (!p.variants.some((v) => v.finish === want)) return false;
-  }
-  if (filters.pickupConfig?.trim()) {
-    const want = filters.pickupConfig.trim().toLowerCase();
-    if (!p.variants.some((v) => v.pickupConfig.trim().toLowerCase() === want)) {
-      return false;
-    }
-  }
-  if (filters.bodyWood?.trim()) {
-    const want = filters.bodyWood.trim().toLowerCase();
-    if (!p.variants.some((v) => v.bodyWood.trim().toLowerCase() === want)) {
-      return false;
-    }
-  }
-  if (filters.condition?.trim()) {
-    const want = filters.condition.trim().toLowerCase();
-    if (!p.variants.some((v) => v.condition.trim().toLowerCase() === want)) {
-      return false;
-    }
-  }
-  if (filters.skillLevel?.trim()) {
-    const want = filters.skillLevel.trim().toLowerCase();
-    if (!p.variants.some((v) => v.skillLevel.trim().toLowerCase() === want)) {
-      return false;
-    }
-  }
-  if (filters.shippingSpeed?.trim()) {
-    const want = filters.shippingSpeed.trim().toLowerCase();
-    if (
-      !p.variants.some((v) => v.shippingSpeed.trim().toLowerCase() === want)
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-export function productMatchesBrand(
-  p: Product,
-  brand: string | undefined,
-): boolean {
-  if (!brand?.trim()) return true;
-  const want = brand.trim().toLowerCase();
-  const b = (p.brand ?? "").trim().toLowerCase();
-  return b === want;
-}
-
-export function productMatchesPriceRange(
-  p: Product,
-  minPrice: number | undefined,
-  maxPrice: number | undefined,
-): boolean {
-  const price = minVariantPrice(p);
-  if (minPrice != null && Number.isFinite(minPrice) && price < minPrice)
-    return false;
-  if (maxPrice != null && Number.isFinite(maxPrice) && price > maxPrice)
-    return false;
-  return true;
 }
 
 export function minVariantPrice(p: Product): number {
