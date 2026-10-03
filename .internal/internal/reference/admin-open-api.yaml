@@ -9790,7 +9790,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 401, 413, 503]
-      x-source-sha256: 771551c2d0178c926175d496639c316681cd9a83095c10e3b85873c7d2550e91
+      x-source-sha256: d21c2d10a76b5d5ec58bb541e11f424bc7a51cee3e88a86c6cc54ce33d3623af
       security:
         - StaffSession: []
       responses:
@@ -9833,7 +9833,7 @@ paths:
       x-contract-metadata-status: source-inferred
       x-contract-metadata-warning: Permission, tenant scope, and replay fields are static source evidence; they are not a substitute for executable route authorization tests.
       x-runtime-statuses: [200, 400, 401, 413, 503]
-      x-source-sha256: 771551c2d0178c926175d496639c316681cd9a83095c10e3b85873c7d2550e91
+      x-source-sha256: d21c2d10a76b5d5ec58bb541e11f424bc7a51cee3e88a86c6cc54ce33d3623af
       security:
         - StaffSession: []
         - name: Idempotency-Key
@@ -15434,7 +15434,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for GET /admin/storefront-home. Runtime source: apps/web/src/app/api/admin/storefront-home/route.ts."
-      x-source-sha256: 771551c2d0178c926175d496639c316681cd9a83095c10e3b85873c7d2550e91
+      x-source-sha256: d21c2d10a76b5d5ec58bb541e11f424bc7a51cee3e88a86c6cc54ce33d3623af
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
@@ -19203,7 +19203,7 @@ components:
       type: object
       additionalProperties: false
       description: "Response contract for PUT /admin/storefront-home. Runtime source: apps/web/src/app/api/admin/storefront-home/route.ts."
-      x-source-sha256: 771551c2d0178c926175d496639c316681cd9a83095c10e3b85873c7d2550e91
+      x-source-sha256: d21c2d10a76b5d5ec58bb541e11f424bc7a51cee3e88a86c6cc54ce33d3623af
       x-contract-inference: runtime-zod
       x-contract-status: executable
       properties:
