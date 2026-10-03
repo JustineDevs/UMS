@@ -4,7 +4,16 @@ import { getAdminSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 function unauthorized(requestId: string): Response {
-  return Response.json({ error: "Unauthorized", requestId }, { status: 401 });
+  return Response.json(
+    { error: "Unauthorized", requestId },
+    {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store",
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    },
+  );
 }
 
 export async function GET(request: Request) {
